@@ -633,6 +633,38 @@ function contentBox(positions, cardW, cardH) {
 
 // The whole graph in the viewport, and never larger than 1:1. A null box is
 // the identity view, which is what an empty graph resets to.
+// Where a card's port marks fan on one edge: centred on the card, stepped by
+// the gap, and the gap shrinks as the count grows so a dense fan never leaves
+// the band above the port line or below the name.
+function handleYs(count, cardH, span, gapMax) {
+  const n = count > 0 ? count : 0
+  if (n === 0) return []
+  const step = Math.min(gapMax, span / n)
+  const out = []
+  for (let i = 0; i < n; i++) {
+    out.push(cardH / 2 + (i - (n - 1) / 2) * step)
+  }
+  return out
+}
+
+// Which mark line `slot` of `total` is drawn from: floor(slot * marks / total).
+// Past the last mark the lines share it, and an edge with no mark answers the
+// card's own middle.
+function markY(ys, slot, total, cardH) {
+  if (!Array.isArray(ys) || ys.length === 0 || slot < 0 || total <= 0) return cardH / 2
+  return ys[Math.min(ys.length - 1, Math.floor(slot * ys.length / total))]
+}
+
+// Whether one of these lines meets the card exactly on this mark. Exact
+// equality, because both numbers are the same entry of the same handle list.
+function lineOnMark(lines, y) {
+  const list = Array.isArray(lines) ? lines : []
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] && list[i].y === y) return true
+  }
+  return false
+}
+
 function fitView(box, viewW, viewH, pad, minZoom, maxZoom) {
   if (box === null || box === undefined) return { zoom: 1, panX: 0, panY: 0 }
   const w = box.w + 2 * pad

@@ -122,4 +122,35 @@ group('the padding is part of the fitted extent', () => {
   eq('padding only ever shrinks the fit', withPad.zoom <= without.zoom, true)
 })
 
+section('handleYs / markY / lineOnMark - the port fan and its lines')
+
+group('the fan is centred on the card and shrinks with the count', () => {
+  eq('no ports, no marks', GM.handleYs(0, 104, 44, 22), [])
+  eq('one port lands on the middle', GM.handleYs(1, 104, 44, 22), [52])
+  eq('two ports are one gap either side', GM.handleYs(2, 104, 44, 22), [41, 63])
+  const four = GM.handleYs(4, 104, 44, 22)
+  approx('the band stays centred', (four[0] + four[3]) / 2, 52)
+  approx('the gap caps at gapMax', four[1] - four[0], 11)
+  const dense = GM.handleYs(44, 104, 44, 22)
+  approx('a dense fan steps by span over count', dense[1] - dense[0], 1)
+  eq('and stays inside the band', dense[43] - dense[0] < 44, true)
+})
+
+group('markY spreads the lines back across the marks', () => {
+  eq('an edge with no mark answers the card middle', GM.markY([], 0, 3, 104), 52)
+  eq('the slot owns its mark while marks last', GM.markY([10, 20, 30], 1, 3, 104), 20)
+  eq('past the last mark the lines share it', GM.markY([10, 20], 5, 6, 104), 20)
+  eq('a negative slot', GM.markY([10, 20], -1, 2, 104), 52)
+  eq('no lines', GM.markY([10, 20], 0, 0, 104), 52)
+  eq('a non-array mark list', GM.markY(null, 0, 1, 104), 52)
+})
+
+group('lineOnMark is exact identity', () => {
+  eq('a line exactly on the mark', GM.lineOnMark([{ y: 10 }, { y: 20 }], 20), true)
+  eq('a mark nothing is on', GM.lineOnMark([{ y: 10 }], 10.0001), false)
+  eq('no lines', GM.lineOnMark([], 10), false)
+  eq('a null line is skipped', GM.lineOnMark([null, { y: 10 }], 10), true)
+  eq('a non-array list', GM.lineOnMark(null, 10), false)
+})
+
 finish()

@@ -749,13 +749,7 @@ Item {
     if (name === "") return []
     const held = Graph.portsOf(
       inputs === true ? tab.controller.inputPorts : tab.controller.outputPorts, name)
-    if (held.length === 0) return []
-    const step = Math.min(tab.handleGapMax, tab.handleSpan / held.length)
-    const out = []
-    for (let i = 0; i < held.length; i++) {
-      out.push(tab.cardH / 2 + (i - (held.length - 1) / 2) * step)
-    }
-    return out
+    return Graph.handleYs(held.length, tab.cardH, tab.handleSpan, tab.handleGapMax)
   }
 
   // What one edge of one card carries, and it is the answer to THREE questions
@@ -814,8 +808,7 @@ Item {
   // remain, and share one only when the edge has none left to give. The card's
   // own middle when the edge has no mark at all.
   function _markY(ys, slot, total) {
-    if (ys.length === 0 || slot < 0 || total <= 0) return tab.cardH / 2
-    return ys[Math.min(ys.length - 1, Math.floor(slot * ys.length / total))]
+    return Graph.markY(ys, slot, total, tab.cardH)
   }
 
   // Whether one of these lines meets the card exactly on this mark. Exact
@@ -823,10 +816,7 @@ Item {
   // the same handle list: a mark a line stands on IS that line's mark, and a
   // mark near one is a mark nothing is attached to.
   function _lineOnMark(lines, y) {
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].y === y) return true
-    }
-    return false
+    return Graph.lineOnMark(lines, y)
   }
 
   // One edge's own entry for one line, or null. The route from a link group to
