@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import QtQuick.Layouts
+import QtQml.Models
 import Quickshell
 import Quickshell.Io
 import Quickshell.Networking
@@ -724,11 +725,10 @@ Item {
   }
 
   // Named intervals (no bare numbers on any Timer): confirmation
-  // beat, MAC copy hold, action timeout, poll cadence, speedtest slice.
+  // beat, MAC copy hold, action timeout, speedtest slice.
   readonly property int profileConfirmMs: 500
   readonly property int macCopyHoldMs: 3000
   readonly property int actionTimeoutMs: 30000
-  readonly property int pollMs: 500
   readonly property int speedtestSliceMs: 15000
 
   // Confirmation beat after a toggle write (see writeProfile).
@@ -893,28 +893,78 @@ Item {
     StatsSampler.release()
   }
 
-  Timer {
-    id: poll
+  // The wifi list follows NetworkManager's own events: the device's network
+  // model reports membership, each network reports the fields a row carries,
+  // and the device reports its own link. The 500 ms poll this replaces read
+  // the same properties four times a second and dropped the result whenever
+  // nothing had moved.
+  //
+  // Coalesced through Qt.callLater, because one association can move several
+  // fields on several networks at once and the row set only has to be derived
+  // after the last of them.
+  property bool _syncQueued: false
+  // Set when a change arrived while a dropdown held the list frozen. The
+  // held sync is what the poll used to promise: the list catches up on
+  // submit/cancel/close instead of staying behind until the next tick.
+  property bool _syncHeld: false
 
-    interval: root.pollMs
-    repeat: true
-    // The content only exists while the host shows it, so an always-on
-    // poll is open-gated by lifetime.
-    running: true
-    onTriggered: {
-      // Throughput is sampled by the shared sampler's own tick, not here: one
-      // owner for the route child and the sysfs reads, whether the reading is
-      // this island's graph or the bar tooltip's labels. This poll only moves
-      // the wifi list.
-      //
-      // Freeze the wifi list while a dropdown is open: swapping the model
-      // rebuilds the delegates, which steals a half-typed passphrase every
-      // tick - and, with the cursor parked on an expanded row's buttons,
-      // drops and restores the hover wash each tick so it flickers. Stats
-      // keep polling; the list resumes on submit/cancel/close. The
-      // completion latch still runs so a vanished AP cannot pin `busy`.
-      if (root.passwordSsid === "" && root.disconnectSsid === "") root.syncWifiNetworks()
-      else root.checkActionCompletion()
+  function syncSoon() {
+    if (root._syncQueued) return
+    root._syncQueued = true
+    Qt.callLater(root._runSyncSoon)
+  }
+
+  function _runSyncSoon() {
+    root._syncQueued = false
+    // Freeze the wifi list while a dropdown is open: swapping the model
+    // rebuilds the delegates, which steals a half-typed passphrase, and with
+    // the cursor parked on an expanded row's buttons it drops and restores
+    // the hover wash so it flickers. The completion latch still runs so a
+    // vanished AP cannot pin `busy`.
+    if (root.passwordSsid !== "" || root.disconnectSsid !== "") {
+      root._syncHeld = true
+      root.checkActionCompletion()
+      return
+    }
+    root._syncHeld = false
+    root.syncWifiNetworks()
+  }
+
+  function _resumeHeldSync() {
+    if (root.passwordSsid !== "" || root.disconnectSsid !== "") return
+    if (!root._syncHeld) return
+    root._syncHeld = false
+    root.syncWifiNetworks()
+  }
+
+  onPasswordSsidChanged: root._resumeHeldSync()
+  onDisconnectSsidChanged: root._resumeHeldSync()
+
+  Connections {
+    target: root.wifiDevice
+    ignoreUnknownSignals: true
+    function onNetworksChanged() { root.syncSoon() }
+    function onConnectedChanged() { root.syncSoon() }
+    function onStateChanged() { root.syncSoon() }
+  }
+
+  // One connection per visible network, following the model. A network that
+  // leaves the scan takes its own connections with it.
+  Instantiator {
+    model: root.wifiDevice && root.wifiDevice.networks ? root.wifiDevice.networks.values : []
+
+    delegate: Connections {
+      required property var modelData
+
+      target: modelData
+      ignoreUnknownSignals: true
+      function onConnectedChanged() { root.syncSoon() }
+      function onKnownChanged() { root.syncSoon() }
+      function onStateChanged() { root.syncSoon() }
+      function onStateChangingChanged() { root.syncSoon() }
+      function onSignalStrengthChanged() { root.syncSoon() }
+      function onNameChanged() { root.syncSoon() }
+      function onSecurityChanged() { root.syncSoon() }
     }
   }
 

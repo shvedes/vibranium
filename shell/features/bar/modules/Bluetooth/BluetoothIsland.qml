@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
+import QtQml.Models
 import Quickshell
 import Quickshell.Bluetooth
 import qs.common
@@ -283,11 +284,10 @@ Item {
   }
 
   // Named intervals (no bare numbers on any Timer): action timeout,
-  // discovery delay/cap, device poll cadence.
+  // discovery delay and cap.
   readonly property int actionTimeoutMs: 30000
   readonly property int refreshDelayMs: 800
   readonly property int refreshCapMs: 15000
-  readonly property int pollMs: 2000
 
   // BlueZ can take a while to accept a connect; the action must outlast it
   // so the timeout lands on the right row (and never latches `busy`).
@@ -355,19 +355,63 @@ Item {
 
   // Sync on every show: the content is incubated fresh, so creation
   // is open.
-  Component.onCompleted: Qt.callLater(root.syncDevices)
+  Component.onCompleted: root.syncSoon()
 
-  // Keep the list fresh (state changes, freshly discovered devices) and
-  // settle in-flight actions. Never starts a scan. The content only
-  // exists while the host shows it, so an always-on poll is open-gated
-  // by lifetime.
-  Timer {
-    id: poll
+  // Keep the list fresh from BlueZ's own events. Every field a row carries is
+  // a Qt notifier on the adapter or the device, so the list is rebuilt when
+  // one arrives instead of on a cadence - the poll this replaces read the same
+  // properties every 2s and dropped the result whenever nothing had moved.
+  //
+  // Coalesced through Qt.callLater: one device state change can move several
+  // fields at once (pair then bond then trust), and the row snapshot only has
+  // to be taken after the last of them. Never starts a scan, and the content
+  // exists only while the host shows it, so the connections are open-gated by
+  // lifetime.
+  property bool _syncQueued: false
 
-    interval: root.pollMs
-    repeat: true
-    running: true
-    onTriggered: root.syncDevices()
+  function syncSoon() {
+    if (root._syncQueued) return
+    root._syncQueued = true
+    Qt.callLater(root._runSyncSoon)
+  }
+
+  function _runSyncSoon() {
+    root._syncQueued = false
+    root.syncDevices()
+  }
+
+  // Membership: the adapter's device model is a constant ObjectModel whose
+  // `values` reports additions and drops. Held as a value so the connection
+  // targets the model object rather than a type the linter cannot narrow.
+  readonly property var deviceModel: Bluetooth.devices
+
+  Connections {
+    target: root.deviceModel
+    function onValuesChanged() { root.syncSoon() }
+  }
+
+  // Fields: one connection per live device, following the model. A departing
+  // delegate takes its own connections with it, so nothing is left attached
+  // to a device BlueZ dropped.
+  Instantiator {
+    model: root.devices
+
+    delegate: Connections {
+      required property var modelData
+
+      target: modelData
+      ignoreUnknownSignals: true
+      function onConnectedChanged() { root.syncSoon() }
+      function onPairedChanged() { root.syncSoon() }
+      function onBondedChanged() { root.syncSoon() }
+      function onPairingChanged() { root.syncSoon() }
+      function onTrustedChanged() { root.syncSoon() }
+      function onBatteryChanged() { root.syncSoon() }
+      function onBatteryAvailableChanged() { root.syncSoon() }
+      function onNameChanged() { root.syncSoon() }
+      function onDeviceNameChanged() { root.syncSoon() }
+      function onIconChanged() { root.syncSoon() }
+    }
   }
 
   // --- content lent to the shared host ---
