@@ -842,13 +842,11 @@ Singleton {
 
   // Coalesce window: a single logind state change can emit several
   // signals (and dbus-monitor prints one block across multiple lines);
-  // the last line re-arms this and exactly one readback follows. Named
-  // so no bare interval survives (see the interval-naming rule).
-  readonly property int coalesceWindowMs: 250
+  // the last line re-arms this and exactly one readback follows.
   Timer {
     id: _coalesceTimer
 
-    interval: root.coalesceWindowMs
+    interval: Ui.coalesceMs
     onTriggered: root.refresh()
   }
 

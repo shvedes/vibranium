@@ -576,12 +576,10 @@ Singleton {
 
   // One event burst (a submit fires JobCreated + JobState + printer
   // events) coalesces into exactly one refresh.
-  // Coalesce window, named: one refresh per burst of bus events.
-  readonly property int coalesceWindowMs: 250
   Timer {
     id: _coalesceTimer
 
-    interval: root.coalesceWindowMs
+    interval: Ui.coalesceMs
     onTriggered: root.refresh()
   }
 
