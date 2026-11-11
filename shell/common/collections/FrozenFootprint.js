@@ -20,15 +20,7 @@
 .pragma library
 
 .import "Recency.js" as Recency
-
-// Internal alongside the public surface: .pragma library exposes every
-// top-level function to importers, not just the documented one.
-function _capacityOf(value) {
-  if (typeof value !== "number" || !isFinite(value))
-    return 1
-  const n = Math.floor(value)
-  return n >= 1 ? n : 1
-}
+.import "StoreGuards.js" as StoreGuards
 
 function _store(value) {
   return value !== null && typeof value === "object" ? value : null
@@ -39,10 +31,6 @@ function _entries(value) {
   return s && s.entries && typeof s.entries === "object" ? s.entries : null
 }
 
-function _key(value) {
-  return typeof value === "string" && value.length > 0
-}
-
 function _dimension(value) {
   // typeof NaN is "number" and isFinite coerces, so both are checked
   // against a numeric typeof first.
@@ -51,7 +39,7 @@ function _dimension(value) {
 
 function _entry(value, key) {
   const entries = _entries(value)
-  if (entries === null || !_key(key))
+  if (entries === null || !StoreGuards.isKey(key))
     return null
   if (!Object.prototype.hasOwnProperty.call(entries, key))
     return null
@@ -95,7 +83,7 @@ function _rejected(store, code) {
 // positive integer falls back to 1: a store with no bound at all is the
 // unbounded map this library exists to remove.
 function create(capacity) {
-  return { capacity: _capacityOf(capacity), entries: Object.create(null), touch: 0 }
+  return { capacity: StoreGuards.capacityOf(capacity), entries: Object.create(null), touch: 0 }
 }
 
 function capacity(store) {
@@ -109,7 +97,7 @@ function count(store) {
 }
 
 function validKey(key) {
-  return _key(key)
+  return StoreGuards.isKey(key)
 }
 
 // A footprint dimension must be a finite positive number. Zero, negative
@@ -169,7 +157,7 @@ function keys(store) {
 // .pragma library exposes every top-level function to importers.
 function save(store, key, width, height) {
   const base = _store(store) !== null ? store : create(1)
-  if (!_key(key))
+  if (!StoreGuards.isKey(key))
     return _rejected(base, "invalid_key")
   if (!_dimension(width))
     return _rejected(base, "invalid_width")

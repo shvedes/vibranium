@@ -38,15 +38,7 @@
 .pragma library
 
 .import "Recency.js" as Recency
-
-// Internal alongside the public surface: .pragma library exposes every
-// top-level function to importers, not just the documented ones.
-function _capacityOf(value) {
-  if (typeof value !== "number" || !isFinite(value))
-    return 1
-  const n = Math.floor(value)
-  return n >= 1 ? n : 1
-}
+.import "StoreGuards.js" as StoreGuards
 
 function _isCache(value) {
   return value !== null && typeof value === "object" && _entries(value) !== null
@@ -63,13 +55,9 @@ function _count(value) {
   return typeof value === "number" ? value : 0
 }
 
-function _key(value) {
-  return typeof value === "string" && value.length > 0
-}
-
 function _slot(cache, key) {
   const entries = _entries(cache)
-  if (entries === null || !_key(key))
+  if (entries === null || !StoreGuards.isKey(key))
     return null
   if (!Object.prototype.hasOwnProperty.call(entries, key))
     return null
@@ -122,7 +110,7 @@ function _evict(cache, keep) {
 // is the unbounded memo this library exists to remove.
 function create(capacity) {
   return {
-    capacity: _capacityOf(capacity),
+    capacity: StoreGuards.capacityOf(capacity),
     size: 0,
     clock: 0,
     hits: 0,
@@ -146,7 +134,7 @@ function size(cache) {
 // Returns whether the value was stored: a key that is not a non-empty
 // string is refused and leaves the map exactly as it was.
 function put(cache, key, value) {
-  if (!_isCache(cache) || !_key(key) || value === undefined)
+  if (!_isCache(cache) || !StoreGuards.isKey(key) || value === undefined)
     return false
   const known = _slot(cache, key) !== null
   cache.entries[key] = { value: value, stamp: ++cache.clock }
@@ -187,7 +175,7 @@ function has(cache, key) {
 // false. The recency clock is left alone - removal is not a use - and the
 // cumulative stores/hits/misses are history, not contents, so they stand.
 function remove(cache, key) {
-  if (!_isCache(cache) || !_key(key))
+  if (!_isCache(cache) || !StoreGuards.isKey(key))
     return false
   const entries = _entries(cache)
   if (!Object.prototype.hasOwnProperty.call(entries, key))
