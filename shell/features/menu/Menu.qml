@@ -10,6 +10,7 @@ import Quickshell.Io
 import qs.common
 import "MenuLib.js" as MenuLib
 import "../../common/math/Range.js" as Range
+import "../../common/settings/SettingsLib.js" as SettingsLib
 import "../../common/text/UnitIpc.js" as UnitIpc
 
 // Menu service: owns loaded bundles, the page stack, search state and the
@@ -1199,51 +1200,30 @@ Singleton {
     }
   }
 
-  // Store-driven condition verdict over a showIf list. Each condition reads
-  // its owning store (hypr.* from HyprlandSettings, misc.* from
-  // MiscSettings, everything else from Settings), ANDed with transitive
-  // hidden-dependency suppression resolved against the same owner. A mixed
-  // list such as the wallpaper transition (shell.wallpaper.enabled AND
+  // The store that owns a showIf key: hypr.* lives in HyprlandSettings,
+  // misc.* in MiscSettings, everything else in Settings. A mixed list such as
+  // the wallpaper transition (shell.wallpaper.enabled AND
   // hypr.animations.enabled) has legs in two stores, so routing the whole
-  // list to one store hides the row unconditionally - the foreign leg never
-  // matches there.
+  // list to one store would hide the row unconditionally - the foreign leg
+  // never matches there.
+  function _condStore(key) {
+    const s = String(key || "")
+    if (s.indexOf("hypr.") === 0) return HyprlandSettings
+    if (s.indexOf("misc.") === 0) return MiscSettings
+    return Settings
+  }
+
+  // Store-driven condition verdict over a showIf list, ANDed with transitive
+  // hidden-dependency suppression. The rule itself is SettingsLib's: the menu
+  // and the settings pages ask the same question, and a second copy here is a
+  // copy that drifts. The two resolvers are what differ, so they are what this
+  // passes - each key is routed to the store that owns it.
   function conditionsMet(showIf) {
     if (showIf === undefined || showIf === null) return true
-    return root._condsMet(showIf, {})
-  }
-
-  function _condValue(v) {
-    const s = String(v || "")
-    if (s.indexOf("hypr.") === 0) return HyprlandSettings.value(s)
-    if (s.indexOf("misc.") === 0) return MiscSettings.value(s)
-    return Settings.value(s)
-  }
-
-  function _condByKey(v) {
-    const s = String(v || "")
-    if (s.indexOf("hypr.") === 0) return HyprlandSettings.byKey(s)
-    if (s.indexOf("misc.") === 0) return MiscSettings.byKey(s)
-    return Settings.byKey(s)
-  }
-
-  function _condsMet(showIf, seen) {
-    for (let i = 0; i < showIf.length; i++) {
-      const cond = showIf[i]
-      const cur = root._condValue(cond.var)
-      let ok
-      if (cond.op === "in") ok = cond.arg.indexOf(cur) >= 0
-      else if (cond.op === "neq") ok = cur !== cond.arg
-      else ok = cur === cond.arg
-      if (ok) {
-        const dep = root._condByKey(cond.var)
-        if (dep && dep.showIf && !seen[cond.var]) {
-          seen[cond.var] = true
-          ok = root._condsMet(dep.showIf, seen)
-        }
-      }
-      if (!ok) return false
-    }
-    return true
+    return SettingsLib.conditionsMet(
+      (key) => root._condStore(key).byKey(String(key || "")),
+      (key) => root._condStore(key).value(String(key || "")),
+      showIf)
   }
 
   // Reverse sync: the store changed behind our back (IPC, another surface,

@@ -734,19 +734,28 @@ function parseUnifiedCatalog(text) {
 // together. Transitive: a referenced option that is itself conditionally
 // hidden suppresses its dependents. Cycle-safe (a cycle counts as
 // satisfied - visibility stays deterministic, no loops).
+// Tables or resolvers: a caller whose values live in more than one store can
+// pass a function and route each key itself. The rule below is the same either
+// way, which is the point - the menu's showIf list spans the settings, hypr
+// and misc stores, and it must not grow a second copy of this evaluation just
+// because its lookup is not a plain map.
+function _lookup(table, key) {
+  return typeof table === "function" ? table(key) : table[key]
+}
+
 function conditionsMet(byKey, values, showIf, seen) {
   if (!showIf || showIf.length === 0) return true
   seen = seen || {}
   for (let i = 0; i < showIf.length; i++) {
     const cond = showIf[i]
-    const cur = values[cond.var]
+    const cur = _lookup(values, cond.var)
     let ok
     if (cond.op === "in") ok = cond.arg.indexOf(cur) >= 0
     else if (cond.op === "neq") ok = cur !== cond.arg
     else ok = cur === cond.arg
 
     if (ok) {
-      const dep = byKey[cond.var]
+      const dep = _lookup(byKey, cond.var)
       if (dep && dep.showIf && !seen[cond.var]) {
         seen[cond.var] = true
         ok = conditionsMet(byKey, values, dep.showIf, seen)

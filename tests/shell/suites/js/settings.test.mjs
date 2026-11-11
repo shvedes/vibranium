@@ -2819,4 +2819,51 @@ group('the library is defensive about the shapes the shell hands it', () => {
   eq('and it is created from nothing', HE.hyprEditContent(null, ['a'], 1).content, 'hl.config({\n    a = 1,\n})\n')
 })
 
+group('conditionsMet accepts a resolver as well as a table', () => {
+  // The menu's showIf keys span three stores, so it passes functions that route
+  // each key to its owner. The evaluation has to be the same rule either way;
+  // these pairs read the same condition list through both forms.
+  const stores = {
+    hypr: { 'hypr.animations.enabled': true },
+    misc: { 'misc.cursorTheme': 'Adwaita' },
+    shell: { 'shell.wallpaper.enabled': false },
+  }
+  const owner = (k) => k.indexOf('hypr.') === 0 ? stores.hypr
+    : k.indexOf('misc.') === 0 ? stores.misc : stores.shell
+  const values = (k) => owner(k)[k]
+  const byKey = (k) => {
+    if (k === 'shell.wallpaper.enabled')
+      return { showIf: [{ var: 'hypr.animations.enabled', op: 'eq', arg: true }] }
+    if (k === 'misc.cursorTheme')
+      return { showIf: [{ var: 'hypr.animations.enabled', op: 'eq', arg: false }] }
+    return null
+  }
+  const list = [{ var: 'shell.wallpaper.enabled', op: 'eq', arg: false }]
+  // The table form needs the dependency's value too: a mixed list read through
+  // one flat map is only equivalent when that map carries every leg.
+  eq('a resolver answers like the table it replaces',
+    SL.conditionsMet(byKey, values, list), SL.conditionsMet(
+      { 'shell.wallpaper.enabled': { showIf: [{ var: 'hypr.animations.enabled', op: 'eq', arg: true }] } },
+      { 'shell.wallpaper.enabled': false, 'hypr.animations.enabled': true },
+      list))
+  eq('and both say visible', SL.conditionsMet(byKey, values, list), true)
+  eq('a hidden dependency reached through the resolver hides the row',
+    SL.conditionsMet(byKey, values, [{ var: 'misc.cursorTheme', op: 'eq', arg: 'Adwaita' }]), false)
+  eq('a mixed list reads each leg from its own store',
+    SL.conditionsMet(byKey, values, [
+      { var: 'shell.wallpaper.enabled', op: 'eq', arg: false },
+      { var: 'hypr.animations.enabled', op: 'eq', arg: true },
+    ]), true)
+  eq('and one failing leg fails the list',
+    SL.conditionsMet(byKey, values, [
+      { var: 'shell.wallpaper.enabled', op: 'eq', arg: false },
+      { var: 'hypr.animations.enabled', op: 'eq', arg: false },
+    ]), false)
+  eq('a key no store answers fails eq',
+    SL.conditionsMet(byKey, values, [{ var: 'shell.nope', op: 'eq', arg: 1 }]), false)
+  eq('and satisfies neq',
+    SL.conditionsMet(byKey, values, [{ var: 'shell.nope', op: 'neq', arg: 1 }]), true)
+  noThrow('a null byKey resolver terminates', () => SL.conditionsMet(() => null, values, list))
+})
+
 finish()
