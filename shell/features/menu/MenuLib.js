@@ -1137,7 +1137,9 @@ function buildPageIndex(page, path, into) {
   // page's rows go with it. Held on the function for the same reason as the
   // bundle memo: this library's published surface is its top-level names.
   if (buildPageIndex._words === undefined) buildPageIndex._words = new WeakMap()
+  if (buildPageIndex._hays === undefined) buildPageIndex._hays = new WeakMap()
   const wordCache = buildPageIndex._words
+  const hayCache = buildPageIndex._hays
   function wordsOf(item) {
     let words = wordCache.get(item)
     if (words === undefined) {
@@ -1166,7 +1168,23 @@ function buildPageIndex(page, path, into) {
     if (!item.selectable || item.label === "") continue
     // item.hay is already lowercased and deduped; hayBaseLower is
     // lowercased once per page.
-    const hay = hayBaseLower !== "" ? item.hay + " " + hayBaseLower : item.hay
+    // The joined hay and its split are a pure function of the row and of the
+    // page's lowercased breadcrumb, and both objects outlive the index: the
+    // row belongs to the store cache, the breadcrumb to the page. Cached per
+    // (row, breadcrumb) so a rebuild after a settings write or a menu reopen
+    // reuses the string and the words instead of allocating both again.
+    let perPath = hayCache.get(item)
+    let combined = perPath === undefined ? undefined : perPath.get(hayBaseLower)
+    if (combined === undefined) {
+      combined = hayBaseLower === ""
+        ? { hay: item.hay, words: wordsOf(item) }
+        : { hay: item.hay + " " + hayBaseLower, words: wordsOf(item).concat(pathWords) }
+      if (perPath === undefined) {
+        perPath = new Map()
+        hayCache.set(item, perPath)
+      }
+      perPath.set(hayBaseLower, combined)
+    }
     into.push({
       pageId: page.id,
       // No pageTitle: the entry carried one and nothing read it. The group
@@ -1176,8 +1194,8 @@ function buildPageIndex(page, path, into) {
       path: breadcrumb,
       row: i,
       label: item.label,
-      hay: hay,
-      words: pathWords === null ? wordsOf(item) : wordsOf(item).concat(pathWords)
+      hay: combined.hay,
+      words: combined.words
     })
   }
   return into
