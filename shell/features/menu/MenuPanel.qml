@@ -6,6 +6,7 @@ import Quickshell
 import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
+import "MenuLayout.js" as MenuLayout
 import "../../common/math/Range.js" as Range
 import "../../common/text/EditUtils.js" as EditUtils
 import "../../common/ui/RowMetrics.js" as RowMetrics
@@ -148,29 +149,7 @@ Rectangle {
 
   // Frozen chrome slots so the row diff treats spacers as unchanged
   // between recompositions (identity, not value, is compared).
-  property var _spacerPool: []
-  property var _headerPool: ({})
-
-  function spacerAt(i) {
-    while (_spacerPool.length <= i)
-      _spacerPool.push({
-        type: "spacer",
-        uid: "sp#" + _spacerPool.length,
-        selectable: false
-      })
-    return _spacerPool[i]
-  }
-
-  function headerFor(sec) {
-    if (_headerPool[sec] === undefined)
-      _headerPool[sec] = {
-        type: "header",
-        uid: "hdr:" + sec,
-        label: sec,
-        selectable: false
-      }
-    return _headerPool[sec]
-  }
+  property var _gridPool: MenuLayout.createPool()
 
   // Weave section headers into a flat cell list: a new section tag starts
   // a fresh row with a full-width header slot followed by invisible
@@ -179,26 +158,8 @@ Rectangle {
   // the page declaration so a closed-window weave matches what the open
   // card will compute.
   function composeGridRows(items, cols) {
-    const c = cols !== undefined ? cols : panel.gridCols
-    const out = []
-    let lastSec = null
-    const padToRowEnd = () => {
-      while (out.length % c !== 0)
-        out.push(spacerAt(out.length))
-    }
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i]
-      const sec = String(it.section ?? "")
-      if (sec !== "" && sec !== lastSec) {
-        padToRowEnd()
-        out.push(headerFor(sec))
-        while (out.length % c !== 0)
-          out.push(spacerAt(out.length))
-        lastSec = sec
-      }
-      out.push(it)
-    }
-    return out
+    return MenuLayout.composeGridRows(_gridPool, items,
+      cols !== undefined ? cols : panel.gridCols)
   }
 
   // Both ends of the model come from the lib's one edge scan; the

@@ -39,5 +39,6 @@ about one of them:
 | `NumberPicker.qml` | The inline numeric and range editor. |
 | `InlineEditor.qml` | The inline text editor. |
 | `MenuLib.js` | The pure layer: item/page normalization, guard emission, search, staged flows, option geometry, keyboard routing, the provider value contract. |
+| `MenuLayout.js` | Grid composition: section-header weaving and the identity-stable chrome-slot pool. |
 | `metadata.json` | Bundle metadata read by the loader. |
 | `qmldir` | Module declaration for `qs.features.menu`. |
