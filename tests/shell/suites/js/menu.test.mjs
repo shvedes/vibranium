@@ -138,7 +138,7 @@ const catalogRows = () => {
   return rows
 }
 
-// The 68-function public surface, named once so the coverage claim is
+// The 70-function public surface, named once so the coverage claim is
 // checkable rather than asserted in prose.
 const SURFACE = [
   'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'quantize',
@@ -155,6 +155,7 @@ const SURFACE = [
   'optionLabelFor', 'optionSeedIndex', 'optionColumnCount', 'optionRowCount',
   'optionColumnStride', 'optionCellCol', 'optionCellRow', 'leadingNumber',
   'exactOptionIndex', 'bestOptionIndex', 'selectableEdge', 'keyRoute',
+  'rowKeySeq', 'rowSetGuard',
 ]
 
 // keyRoute: one context factory and three projections over the route it picks.
@@ -171,18 +172,19 @@ const routeName = (over) => {
   return r === null ? null : r.name
 }
 
-suite('menu/MenuLib', 'the menu framework\'s pure layer - 68 functions')
+suite('menu/MenuLib', 'the menu framework\'s pure layer - 70 functions')
 
 // ======================================================================
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // 72 functions plus the seven cache `var`s (the six search caches and the
-  // scoped-filter hay cache), which the loader picks up because a
-  // `.pragma library` namespace is its top-level declarations.
-  eq('78 declarations', Object.keys(M).length, 78)
+  // The 70-name ledger plus ten top-level declarations the suite reads
+  // separately: the three filter-hay builders and the seven cache `var`s (the
+  // six search caches and the scoped-filter hay cache), which the loader picks
+  // up because a `.pragma library` namespace is its top-level declarations.
+  eq('80 declarations', Object.keys(M).length, 80)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 68 named functions are callable', missing, [])
+  eq('all 70 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -202,7 +204,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 78 names', Object.keys(F).length, 78)
+  eq('the live view publishes the same 80 names', Object.keys(F).length, 80)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -1872,19 +1874,8 @@ group('every grouped row is keyed, because the panel keys the whole set', () => 
     + '{"id":"wall","type":"action","label":"Show wallpaper"}]}]}')
   const bundleHit = M.buildIndex(b)[0]
 
-  // MenuPanel.keyedRows, verbatim (MenuPanel.qml:782-794).
-  const keyedRows = c => {
-    if (!Array.isArray(c)) return null
-    const seen = Object.create(null)
-    for (let i = 0; i < c.length; i++) {
-      const it = c[i]
-      if (!it || it.uid === undefined || it.uid === null) return null
-      const k = String(it.uid)
-      if (k.trim() === '' || seen[k] !== undefined) return null
-      seen[k] = true
-    }
-    return c
-  }
+  // The guard MenuPanel.keyedRows installs through.
+  const keyedRows = c => M.rowSetGuard(c).rows
 
   // What the panel passes: Menu.pageById, which spans the dynamic page.
   const pageById = id => (id === 'font-picker'
@@ -4051,15 +4042,51 @@ group('the same rows hold at 1.0, 1.25, 1.5 and 2.0', () => {
     R.restH('sub', g2) > R.restH('line', g2), true)
 })
 
+section('row-set identity - the fold and the guard the panel installs through')
+group('rowKeySeq folds the uid sequence with a NUL boundary', () => {
+  eq('two rows', M.rowKeySeq([{ uid: 'a' }, { uid: 'b' }]), 'a\u0000b')
+  eq('one row', M.rowKeySeq([{ uid: 'a' }]), 'a')
+  eq('an empty set', M.rowKeySeq([]), '')
+  eq('not an array is the empty set', M.rowKeySeq(null), '')
+  eq('a row without a uid folds as empty', M.rowKeySeq([{}, { uid: 'a' }]), '\u0000a')
+  eq('a numeric uid is stringified', M.rowKeySeq([{ uid: 7 }]), '7')
+  // The separator is what keeps [a, bc] and [ab, c] distinct.
+  ne('the join is not ambiguous', M.rowKeySeq([{ uid: 'a' }, { uid: 'bc' }]), M.rowKeySeq([{ uid: 'ab' }, { uid: 'c' }]))
+  // identity, not value: the same uid sequence is the same fold.
+  eq('one fold per set', M.rowKeySeq([{ uid: 'a' }, { uid: 'b' }]), M.rowKeySeq([{ uid: 'a' }, { uid: 'b' }]))
+})
+
+group('rowSetGuard answers a fresh row array or a refusal code', () => {
+  const a = { uid: 'a' }
+  const b = { uid: 'b' }
+  const ok = M.rowSetGuard([a, b])
+  eq('a healthy set has no error', ok.error, '')
+  eq('and the same rows', ok.rows, [a, b])
+  ne('in a fresh array', ok.rows === [a, b], true)
+  eq('which is a different array from the caller\'s', ok.rows !== undefined && ok.rows.length, 2)
+  eq('not an array', M.rowSetGuard(null).error, 'not_array')
+  eq('an object is not a row set', M.rowSetGuard({}).error, 'not_array')
+  eq('a row with no uid', M.rowSetGuard([a, {}]).error, 'invalid_row')
+  eq('a null row', M.rowSetGuard([null]).error, 'invalid_row')
+  eq('a blank uid', M.rowSetGuard([{ uid: '  ' }]).error, 'missing_key')
+  eq('a repeated uid', M.rowSetGuard([a, { uid: 'a' }]).error, 'duplicate_key')
+  eq('the refusal carries no rows', M.rowSetGuard([a, { uid: 'a' }]).rows, null)
+  eq('an empty set is a valid install', M.rowSetGuard([]).error, '')
+  eq('an empty set carries an empty array', M.rowSetGuard([]).rows, [])
+  // A numeric uid and its text spelling are one identity, because the guard
+  // keys on String(uid) exactly as the model does.
+  eq('a numeric uid and its string are one identity', M.rowSetGuard([{ uid: 7 }, { uid: '7' }]).error, 'duplicate_key')
+})
+
 section('coverage ledger')
-group('every one of the 68 functions was exercised above', () => {
+group('every one of the 70 functions was exercised above', () => {
   // A machine-checkable statement, not a claim in prose. The surface list at
   // the top of this file is checked against the loaded namespace, and then
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 68 long', SURFACE.length, 68)
-  eq('with no duplicates', new Set(SURFACE).size, 68)
+  eq('the surface list is 70 long', SURFACE.length, 70)
+  eq('with no duplicates', new Set(SURFACE).size, 70)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

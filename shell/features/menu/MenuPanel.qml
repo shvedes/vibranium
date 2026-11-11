@@ -971,16 +971,9 @@ Rectangle {
   // sequence, which costs a missed reconcile and a table that re-learns -
   // never a wrong install.
   function keySeq(rows) {
-    // Memoized on the array identity -> one join per distinct instance.
+    // Memoized on the array identity -> one fold per distinct instance.
     if (rows === panel._keySeqSrc) return panel._keySeqVal
-    const pool = Array.isArray(rows) ? rows : []
-    const keys = new Array(pool.length)
-    for (let i = 0; i < pool.length; i++) {
-      const item = pool[i]
-      keys[i] = String(item && item.uid !== undefined && item.uid !== null
-        ? item.uid : "")
-    }
-    const seq = keys.join("\u0000")
+    const seq = MenuLib.rowKeySeq(rows)
     panel._keySeqSrc = rows
     panel._keySeqVal = seq
     return seq
@@ -1013,32 +1006,9 @@ Rectangle {
   // objects, the same order, which recomputeRows installs rather than
   // dropping - is exactly that case.
   function keyedRows(candidate) {
-    if (!Array.isArray(candidate)) {
-      panel._modelError = "not_array"
-      return null
-    }
-    const rows = new Array(candidate.length)
-    const seen = Object.create(null)
-    for (let i = 0; i < candidate.length; i++) {
-      const item = candidate[i]
-      if (!item || item.uid === undefined || item.uid === null) {
-        panel._modelError = "invalid_row"
-        return null
-      }
-      const key = String(item.uid)
-      if (key.trim() === "") {
-        panel._modelError = "missing_key"
-        return null
-      }
-      if (seen[key] !== undefined) {
-        panel._modelError = "duplicate_key"
-        return null
-      }
-      seen[key] = true
-      rows[i] = item
-    }
-    panel._modelError = ""
-    return rows
+    const guarded = MenuLib.rowSetGuard(candidate)
+    panel._modelError = guarded.error
+    return guarded.rows
   }
 
   // The array assignment is the model's single write: the views read

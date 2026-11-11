@@ -2149,6 +2149,47 @@ function selectableEdge(rows, isSelectable, last) {
 // belongs to the route, so a Space in filter mode, an Enter under the
 // field and a Left in filter mode all stay unclaimed without the caller
 // re-deriving a mode check per route.
+// --- row-set identity ---------------------------------------------------
+
+// The uid sequence a row set is identified by. NUL is the separator because
+// uidKey strips every control character out of an item id and a page id, so a
+// row uid cannot hold one and the join cannot forge a boundary between rows.
+// The panel memoizes this on the array identity; the fold itself is pure.
+function rowKeySeq(rows) {
+  const pool = Array.isArray(rows) ? rows : []
+  const keys = new Array(pool.length)
+  for (let i = 0; i < pool.length; i++) {
+    const item = pool[i]
+    keys[i] = String(item && item.uid !== undefined && item.uid !== null
+      ? item.uid : "")
+  }
+  return keys.join("\u0000")
+}
+
+// The row set a keyed model may install, or the refusal code that says why it
+// may not. Four rows in and four rows out is not an install a height table can
+// absorb when two of them share one identity: List refuses to measure either,
+// prunes both and raises identityError, so a duplicate has to be refused at
+// this boundary rather than handed on. The codes are the keyed-model validate
+// vocabulary; `rows` is a fresh array holding the caller's own row objects,
+// which is what makes the install observable.
+function rowSetGuard(candidate) {
+  if (!Array.isArray(candidate)) return { rows: null, error: "not_array" }
+  const rows = new Array(candidate.length)
+  const seen = Object.create(null)
+  for (let i = 0; i < candidate.length; i++) {
+    const item = candidate[i]
+    if (!item || item.uid === undefined || item.uid === null)
+      return { rows: null, error: "invalid_row" }
+    const key = String(item.uid)
+    if (key.trim() === "") return { rows: null, error: "missing_key" }
+    if (seen[key] !== undefined) return { rows: null, error: "duplicate_key" }
+    seen[key] = true
+    rows[i] = item
+  }
+  return { rows: rows, error: "" }
+}
+
 function keyRoute(ctx) {
   const k = ctx.key
   const ctrl = ctx.ctrl === true
