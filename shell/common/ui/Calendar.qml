@@ -31,6 +31,16 @@ Item {
   property int viewYear: selectedDate.getFullYear()
   property int viewMonth: selectedDate.getMonth()
 
+  // The view as the grid and the title consume it: the declared ints above are
+  // the input, and an out-of-range write is rolled into the month it names
+  // rather than compared raw. `new Date(2024, 12, 1)` has always meant January
+  // 2025, but the grid compares each cell against the month it is handed, so a
+  // raw 12 matched no cell at all and painted the whole grid as neighbouring
+  // days. Deriving the pair keeps every write usable without making the
+  // properties read-only or fighting the host with a write-back handler.
+  readonly property int viewMonthIndex: ((root.viewMonth % 12) + 12) % 12
+  readonly property int viewYearRolled: root.viewYear + Math.floor(root.viewMonth / 12)
+
   signal daySelected(date date)
 
   // ---- geometry -----------------------------------------------------------
@@ -76,7 +86,7 @@ Item {
   // _refreshCells runs on the key change and once at completion, and the
   // cache check inside keeps the same-key -> no rebuild memoization.
   property var _gridCache: ({ key: "", cells: [] })
-  readonly property string _gridKey: root.viewYear + "-" + root.viewMonth + "-"
+  readonly property string _gridKey: root.viewYearRolled + "-" + root.viewMonthIndex + "-"
     + root.weekStart + "-" + CalendarLib.keyForDate(root.today)
   property var cells: []
 
@@ -85,7 +95,7 @@ Item {
     if (root._gridCache.key !== k) {
       root._gridCache = {
         key: k,
-        cells: CalendarLib.monthGrid(root.viewYear, root.viewMonth,
+        cells: CalendarLib.monthGrid(root.viewYearRolled, root.viewMonthIndex,
           root.weekStart, CalendarLib.keyForDate(root.today))
       }
     }
@@ -117,7 +127,7 @@ Item {
     }
     root._sliding = true
     const dir = delta > 0 ? 1 : -1
-    const next = CalendarLib.stepMonth(root.viewYear, root.viewMonth, delta)
+    const next = CalendarLib.stepMonth(root.viewYearRolled, root.viewMonthIndex, delta)
     root.viewYear = next.year
     root.viewMonth = next.month
     // Slide-fade in, just like settings-menu navigation: begin from a
@@ -163,7 +173,7 @@ Item {
       id: monthTitle
 
       anchors.centerIn: parent
-      text: Qt.formatDate(new Date(root.viewYear, root.viewMonth, 1), "MMMM yyyy")
+      text: Qt.formatDate(new Date(root.viewYearRolled, root.viewMonthIndex, 1), "MMMM yyyy")
       color: Ui.solid("foreground_0")
       font.pixelSize: Ui.fontM
       font.family: Ui.fontFamily

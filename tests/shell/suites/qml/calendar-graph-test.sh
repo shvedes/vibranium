@@ -300,25 +300,25 @@ t_eq "month 0 reads back as 0" "0" "$(qp_get vm0.month)"
 t_eq "and shows a full January" "31" "$(qp_get vm0.inMonth)"
 t_eq "which is the January grid" "true" "$(qp_get vm0.isJanuary)"
 
-t_section "FINDING: viewMonth past the end of the year is not normalised"
-# viewYear/viewMonth are plain writable ints. The library is tolerant - new
-# Date(2024, 12, 1) IS January 2025 - but monthGrid compares every cell
-# against the RAW month and year (CalendarLib.js:109), so an out-of-range
-# month matches nothing at all.
-t_note "FINDING Calendar.qml:31-32 declares viewYear/viewMonth as bare writable ints with no normalisation. Writing viewMonth: 12 leaves viewYear 2024 and viewMonth 12, and monthGrid(2024, 12, ...) returns the 30-Dec-2024..9-Feb-2025 grid with inMonth false for ALL 42 cells (CalendarLib.js:109 compares cellMonth === month), so every day renders in the dimmed neighbouring-month colour and the selected day has no highlight. Writing viewMonth: -1 does the same for 27-Nov-2023..7-Jan-2024. Not reachable from the running shell today - only stepMonth/selectDay write the view, and they go through CalendarLib.stepMonth, which rolls the year - but it is one host assignment away, and the title (Qt.formatDate on new Date(viewYear, viewMonth, 1)) will read January 2025 while viewYear still says 2024."
-t_eq "viewMonth 12 reads back out of range" "12" "$(qp_get vm12.month)"
-t_eq "while viewYear stays 2024 - the year does not roll" "2024" "$(qp_get vm12.year)"
-t_eq "so the month is not in the 0..11 range" "false" "$(qp_get vm12.inRange)"
-t_eq "and the grid matches December 2024 + January 2025" "2024-12-30..2025-02-09" \
+t_section "an out-of-range viewMonth renders as the month it names"
+# viewYear/viewMonth are plain writable ints; their grid and title consumers
+# read a derived, rolled pair. The library is tolerant - new Date(2024, 12, 1)
+# IS January 2025 - and now so is the grid: a write past either end lands on
+# the month it names, with the year rolled, instead of matching no cell at all.
+t_note "Calendar.qml declares viewYear/viewMonth as writable ints and derives viewYearRolled/viewMonthIndex from them. A raw viewMonth: 12 leaves the declared values at 2024/12 but the grid, title and stepMonth all read 2025/0, so the card shows a real January 2025 with all 31 January cells in month. viewMonth: -1 reads 2023/11, the December 2023 grid. This keeps a host assignment usable without a write-back handler fighting the seeding binding."
+t_eq "viewMonth 12 reads back as written" "12" "$(qp_get vm12.month)"
+t_eq "and viewYear still says 2024 - the declared pair is the input" "2024" "$(qp_get vm12.year)"
+t_eq "the raw month is outside 0..11" "false" "$(qp_get vm12.inRange)"
+t_eq "but the grid is the January 2025 grid" "2024-12-30..2025-02-09" \
   "$(printf '%s..%s' "$(qp_get vm12.firstKey)" "$(qp_get vm12.lastKey)")"
-t_eq "but NOT ONE of its 42 cells claims to be in month" "0" "$(qp_get vm12.inMonth)"
-t_eq "so the selected day is nowhere to be found" "0" "$(qp_get vm12.selectedCount)"
-t_eq "viewMonth -1 reads back out of range too" "-1" "$(qp_get vmneg.month)"
-t_eq "and it is not in range" "false" "$(qp_get vmneg.inRange)"
-t_eq "its grid is November 2023 + January 2024" "2023-11-27..2024-01-07" \
+t_eq "with every January cell claiming its month" "31" "$(qp_get vm12.inMonth)"
+t_eq "while a September selection is nowhere to be found" "0" "$(qp_get vm12.selectedCount)"
+t_eq "viewMonth -1 reads back as written too" "-1" "$(qp_get vmneg.month)"
+t_eq "and is equally outside the range" "false" "$(qp_get vmneg.inRange)"
+t_eq "its grid is the December 2023 grid" "2023-11-27..2024-01-07" \
   "$(printf '%s..%s' "$(qp_get vmneg.firstKey)" "$(qp_get vmneg.lastKey)")"
-t_eq "with again no cell in month" "0" "$(qp_get vmneg.inMonth)"
-t_eq "and no visible selection" "0" "$(qp_get vmneg.selectedCount)"
+t_eq "with all 31 December cells in month" "31" "$(qp_get vmneg.inMonth)"
+t_eq "and again no visible selection" "0" "$(qp_get vmneg.selectedCount)"
 
 t_section "viewYear/viewMonth are seeded from selectedDate, and the binding is one-way"
 t_eq "a fresh calendar views its selection's month" "2024/8" "$(qp_get v.mover.before)"

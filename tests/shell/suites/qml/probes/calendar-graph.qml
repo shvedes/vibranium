@@ -305,7 +305,8 @@ Item {
   Calendar { id: ws0; selectedDate: new Date(2024, 8, 11); today: new Date(2024, 8, 11); weekStart: 0 }
   Calendar { id: ws6; selectedDate: new Date(2024, 8, 11); today: new Date(2024, 8, 11); weekStart: 6 }
 
-  // Out-of-range viewMonth, written straight to the public property.
+  // Out-of-range viewMonth, written straight to the public property. The
+  // declared pair keeps the raw value; the grid and title read the rolled one.
   Calendar { id: vm12; selectedDate: new Date(2024, 8, 11); today: new Date(2024, 8, 11); viewMonth: 12 }
   Calendar { id: vmNeg1; selectedDate: new Date(2024, 8, 11); today: new Date(2024, 8, 11); viewMonth: -1 }
   // In-range extremes, for contrast.
