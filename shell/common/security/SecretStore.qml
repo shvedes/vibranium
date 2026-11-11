@@ -40,11 +40,18 @@ Singleton {
   property string _helperNonce: ""
   property int _seq: 0
 
+  // Absent and null both read as the empty string, which is the "no handle"
+  // answer every entry point below tests. One rule, so a caller cannot get
+  // "undefined" as a key in one function and "" in another.
+  function asText(value) {
+    return String(value === undefined || value === null ? "" : value)
+  }
+
   // A handle is an opaque caller-side name, never the value itself: it is
   // safe to log, compare, and put in a DTO.
   function stash(handle, value) {
-    const key = String(handle === undefined || handle === null ? "" : handle)
-    const text = String(value === undefined || value === null ? "" : value)
+    const key = asText(handle)
+    const text = asText(value)
     if (key === "" || text === "") return false
     const next = Object.assign({}, root._slots)
     next[key] = text
@@ -53,7 +60,7 @@ Singleton {
   }
 
   function has(handle) {
-    const key = String(handle === undefined || handle === null ? "" : handle)
+    const key = asText(handle)
     return key !== "" && root._slots[key] !== undefined
   }
 
@@ -61,7 +68,7 @@ Singleton {
   // and then another) or need to compare before committing. Prefer feed():
   // it forgets the value on the way out, peek() does not.
   function peek(handle) {
-    const key = String(handle === undefined || handle === null ? "" : handle)
+    const key = asText(handle)
     if (key === "") return ""
     const v = root._slots[key]
     return v === undefined ? "" : String(v)
@@ -72,7 +79,7 @@ Singleton {
   // the value is handed to the sink and to nothing else - there is no call
   // shape here that returns a credential to arbitrary code.
   function feed(handle, sink) {
-    const key = String(handle === undefined || handle === null ? "" : handle)
+    const key = asText(handle)
     if (key === "" || typeof sink !== "function") return false
     const v = root._slots[key]
     if (v === undefined) return false
@@ -87,7 +94,7 @@ Singleton {
   }
 
   function drop(handle) {
-    const key = String(handle === undefined || handle === null ? "" : handle)
+    const key = asText(handle)
     if (key === "" || root._slots[key] === undefined) return false
     const next = Object.assign({}, root._slots)
     delete next[key]
@@ -98,11 +105,11 @@ Singleton {
   // Equality test that never hands either value to the caller. Used for
   // deduplication and for matching a value that came back off the clipboard.
   function matchesValue(handle, candidate) {
-    const key = String(handle === undefined || handle === null ? "" : handle)
+    const key = asText(handle)
     if (key === "") return false
     const v = root._slots[key]
     if (v === undefined) return false
-    return String(v) === String(candidate === undefined || candidate === null ? "" : candidate)
+    return String(v) === asText(candidate)
   }
 
   function clear() {
@@ -118,12 +125,12 @@ Singleton {
   // this function deliberately takes no key to hand the helper.
   function enableHelper(execPath, protocolVersion) {
     if (root._helperOk) return { ok: false, code: "already_enabled" }
-    const path = String(execPath === undefined || execPath === null ? "" : execPath)
+    const path = asText(execPath)
     if (path === "") return { ok: false, code: "no_path" }
     if (path.charAt(0) !== "/") return { ok: false, code: "not_absolute" }
     if (/[\s;&|<>$`'"\\*?(){}[\]!#~]/.test(path)) return { ok: false, code: "unsafe_path" }
     if (path.indexOf("..") >= 0) return { ok: false, code: "unsafe_path" }
-    const version = String(protocolVersion === undefined || protocolVersion === null ? "" : protocolVersion)
+    const version = asText(protocolVersion)
     if (version === "") return { ok: false, code: "no_protocol" }
     root._seq++
     const nonce = "h" + (Date.now().toString(36)) + "-" + root._seq
@@ -140,7 +147,7 @@ Singleton {
   // its own ciphertext.
   function confirmHelper(nonce) {
     if (root._helperState !== "unverified") return { ok: false, code: "no_candidate" }
-    if (String(nonce === undefined || nonce === null ? "" : nonce) !== root._helperNonce) {
+    if (asText(nonce) !== root._helperNonce) {
       root._helperState = "rejected"
       return { ok: false, code: "nonce_mismatch" }
     }
