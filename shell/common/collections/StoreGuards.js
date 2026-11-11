@@ -25,3 +25,10 @@ function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
+// A read-only list projection: the value itself when it is an array, [] for
+// anything else. Callers that mutate the result need their own copy; this is
+// the shape the row-walking and projection loops want.
+function asList(value) {
+  return Array.isArray(value) ? value : []
+}
+

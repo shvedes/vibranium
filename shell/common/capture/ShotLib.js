@@ -15,6 +15,8 @@
 //     matched against. The guards are pure; the effects they gate stay in
 //     the service, which owns the processes, timers and windows.
 .pragma library
+
+.import "../collections/StoreGuards.js" as StoreGuards
 .import "../text/StringUtils.js" as SU
 .import "../text/Format.js" as Format
 .import "../text/FileUri.js" as FileUri
@@ -91,7 +93,7 @@ function screenKey(candidate, other) {
 // resolution change reads as a different screen rather than the old one.
 function matchScreen(candidate, screens) {
   if (candidate === null || candidate === undefined) return null
-  const list = Array.isArray(screens) ? screens : []
+  const list = StoreGuards.asList(screens)
   for (let i = 0; i < list.length; i++) {
     const current = list[i]
     if (current === candidate) return current

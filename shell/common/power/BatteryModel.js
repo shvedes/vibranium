@@ -3,6 +3,7 @@
 .import "../text/Format.js" as Format
 .import "../text/Duration.js" as DurationFmt
 .import "../math/Range.js" as Range
+.import "../collections/StoreGuards.js" as StoreGuards
 
 // Pure helpers for the Battery bar module: level thresholds, icon and
 // tone selection, device labels/type glyphs and row projections.
@@ -286,7 +287,7 @@ function detailRows(info) {
 // the time to full - the same shape the island entry's sub-line uses. The
 // rest of the telemetry stays in the island's per-device dropdown.
 function tooltipRows(entries) {
-  var list = Array.isArray(entries) ? entries : []
+  var list = StoreGuards.asList(entries)
   var rows = []
   for (var i = 0; i < list.length; i++) {
     var e = list[i] || {}
@@ -311,7 +312,7 @@ function tooltipRows(entries) {
 function rowForKey(rows, key) {
   var k = String(key === undefined || key === null ? "" : key)
   if (k === "") return null
-  var list = Array.isArray(rows) ? rows : []
+  var list = StoreGuards.asList(rows)
   for (var i = 0; i < list.length; i++) {
     var r = list[i]
     if (r && String(r.key === undefined || r.key === null ? "" : r.key) === k) return r
@@ -327,7 +328,7 @@ function rowForKey(rows, key) {
 // Returns "" when there is nothing to move to: an empty list, a zero or
 // non-finite step, or a landing row that carries no key.
 function cycleKey(rows, currentKey, step) {
-  var list = Array.isArray(rows) ? rows : []
+  var list = StoreGuards.asList(rows)
   var n = list.length
   var s = Number(step)
   if (n === 0 || !isFinite(s) || s === 0) return ""

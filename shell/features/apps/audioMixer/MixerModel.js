@@ -2,6 +2,7 @@
 
 .import "../../../common/theme/DeviceIcons.js" as DeviceIcons
 .import "../../../common/math/Range.js" as Range
+.import "../../../common/collections/StoreGuards.js" as StoreGuards
 .import "NodeKey.js" as NodeKey
 
 // Pure derivations for the audio mixer: what a node IS, what it is CALLED,
@@ -1524,7 +1525,7 @@ function sinkScore(node) {
 // whose only sink is a perfectly working one, for a reason the user can do
 // nothing about.
 function resolveMonitorSink(defaultSink, devices) {
-  const list = Array.isArray(devices) ? devices : []
+  const list = StoreGuards.asList(devices)
   const defaultKey = nodeKey(defaultSink)
   let best = null
   let bestScore = -1
