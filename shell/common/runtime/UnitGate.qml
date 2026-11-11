@@ -333,11 +333,11 @@ Singleton {
     try {
       record.descriptor.resolver()
     } catch (error) {
-      record.constructionMs = Math.max(0, Date.now() - record.startedAtMs)
+      record.constructionMs = root._elapsedMs(record.startedAtMs)
       root._fail(record, error)
       return false
     }
-    record.constructionMs = Math.max(0, Date.now() - record.startedAtMs)
+    record.constructionMs = root._elapsedMs(record.startedAtMs)
 
     let ready = true
     try {
@@ -351,13 +351,19 @@ Singleton {
     return true
   }
 
+  // Milliseconds since `since`, never negative: a clock step backwards is
+  // not a negative duration in a timing record.
+  function _elapsedMs(since) {
+    return Math.max(0, Date.now() - since)
+  }
+
   function _markReady(record) {
     record.state = "ready"
     record.health = "healthy"
     record.lastError = ""
     record.nextRetryMs = 0
-    record.readyMs = Math.max(0, Date.now() - record.startedAtMs)
-    record.totalMs = Math.max(0, Date.now() - root._bootStartedAtMs)
+    record.readyMs = root._elapsedMs(record.startedAtMs)
+    record.totalMs = root._elapsedMs(root._bootStartedAtMs)
     // One of the three arrivals a unit makes, and the EXPECTED one - so it is
     // DEBUG and not INFO. A boot settles 49 units, which is a fixed fifty-odd
     // line block before the shell has drawn anything, and nobody reads
@@ -378,7 +384,7 @@ Singleton {
     record.readyMs = 0
     // A failure is a terminal arrival too. Leaving totalMs at 0 would read as
     // "never started" in the boot table, which is a different and wrong claim.
-    record.totalMs = Math.max(0, Date.now() - root._bootStartedAtMs)
+    record.totalMs = root._elapsedMs(root._bootStartedAtMs)
     root._teardown(record)
     root._scheduleRetry(record)
     // WARN, not ERROR, and not DEBUG - this is the one arrival that stays above
