@@ -44,5 +44,6 @@ about one of them:
 | `MenuRow.js` | Row presentation: staged flows, the rest shape, the copy a stage overrides, the value slot and the inline dropdown's geometry. Re-exported by `MenuLib`. |
 | `MenuLayout.js` | Grid composition: section-header weaving and the identity-stable chrome-slot pool. |
 | `MenuRows.js` | Row-set identity: whether two installs hold the same records, whether the cursor's row survives, and where the cursor lands after a count change. |
+| `MenuState.js` | Per-item state records: the shape a row starts with and the copy-on-write rules for the slot-close latch. |
 | `metadata.json` | Bundle metadata read by the loader. |
 | `qmldir` | Module declaration for `qs.features.menu`. |

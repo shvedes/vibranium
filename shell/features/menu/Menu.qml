@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import "MenuLib.js" as MenuLib
+import "MenuState.js" as MenuState
 import "../../common/math/Range.js" as Range
 import "../../common/settings/SettingsLib.js" as SettingsLib
 import "../../common/text/UnitIpc.js" as UnitIpc
@@ -1947,23 +1948,8 @@ Singleton {
   function _rawState(item) {
     let st = root._states[item.uid]
     if (st === undefined) {
-      let checked = item.checked_ === true
-      let value = item.value !== undefined ? item.value : ""
-      if (item.var !== "") {
-        let live
-        const v = String(item.var)
-        if (v.indexOf("hypr.") === 0) live = HyprlandSettings.value(item.var)
-        else if (v.indexOf("misc.") === 0) live = MiscSettings.value(item.var)
-        else live = Settings.value(item.var)
-        if (item.type === "toggle") checked = live === true
-        else if (live !== undefined) value = live
-      }
-      st = {
-        checked: checked,
-        value: value,
-        expanded: false,
-        info: false
-      }
+      st = MenuState.initialState(item,
+        (key) => root._condStore(key).value(String(key || "")))
       root._states[item.uid] = st
     }
     return st
@@ -1973,12 +1959,7 @@ Singleton {
   // mutation, and the fresh object guarantees dependents see a change - a
   // same-reference var result would silently notify nobody.
   function stateOf(item) {
-    if (!item || !item.uid) return {
-      checked: false,
-      value: "",
-      expanded: false,
-      info: false
-    }
+    if (!item || !item.uid) return MenuState.blankState()
     root.rev
     return Object.assign({}, root._rawState(item))
   }
@@ -2041,10 +2022,7 @@ Singleton {
   // is replaced, not mutated, so a binding re-evaluates on assignment.
   function _setSlotClose(uid, closing) {
     if (!uid) return
-    const next = Object.assign({}, root._slotCloses)
-    if (closing) next[uid] = true
-    else delete next[uid]
-    root._slotCloses = next
+    root._slotCloses = MenuState.withSlotClose(root._slotCloses, uid, closing)
   }
 
   function setExpanded(item, value) {
@@ -2102,29 +2080,16 @@ Singleton {
   // latch just re-arms instead.
   function slotCloseFinished(item) {
     if (!item || !item.uid) return
-    if (root._slotCloses[item.uid] === undefined) return
-    const next = Object.assign({}, root._slotCloses)
-    delete next[item.uid]
-    root._slotCloses = next
+    const next = MenuState.withoutSlotClose(root._slotCloses, item.uid)
+    if (next !== root._slotCloses) root._slotCloses = next
   }
 
   // A close latch belongs to a row the model still lists. `candidate` is
   // the authoritative next model, so anything pruned here has no delegate
   // left to report its close.
   function pruneSlotCloses(candidate) {
-    const rows = Array.isArray(candidate) ? candidate : []
-    const keep = {}
-    for (let i = 0; i < rows.length; i++) {
-      const uid = rows[i] ? rows[i].uid : ""
-      if (uid) keep[uid] = true
-    }
-    const next = {}
-    let changed = false
-    for (const uid in root._slotCloses) {
-      if (keep[uid]) next[uid] = true
-      else changed = true
-    }
-    if (changed) root._slotCloses = next
+    const next = MenuState.pruneSlotCloses(root._slotCloses, candidate)
+    if (next !== root._slotCloses) root._slotCloses = next
   }
 
   // --- actions ---

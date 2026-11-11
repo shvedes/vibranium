@@ -4186,4 +4186,61 @@ group('MenuRows.cursorSurvives asks the payload, not the view', () => {
   eq('a null current set does not', MR.cursorSurvives(null, 0, [a]), false)
 })
 
+// ---------------------------------------------------------------------------
+// MenuState.js: the per-item record shape and the close latch
+// ---------------------------------------------------------------------------
+// These are the parts of Menu's item store that are pure: what a row starts
+// with, and the copy-on-write rules the slot-close latch follows. The store,
+// the revision counter and the timers stay in the singleton.
+const MS = loadLib(path.join(SHELL_DIR, 'features/menu/MenuState.js'))
+
+group('MenuState.initialState seeds a row from its payload or its store', () => {
+  const store = { 'shell.a': 'stored', 'shell.b': true, 'shell.c': undefined }
+  const live = (k) => store[k]
+  const blank = MS.initialState({ var: '' }, live)
+  eq('rugged defaults: unchecked', blank.checked, false)
+  eq('empty value', blank.value, '')
+  eq('collapsed', blank.expanded, false)
+  eq('description closed', blank.info, false)
+  eq('a payload checked_ seed is kept', MS.initialState({ var: '', checked_: true }, live).checked, true)
+  eq('a payload value is kept', MS.initialState({ var: '', value: 7 }, live).value, 7)
+  eq('a bound toggle takes the store boolean', MS.initialState({ var: 'shell.b', type: 'toggle' }, live).checked, true)
+  eq('and a false store value clears it', MS.initialState({ var: 'shell.b', type: 'toggle', checked_: true }, () => false).checked, false)
+  eq('a bound value row takes the store value', MS.initialState({ var: 'shell.a', type: 'select', value: 'payload' }, live).value, 'stored')
+  eq('an unset store value keeps the payload', MS.initialState({ var: 'shell.c', type: 'select', value: 'payload' }, live).value, 'payload')
+  let asked = ''
+  MS.initialState({ var: '' }, (k) => { asked = k; return 'x' })
+  eq('an unbound row asks the store nothing', asked, '')
+})
+
+group('MenuState close-latch maps are copy-on-write', () => {
+  const base = { a: true }
+  const added = MS.withSlotClose(base, 'b', true)
+  eq('a close adds the row', added.b, true)
+  eq('and leaves the old map alone', base.b, undefined)
+  ne('as a new object', added, base)
+  const cleared = MS.withSlotClose(added, 'a', false)
+  eq('an open drops the row', cleared.a, undefined)
+  eq('while keeping its sibling', cleared.b, true)
+  eq('the map it was handed still holds it', added.a, true)
+  is('dropping an absent latch returns the same map', MS.withoutSlotClose(base, 'nope'), (v) => v === base)
+  const gone = MS.withoutSlotClose(base, 'a')
+  eq('dropping a present latch removes it', gone.a, undefined)
+  ne('and is a new map', gone, base)
+})
+
+group('MenuState.pruneSlotCloses keeps only rows the model still lists', () => {
+  const map = { a: true, b: true }
+  is('a full model prunes nothing, so the map is reused',
+    MS.pruneSlotCloses(map, [{ uid: 'a' }, { uid: 'b' }]), (v) => v === map)
+  const pruned = MS.pruneSlotCloses(map, [{ uid: 'b' }])
+  eq('a dropped row loses its latch', pruned.a, undefined)
+  eq('the listed row keeps it', pruned.b, true)
+  eq('an empty model drops everything', Object.keys(MS.pruneSlotCloses(map, [])).length, 0)
+  eq('a non-array model drops everything too', Object.keys(MS.pruneSlotCloses(map, null)).length, 0)
+  eq('a row without a uid is not a keeper', Object.keys(MS.pruneSlotCloses(map, [{}])).length, 0)
+  const empty = {}
+  is('nothing to prune reuses the map it was handed', MS.pruneSlotCloses(empty, []), (v) => v === empty)
+})
+
 finish()
