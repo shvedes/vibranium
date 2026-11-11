@@ -876,17 +876,7 @@ function searchRecords(records, query, cap, tiebreak) {
   // -> cap slices. The scan-order copy is taken before the sort, the way the
   // -> menu keeps its hit set, so ties rank by pool order either way.
   const hits = hitRecs
-  const tb = typeof tiebreak === "function" ? tiebreak : null
-  const order = new Array(hitRecs.length)
-  for (let i = 0; i < order.length; i++) order[i] = i
-  order.sort((a, b) => {
-    if (hitScores[b] !== hitScores[a]) return hitScores[b] - hitScores[a]
-    if (tb) {
-      const d = tb(hitRecs[b]) - tb(hitRecs[a])
-      if (d !== 0) return d
-    }
-    return a - b
-  })
+  const order = SL.orderHits(hitRecs, hitScores, tiebreak)
   const full = new Array(order.length)
   for (let i = 0; i < order.length; i++) full[i] = hitRecs[order[i]]
   _searchCacheRecords = records
@@ -930,18 +920,8 @@ function searchTypo(records, query, cap, tiebreak) {
       hitScores.push(total)
     }
   }
-  const tb = typeof tiebreak === "function" ? tiebreak : null
   const m = hitRecs.length
-  const order = new Array(m)
-  for (let i = 0; i < m; i++) order[i] = i
-  order.sort((a, b) => {
-    if (hitScores[b] !== hitScores[a]) return hitScores[b] - hitScores[a]
-    if (tb) {
-      const d = tb(hitRecs[b]) - tb(hitRecs[a])
-      if (d !== 0) return d
-    }
-    return a - b
-  })
+  const order = SL.orderHits(hitRecs, hitScores, tiebreak)
   const n = Math.min(m, cap)
   const out = new Array(n)
   for (let i = 0; i < n; i++) out[i] = hitRecs[order[i]]

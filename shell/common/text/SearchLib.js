@@ -107,6 +107,25 @@ function narrowsQuery(sameIndex, cachedQ, q, hits) {
     && q.length > cachedQ.length && q.indexOf(cachedQ) === 0 && hits !== null
 }
 
+// Hit indices ordered by descending score, then the caller's tiebreak, then
+// scan order. The launcher's exact and typo searches share this ranking, and
+// a caller that keeps its hits in scan order can reuse it without a copy of
+// the comparator.
+function orderHits(hitRecs, hitScores, tiebreak) {
+  const tb = typeof tiebreak === "function" ? tiebreak : null
+  const order = new Array(hitRecs.length)
+  for (let i = 0; i < order.length; i++) order[i] = i
+  order.sort((a, b) => {
+    if (hitScores[b] !== hitScores[a]) return hitScores[b] - hitScores[a]
+    if (tb) {
+      const d = tb(hitRecs[b]) - tb(hitRecs[a])
+      if (d !== 0) return d
+    }
+    return a - b
+  })
+  return order
+}
+
 // Generic {total, matched, rows} shell over a records-style search.
 // -> searchFn(pool, query, cap, tiebreak) answers {rows, count}; blank
 // -> queries slice the pool and never reach it, so `matched` is the true
