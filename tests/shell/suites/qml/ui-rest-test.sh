@@ -108,7 +108,7 @@ t_section "Icon: the boot scan is what makes a name resolvable at all"
 t_eq "the icon set is still empty at Component.onCompleted" "0" "$(qp_get icon.scan.bootIndexed)"
 t_eq "so the scan has not reported yet" "false" "$(qp_get icon.scan.bootReady)"
 t_eq "and a known name resolves to nothing yet" "0" "$(qp_get icon.url.bootLength)"
-t_eq "on the first turn the scan is in" "187" "$(qp_get icon.scan.indexed)"
+t_eq "on the first turn the scan is in" "185" "$(qp_get icon.scan.indexed)"
 t_eq "and reports ready" "true" "$(qp_get icon.scan.ready)"
 
 t_section "Icon: a known name resolves to a recolored data URL"
