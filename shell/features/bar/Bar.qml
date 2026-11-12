@@ -587,8 +587,8 @@ Singleton {
   // resolved to, and how many real screens exist to build it on.
   //
   // "Loaded" means the Loader reached Ready. It deliberately does not mean the
-  // module painted: `shell/README.md` records that
-  // `QT_QPA_PLATFORM=offscreen` drives no render loop, so first-frame
+  // module painted: `QT_QPA_PLATFORM=offscreen` drives no render loop, so
+  // first-frame
   // presentation latency is not observable in this environment.
   //
   // One record per module KIND, not per instance. The bar is built per output,

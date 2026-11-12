@@ -29,8 +29,8 @@ import "../collections/BoundedCache.js" as BoundedCache
 // untagged children inherit the primary color through the root's default
 // fill/stroke and only indicators opt into the accent color. Animation
 // rides on top as a second pre-rasterized indicator layer driven by GPU
-// opacity (Icon.qml); the SVG string is never regenerated per frame. See
-// assets/icons/README.md ("tone classes") for the contract.
+// opacity (Icon.qml); the SVG string is never regenerated per frame. The
+// contract is the tone rewrite in recolor() below.
 Singleton {
   id: root
 
@@ -245,8 +245,8 @@ Singleton {
   // preserved, since transparent masks must stay transparent.
   //
   // Tone rewrite (accentHex given): colors each element by its tone class -
-  // class="indicator" -> accentHex, everything else -> bodyHex (see the
-  // tone-class contract in assets/icons/README.md). The rewrite stays a
+  // class="indicator" -> accentHex, everything else -> bodyHex (the tone
+  // contract is toneFor() below). The rewrite stays a
   // flat string pipeline: assets are machine-formatted with no `>` inside
   // attribute values (contract-tested), so matching one whole element tag
   // and rewriting its paint attributes in place decides the tone per
@@ -286,8 +286,8 @@ Singleton {
         .replace(/([;{"'\s])(fill|stroke)(\s*:\s*)(?!none)[^;"'\s}]+/g, "$1$2$3" + hex)
     const toneFor = el => {
       if (/^<svg[\s>]/.test(el)) return hex
-      // Tier classes first (see the tier-class contract in
-      // assets/icons/README.md): tier-N paints in full body tone while
+      // Tier classes first (see the tier-class contract in this file):
+      // tier-N paints in full body tone while
       // dimTiers >= N (0 paints everything), otherwise in the ghost
       // tone - the outer waves fade first, the base shape last. A
       // visible tier is body paint, so the indicator layer keeps all

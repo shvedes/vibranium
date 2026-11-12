@@ -67,8 +67,8 @@ Item {
   property string indicatorAnim: ""
   // Tiered glyphs (volume/wifi strength): how many leading wave/arc
   // groups stay in full body tone. 0 (default) paints the whole glyph;
-  // N keeps tiers 1..N solid and dims the rest to a ghost gray (see
-  // assets/icons/README.md, "tier classes"). Forwarded to both layer
+  // N keeps tiers 1..N solid and dims the rest to a ghost gray (see the
+  // tier-class contract in common/theme/Icons.qml). Forwarded to both layer
   // sources so a tiered glyph stays correct even if it ever combines
   // with an animated indicator.
   property int dimTiers: 0
