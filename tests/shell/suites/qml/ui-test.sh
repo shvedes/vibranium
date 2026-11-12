@@ -122,8 +122,6 @@ t_section "Title derives its presentation from level"
 t_eq "level 1 has its own height" "17" "$(qp_get title1.height)"
 t_eq "level 2 is a different size" "14" "$(qp_get title2.height)"
 t_eq "and they are not the same" "true" "$(qp_get title.level2Differs)"
-t_eq "level 2 is the section style" "true" "$(qp_get title.isSection)"
-t_eq "level 1 is the island style" "true" "$(qp_get title.isIsland)"
 
 t_section "derived flags and signals"
 t_eq "a warning notice is not danger" "false" "$(qp_get notice.warning.danger)"

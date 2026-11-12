@@ -19,21 +19,16 @@ Text {
   // 5: Body / empty hint - Ui.fontS muted 0.5
   property int level: 1
 
-  property bool isSection: root.level === 2
-  property bool isIsland: root.level === 1
-
   color: {
     if (root.level === 1) return Ui.solid("foreground_0")
     if (root.level === 2) return Ui.tint("foreground_1", 0.5)
     if (root.level === 3) return Ui.solid("foreground_1")
-    if (root.level === 4) return Ui.tint("foreground_1", 0.5)
     return Ui.tint("foreground_1", 0.5)
   }
   font.family: Ui.fontFamily
   font.pixelSize: {
     if (root.level === 1) return Ui.fontM
     if (root.level === 2) return Ui.fontXs
-    if (root.level === 3) return Ui.fontS
     if (root.level === 4) return Ui.fontXs
     return Ui.fontS
   }

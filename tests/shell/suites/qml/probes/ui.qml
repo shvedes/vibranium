@@ -239,8 +239,6 @@ Item {
     kv("title1.height", title1.implicitHeight)
     kv("title2.height", title2.implicitHeight)
     kv("title.level2Differs", title1.implicitHeight !== title2.implicitHeight)
-    kv("title.isSection", title2.isSection)
-    kv("title.isIsland", title1.isIsland)
   }
 
   // Derived state and signals. These are pure functions of their inputs and
