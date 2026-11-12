@@ -672,6 +672,25 @@ function handleYs(count, cardH, span, gapMax) {
   return out
 }
 
+// The index of the value nearest `target`, or -1 when there is none. First
+// minimum wins, so a tie keeps the earlier mark - the same answer the wire's
+// inline snap scan gave, now stated once and driven by its own tests.
+function nearestIndex(values, target) {
+  if (!Array.isArray(values) || values.length === 0) return -1
+  const at = Number(target)
+  let best = 0
+  if (!isFinite(at)) return best
+  let nearest = Math.abs(values[0] - at)
+  for (let i = 1; i < values.length; i++) {
+    const d = Math.abs(values[i] - at)
+    if (d < nearest) {
+      nearest = d
+      best = i
+    }
+  }
+  return best
+}
+
 // Which mark line `slot` of `total` is drawn from: floor(slot * marks / total).
 // Past the last mark the lines share it, and an edge with no mark answers the
 // card's own middle.

@@ -594,13 +594,7 @@ Item {
   // with ghosts.
   function _place(cards) {
     const plan = Graph.layerPlan(tab._layoutNodes(cards), tab._graphGroups())
-    const metrics = {
-      cardW: tab.cardW,
-      cardH: tab.cardH,
-      gapX: tab.gapX,
-      gapY: tab.gapY,
-      margin: tab.margin
-    }
+    const metrics = tab._metrics()
     const slots = Graph.layerSlots(plan, metrics)
     const kept = ({})
     for (let i = 0; i < cards.length; i++) {
@@ -616,6 +610,31 @@ Item {
     }
     tab._positions = kept
     tab._extent = Graph.layerExtent(plan, metrics)
+  }
+
+  // The metrics the layout arithmetic speaks, stated once: the card layout and
+  // the link-change extent refresh have to measure the world with the same
+  // numbers, and a second literal object is a second answer.
+  function _metrics() {
+    return {
+      cardW: tab.cardW,
+      cardH: tab.cardH,
+      gapX: tab.gapX,
+      gapY: tab.gapY,
+      margin: tab.margin
+    }
+  }
+
+  // The plan is a function of the LINKS as well as the cards. A connection
+  // made or cut changes which column the band ends at, so the world's extent -
+  // the bound the pan is clamped to - has to follow it even though no card
+  // moves and no card rebuild runs. Places are untouched: this is the bound,
+  // not the layout.
+  function _refreshExtent() {
+    if (tab.controller === null) return
+    const plan = Graph.layerPlan(tab._layoutNodes(tab._cards), tab._graphGroups())
+    tab._extent = Graph.layerExtent(plan, tab._metrics())
+    tab._clampPan()
   }
 
   // The layout's own inputs, in the plain shapes GraphModel.layerPlan takes: a
@@ -858,13 +877,55 @@ Item {
     return Graph.lineOnMark(lines, y)
   }
 
-  // One edge's own entry for one line, or null. The route from a link group to
-  // the two points its curve is drawn between: the curve's endpoint and the
-  // grip that takes hold of that endpoint are one number read twice.
-  function _lineOn(key, side, linkKey) {
-    const list = tab.edgeAt(key, side).lines
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].key === linkKey) return list[i]
+  // Every edge's drawn lines, in ONE pass over the link list.
+  //
+  // `edgeAt` answers one edge on demand, which is what a card needs. The curve
+  // builder needs every edge at once, and it used to ask `edgeAt` twice per
+  // group: each call walked the whole link list and allocated a mark list that
+  // was thrown away, so building N curves cost O(N^2) walks. These are the
+  // same line entries `edgeAt` returns, keyed by card and side, with their y
+  // resolved once.
+  //
+  // The key is "nodeId|side", safe because a node key carries no pipe (see
+  // NodeKey.of), and a collision would only merge edges of one card, which it
+  // cannot have two of.
+  function _edgeLines() {
+    const groups = tab._graphGroups()
+    const slots = tab._slots
+    const byEdge = ({})
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i]
+      if (group === null || group === undefined) continue
+      tab._addEdgeLine(byEdge, group.sourceKey, 1, group.key, slots[i].from)
+      tab._addEdgeLine(byEdge, group.targetKey, 0, group.key, slots[i].to)
+    }
+    for (const id in byEdge) {
+      const edge = byEdge[id]
+      const ys = tab.portHandles(edge.key, edge.side !== 1)
+      for (let i = 0; i < edge.lines.length; i++) {
+        edge.lines[i].y = tab._markY(ys, edge.lines[i].slot, edge.lines.length)
+      }
+    }
+    return byEdge
+  }
+
+  function _addEdgeLine(byEdge, key, side, linkKey, slot) {
+    const id = key + "|" + side
+    let edge = byEdge[id]
+    if (edge === undefined) {
+      edge = { key: key, side: side, lines: [] }
+      byEdge[id] = edge
+    }
+    edge.lines.push({ key: linkKey, slot: slot })
+  }
+
+  // One line's entry on one edge, or null. The same answer `edgeAt` gives for
+  // that line, read from the pass above instead of walking the graph again.
+  function _lineOnEdge(edges, key, side, linkKey) {
+    const edge = edges[key + "|" + side]
+    if (edge === undefined) return null
+    for (let i = 0; i < edge.lines.length; i++) {
+      if (edge.lines[i].key === linkKey) return edge.lines[i]
     }
     return null
   }
@@ -1037,19 +1098,8 @@ Item {
     const ys = tab.portHandles(tab.wireDropKey, side === 0)
     // The card's own middle when the edge has no mark, which is the same
     // fallback `_markY` makes for a line whose edge has nothing to land on.
-    let localY = tab.cardH / 2
-    if (ys.length > 0) {
-      const from = tab.wireY - at.y
-      localY = ys[0]
-      let nearest = Math.abs(ys[0] - from)
-      for (let i = 1; i < ys.length; i++) {
-        const d = Math.abs(ys[i] - from)
-        if (d < nearest) {
-          nearest = d
-          localY = ys[i]
-        }
-      }
-    }
+    const nearest = Graph.nearestIndex(ys, tab.wireY - at.y)
+    const localY = nearest >= 0 ? ys[nearest] : tab.cardH / 2
     return {
       key: tab.wireDropKey,
       side: side,
@@ -1091,13 +1141,14 @@ Item {
     if (tab.controller === null) return out
     const groups = tab.controller.graphLinks
     if (!Array.isArray(groups)) return out
+    const edges = tab._edgeLines()
     // The stroke's own half width at its heaviest, plus a unit of antialiasing.
     const pad = tab.linkWeight / 2 + 1
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i]
       if (group === null || group === undefined) continue
-      const leaving = tab._lineOn(group.sourceKey, 1, group.key)
-      const arriving = tab._lineOn(group.targetKey, 0, group.key)
+      const leaving = tab._lineOnEdge(edges, group.sourceKey, 1, group.key)
+      const arriving = tab._lineOnEdge(edges, group.targetKey, 0, group.key)
       if (leaving === null || arriving === null) continue
       const from = tab._edgePoint(group.sourceKey, 1, leaving.y)
       const to = tab._edgePoint(group.targetKey, 0, arriving.y)
@@ -1391,6 +1442,10 @@ Item {
   Connections {
     target: tab.controller
     function onGraphNodesChanged() { tab._scheduleCards() }
+    // A link that was made or cut changes the plan's extent without changing
+    // the card set, so the card rebuild has nothing to do and the world bound
+    // would stay at the topology it was laid out against.
+    function onGraphLinksChanged() { tab._refreshExtent() }
   }
 
   Timer {

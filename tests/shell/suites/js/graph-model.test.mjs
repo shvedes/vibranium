@@ -192,4 +192,19 @@ group('it accepts the mono single-port case and the shared channel case', () => 
     GM.pairPossible(['node:output_FL'], ['node:playback_FR', 'node:playback_FL']), true)
 })
 
+section('nearestIndex - the mark a wire snaps to')
+
+group('the nearest mark wins, and a tie keeps the earlier one', () => {
+  eq('no marks', GM.nearestIndex([], 10), -1)
+  eq('no list', GM.nearestIndex(null, 10), -1)
+  eq('a single mark is always nearest', GM.nearestIndex([40], 0), 0)
+  eq('an exact mark', GM.nearestIndex([10, 20, 30], 20), 1)
+  eq('between two marks, the closer', GM.nearestIndex([10, 20], 16), 1)
+  eq('and the other side', GM.nearestIndex([10, 20], 14), 0)
+  eq('a tie keeps the earlier mark', GM.nearestIndex([10, 20], 15), 0)
+  eq('above the last mark', GM.nearestIndex([10, 20], 99), 1)
+  eq('below the first mark', GM.nearestIndex([10, 20], -99), 0)
+  eq('a non-finite target is not a nearest-mark question', GM.nearestIndex([10, 20], NaN), 0)
+})
+
 finish()
