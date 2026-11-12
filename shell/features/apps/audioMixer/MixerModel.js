@@ -1078,9 +1078,11 @@ var PROFILE_AVAIL_RE = /available:\s*([A-Za-z]+)/
 // The profile every card carries at index 0, with 0 sinks and 0 sources. It is
 // not a mode: it is how a device is DISABLED, which the daemon's own
 // description does not say - it prints the single word "Off" - and which is
-// what a user reaching for a way to turn a device off is looking for.
+// what a user reaching for a way to turn a device off is looking for. The state
+// is the word in the brackets: "Off (off)" would read as a mode called off, and
+// the chip has to say what picking it DOES to the device.
 var OFF_PROFILE = "off"
-var OFF_DESCRIPTION = "Off (disables the device)"
+var OFF_DESCRIPTION = "Off (disabled)"
 
 // Key prefixes. The form is what makes a key safe to index by: "analog-stereo"
 // is an input profile on one card and an output profile on another, while
