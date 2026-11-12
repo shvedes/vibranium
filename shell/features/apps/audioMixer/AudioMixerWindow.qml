@@ -204,6 +204,11 @@ QtObject {
   // be two things that can drift.
   readonly property var outputDevices: mixer.controller.outputDevices
   readonly property var inputDevices: mixer.controller.inputDevices
+  // The cards the graph has no node for, projected through this holder like the
+  // four lists above it: the Configuration tab reads the window, never the
+  // controller, so a list it needs has to exist HERE as well.
+  readonly property var disabledOutputDevices: mixer.controller.disabledOutputDevices
+  readonly property var disabledInputDevices: mixer.controller.disabledInputDevices
   readonly property var playbackStreams: mixer.controller.playbackStreams
   readonly property var recordingStreams: mixer.controller.recordingStreams
   // The Graph tab's two lists, handed over rather than reached for inside the
