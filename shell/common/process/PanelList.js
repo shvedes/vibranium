@@ -19,7 +19,7 @@
 
 // Append `panel` to `list` and return a new array.
 function attach(list, panel) {
-  var next = StoreGuards.copyList(list)
+  let next = StoreGuards.copyList(list)
   next.push(panel)
   return next
 }

@@ -20,9 +20,9 @@ var MAX_MS = 9000
 // overflow is not a finite number. The clamp keeps the same 1800..9000
 // window every caller already used.
 function legMs(overflow) {
-  var n = Number(overflow)
+  let n = Number(overflow)
   if (!isFinite(n)) n = 0
-  var travel = BASE_MS + Math.max(0, n) * PER_PIXEL_MS
+  let travel = BASE_MS + Math.max(0, n) * PER_PIXEL_MS
   return Range.clamp(Math.round(travel), MIN_MS, MAX_MS)
 }
 

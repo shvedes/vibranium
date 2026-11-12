@@ -14,8 +14,8 @@
 // height one notch moves; a fractional notch (trackpad) moves the same
 // fraction of the row.
 function wheelOffset(contentY, contentHeight, viewHeight, notches, rowH) {
-  var maxY = Math.max(0, Number(contentHeight) - Number(viewHeight))
-  var next = Number(contentY) - Number(notches) * Number(rowH)
+  let maxY = Math.max(0, Number(contentHeight) - Number(viewHeight))
+  let next = Number(contentY) - Number(notches) * Number(rowH)
   return Range.clamp(next, 0, maxY)
 }
 
