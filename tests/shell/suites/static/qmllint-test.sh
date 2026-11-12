@@ -1,5 +1,5 @@
 #!/bin/bash
-# Suite: qmllint - the reproducible lint baseline from shell/README.md.
+# Suite: qmllint - the reproducible lint baseline recorded below.
 #
 # The README publishes one invocation and a measured baseline: 230 files,
 # 0 errors, 141 warnings, and 71 informational diagnostics. Exit status alone
@@ -132,7 +132,6 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 RECORDED_FILE_COUNT=249
 RECORDED_WARNING_COUNT=139
 RECORDED_INFO_COUNT=51
-README_WARNING_COUNT=139
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -190,11 +189,11 @@ mapfile -t QML_FILES < <(shell_qml_files | LC_ALL=C sort)
 t_not_empty "the tree has .qml files to lint" "${#QML_FILES[*]}"
 
 # The recorded file count, checked against the tree rather than trusted.
-# RECORDED_FILE_COUNT is what shell/README.md publishes; a drift is reported
+# RECORDED_FILE_COUNT is the recorded size of the tree; a drift is reported
 # loudly instead of being silently absorbed.
-t_count "the tree holds the README's file count" "$RECORDED_FILE_COUNT" "${#QML_FILES[@]}"
+t_count "the tree holds the recorded file count" "$RECORDED_FILE_COUNT" "${#QML_FILES[@]}"
 if (( ${#QML_FILES[@]} != RECORDED_FILE_COUNT )); then
-  t_note "shell/README.md's \"$RECORDED_FILE_COUNT files\" is stale: the tree now holds ${#QML_FILES[@]} .qml files"
+  t_note "the recorded file count is stale: the tree now holds ${#QML_FILES[@]} .qml files"
 fi
 
 # Three whole-tree runs are needed: the baseline, the second run the
@@ -314,9 +313,6 @@ t_count "the warning total matches the recorded one" "$RECORDED_WARNING_COUNT" "
 t_count "the Info total matches the recorded one" "$RECORDED_INFO_COUNT" "$INFO_COUNT"
 t_count "the three severities account for every header" "$(( ERR_COUNT + WARN_COUNT + INFO_COUNT ))" "$(count_headers "$LINT_OUT")"
 
-if (( WARN_COUNT != README_WARNING_COUNT )); then
-  t_note "shell/README.md's \"$README_WARNING_COUNT warnings\" is stale: qmllint emits $WARN_COUNT Warning: diagnostics (off by $(( README_WARNING_COUNT - WARN_COUNT ))), plus $INFO_COUNT Info: lines"
-fi
 t_note "the recorded warning total is $RECORDED_WARNING_COUNT and the per-kind breakdown above is the assertion that makes a diff legible"
 
 t_section "the unresolved types are only Quickshell C++ types"
@@ -352,22 +348,6 @@ if [[ -d $QS_QMLTYPES ]]; then
   t_empty "every unresolved type is registered in a quickshell-*.qmltypes" "$MISSING_FROM_QMLTYPES"
 else
   t_note "no qmltypes tree at $QS_QMLTYPES, so the Quickshell-registration cross-check could not run"
-fi
-
-# The README's list of the types the linter may leave unresolved. Recorded,
-# not asserted: the list is the code's, and the README states it so a reader
-# can tell an expected name from a lost import.
-README_UNRESOLVED_TYPES=""
-for ty in AuthFlow FileViewAdapter PanelWindow BluetoothAdapter UntypedObjectModel; do
-  if grep -q "\`$ty\`" "$SHELL_DIR/README.md"; then
-    README_UNRESOLVED_TYPES="${README_UNRESOLVED_TYPES:+$README_UNRESOLVED_TYPES }$ty"
-  fi
-done
-t_note "shell/README.md's list of expected unresolved types names: ${README_UNRESOLVED_TYPES:-none}"
-if [[ $UNRESOLVED_TYPES != *"AuthFlow"* ]]; then
-  t_note "AuthFlow no longer appears in the unresolved set, so shell/README.md's list needs no AuthFlow"
-else
-  t_note "AuthFlow is in the unresolved set and shell/README.md's list names it; features/polkit/Polkit.qml produces it four times"
 fi
 
 t_section "the run is deterministic"

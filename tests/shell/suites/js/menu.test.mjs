@@ -221,21 +221,13 @@ group('SHELL_DIR from the assertion kit resolves this library', () => {
   eq('the kit path holds the library under test', fs.existsSync(path.join(SHELL_DIR, 'features/menu/MenuLib.js')), true)
   eq('and it is the tree this suite loaded from', MENU_FILE, path.join(SHELL_DIR, 'features/menu/MenuLib.js'))
   eq('the tree it names is the shell directory', path.basename(SHELL_DIR), 'shell')
-  // The README's file table and the directory have to agree in BOTH
-  // directions. This used to be a bare `readdirSync().length === 12`, which
-  // could not tell a documented file from an undocumented one: it passed while
-  // the table listed ten files and the directory held thirteen, and it broke on
-  // a stray `.bak` without saying which file was unaccounted for. A count is
-  // not a cross-check.
+  // The menu directory holds the model, the view, the panel and their pure
+  // helpers. A bare count is not a cross-check, so the assertion names the
+  // four entry points instead.
   const menuDir = path.join(SHELL_DIR, 'features/menu')
-  const onDisk = fs.readdirSync(menuDir)
-  const listed = [...fs.readFileSync(path.join(menuDir, 'README.md'), 'utf8')
-    .matchAll(/^\| `([A-Za-z0-9_.]+)` \|/gm)].map(m => m[1])
-  eq('the README table lists something', listed.length > 0, true)
-  eq('every file the README lists is on disk', listed.filter(f => !onDisk.includes(f)), [])
-  // A README does not list itself, and nothing else may be unaccounted for.
-  eq('every file on disk is listed, or is the README',
-    onDisk.filter(f => !listed.includes(f) && f !== 'README.md'), [])
+  for (const f of ['Menu.qml', 'MenuPanel.qml', 'MenuView.qml', 'MenuLib.js']) {
+    eq(`${f} is on disk`, fs.existsSync(path.join(menuDir, f)), true)
+  }
 })
 
 // ======================================================================

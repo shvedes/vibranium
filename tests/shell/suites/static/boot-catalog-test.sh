@@ -45,8 +45,6 @@ BOOT_QML="$SHELL_DIR/boot/Boot.qml"
 BOOTBAR_QML="$SHELL_DIR/boot/BootBar.qml"
 BOOTSERVICES_QML="$SHELL_DIR/boot/BootServices.qml"
 BOOTLATE_QML="$SHELL_DIR/boot/BootLate.qml"
-BOOT_README="$SHELL_DIR/boot/README.md"
-SHELL_README="$SHELL_DIR/README.md"
 GATE_QML="$SHELL_DIR/common/runtime/UnitGate.qml"
 
 # The vocabulary this suite validates against. The assertions below read the
@@ -465,8 +463,6 @@ distribution() {
 
 t_section "the files this suite reads"
 t_file "Boot.qml" "$BOOT_QML"
-t_file "boot/README.md" "$BOOT_README"
-t_file "shell/README.md" "$SHELL_README"
 t_file "UnitGate.qml" "$GATE_QML"
 t_not_empty "the _catalog literal extracted" "$(head -1 "$BC_RECORDS")"
 t_empty "the extractor said nothing on stderr" "$(cat "$BC_ERR")"

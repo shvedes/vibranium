@@ -55,7 +55,6 @@ t_init "ipptool" "the nine IPP request templates: grammar, requesting-user-name,
 require_tools awk sed grep sort tr wc find paste
 
 IPP_DIR="$SHELL_DIR/services/system/ipptool"
-IPP_README="$IPP_DIR/README.md"
 PRINTERS_QML="$SHELL_DIR/services/system/Printers.qml"
 PRINTERS_LIB="$SHELL_DIR/services/system/PrintersLib.js"
 ISLAND_QML="$SHELL_DIR/features/bar/modules/Printers/PrintersIsland.qml"
@@ -91,7 +90,7 @@ LISTING_TEMPLATES=(printers.test jobs.test sub-list.test)
 # whole first word. Anything else is a typo or a stray code line.
 LEGAL_KEYWORD_RE='^(NAME|OPERATION|GROUP|ATTR|STATUS|DISPLAY|\{|\})([[:space:]]|$)'
 
-# The variables the README names, and the templates that legitimately need each.
+# The templates that legitimately need each ipptool variable.
 VAR_PURI_FILES=(hold.test release.test cancel-job.test
   sub-create.test sub-renew.test sub-cancel.test sub-list.test)
 VAR_JOBID_FILES=(hold.test release.test cancel-job.test)
@@ -258,7 +257,6 @@ anchors_in() {
 # --------------------------------------------------------------------------
 
 t_section "the files this suite reads"
-t_file "ipptool/README.md" "$IPP_README"
 t_file "Printers.qml" "$PRINTERS_QML"
 t_file "PrintersLib.js" "$PRINTERS_LIB"
 t_file "PrintersIsland.qml" "$ISLAND_QML"
@@ -266,11 +264,9 @@ t_true "the ipptool directory exists" test -d "$IPP_DIR"
 for f in "${TEMPLATES[@]}"; do
   t_file "$f" "$IPP_DIR/$f"
 done
-t_eq "the README's table names nine templates" "9" \
-  "$(grep -cE '^\| `[a-z-]+\.test` \|' "$IPP_README")"
-t_eq "nine templates exist and nothing else is in the directory" "9 1" \
+t_eq "nine templates exist and nothing else is in the directory" "9 0" \
   "$(find "$IPP_DIR" -name '*.test' -type f | wc -l | tr -d ' ')$(printf ' %s' \
-    "$(find "$IPP_DIR" -name 'README.md' -type f | wc -l | tr -d ' ')")"
+    "$(find "$IPP_DIR" -type f ! -name '*.test' | wc -l | tr -d ' ')")"
 t_eq "no template carries code: none holds a QML, JS or shebang line" "0" \
   "$(grep -lE '^(import |export |const |let |var |function |[a-z]+\.qml|//)' \
     "$IPP_DIR"/*.test 2>/dev/null | wc -l | tr -d ' ')"
@@ -367,12 +363,10 @@ t_eq "every runIpp call site passes that same resolved name" "0" \
     grep -vF 'user: root._userName()' | grep -c . || true)"
 
 t_section "the \$-variables are references, not literals"
-t_eq "the README names \$user, \$puri and \$jobid" '$jobid $puri $user' \
-  "$(grep -oE '\$(user|puri|jobid)\b' "$IPP_README" | LC_ALL=C sort -u | paste -sd' ' -)"
-t_eq "and the templates use those three plus \$subid" '$jobid,$puri,$subid,$user' \
+t_eq "the templates use \$user, \$puri, \$jobid and \$subid" '$jobid,$puri,$subid,$user' \
   "$(for f in "${TEMPLATES[@]}"; do vars_in "$f"; done |
     tr ',' '\n' | LC_ALL=C sort -u | paste -sd, -)"
-t_note "sub-cancel.test and sub-renew.test also use \$subid for notify-subscription-id, a fourth ipptool variable; ipptool/README.md names it in its table of the variables the caller substitutes, and Printers.qml:651 and :683 do substitute it, so the templates, the caller and the README agree"
+t_note "sub-cancel.test and sub-renew.test also use \$subid for notify-subscription-id, a fourth ipptool variable; Printers.qml:651 and :683 substitute it, so the templates and the caller agree"
 for f in "${VAR_PURI_FILES[@]}"; do
   t_eq "$f takes the printer uri from \$puri" '$puri' "$(attr_value "$f" printer-uri)"
   t_match "$f's \$puri is a reference, not a literal" '^\$[a-z][a-zA-Z0-9_-]*$' \
