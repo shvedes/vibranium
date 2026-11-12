@@ -35,7 +35,7 @@ WEATHER_MODEL="$SHELL_DIR/services/weather/Model.js"
 
 # Recorded inventories. These move when a glyph is added, which is a real
 # change and should show up in a diff rather than be absorbed.
-RECORDED_SVG_COUNT=187
+RECORDED_SVG_COUNT=185
 RECORDED_SUBDIRS="battery file hypr player weather"
 RECORDED_SYMLINKS=4
 RECORDED_BATTERY="battery-0
@@ -47,10 +47,8 @@ battery-charging"
 # reads .qml, .js and config data under shell/, so an entry here means
 # "nothing in the tree names it".
 #
-# Two glyphs are shipped but named nowhere: moon.svg and wifi-cog.svg. They
-# are pinned rather than removed so that a rename elsewhere cannot hide a
-# genuinely dead asset behind them.
-RECORDED_ORPHANS="moon wifi-cog"
+# The set is empty: every shipped glyph is named somewhere in the tree.
+RECORDED_ORPHANS=""
 # Every name services/weather/Model.js can return from iconForWmoCode or
 # iconForCode. Sixteen, and the set is the contract - it is what an SVG has
 # to exist for, so it is pinned exactly and a new mapping is a deliberate edit.
