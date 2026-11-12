@@ -44,15 +44,14 @@ Item {
   function demand() {
     if (host.phase === "ready" && host.controller !== null) return host.controller
     const result = UnitGate.ensure(host.unitId, host.owner)
-    if (result === undefined || result === null || result.ok !== true) {
+    if (!result || result.ok !== true) {
       // A blocked, failed or unregistered unit still hands back a lease for
       // two of those three; give it straight back so the record cannot collect
       // owners for a demand that never loaded.
-      if (result !== undefined && result !== null && result.lease !== undefined && result.lease !== null)
-        host._lease = result.lease
+      if (result && result.lease) host._lease = result.lease
       host._dropLease()
-      host._setState(result !== undefined && result !== null && result.state === "failed" ? "failed" : "unavailable",
-        result !== undefined && result !== null && result.state === "failed" ? "unit" : "gate")
+      const failed = result && result.state === "failed"
+      host._setState(failed ? "failed" : "unavailable", failed ? "unit" : "gate")
       return null
     }
     if (result.lease !== host._lease) {
