@@ -239,7 +239,7 @@ Singleton {
             root._scanCursorSizes(check.value)
         } else if (key === "misc.cursorSize") {
             const curTheme = root.values["misc.cursorTheme"] || "Adwaita"
-            const proc = sizeProc.createObject(root, { command: [Paths.vibraniumHome + "/bin/vb-cursor-set", "--size", String(check.value), curTheme] })
+            const proc = themeProc.createObject(root, { command: [Paths.vibraniumHome + "/bin/vb-cursor-set", "--size", String(check.value), curTheme] })
             // vb-cursor-set expects theme as positional arg, size via --size
             // Actually vb-cursor-set [THEME] --size SIZE, so we need to handle correctly
             // For size change, keep current theme
@@ -465,13 +465,7 @@ Singleton {
             stderr: StdioCollector {}
         }
     }
-    Component {
-        id: sizeProc
-        Process {
-            stdout: StdioCollector {}
-            stderr: StdioCollector {}
-        }
-    }
+
 
     IpcHandler {
         target: "miscSettings"
