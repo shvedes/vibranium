@@ -9,12 +9,6 @@ Singleton {
 
   readonly property bool enabled: HyprlandSettings.value("hypr.animations.enabled") === true
 
-  // The setting itself flipping is the one event here that is not a
-  // consequence of something else asking, so it gets its own line: every
-  // other motion line in the shell is downstream of this one, and a run
-  // where nothing moved has to be able to show the switch rather than
-  // infer it from an absence.
-
   // The one place that turns a requested duration into a runnable one. A
   // NumberAnimation has no `enabled` member to switch off, so a primitive
   // that wants to honor the policy from the inside has to carry the gate in
