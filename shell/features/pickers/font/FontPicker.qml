@@ -547,9 +547,29 @@ Singleton {
       // summoned from a standalone picker bundle instead of pushing a
       // settings page onto a foreign stack.
       if (Menu.open && !Menu.externalPagesAllowed()) Menu.close()
-      if (!Menu.open) Menu.openFile(Paths.settingsBundlePath)
+      // A summon from closed has no row to remember - the launch seat owns
+      // that landing - so it opens the bundle and takes the plain push.
+      if (!Menu.open) {
+        Menu.openFile(Paths.settingsBundlePath)
+        if (!Menu.hasDynamicPage(root.pageId)) root._compose()
+        Menu.push(root.pageId)
+        return
+      }
       if (!Menu.hasDynamicPage(root.pageId)) root._compose()
-      Menu.push(root.pageId)
+      // Pushed from a row of an open menu, the panel's push is the one that
+      // checkpoints: it saves the cursor's row on the page being left, which
+      // is what Back restores. A plain Menu.push leaves that page with only
+      // its stored frame slot (usually the head), so walking back from the
+      // picker lost the row that opened it.
+      //
+      // Read as two branches rather than a captured `const wasOpen =
+      // Menu.open`: this linter silently drops every diagnostic in the file
+      // for a const/let bound to a singleton property, and taking this
+      // file's warnings off the count to keep a local variable is a bad
+      // trade.
+      if (Menu.probeSource && typeof Menu.probeSource.pushPage === "function")
+        Menu.probeSource.pushPage(root.pageId)
+      else Menu.push(root.pageId)
     })
     return "ok"
   }

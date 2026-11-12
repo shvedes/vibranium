@@ -1213,6 +1213,11 @@ Rectangle {
     // The plan answers row motion for the whole install; a wholesale one
     // has already answered no, so publishing it here needs no second test.
     panel.syncAnimated = plan.glide
+    // A seat a navigation already owns: the push armed it and its landing
+    // seat is the only answer for this row set. It is read before the write,
+    // because a row set arriving under it must not put the cursor anywhere of
+    // its own (see both branches below).
+    const navSeat = Menu.pendingSel >= 0
 
     if (!plan.wholesale) {
       panel._clearCursorForSwap(records)
@@ -1223,7 +1228,8 @@ Rectangle {
       // over, with the head row pushed down by the offset it remembered.
       if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
       if (!panel._sameRecords(records)) {
-        panel._writeRecords(records, !panel.searching && !panel.scopedSearching)
+        panel._writeRecords(records,
+          !navSeat && !panel.searching && !panel.scopedSearching)
         if (plan.glide) panel._quiesceDisarm()
         else panel._quiesceArm()
       }
@@ -1245,6 +1251,12 @@ Rectangle {
       // ones whose last install is this one. Deferred, because the view
       // applies the array swap after this returns.
       else if (panel._summonSeat) Idle.run(() => panel._reseatFrameSel(), 2)
+      // A page change whose rebuild was superseded by an in-place install -
+      // the push is queued, and the page's own owner recomposes behind it
+      // (the font page's current-font read). The wholesale path would have
+      // consumed the navigation seat; this one landed instead, so it does.
+      // Deferred for the same reason as the re-seat above.
+      else if (navSeat) Idle.run(() => panel.applyFrameState(), 2)
       // A reveal with no launch in it: a showIf verdict, a guard verdict, a
       // "/" filter. The row set moved under the cursor, and the cursor goes
       // with the row it was on: the row that appeared or disappeared above
