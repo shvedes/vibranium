@@ -16,11 +16,11 @@ CollapsibleSlot {
 
   // Last payload from the update service's topic; null before the first
   // publish (the module stays hidden until the service says otherwise).
-  readonly property var state: Bus.latest("update.available")
+  readonly property var payload: Bus.latest("update.available")
 
   // Mirrors the service's live availability; hidden state takes no space
   // (the collapse matches the owned-indicator convention).
-  readonly property bool on: root.state?.available ?? false
+  readonly property bool on: root.payload?.available ?? false
 
   // Collapsible slot (see CollapsibleSlot.qml): zero width while idle
   // so it leaves no gap.
@@ -47,5 +47,5 @@ CollapsibleSlot {
 
   // Shown only while an update is pending and hovered.
   barTipActive: root.on && root.hovered
-  barTipText: root.state?.tooltipText ?? ""
+  barTipText: root.payload?.tooltipText ?? ""
 }

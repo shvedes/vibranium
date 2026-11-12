@@ -19,12 +19,12 @@ CollapsibleSlot {
 
   // Last payload from the inhibitor service's topic; null before the first
   // publish (the module stays hidden until the service says otherwise).
-  readonly property var state: Bus.latest("inhibitor.bus")
+  readonly property var payload: Bus.latest("inhibitor.bus")
 
   // Live countdown mirrors with null-safe fallbacks.
-  readonly property bool active: root.state?.active ?? false
-  readonly property bool infinite: root.state?.infinite ?? false
-  readonly property string formatted: root.state?.formatted ?? ""
+  readonly property bool active: root.payload?.active ?? false
+  readonly property bool infinite: root.payload?.infinite ?? false
+  readonly property string formatted: root.payload?.formatted ?? ""
 
   // Finite pill shows only while a finite inhibit holds. The infinite
   // tail shows no pill; the steam turns red instead.

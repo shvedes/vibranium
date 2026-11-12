@@ -21,16 +21,16 @@ CollapsibleSlot {
 
   // Last payload from the timer service's topic; null before the first
   // publish (the module stays hidden until the service says otherwise).
-  readonly property var state: Bus.latest("timer.bus")
+  readonly property var payload: Bus.latest("timer.bus")
 
   // Mirrors the timer service's live state; hidden state takes no space
   // (the collapse matches the owned-indicator convention). `shown` is
   // read on every zone layout pass, so the slot keeps its position in
   // the persisted order while collapsed.
-  readonly property bool shown: (root.state?.active ?? false)
-    || (root.state?.expired ?? false)
-  readonly property bool expired: root.state?.expired ?? false
-  readonly property string formatted: root.state?.formatted ?? ""
+  readonly property bool shown: (root.payload?.active ?? false)
+    || (root.payload?.expired ?? false)
+  readonly property bool expired: root.payload?.expired ?? false
+  readonly property string formatted: root.payload?.formatted ?? ""
 
   // Collapsible slot (see CollapsibleSlot.qml): static glyph plus
   // countdown pill (the caffeine finite-pill shape). Zero width while
@@ -64,9 +64,9 @@ CollapsibleSlot {
 
   // The remaining time, live: the text re-evaluates on every tick. The
   // expired state drops the "remaining" suffix - there is nothing left.
-  readonly property string tooltipText: root.state?.expired ?? false
+  readonly property string tooltipText: root.payload?.expired ?? false
     ? "Timer: Time's up!"
-    : "Timer: " + (root.state?.formatted ?? "") + " remaining"
+    : "Timer: " + (root.payload?.formatted ?? "") + " remaining"
 
   barTipActive: root.shown && root.hovered
   barTipText: root.tooltipText

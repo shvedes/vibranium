@@ -18,19 +18,19 @@ CollapsibleSlot {
 
   // Last payload from the recording service's topic; null before the
   // first publish (the module stays hidden until the service says so).
-  readonly property var state: Bus.latest("recording.bus")
+  readonly property var payload: Bus.latest("recording.bus")
 
   // Mirrors the service's live state; hidden state takes no space (the
   // collapse matches the owned-indicator convention).
-  readonly property bool active: root.state?.ongoing ?? false
+  readonly property bool active: root.payload?.ongoing ?? false
   // GNOME-style pill (shell.statusbar.recordingElapsed, default off):
   // red dot plus live elapsed instead of the plain dot.
   readonly property bool elapsedPill: Settings.value("shell.statusbar.recordingElapsed") === true
   // Payload stamp, falling back to first-seen-active for payloads
   // that predate it.
   property double _seenSince: 0
-  readonly property double startedAt: (root.state?.startedAt ?? 0) > 0
-    ? root.state.startedAt : root._seenSince
+  readonly property double startedAt: (root.payload?.startedAt ?? 0) > 0
+    ? root.payload.startedAt : root._seenSince
   property double nowMs: 0
   readonly property int elapsedSec: root.startedAt > 0 && root.nowMs >= root.startedAt
     ? Math.floor((root.nowMs - root.startedAt) / 1000) : 0
