@@ -30,14 +30,9 @@ Singleton {
 
   // --- pub/sub ---
   function publish(topic, payload) {
-    const stored = root._topics[topic]
-    // Existence is read with the same test the lookup below uses, so the
-    // two cannot disagree about a topic whose entry is falsy - and it has
-    // to be read before the write, because the write is what creates the
-    // topic.
-    const entry = stored || { payload: null }
-    entry.payload = payload
-    root._topics = Object.assign(Object.create(null), root._topics, { [topic]: entry })
+    // A fresh entry per write, so a reader holding the previous map cannot
+    // see the payload change without the map assignment that announces it.
+    root._topics = Object.assign(Object.create(null), root._topics, { [topic]: { payload: payload } })
   }
 
   function latest(topic) {
