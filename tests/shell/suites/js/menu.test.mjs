@@ -4219,6 +4219,19 @@ group('MenuQuiesce gates a motionless install on the previous one landing', () =
     MQ.check(MQ.note(armedGate), 3001, 2000).ready, true)
   eq('noting churn on an idle gate counts nothing', MQ.note(idleGate).events, 0)
   eq('and check answers a missing state as idle', MQ.check(null, 0, 2000).ready, true)
+  // The wait is a bound on the ARM, not on the last look: a starved loop that
+  // keeps looking must not keep pushing the deadline out, or typing behind a
+  // slow install could hold the next write forever.
+  eq('the bounded wait is measured from the arm, not the last look',
+    MQ.check(MQ.note(armedGate), 2999, 2000).ready, false)
+  eq('and one millisecond past the bound it releases',
+    MQ.check(MQ.note(armedGate), 3001, 2000).ready, true)
+  eq('a clock that goes backwards cannot release a held write',
+    MQ.check(MQ.note(armedGate), 900, 2000).ready, false)
+  eq('a zero wait still holds a write armed in the same millisecond',
+    MQ.check(MQ.note(MQ.armed(0)), 0, 0).ready, false)
+  eq('a missing wait is read as zero, not as indefinite',
+    MQ.check(MQ.note(MQ.armed(0)), 1, undefined).ready, true)
 })
 
 // ---------------------------------------------------------------------------
