@@ -1262,10 +1262,14 @@ Rectangle {
     if (!sameContent) {
       list.beginSwap()
       panel._swapping = true
-    }
+      // The pending generation describes the swap that is actually running.
+      // Set for an install that begins no swap it is a claim nobody retires,
+      // and the deferred release below then stamps a swap-recency window on a
+      // write that replaced nothing.
       panel._swapPendingGen = generation
-      panel._clearCursorForSwap(records)
-      if (!sameContent) {
+    }
+    panel._clearCursorForSwap(records)
+    if (!sameContent) {
         // The same answer as the incremental path above: the search
         // projections seat the head of the new order instead of keeping
         // the cursor's row, so they do not ask the view to keep it.
@@ -1295,9 +1299,11 @@ Rectangle {
           panel._reseatFrameSel()
           return
         }
-        panel._swapping = false
-        panel._swapPendingGen = -1
-        list.endSwap()
+        if (panel._swapping) {
+          panel._swapping = false
+          panel._swapPendingGen = -1
+          list.endSwap()
+        }
         if (panel._swapGen !== g || panel._pendingGen !== generation) {
           panel._reseatFrameSel()
           return
