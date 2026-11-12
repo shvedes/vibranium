@@ -825,7 +825,6 @@ ListView {
     return removed
   }
   onCountChanged: {
-    root._noteWindowing()
     root._syncIdentitySet()
     // A row added or removed ABOVE the cursor moves the cursor's row to a new
     // index while leaving the index itself untouched: neither
@@ -931,39 +930,6 @@ ListView {
     const freshSwap = (Date.now() - root._swapEndMs) < Ui.fastMs
     root.trackCursor(root.currentIndex, !root._seatsInstant && root.smoothScroll && !freshSwap)
   }
-
-  // Live delegate count and the windowing regime, both derived and both
-  // re-derived from the view rather than tracked: the view owns how many
-  // delegates exist and the buffer, and asking it is cheaper than being
-  // right about it.
-  property int _liveDelegates: -1
-  property int _windowingRegime: -1
-
-  // Delegate construction and destruction. `contentItem.children` is the
-  // live set, so a difference from the last reading is exactly one
-  // construction or one destruction.
-  function _noteDelegates() {
-    const live = root.contentItem ? root.contentItem.children.length : 0
-    if (live === root._liveDelegates) return
-    root._liveDelegates = live
-  }
-
-  // The full-instantiation threshold. Below `Ui.listFullRows` the list
-  // instantiates every row and the layout is exact; above it the fixed
-  // buffer trades that for a bounded delegate count, and the answer changes
-  // from exact to estimated at the crossing. Which side of it a list is on
-  // explains most of what a reader cannot explain about its geometry.
-  function _noteWindowing() {
-    const regime = root.autoCache ? (root.count < Ui.listFullRows ? 1 : 0) : 2
-    if (regime === root._windowingRegime) return
-    root._windowingRegime = regime
-  }
-
-  Component.onCompleted: {
-    root._noteWindowing()
-  }
-
-  onAutoCacheChanged: root._noteWindowing()
 
   function _avg() {
     return RowMetrics.fallbackRowH(root._avgH, root.count,
@@ -1781,10 +1747,16 @@ ListView {
     const y = root.contentY
     root.model = root.stableModel
     if (y <= 0) return
-    const e = root._seatEpoch
+    // The epoch retires this restore when some OTHER seat moves the view.
+    // Our own seat bumps it too, so the baseline is re-read after every write:
+    // taken once, the first restore invalidated its own retry chain, and the
+    // offset was asserted a single time against content that had not finished
+    // measuring - which is the short land the retries exist to repair.
+    let e = root._seatEpoch
     const retry = (n) => {
       if (e !== root._seatEpoch) return
-      root.seatTo(y, false)
+      root.seatTo(y, false, "stable")
+      e = root._seatEpoch
       if (n < 4) Idle.run(() => retry(n + 1), 2)
     }
     retry(0)
@@ -2285,7 +2257,6 @@ ListView {
     target: root.contentItem
 
     function onChildrenChanged() {
-      root._noteDelegates()
       root.bindAutoRevealItem()
       root.pursue()
     }
