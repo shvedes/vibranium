@@ -189,15 +189,9 @@ Singleton {
       const entry = root._watchers[path]
       if (!entry || !entry.pending) continue
       entry.pending = false
-      // Read current content
-      let text = null
-      let ok = false
-      const r = _readView(path, entry.view)
-      ok = r.ok
-      text = r.text
-      // Dispatch to subscribers
+      const read = _readView(path, entry.view)
       for (let i = 0; i < entry.subs.length; i++) {
-        entry.subs[i](text)
+        entry.subs[i](read.text)
       }
     }
     root._dispatching = false
