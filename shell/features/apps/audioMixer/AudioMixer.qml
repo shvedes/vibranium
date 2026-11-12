@@ -89,7 +89,6 @@ Singleton {
 
   readonly property alias controllerState: lease.phase
   readonly property alias controllerError: lease.error
-  readonly property bool controllerReady: lease.phase === "ready"
   // The facade is ready as soon as this singleton exists; the boot drain
   // waits for that, not for a controller.
   readonly property bool facadeReady: root.tag !== ""

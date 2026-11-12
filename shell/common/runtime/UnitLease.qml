@@ -120,9 +120,8 @@ Item {
     if (host.phase === next && host.error === detail) return
     host.phase = next
     host.error = detail
-    // The unit's own ready probe reads controllerReady, and nothing polls a
-    // demand-loaded unit, so the record is settled here instead: the gate must
-    // not sit in "starting" once the controller is up.
+    // Nothing polls a demand-loaded unit, so the record is settled here: the
+    // gate must not sit in "starting" once the controller is up.
     if (next === "ready") UnitGate.refresh(host.unitId)
   }
 

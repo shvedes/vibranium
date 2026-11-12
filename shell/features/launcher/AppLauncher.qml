@@ -139,7 +139,6 @@ Singleton {
 
   readonly property alias controllerState: lease.phase
   readonly property alias controllerError: lease.error
-  readonly property bool controllerReady: lease.phase === "ready"
   readonly property bool facadeReady: root.tag !== ""
   readonly property alias constructions: lease.constructions
 
