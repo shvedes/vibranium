@@ -537,7 +537,7 @@ CollapsibleSlot {
     { icon: "volume-max", text: root.player ? Format.percent(root.player.volume ?? 0) : "--" }
   ]
 
-  barTipActive: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
+  barTipActive: root.hovered && !root.islandOpen
   barTipText: root.hasTrack ? root.title : "Now Playing"
   barTipLines: root.tipLines
 

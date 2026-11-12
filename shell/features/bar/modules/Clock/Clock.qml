@@ -229,7 +229,7 @@ BarModule {
   }
 
   barTipActive: root.hovered && root.showSeconds && root.showSecondsInTooltip
-    && !root.barWindow.islandHost.isOpenFor(root)
+    && !root.islandOpen
   barTipText: root.tipText
 
   Component {

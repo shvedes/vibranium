@@ -296,7 +296,7 @@ BarModule {
   // One tooltip per pill: the active one follows whichever surface the
   // cursor rests on (the mic pill's surface is disabled while hidden).
   ToolTipBind {
-    active: micHover.containsMouse && !root.barWindow.islandHost.isOpenFor(root)
+    active: micHover.containsMouse && !root.islandOpen
     lines: root.micTipLines
     anchor: micBox
     barWindow: root.barWindow
@@ -304,7 +304,7 @@ BarModule {
   }
 
   ToolTipBind {
-    active: hoverArea.containsMouse && !root.barWindow.islandHost.isOpenFor(root)
+    active: hoverArea.containsMouse && !root.islandOpen
     lines: root.volumeTipLines
     anchor: volumeBox
     barWindow: root.barWindow

@@ -113,7 +113,7 @@ CollapsibleSlot {
   fillButtons: Qt.LeftButton
   onClicked: mouse => root.openIsland()
 
-  barTipActive: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
+  barTipActive: root.hovered && !root.islandOpen
   barTipText: root.vmUnavailable ? "Printers - not available in a VM"
     : root.failed || root.printerDown ? "Printers - attention"
     : Svc.Printers.anyPrinting ? "Printers - printing"

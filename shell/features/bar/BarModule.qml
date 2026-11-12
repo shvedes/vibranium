@@ -40,6 +40,16 @@ Item {
   property ShellScreen barScreen: null
   property var barWindow: null
 
+  // Whether this module's island is the one the bar host has open. Read
+  // through the module so every consumer asks the host the same question
+  // rather than re-deriving it from an anchor check of its own.
+  readonly property bool islandOpen: !!(root.barWindow && root.barWindow.islandHost && root.barWindow.islandHost.isOpenFor(root))
+
+  // Whether a fullscreen window covers this module's screen, or any screen
+  // while the slot wrapper has not named one yet. A bar announcement parks
+  // while true so it cannot grow the bar over fullscreen content.
+  readonly property bool fullscreenActive: root.barScreen ? FullscreenProbe.screenActive(root.barScreen.name) : FullscreenProbe.anyActive
+
   // The module's layout slot id. The settings-key namespace for this
   // module's click commands: shell.statusbar.<moduleId><action>.
   property string moduleId: ""

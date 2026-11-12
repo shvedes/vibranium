@@ -243,18 +243,17 @@ BarModule {
   // parked the same way. The reveal itself never reads fullscreen: while
   // fullscreen is up nothing pulses and nothing shows. Only a named
   // (wifi) link parks - a cable has nothing to show.
-  readonly property bool _fsActive: root.barScreen ? FullscreenProbe.screenActive(root.barScreen.name) : FullscreenProbe.anyActive
   property bool _flashPending: false
   function _fireLinkFlash() {
     if (root.ssid === "") return
-    if (root._fsActive) {
+    if (root.fullscreenActive) {
       root._flashPending = true
       return
     }
     nameFlash.pulse()
   }
-  on_FsActiveChanged: {
-    if (root._fsActive) {
+  onFullscreenActiveChanged: {
+    if (root.fullscreenActive) {
       // Entering fullscreen with a flash up: park it and take it off
       // screen instead of letting it run under the fullscreen window.
       if (nameFlash.active) {
@@ -278,7 +277,6 @@ BarModule {
   // The island's own reveal: the same slide, held for the island's lifespan
   // while a wifi link stays connected. No window, no colour, no blink - the
   // island opening is the timer. A cable has no name, so it reveals nothing.
-  readonly property bool islandOpen: !!(root.barWindow && root.barWindow.islandHost && root.barWindow.islandHost.isOpenFor(root))
   readonly property bool islandReveal: root.islandOpen && root.ssid !== ""
   // The flash's green-normal blink: the colour alternates between green and
   // the resting tone at the blink cadence, independent of the global motion

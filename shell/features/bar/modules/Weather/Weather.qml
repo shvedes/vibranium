@@ -21,10 +21,6 @@ BarModule {
   // "Show temperature" is off, the temperature is briefly revealed on
   // each data update. Mirrors the Now Playing track-name flash.
   readonly property bool flashEnabled: Settings.value("shell.statusbar.weatherFlash") !== false
-  // Closed-island effect only: the island shows the temperature itself, so
-  // a refresh that lands while it is open must not reveal the bar label
-  // behind it.
-  readonly property bool islandOpen: !!(root.barWindow && root.barWindow.islandHost && root.barWindow.islandHost.isOpenFor(root))
   property bool flashActive: false
   property real tempSlide: (Core.Weather.showTemp || root.flashActive) ? 1 : 0
   Behavior on tempSlide {
@@ -165,7 +161,7 @@ BarModule {
     root.openIsland()
   }
 
-  barTipActive: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
+  barTipActive: root.hovered && !root.islandOpen
   barTipText: Core.Weather.tooltipText
   barTipLines: Core.Weather.tooltipLines
 

@@ -393,7 +393,7 @@ BarModule {
     const s = String(text === undefined || text === null ? "" : text)
     if (s === "") return
     root.flashText = s
-    if (root._fsActive) {
+    if (root.fullscreenActive) {
       root._flashPending = true
       return
     }
@@ -1048,10 +1048,9 @@ BarModule {
   // visible again. An in-flight flash cut off by entering fullscreen is
   // parked the same way. The reveal itself never reads fullscreen: while
   // fullscreen is up nothing pulses and nothing shows.
-  readonly property bool _fsActive: root.barScreen ? FullscreenProbe.screenActive(root.barScreen.name) : FullscreenProbe.anyActive
   property bool _flashPending: false
-  on_FsActiveChanged: {
-    if (root._fsActive) {
+  onFullscreenActiveChanged: {
+    if (root.fullscreenActive) {
       // Entering fullscreen with a flash up: park it and take it off
       // screen instead of letting it run under the fullscreen window.
       if (codeFlash.active) {

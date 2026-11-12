@@ -226,17 +226,16 @@ CollapsibleSlot {
   // Fullscreen defer, the Network/Bluetooth convention: the announcement
   // must not grow the bar over a fullscreen window. The event parks and
   // replays when the fullscreen ends; an in-flight flash is parked too.
-  readonly property bool _fsActive: root.barScreen ? FullscreenProbe.screenActive(root.barScreen.name) : FullscreenProbe.anyActive
   property string _flashPending: ""
   function _fireFlash(text): void {
-    if (root._fsActive) {
+    if (root.fullscreenActive) {
       root._flashPending = text
       return
     }
     root._startFlash(text)
   }
-  on_FsActiveChanged: {
-    if (root._fsActive) {
+  onFullscreenActiveChanged: {
+    if (root.fullscreenActive) {
       if (chargeFlash.active) {
         root._flashPending = root.flashText
         chargeFlash.clear()
