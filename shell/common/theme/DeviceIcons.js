@@ -14,7 +14,7 @@
 // The level at or below which a glyph reads as silence. PipeWire reports
 // 0..1 fractions and the shell's own steps land exactly on 0, so the
 // threshold only absorbs float dust; it is not a "quiet" band.
-var SILENT_LEVEL = 0.01
+let SILENT_LEVEL = 0.01
 
 // Whether a level reads as silence: explicitly muted, or driven to zero.
 // This is the glyph's own question - volume-off is the answer for both -
@@ -23,7 +23,7 @@ var SILENT_LEVEL = 0.01
 // `muted` for the controls that must not claim a mute the user never
 // performed (a toggle, a "Muted" readout).
 function silentFor(volume, muted) {
-  var v = Number(volume)
+  let v = Number(volume)
   return muted === true || !isFinite(v) || v <= SILENT_LEVEL
 }
 
@@ -42,7 +42,7 @@ function volumeIconFor(volume, muted) {
 // home of Audio.volumeDimTiersFor and its mirrors.
 function volumeDimTiersFor(volume, muted) {
   if (silentFor(volume, muted)) return 0
-  var v = Number(volume)
+  let v = Number(volume)
   if (v < 1 / 3) return 1
   if (v < 2 / 3) return 2
   return 3
@@ -56,7 +56,7 @@ function volumeDimTiersFor(volume, muted) {
 // Canonical home of Bluetooth deviceIconName; takes the class string so
 // both the island and the model share one matcher.
 function iconForDeviceClass(iconClass) {
-  var icon = String(iconClass || "").toLowerCase()
+  let icon = String(iconClass || "").toLowerCase()
   if (/keyboard/.test(icon)) return "keyboard"
   if (/mous/.test(icon)) return "mice"
   if (/gaming|game|joy/.test(icon)) return "gamepad"
@@ -90,7 +90,7 @@ function iconForFormFactor(form, icon, name, desc, nick, devDesc) {
 // own name rather than to a wrong glyph. Canonical home of Mixer
 // iconForMediaClass.
 function iconForMediaClass(cls) {
-  var c = String(cls)
+  let c = String(cls)
   if (c === "Stream/Output/Audio") return "music"
   if (c === "Stream/Input/Audio") return "mic-on"
   if (c === "Audio/Sink") return "speaker"
@@ -119,10 +119,10 @@ function iconForMediaClass(cls) {
 // set's miss renders as a purple checker. "" is the honest answer here,
 // and the caller turns it into the generic glyph.
 function appIconNameFromProps(get) {
-  var keys = ["application.icon-name", "application.iconName",
+  let keys = ["application.icon-name", "application.iconName",
     "application.process.binary", "application.name"]
-  for (var i = 0; i < keys.length; i++) {
-    var cand = ""
+  for (let i = 0; i < keys.length; i++) {
+    let cand = ""
     try {
       cand = get(keys[i])
     } catch (ignored) {
