@@ -995,4 +995,94 @@ group('the answers are a pure function of the string handed in', () => {
   skip('the fixture is byte-shaped like a live daemon capture', 'needs a running Pulse/PipeWire daemon, and the suite is required to pass on a host that has none: the fixture is a trimmed hand-written excerpt, so only its shape is asserted')
 })
 
+// ---------------------------------------------------------------------------
+section('disabledDeviceNodes - the cards the graph has no node for')
+// ---------------------------------------------------------------------------
+
+// A card as parseCardProfiles publishes one. The disable profile is index 0 and
+// carries no sink and no source, which is what makes it the profile that takes
+// the device out of the graph rather than a mode it can play in.
+const CARD = (over) => ({
+  index: 0,
+  name: 'alsa_card.pci',
+  driver: 'module-alsa-card',
+  description: 'Built-in Audio',
+  active: 'off',
+  objectId: '902',
+  alsa: '',
+  key: 'card:902',
+  profiles: [
+    { index: 0, name: 'off', description: 'Off (disables the device)', available: true, sinks: 0, sources: 0 },
+    { index: 1, name: 'output:analog-stereo', description: 'Analog Stereo Output', available: true, sinks: 1, sources: 0 },
+  ],
+  ...over,
+})
+
+const CARDS = (cards, byKey) => ({ cards: cards, byKey: byKey || {}, ambiguous: {} })
+
+const DEVICE = (over) => ({ isSink: true, isStream: false, properties: {}, ...over })
+
+group('a disabled card is listed as a row, keyed by the card and not by an id', () => {
+  const out = M.disabledDeviceNodes(CARDS([CARD()]), [])
+  eq('one card with no node is one row', out.length, 1)
+  eq('the row is keyed by the card', out[0].mixerKey, 'card:902')
+  eq('and marked disabled, which is what tells it from a node', out[0].disabled, true)
+  eq('the label is the card description', out[0].description, 'Built-in Audio')
+  // `device.id` is the join nodeCardKey resolves, so the profile picker on this
+  // row reaches the card it was built from.
+  eq('device.id is the join back to the card', out[0].properties['device.id'], '902')
+  eq('the media class follows the heading it is offered under',
+    out[0].properties['media.class'], 'Audio/Sink')
+  // No audio of its own: a card with no node has no volume, and a row that
+  // claimed one would draw a dead fader as a live level.
+  eq('the row carries no audio object', out[0].audio, null)
+  eq('and is not a stream', out[0].isStream, false)
+})
+
+group('only the disable profile makes a card a row of its own', () => {
+  eq('a live card is not listed', M.disabledDeviceNodes(CARDS([CARD({ active: 'output:analog-stereo' })]), []).length, 0)
+  eq('a card whose profile was never read is not listed either',
+    M.disabledDeviceNodes(CARDS([CARD({ active: '' })]), []).length, 0)
+})
+
+group('a card a device already names is not listed twice', () => {
+  eq('the same key claims the card',
+    M.disabledDeviceNodes(CARDS([CARD()]), [DEVICE({ properties: { 'device.id': '902' } })]).length, 0)
+  // A device can name its card through any of four keys, and the card publishes
+  // its own under a different one: the claim is resolved THROUGH the card map
+  // rather than by comparing the two spellings.
+  const cards = CARDS([CARD({ key: 'alsa:1' })], { 'card:902': CARD({ key: 'alsa:1' }) })
+  eq('a claim through another key form still claims it',
+    M.disabledDeviceNodes(cards, [DEVICE({ properties: { 'device.id': '902' } })]).length, 0)
+  eq('and the card is listed when the device is gone',
+    M.disabledDeviceNodes(cards, [DEVICE({ properties: { 'device.id': '904' } })]).length, 1)
+})
+
+group('the heading comes from what the card offers, not from a node flag', () => {
+  const output = M.disabledDeviceNodes(CARDS([CARD()]), [])
+  eq('a card with a sink profile is an output row', output[0].isSink, true)
+  const input = M.disabledDeviceNodes(CARDS([CARD({ profiles: [
+    { index: 0, name: 'off', description: 'Off (disables the device)', available: true, sinks: 0, sources: 0 },
+    { index: 1, name: 'input:analog-stereo', description: 'Analog Stereo Input', available: true, sinks: 0, sources: 1 },
+  ] })]), [])
+  eq('a card with a source profile is an input row', input[0].isSink, false)
+  eq('and wears the source class', input[0].properties['media.class'], 'Audio/Source')
+  // One row, not two: two rows over one profile list would be two pickers.
+  const duplex = M.disabledDeviceNodes(CARDS([CARD({ profiles: [
+    { index: 0, name: 'off', description: 'Off (disables the device)', available: true, sinks: 0, sources: 0 },
+    { index: 1, name: 'output:analog-stereo+input:analog-stereo', description: 'Duplex', available: true, sinks: 1, sources: 1 },
+  ] })]), [])
+  eq('a duplex card is one row', duplex.length, 1)
+  eq('offered under the output heading', duplex[0].isSink, true)
+  eq('a card with nothing but the disable profile has no row',
+    M.disabledDeviceNodes(CARDS([CARD({ profiles: [{ index: 0, name: 'off', description: 'Off', available: true, sinks: 0, sources: 0 }] })]), []).length, 0)
+})
+
+group('a card map that was never read answers nothing rather than throwing', () => {
+  eq('null cards', M.disabledDeviceNodes(null, []).length, 0)
+  eq('a missing card list', M.disabledDeviceNodes({}, []).length, 0)
+  eq('null devices', M.disabledDeviceNodes(CARDS([CARD()]), null).length, 1)
+  eq('a null member', M.disabledDeviceNodes({ cards: [null] }, []).length, 0)
+})
+
 finish()

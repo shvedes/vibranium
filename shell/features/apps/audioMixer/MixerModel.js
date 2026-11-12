@@ -1160,6 +1160,102 @@ function nodeCardKey(node) {
   return ""
 }
 
+// --- cards with no node -------------------------------------------------
+//
+// A card whose active profile is the disable profile has no sink and no
+// source, so the graph publishes no node for it. Every list the mixer draws is
+// built by classifying nodes, so the device disappears from all of them - and
+// the one row that carries the profile picker is exactly the row that goes
+// away, which made turning a device back on a one-way door.
+//
+// The Configuration tab therefore lists the CARD instead of the node it does
+// not have: the profile list is card data, so the picker that turns the device
+// back on comes from the same list either way.
+//
+// The heading a card is offered under is card data too rather than a node's
+// flags: a card is an OUTPUT card when any profile it offers carries a sink, an
+// INPUT card when any carries a source, and a duplex card is both - offered
+// once, under the output heading, because two rows would be two pickers over
+// one profile list.
+//
+// Only DISABLED cards are listed. A card with no node and a live profile is a
+// card whose nodes have not arrived yet, and a row invented for it would be a
+// device that appears and vanishes.
+function disabledDeviceNodes(cards, devices) {
+  const out = []
+  const map = cards !== null && cards !== undefined && Array.isArray(cards.cards)
+    ? cards.cards : []
+  const claimed = claimCards(cards, devices)
+  for (let i = 0; i < map.length; i++) {
+    const card = map[i]
+    if (card === null || card === undefined) continue
+    if (text(card.active) !== OFF_PROFILE) continue
+    const key = text(card.key)
+    if (key === "" || claimed[key] === true) continue
+    const shape = cardShape(card)
+    if (shape === null) continue
+    out.push({
+      // This card has no PipeWire id to be keyed by, so the row's identity is
+      // the card key itself: DeviceRow.nodeKey prefers `mixerKey` for exactly
+      // this case. `device.id` is what makes the profile picker resolve back to
+      // this card through nodeCardKey().
+      mixerKey: key,
+      disabled: true,
+      name: "",
+      nickname: "",
+      description: text(card.description),
+      isSink: shape.output,
+      isStream: false,
+      audio: null,
+      properties: {
+        "device.id": text(card.objectId),
+        "device.description": text(card.description),
+        "media.class": shape.output ? "Audio/Sink" : "Audio/Source"
+      }
+    })
+  }
+  return out
+}
+
+// Which of those cards already have a device in the graph, keyed by card key.
+//
+// A device names its card through whichever of the four keys it carries, so the
+// answer is read through the same join the profile picker uses and then resolved
+// to the CARD: comparing a device's `device.id` key against a card's `alsa:` key
+// would miss the pair and list a card whose device is on screen.
+function claimCards(cards, devices) {
+  const claimed = ({})
+  const list = StoreGuards.asList(devices)
+  for (let i = 0; i < list.length; i++) {
+    const key = nodeCardKey(list[i])
+    if (key === "") continue
+    claimed[key] = true
+    const card = cards !== null && cards !== undefined && cards.byKey !== undefined
+      ? cards.byKey[key] : undefined
+    const own = card === undefined || card === null ? "" : text(card.key)
+    if (own !== "") claimed[own] = true
+  }
+  return claimed
+}
+
+// The headings a card belongs under, from its own profile list, or null for a
+// card whose list offers nothing but the disable profile: there is no profile
+// to turn that card back on WITH, so it gets no row.
+function cardShape(card) {
+  const profiles = Array.isArray(card.profiles) ? card.profiles : []
+  let output = false
+  let input = false
+  for (let i = 0; i < profiles.length; i++) {
+    const profile = profiles[i]
+    if (profile === null || profile === undefined) continue
+    if (text(profile.name) === OFF_PROFILE) continue
+    if (Number(profile.sinks) > 0) output = true
+    if (Number(profile.sources) > 0) input = true
+  }
+  if (!output && !input) return null
+  return { output: output, input: input }
+}
+
 // One `Profiles:` line, or null for anything that is not one.
 function parseProfileLine(body) {
   const head = PROFILE_RE.exec(body)

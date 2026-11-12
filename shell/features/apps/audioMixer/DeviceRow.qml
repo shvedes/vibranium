@@ -82,7 +82,13 @@ Item {
   // reads this; the toggle and the "Muted" readout keep `muted`.
   readonly property bool silent: row.audio !== null
     && Core.Audio.silentFor(row.volume, row.muted)
-  readonly property string nodeKey: Model.nodeKey(row.node)
+  // The row's identity: the node's PipeWire id, or the card key a card with no
+  // node of its own carries (MixerModel.disabledDeviceNodes). Such a card has
+  // no graph id to be keyed by, and "" for every one of them would make them
+  // one row so far as the disclosure and the popover are concerned.
+  readonly property string nodeKey: row.node !== null && row.node !== undefined
+    && row.node.mixerKey !== undefined
+    ? String(row.node.mixerKey) : Model.nodeKey(row.node)
 
   // Two defaults (a sink and a source) and two writes, so the row asks the
   // state owner which side it is on rather than inferring it from the icon.

@@ -211,6 +211,24 @@ QtObject {
   readonly property var graphNodes: mixer.controller.graphNodes
   readonly property var graphLinks: mixer.controller.graphLinks
 
+  // The Configuration tab's two lists: the devices the graph carries, plus the
+  // cards it does not. A device switched off is a CARD with no node, so it is on
+  // this tab and nowhere else - the profile picker that turns it back on lives
+  // on the row that lists it, and a list built by classifying nodes would drop
+  // exactly that row. See AudioMixerController.disabledOutputDevices.
+  readonly property var configurationOutputs:
+    mixer.outputDevices.concat(mixer.disabledOutputDevices)
+  readonly property var configurationInputs:
+    mixer.inputDevices.concat(mixer.disabledInputDevices)
+
+  // One row's identity: the node's PipeWire id, or the card key a card with no
+  // node carries. The row reads it the same way (see DeviceRow.nodeKey), so the
+  // disclosure and the profile list of a disabled card are its own.
+  function deviceKey(node) {
+    return node !== null && node !== undefined && node.mixerKey !== undefined
+      ? String(node.mixerKey) : Model.nodeKey(node)
+  }
+
   // The device a stream currently plays through or records into, as a node, or
   // null when no device reports a link to it. A filter leg is linked to no
   // device and a stream the user has just moved has not settled yet; both are
@@ -1299,7 +1317,7 @@ QtObject {
           }
 
           Repeater {
-            model: mixer.tab === "configuration" ? mixer.outputDevices : []
+            model: mixer.tab === "configuration" ? mixer.configurationOutputs : []
 
             delegate: DeviceConfigRow {
               width: columns.width
@@ -1318,7 +1336,7 @@ QtObject {
           }
 
           Repeater {
-            model: mixer.tab === "configuration" ? mixer.inputDevices : []
+            model: mixer.tab === "configuration" ? mixer.configurationInputs : []
 
             delegate: DeviceConfigRow {
               width: columns.width
@@ -1552,11 +1570,11 @@ QtObject {
     required property var mixerRef
 
     node: modelData
-    linkHandle: mixerRef.controller.deviceLinks[Model.nodeKey(modelData)]
-    expanded: mixerRef.isExpanded(Model.nodeKey(modelData))
+    linkHandle: mixerRef.controller.deviceLinks[mixerRef.deviceKey(modelData)]
+    expanded: mixerRef.isExpanded(mixerRef.deviceKey(modelData))
     controller: mixerRef.controller
     mixerWindow: mixerRef
-    onToggleExpanded: mixerRef.toggleDevice(Model.nodeKey(modelData))
+    onToggleExpanded: mixerRef.toggleDevice(mixerRef.deviceKey(modelData))
   }
 
   component DeviceConfigRow: DeviceTabRow {

@@ -197,6 +197,30 @@ Item {
       root._captureStreams, root.nodesOfKind(nodes, "captureStream"))
     root._graphNodes = Model.stableList(
       root._graphNodes, root.audioNodes(nodes))
+    root._recomputeDisabled()
+  }
+
+  // The cards the graph has no node for, split by heading: a card whose active
+  // profile is the disable profile has no sink and no source, so it is in every
+  // list only as its absence. They are the Configuration tab's alone, because
+  // the profile picker that turns the card back on is the one control that can
+  // act on a device the graph is not carrying. See MixerModel's
+  // disabledDeviceNodes for the join and the direction rule.
+  property var _disabledOutputs: []
+  property var _disabledInputs: []
+  readonly property var disabledOutputDevices: root._disabledOutputs
+  readonly property var disabledInputDevices: root._disabledInputs
+
+  function _recomputeDisabled() {
+    const list = Model.disabledDeviceNodes(root._cards, root.allDevices)
+    const out = []
+    const ins = []
+    for (let i = 0; i < list.length; i++) {
+      if (list[i].isSink === true) out.push(list[i])
+      else ins.push(list[i])
+    }
+    root._disabledOutputs = out
+    root._disabledInputs = ins
   }
 
   // A burst of graph notifications must not cost a burst of rebuilds.
@@ -514,6 +538,9 @@ Item {
       root._armConfigRetry()
     } else {
       root._cards = Model.parseCardProfiles(String(result.stdout || ""))
+      // A card read is what tells a disabled card apart from one whose nodes
+      // have not arrived, so the Configuration tab's extra rows follow it.
+      root._recomputeDisabled()
       root.configAt = Date.now()
       root.configError = ""
       root._configTries = 0
