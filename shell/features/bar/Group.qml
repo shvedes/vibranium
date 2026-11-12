@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 // qmllint disable uncreatable-type
 import QtQuick
 import Quickshell
-import qs.common
 import qs.features.bar
 
 // Module group container. A group occupies one slot in the bar layout (its

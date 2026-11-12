@@ -992,14 +992,6 @@ Singleton {
         showFiles: true
         sortField: FolderListModel.Name
     }
-    function openFolder() {
-        const dir = root.backgroundsDir
-        const proc = folderProc.createObject(root, { command: ["xdg-open", dir] })
-        proc.exited.connect(proc.destroy)
-        proc.running = true
-        root.close()
-    }
-
     Component {
         id: delProc
         Process {
@@ -1007,14 +999,6 @@ Singleton {
             stderr: StdioCollector {}
         }
     }
-    Component {
-        id: folderProc
-        Process {
-            stdout: StdioCollector {}
-            stderr: StdioCollector {}
-        }
-    }
-
     IpcHandler {
         target: "wallpaperPicker"
         function help(command: string): string {

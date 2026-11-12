@@ -6,8 +6,6 @@ import QtQuick.Layouts
 import qs.common
 import qs.services as Core
 import "MixerModel.js" as Model
-import "../../../common/math/Range.js" as Range
-import "../../../common/text/Format.js" as Format
 import "../../../common/audio/LevelBand.js" as LevelBand
 
 // One device row, in two modes against one header:

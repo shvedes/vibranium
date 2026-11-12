@@ -99,7 +99,6 @@ import QtQuick.Shapes
 import qs.common
 import "MixerModel.js" as Model
 import "GraphModel.js" as Graph
-import "../../../common/math/Range.js" as Range
 
 Item {
   id: tab
