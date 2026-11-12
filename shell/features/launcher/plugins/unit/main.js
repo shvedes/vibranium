@@ -875,7 +875,7 @@ var UNIT_NOUN = {
 // sentence [singular, plural]. `extra` merges into the row (recip).
 // ---------------------------------------------------------------------------
 function addUnit(sym, dim, factor, def, names, noun, extra) {
-  var u = { sym: sym, dim: dim, factor: factor, def: def, names: names };
+  let u = { sym: sym, dim: dim, factor: factor, def: def, names: names };
   if (extra) for (var k in extra) u[k] = extra[k];
   UNITS.push(u);
   if (UNIT_NOUN[dim] === undefined) UNIT_NOUN[dim] = {};
@@ -1296,14 +1296,14 @@ var UNIT_WORD = null;
 function unitWord(sym, value) {
   if (UNIT_WORD === null) {
     UNIT_WORD = {};
-    for (var d in UNIT_NOUN) {
-      var group = UNIT_NOUN[d];
-      for (var s in group) {
+    for (let d in UNIT_NOUN) {
+      let group = UNIT_NOUN[d];
+      for (let s in group) {
         if (Object.prototype.hasOwnProperty.call(group, s)) UNIT_WORD[s] = group[s];
       }
     }
   }
-  var pair = UNIT_WORD[sym];
+  let pair = UNIT_WORD[sym];
   if (pair === undefined) return String(sym);
   return Math.abs(value) === 1 ? pair[0] : pair[1];
 }
@@ -1320,7 +1320,7 @@ function unitWord(sym, value) {
 // the sentence says "the speed of sound is ..." rather than "1 speed of
 // sound is ...". An ordinary source keeps the number and the noun.
 function phrase(value, fromSym, out, toSym, implicit) {
-  var source = implicit === true
+  let source = implicit === true
     ? "the " + unitWord(fromSym, value)
     : formatNumber(value) + " " + unitWord(fromSym, value);
   return source + " is " + formatNumber(out) + " " + unitWord(toSym, out);
@@ -1332,7 +1332,7 @@ function phrase(value, fromSym, out, toSym, implicit) {
 // through unitWord; the compact forms had no plural at all, which is what
 // made a plural query read back in the singular.
 function displaySym(sym, value) {
-  var pair = UNIT_WORD !== null ? UNIT_WORD[sym] : undefined;
+  let pair = UNIT_WORD !== null ? UNIT_WORD[sym] : undefined;
   if (pair === undefined) {
     unitWord(sym, value);
     pair = UNIT_WORD[sym];
@@ -1365,9 +1365,9 @@ var _aliasMap = null;
 
 function aliasMap() {
   if (_aliasMap !== null) return _aliasMap;
-  var m = {};
-  for (var i = 0; i < UNITS.length; i++) {
-    for (var j = 0; j < UNITS[i].names.length; j++) {
+  let m = {};
+  for (let i = 0; i < UNITS.length; i++) {
+    for (let j = 0; j < UNITS[i].names.length; j++) {
       m[UNITS[i].names[j]] = UNITS[i];
     }
   }
@@ -1394,7 +1394,7 @@ var SUPERSCRIPT = { "\u00b9": "^1", "\u00b2": "^2", "\u00b3": "^3" };
 // head is retried as "90 deg in", and "deg in" with the sign gone was the inch.
 // A "sq." or "cu." prefix loses its dot for the same reason a trailing one does.
 function normalizeUnit(s) {
-  var t = String(s === undefined || s === null ? "" : s).toLowerCase().trim();
+  let t = String(s === undefined || s === null ? "" : s).toLowerCase().trim();
   t = t.replace(/\u00b0\s*(?=(?:c|f|k|r|re|celsius|fahrenheit|kelvin|rankine|reaumur|r\u00e9aumur)\.*$)/, "");
   t = t.replace(/[_-]+/g, "");
   t = t.replace(/\s+/g, "");
@@ -1407,16 +1407,16 @@ function normalizeUnit(s) {
 }
 
 function lookup(key) {
-  var n = normalizeUnit(key);
+  let n = normalizeUnit(key);
   if (n === "") return null;
-  var m = aliasMap();
+  let m = aliasMap();
   return Object.prototype.hasOwnProperty.call(m, n) ? m[n] : null;
 }
 
 // One unit token as the user typed it: the case-sensitive override first, the
 // folded alias table second.
 function unitFor(token) {
-  var t = String(token === undefined || token === null ? "" : token).trim();
+  let t = String(token === undefined || token === null ? "" : token).trim();
   if (Object.prototype.hasOwnProperty.call(CASE_OVERRIDE, t)) return lookup(CASE_OVERRIDE[t]);
   return lookup(t);
 }
@@ -1431,7 +1431,7 @@ var _symMap = null;
 function symLookup(sym) {
   if (_symMap === null) {
     _symMap = {};
-    for (var i = 0; i < UNITS.length; i++) _symMap[UNITS[i].sym] = UNITS[i];
+    for (let i = 0; i < UNITS.length; i++) _symMap[UNITS[i].sym] = UNITS[i];
   }
   if (Object.prototype.hasOwnProperty.call(_symMap, sym)) return _symMap[sym];
   return lookup(sym);
@@ -1455,7 +1455,7 @@ function formatNumber(v) {
     if (Math.abs(v) < 1e15) return String(v);
     return trimExp(v.toExponential(6));
   }
-  var abs = Math.abs(v);
+  let abs = Math.abs(v);
   if (abs !== 0 && (abs >= 1e12 || abs < 1e-6)) return trimExp(v.toExponential(6));
   // toPrecision switches to exponent form at 1e6, which printed 1610953.344
   // as "1.61095e+6" while the integer 1609344 printed in full. Between there
@@ -1463,7 +1463,7 @@ function formatNumber(v) {
   if (abs >= 999999.5) return String(Math.round(v));
   // At most 6 significant digits: "20cm" reads "7.87402 in" while
   // exact-looking results ("402.336", "2.20462") are untouched.
-  var s = v.toPrecision(6);
+  let s = v.toPrecision(6);
   if (s.indexOf("e") >= 0 || s.indexOf("E") >= 0) {
     return s.replace(/(\.\d*?[1-9])0+e/, "$1e").replace(/\.0+e/, "e");
   }
@@ -1534,17 +1534,17 @@ function stripTail(s) {
 // question forms, which return early because their rewrite does not start
 // with a filler word, then the filler strip, then the tail.
 function preprocess(query) {
-  var s = String(query === undefined || query === null ? "" : query).trim();
+  let s = String(query === undefined || query === null ? "" : query).trim();
   s = stripTail(s.replace(RE_ARROW, " -> "));
   // The tail is dropped before the question forms are read, not after: they
   // return early, and a "please" still sitting inside a capture would rewrite
   // to "5 mi please? in km", which is not a query. Once it is gone the
   // rewrites need no tail handling of their own.
-  var ask0 = s.match(RE_ASK_IS);
+  let ask0 = s.match(RE_ASK_IS);
   if (ask0 !== null) return ask0[1] + " in " + ask0[2];
-  var ask = s.match(RE_ASK_LAST);
+  let ask = s.match(RE_ASK_LAST);
   if (ask !== null) return ask[2] + " in " + ask[1];
-  var ask2 = s.match(RE_ASK_FIRST);
+  let ask2 = s.match(RE_ASK_FIRST);
   if (ask2 !== null) return ask2[1] + " in " + ask2[2];
   return s.replace(RE_FILLER, "");
 }
@@ -1554,10 +1554,10 @@ function preprocess(query) {
 // a row flagged bare qualifies: an ordinary unit still needs a value, which
 // keeps a bare "km" an app search rather than a list of conversions.
 function bareUnitName(text) {
-  var t = String(text === undefined || text === null ? "" : text).trim();
+  let t = String(text === undefined || text === null ? "" : text).trim();
   if (t.substring(0, 4).toLowerCase() === "the ") t = t.substring(4).trim();
   if (t === "") return null;
-  var u = unitFor(t);
+  let u = unitFor(t);
   return u !== null && u.bare === true ? u : null;
 }
 
@@ -1568,13 +1568,13 @@ function bareUnitName(text) {
 // nothing else - tryConvert calls it, so nothing here reaches back into the
 // parser.
 function isPotentialUnit(query) {
-  var t = preprocess(query);
+  let t = preprocess(query);
   if (t === "" || t.length > 128) return false;
   if (t.indexOf("\n") >= 0 || t.indexOf("\r") >= 0) return false;
   if (bareUnitName(t) !== null) return true;
   // A bare constant with a target ("speed of sound in m/s", or the
   // half-typed "speed of sound in") carries the number in its head.
-  var sp = splitExplicit(t);
+  let sp = splitExplicit(t);
   if (sp !== null && bareUnitName(sp.head) !== null) return true;
   if (!RE_NUM.test(t)) return false;
   if (!/[a-zA-Z"'\/\u00b0]/.test(t)) return false;
@@ -1588,11 +1588,11 @@ function isPotentialUnit(query) {
 var RE_FT_IN = /^(\d+(?:\.\d+)?)\s*'\s*(\d+(?:\.\d+)?)?\s*(?:"|in\b|inch|inches)?$/i;
 
 function parseFeetInches(text) {
-  var m = String(text).match(RE_FT_IN);
+  let m = String(text).match(RE_FT_IN);
   if (m === null || m[2] === undefined) return null;
-  var table = aliasMap();
-  var ft = table["ft"];
-  var inch = table["in"];
+  let table = aliasMap();
+  let ft = table["ft"];
+  let inch = table["in"];
   if (!ft || !inch) return null;
   return [{ value: Number(m[1]), unit: ft, text: m[1] },
     { value: Number(m[2]), unit: inch, text: m[2] }];
@@ -1608,23 +1608,23 @@ function isSpace(ch) {
 // and "5m" is the same shape as "5 m". The number is kept as written,
 // grouping commas included, because the label echoes what was typed.
 function parseSource(text) {
-  var s = String(text);
-  var terms = [];
-  var i = 0;
+  let s = String(text);
+  let terms = [];
+  let i = 0;
   while (i < s.length) {
     while (i < s.length && isSpace(s.charAt(i))) i++;
     if (i >= s.length) break;
-    var m = s.substring(i).match(RE_NUM);
+    let m = s.substring(i).match(RE_NUM);
     if (m === null) return null;
-    var written = m[0];
-    var value = Number(written.replace(/,/g, ""));
+    let written = m[0];
+    let value = Number(written.replace(/,/g, ""));
     if (!isFinite(value)) return null;
     i += written.length;
     while (i < s.length && isSpace(s.charAt(i))) i++;
-    var j = i;
+    let j = i;
     while (j < s.length && !isSpace(s.charAt(j))) j++;
-    var unit = unitFor(s.substring(i, j));
-    var end = j;
+    let unit = unitFor(s.substring(i, j));
+    let end = j;
     // A name can be more than one word and normalizeUnit drops the spaces,
     // so "degrees celsius" is one alias and "degrees" on its own is a
     // different one. The token grows a word at a time, and a word that
@@ -1636,17 +1636,17 @@ function parseSource(text) {
     // number. Only a resolved key moves the term's end, so text that resolved
     // to nothing is scanned again as the next term instead of vanishing into
     // the unit that failed to claim it.
-    var scan = end;
-    for (var extra = 0; extra < 3 && scan < s.length; extra++) {
-      var k = scan;
+    let scan = end;
+    for (let extra = 0; extra < 3 && scan < s.length; extra++) {
+      let k = scan;
       while (k < s.length && isSpace(s.charAt(k))) k++;
-      var w = k;
+      let w = k;
       while (w < s.length && !isSpace(s.charAt(w))) w++;
       if (w === k) break;
       scan = w;
-      var wider = unitFor(s.substring(i, w));
+      let wider = unitFor(s.substring(i, w));
       if (wider === null) continue;
-      var rest = s.substring(w).replace(/^\s+/, "");
+      let rest = s.substring(w).replace(/^\s+/, "");
       if (rest !== "" && !RE_NUM.test(rest)) break;
       unit = wider;
       end = w;
@@ -1658,7 +1658,7 @@ function parseSource(text) {
       // Only a foot may lend its inches. "5 m 30" has no such reading, and
       // taking the 30 for inches would be the silent guess this engine never
       // makes.
-      var lastTerm = terms.length > 0 ? terms[terms.length - 1].unit : null;
+      let lastTerm = terms.length > 0 ? terms[terms.length - 1].unit : null;
       if (i === j && j >= s.length && lastTerm !== null && lastTerm.sym === "ft") unit = aliasMap()["in"];
       else return null;
     }
@@ -1673,11 +1673,11 @@ function parseSource(text) {
 // "into" is safe in the alternation because a split only happens where a
 // unit follows the keyword.
 function splitExplicit(body) {
-  var m = String(body).match(/^(.*)\s+(in|into|to|as|->|=)\s+(.+?)\s*$/i);
+  let m = String(body).match(/^(.*)\s+(in|into|to|as|->|=)\s+(.+?)\s*$/i);
   if (m) return { head: m[1], key: m[2], tail: m[3] };
-  var mTight = String(body).match(/^(\d+(?:\.\d+)?)(in)\s+(.+?)\s*$/i);
+  let mTight = String(body).match(/^(\d+(?:\.\d+)?)(in)\s+(.+?)\s*$/i);
   if (mTight) return { head: mTight[1], key: mTight[2], tail: mTight[3] };
-  var m2 = String(body).match(/^(.*)\s+(in|into|to|as|->|=)\s*$/i);
+  let m2 = String(body).match(/^(.*)\s+(in|into|to|as|->|=)\s*$/i);
   if (m2) return { head: m2[1], key: m2[2], tail: "" };
   return null;}
 
@@ -1688,7 +1688,7 @@ var _dimCache = null;
 function dimUnits(dim) {
   if (_dimCache === null) {
     _dimCache = {};
-    for (var i = 0; i < UNITS.length; i++) {
+    for (let i = 0; i < UNITS.length; i++) {
       if (_dimCache[UNITS[i].dim] === undefined) _dimCache[UNITS[i].dim] = [];
       _dimCache[UNITS[i].dim].push(UNITS[i].sym);
     }
@@ -1700,9 +1700,9 @@ function dimUnits(dim) {
 // source's own default first, then the rest of its dimension in table order.
 // Two candidates is the floor for a suggestion list.
 function dimHint(from) {
-  var syms = dimUnits(from.dim);
-  var out = [from.def];
-  for (var i = 0; i < syms.length && out.length < 6; i++) {
+  let syms = dimUnits(from.dim);
+  let out = [from.def];
+  for (let i = 0; i < syms.length && out.length < 6; i++) {
     if (syms[i] === from.sym || out.indexOf(syms[i]) >= 0) continue;
     out.push(syms[i]);
   }
@@ -1744,9 +1744,9 @@ function convertValue(value, from, to) {
 }
 
 function pickDefault(value, from) {
-  var ladder = DEF_LADDER[from.dim];
+  let ladder = DEF_LADDER[from.dim];
   if (ladder === undefined) return from.def;
-  var i, cand, out;
+  let i, cand, out;
   if (ladder.pick === "window") {
     for (i = 0; i < ladder.syms.length; i++) {
       cand = symLookup(ladder.syms[i]);
@@ -1756,8 +1756,8 @@ function pickDefault(value, from) {
     }
     return from.def;
   }
-  var best = null;
-  var bestScore = Infinity;
+  let best = null;
+  let bestScore = Infinity;
   for (i = 0; i < ladder.syms.length; i++) {
     cand = symLookup(ladder.syms[i]);
     if (cand === null || cand.sym === from.sym) continue;
@@ -1765,7 +1765,7 @@ function pickDefault(value, from) {
     // A reading under a tenth of one is the prefix one step too large, and
     // its log distance would otherwise beat every real answer.
     if (Math.abs(out) < 0.1) continue;
-    var score = Math.abs(Math.log10(Math.abs(out)));
+    let score = Math.abs(Math.log10(Math.abs(out)));
     if (score < bestScore) {
       bestScore = score;
       best = cand.sym;
@@ -1795,38 +1795,38 @@ function pickTargets(value, from) {
   // that list to numbers a person has a feel for; a pinned snapshot is the
   // other case, so a `spread` row answers exactly the units it is quoted in.
   if (from.spread !== undefined) {
-    var spread = [];
-    for (var s = 0; s < from.spread.length && spread.length < MAX_TARGETS; s++) {
-      var pick = symLookup(from.spread[s]);
+    let spread = [];
+    for (let s = 0; s < from.spread.length && spread.length < MAX_TARGETS; s++) {
+      let pick = symLookup(from.spread[s]);
       if (pick !== null && pick.sym !== from.sym) spread.push(pick.sym);
     }
     if (spread.length > 0) return spread;
   }
   function readable(v) {
-    var a = Math.abs(v);
+    let a = Math.abs(v);
     if (!isFinite(a) || a < MIN_FRACTION) return false;
-    var l = Math.log10(a);
+    let l = Math.log10(a);
     return Math.min(Math.abs(l), Math.abs(l - 3)) < MAX_DECADES;
   }
-  var first = pickDefault(value, from);
-  var queue = [first];
-  var list = SUGGEST[from.dim];
+  let first = pickDefault(value, from);
+  let queue = [first];
+  let list = SUGGEST[from.dim];
   if (list !== undefined) {
-    for (var i = 0; i < list.length; i++) {
+    for (let i = 0; i < list.length; i++) {
       if (queue.indexOf(list[i]) < 0) queue.push(list[i]);
     }
   }
-  var out = [];
-  var numbers = [];
-  for (var j = 0; j < queue.length && out.length < MAX_TARGETS; j++) {
-    var cand = symLookup(queue[j]);
+  let out = [];
+  let numbers = [];
+  for (let j = 0; j < queue.length && out.length < MAX_TARGETS; j++) {
+    let cand = symLookup(queue[j]);
     if (cand === null || cand.sym === from.sym) continue;
-    var reading = convertValue(value, from, cand);
+    let reading = convertValue(value, from, cand);
     if (j > 0 && readable(reading) === false) continue;
-    var range = SUGGEST_RANGE[cand.sym];
+    let range = SUGGEST_RANGE[cand.sym];
     if (j > 0 && range !== undefined
         && (Math.abs(reading) < range[0] || Math.abs(reading) > range[1])) continue;
-    var text = formatNumber(reading);
+    let text = formatNumber(reading);
     if (numbers.indexOf(text) >= 0) continue;
     numbers.push(text);
     out.push(cand.sym);
@@ -1846,16 +1846,16 @@ function pickTargets(value, from) {
 // ("convert convert 5 km to mi") has a fixed number of passes to spend.
 function parseQuery(query, depth) {
   if (depth === undefined) {
-    var pre = preprocess(query);
+    let pre = preprocess(query);
     if (pre === "" || pre.length > 128 || pre.indexOf("\n") >= 0) return null;
     return parseQuery(pre, 1);
   }
-  var raw = String(query);
+  let raw = String(query);
   if (!isPotentialUnit(raw)) return null;
-  var split = splitExplicit(raw);
-  var headText = split === null ? raw : split.head;
-  var tailText = split === null ? null : split.tail;
-  var terms = parseSource(headText);
+  let split = splitExplicit(raw);
+  let headText = split === null ? raw : split.head;
+  let tailText = split === null ? null : split.tail;
+  let terms = parseSource(headText);
   // "5 in cm" splits at its only keyword, which leaves "5" as the source and
   // "cm" as the target; the keyword is really the source unit, so the head is
   // retried with it.
@@ -1863,7 +1863,7 @@ function parseQuery(query, depth) {
   if (terms === null) terms = parseFeetInches(headText);
   if (terms === null && split !== null) terms = parseFeetInches(headText + " " + split.key);
   if (terms === null) {
-    var constant = bareUnitName(headText);
+    let constant = bareUnitName(headText);
     if (constant === null) return null;
     terms = [{ value: 1, unit: constant, text: "", implicit: true }];
   }
@@ -1875,7 +1875,7 @@ function parseQuery(query, depth) {
     // one and takes the query whole, so the keyword becomes a unit and the
     // answer is bare; a tie keeps the head, which is what holds "5 m in" at
     // one metre rather than five minutes - "m in" is the minute.
-    var joined = split === null ? null : parseSource(headText + " " + split.key);
+    let joined = split === null ? null : parseSource(headText + " " + split.key);
     if (joined !== null && joined.length > terms.length) {
       terms = joined;
       tailText = null;
@@ -1887,15 +1887,15 @@ function parseQuery(query, depth) {
       // is the honest answer to that.
       tailText = null;
     } else {
-      var open = termText(terms[0]);
+      let open = termText(terms[0]);
       return { ok: false, error: "incomplete", expr: open,
         label: terms[0].implicit === true ? "the " + open : open,
         sub: "Continue typing..." };
     }
   }
-  var inputText = terms.map(termText).join(" + ");
-  var from = terms[0].unit;
-  var value = terms[0].value;
+  let inputText = terms.map(termText).join(" + ");
+  let from = terms[0].unit;
+  let value = terms[0].value;
   // A sum is only meaningful for an amount. Two temperature readings are
   // points on a scale and two fuel economies are reciprocals, so "10 C 50 F"
   // has no answer and adding them would print one anyway.
@@ -1904,7 +1904,7 @@ function parseQuery(query, depth) {
       label: "Cannot add " + from.dim + " values",
       sub: "convert one value at a time" };
   }
-  for (var i = 1; i < terms.length; i++) {
+  for (let i = 1; i < terms.length; i++) {
     if (terms[i].unit.dim !== from.dim) {
       return { ok: false, error: "incompatible", expr: inputText,
         label: "Incompatible units",
@@ -1926,9 +1926,9 @@ function parseQuery(query, depth) {
 // folded table alone read it as calories, a factor of a thousand), or a unit
 // the engine picked itself.
 function renderTarget(q, toSpec) {
-  var inputText = q.inputText;
-  var from = q.from;
-  var to = typeof toSpec === "string" ? unitFor(toSpec) : toSpec;
+  let inputText = q.inputText;
+  let from = q.from;
+  let to = typeof toSpec === "string" ? unitFor(toSpec) : toSpec;
   if (!to) {
     return { ok: false, error: "unknown-target", expr: inputText,
       label: "Unknown unit '" + String(toSpec).trim() + "'",
@@ -1936,7 +1936,7 @@ function renderTarget(q, toSpec) {
   }
   // Speed shorthand: length target coerces to its speed twin.
   if (from.dim === "speed" && to.dim === "length") {
-    var twin = SPEED_LEN[to.sym];
+    let twin = SPEED_LEN[to.sym];
     if (twin === undefined) {
       return { ok: false, error: "incompatible", expr: inputText,
         label: "Incompatible units",
@@ -1952,22 +1952,22 @@ function renderTarget(q, toSpec) {
   // Unphysical temperatures: anything under 0 K is a hint, never a
   // number. Covers both directions ("-300C in K", "-5K in C").
   if (from.dim === "temperature") {
-    var kelvin = toCelsius(q.value, from.sym) + 273.15;
+    let kelvin = toCelsius(q.value, from.sym) + 273.15;
     if (kelvin < -1e-9) {
       return { ok: false, error: "unphysical", expr: inputText,
         label: "Below absolute zero",
         sub: inputText + " is under 0 K" };
     }
   }
-  var out = convertValue(q.value, from, to);
+  let out = convertValue(q.value, from, to);
   if (typeof out !== "number" || isNaN(out) || !isFinite(out)) {
     return { ok: false, error: "out-of-range", expr: inputText,
       label: "Result out of range",
       sub: "e.g. 5m in cm" };
   }
-  var formatted = formatNumber(out);
-  var copy = formatted + " " + displaySym(to.sym, out);
-  var implicit = q.implicit === true;
+  let formatted = formatNumber(out);
+  let copy = formatted + " " + displaySym(to.sym, out);
+  let implicit = q.implicit === true;
   return { ok: true, value: q.value, from: from.sym, to: to.sym,
     out: out, formatted: formatted, copy: copy,
     phrase: phrase(q.value, from.sym, out, to.sym, implicit),
@@ -1978,7 +1978,7 @@ function renderTarget(q, toSpec) {
 // Main entry, see header for the return contract. Never throws:
 // unparseable input is null (caller falls through to app search).
 function tryConvert(query) {
-  var q = parseQuery(query);
+  let q = parseQuery(query);
   if (q === null || q.ok === false) return q;
   return renderTarget(q, q.bare ? symLookup(pickDefault(q.value, q.from)) : q.toSpec);
 }
@@ -1990,14 +1990,14 @@ function tryConvert(query) {
 // query the checks refuse stops there instead of repeating itself once per
 // candidate.
 function tryAll(query) {
-  var q = parseQuery(query);
+  let q = parseQuery(query);
   if (q === null) return null;
   if (q.ok === false) return [q];
   if (q.bare === false) return [renderTarget(q, q.toSpec)];
-  var targets = pickTargets(q.value, q.from);
-  var out = [];
-  for (var i = 0; i < targets.length; i++) {
-    var r = renderTarget(q, symLookup(targets[i]));
+  let targets = pickTargets(q.value, q.from);
+  let out = [];
+  for (let i = 0; i < targets.length; i++) {
+    let r = renderTarget(q, symLookup(targets[i]));
     if (r.ok !== true) {
       if (i === 0) return [r];
       continue;
