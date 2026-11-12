@@ -190,7 +190,7 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 111 of the 250 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 112 of the 251 declared types, and every one of them
 # through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
@@ -246,6 +246,7 @@ qs.features.bar.BarModule
 qs.features.bar.BarPill
 qs.features.bar.CollapsibleSlot
 qs.features.bar.Group
+qs.features.bar.RevealFlash
 qs.features.bar.SectionLabel
 qs.features.bar.ToolTipBind
 qs.features.bar.Zone
@@ -348,15 +349,15 @@ EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null
 supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 248 declared entries over 46 qmldir files, one of which is excluded from the
-# work list (boot/Boot.qml), so 247 cases are built. The 132 that are not built
+# 249 declared entries over 46 qmldir files, one of which is excluded from the
+# work list (boot/Boot.qml), so 248 cases are built. The 132 that are not built
 # are the needs-environment and declared-but-uncreatable sets below. A
 # singleton (RowGeometry, Paths) is not creatable either; the probe's case for
 # one names it and lets the engine build it, which is why a singleton that
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=250
+EXPECTED_DECLARED_COUNT=251
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -376,7 +377,7 @@ EXPECTED_DECLARED_COUNT=250
 # qs.common.Vignette is in the same class: a plain Item over a Shape and a
 # radial gradient, with no singleton and no window behind it.
 EXPECTED_CLEAN_COUNT=115
-EXPECTED_NEEDS_COUNT=111
+EXPECTED_NEEDS_COUNT=112
 EXPECTED_UNCREATABLE_COUNT=23
 
 # --------------------------------------------------------------------------

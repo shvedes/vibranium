@@ -277,38 +277,25 @@ BarModule {
   // while a wifi link stays connected. No window, no colour, no blink - the
   // island opening is the timer. A cable has no name, so it reveals nothing.
   readonly property bool islandReveal: root.islandOpen && root.ssid !== ""
-  // The flash's green-normal blink: the colour alternates between green and
-  // the resting tone at the blink cadence, independent of the global motion
-  // setting.
-  property bool flashTick: false
-  Timer {
-    id: blinkTimer
-
-    interval: Ui.blinkMs
-    running: root.revealed
-    repeat: true
-    onTriggered: root.flashTick = !root.flashTick
+  RevealFlash {
+    id: reveal
+    revealed: root.revealed
+    islandReveal: root.islandReveal
+    greenColor: Ui.solid("green")
+    restingColor: Ui.solid(root.iconColor)
+    slowMs: Ui.slowMs
+    blinkMs: Ui.blinkMs
   }
-  onRevealedChanged: {
-    if (root.revealed) root.flashTick = true
-    else root.flashTick = false
-  }
-  readonly property bool greenPhase: root.revealed && root.flashTick
-  property real nameSlide: (root.revealed || root.islandReveal) ? 1 : 0
+  property real nameSlide: reveal.nameSlide
   Behavior on nameSlide {
     Glide { duration: Ui.slowMs }
   }
   // The glyph's colour is tweened rather than swapped: Icon takes a literal
   // "#rrggbb" for colorKey (Icons.url), so both endpoints are real colours
-  // and the green-in and the green-out are fades rather than snaps. The way
-  // in matches the pill's glide so the two arrive together; the way home
-  // lasts a blink so it lands softly. A Behaviour carries one duration, so
-  // it is read per travel. The resting endpoint resolves exactly as Icon
-  // resolves a palette key, so neither end of the fade has a seam.
-  readonly property int colorMs: root.revealed ? Ui.slowMs : Ui.blinkMs
-  property color glyphColor: root.greenPhase ? Ui.solid("green") : Ui.solid(root.iconColor)
+  // and the green-in and the green-out are fades rather than snaps.
+  property color glyphColor: reveal.glyphColor
   Behavior on glyphColor {
-    ColorAnim { duration: root.colorMs; easing.type: root.revealed ? Easing.OutCubic : Easing.InOutQuad }
+    ColorAnim { duration: reveal.colorMs; easing.type: root.revealed ? Easing.OutCubic : Easing.InOutQuad }
   }
 
   // Dynamic pill (the NowPlaying convention): a `nameSlide` real animates

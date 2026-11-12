@@ -5,6 +5,7 @@ BarModule 1.0 BarModule.qml
 BarPill 1.0 BarPill.qml
 SectionLabel 1.0 SectionLabel.qml
 CollapsibleSlot 1.0 CollapsibleSlot.qml
+RevealFlash 1.0 RevealFlash.qml
 BarView 1.0 BarView.qml
 ToolTipBind 1.0 ToolTipBind.qml
 ToolTipHost 1.0 ToolTipHost.qml
