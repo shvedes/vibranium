@@ -15,7 +15,7 @@
 // 3 = + middle arc, 4 = everything. A strength below 25% still draws
 // the dot, so the lowest tier is 1.
 function strengthDimTiers(strength) {
-  var s = Number(strength)
+  let s = Number(strength)
   if (!isFinite(s)) s = 0
   if (s < 0.25) return 1
   if (s < 0.5) return 2
@@ -25,12 +25,12 @@ function strengthDimTiers(strength) {
 
 // Parse the poll's key<TAB>value lines into an object.
 function parseStats(raw) {
-  var out = {}
-  var lines = String(raw || "").split("\n")
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i]
+  let out = {}
+  let lines = String(raw || "").split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i]
     if (line === "") continue
-    var idx = line.indexOf("\t")
+    let idx = line.indexOf("\t")
     if (idx === -1) continue
     out[line.substring(0, idx)] = line.substring(idx + 1).trim()
   }
@@ -41,11 +41,11 @@ function parseStats(raw) {
 // The first sample after a switch (or after open) has no baseline and must
 // not manufacture a spike.
 function throughputState(previous, sample, now) {
-  var prev = previous || {}
-  var rx = parseFloat(sample.rx_bytes || "0")
-  var tx = parseFloat(sample.tx_bytes || "0")
-  var iface = sample.iface || ""
-  var prevTime = Number(prev.prevSampleTime || 0)
+  let prev = previous || {}
+  let rx = parseFloat(sample.rx_bytes || "0")
+  let tx = parseFloat(sample.tx_bytes || "0")
+  let iface = sample.iface || ""
+  let prevTime = Number(prev.prevSampleTime || 0)
 
   if (iface === "" || iface !== (prev.prevIface || "") || prevTime === 0) {
     return {
@@ -58,9 +58,9 @@ function throughputState(previous, sample, now) {
     }
   }
 
-  var dt = now - prevTime
-  var down = 0
-  var up = 0
+  let dt = now - prevTime
+  let down = 0
+  let up = 0
   if (dt > 0) {
     down = Math.max(0, (rx - Number(prev.prevRxBytes || 0)) / dt)
     up = Math.max(0, (tx - Number(prev.prevTxBytes || 0)) / dt)
@@ -104,7 +104,7 @@ var SECURITY_LABELS = [
 ]
 
 function securityLabel(security) {
-  var s = parseInt(security, 10)
+  let s = parseInt(security, 10)
   if (!isFinite(s) || s < 0 || s >= SECURITY_LABELS.length) return "Secured"
   return SECURITY_LABELS[s]
 }
@@ -115,19 +115,19 @@ function securityLabel(security) {
 // still the same row whether it is up or down, so the marker rides here
 // rather than swapping the title suffix beside the name.
 function subtextFor(row) {
-  var r = row || {}
-  var sig = Number(r.signal)
+  let r = row || {}
+  let sig = Number(r.signal)
   if (!isFinite(sig)) sig = 0
   sig = Range.clamp(Math.round(sig), 0, 100)
-  var label = r.securityLabel ? r.securityLabel : "Open"
-  var out = sig + "% signal \u00b7 " + label
+  let label = r.securityLabel ? r.securityLabel : "Open"
+  let out = sig + "% signal \u00b7 " + label
   if (r.known && !r.connected) out += " \u00b7 saved"
   return out
 }
 
 function isOutOfReach(network) {
-  var n = network || {}
-  var signal = Number(n.signalStrength)
+  let n = network || {}
+  let signal = Number(n.signalStrength)
   return !!n.known && !n.connected && (!isFinite(signal) || signal <= 0)
 }
 
@@ -136,7 +136,7 @@ function isOutOfReach(network) {
 // openSecurity/oweSecurity are the WifiSecurityType enums from QML.
 function wifiRow(network, openSecurity, oweSecurity) {
   if (!network) return null
-  var signal = Format.percentInt(network.signalStrength || 0)
+  let signal = Format.percentInt(network.signalStrength || 0)
   return {
     connected: !!network.connected,
     known: !!network.known,
@@ -154,7 +154,7 @@ function wifiRow(network, openSecurity, oweSecurity) {
 // typed secret as NoSecrets as often as WifiAuthTimeout, so either reason
 // reads as "wrong password", never "passphrase required".
 function failureReasonText(reason, reasons, freshSecrets) {
-  var r = reasons || {}
+  let r = reasons || {}
   if (freshSecrets === true && (reason === r.NoSecrets || reason === r.WifiAuthTimeout)) return "Wrong password"
   if (reason === r.NoSecrets) return "Passphrase required"
   if (reason === r.WifiAuthTimeout) return "Wrong password"
@@ -173,13 +173,13 @@ function failureReasonText(reason, reasons, freshSecrets) {
 // deleted - its owner retypes or forgets it by hand.
 function shouldDiscardSecrets(actionKind, freshSecrets, reason, reasons) {
   if (actionKind !== "connect" || freshSecrets !== true) return false
-  var r = reasons || {}
+  let r = reasons || {}
   return reason === r.WifiAuthTimeout || reason === r.NoSecrets
 }
 
 // Connected first, then known, then by signal strength.
 function sortWifiRows(rows) {
-  var nets = Array.isArray(rows) ? rows.slice() : []
+  let nets = Array.isArray(rows) ? rows.slice() : []
   nets.sort(function(a, b) {
     if (a.connected !== b.connected) return a.connected ? -1 : 1
     if (a.known !== b.known) return a.known ? -1 : 1
@@ -193,12 +193,12 @@ function sortWifiRows(rows) {
 // the ListView model and recreates every delegate (focus loss, scroll
 // pursuit). Skip the assignment when nothing visible changed.
 function wifiRowsEqual(a, b) {
-  var x = StoreGuards.asList(a)
-  var y = StoreGuards.asList(b)
+  let x = StoreGuards.asList(a)
+  let y = StoreGuards.asList(b)
   if (x.length !== y.length) return false
-  for (var i = 0; i < x.length; i++) {
-    var r = x[i] || {}
-    var s = y[i] || {}
+  for (let i = 0; i < x.length; i++) {
+    let r = x[i] || {}
+    let s = y[i] || {}
     if (r.ssid !== s.ssid) return false
     if (!!r.connected !== !!s.connected) return false
     if (!!r.known !== !!s.known) return false
@@ -257,19 +257,19 @@ function wifiDisplayKey(row) {
 // sectionTitleFor returns "" on continuations, and ListView turns a "" into
 // its own blank section header - a phantom gap.
 function deriveWifiState(prev, rows) {
-  var p = prev || {}
-  var sorted = sortWifiRows(StoreGuards.asList(rows))
+  let p = prev || {}
+  let sorted = sortWifiRows(StoreGuards.asList(rows))
 
-  var currentSection = ""
-  for (var i = 0; i < sorted.length; i++) {
-    var t = sectionTitleFor(i, sorted)
+  let currentSection = ""
+  for (let i = 0; i < sorted.length; i++) {
+    let t = sectionTitleFor(i, sorted)
     if (t !== "") currentSection = t
     sorted[i].section = currentSection
   }
 
-  var prevSorted = StoreGuards.asList(p.sorted)
-  var prevKnown = StoreGuards.asList(p.known)
-  var prevOther = StoreGuards.asList(p.other)
+  let prevSorted = StoreGuards.asList(p.sorted)
+  let prevKnown = StoreGuards.asList(p.known)
+  let prevOther = StoreGuards.asList(p.other)
 
   // The poll rebuilds the same rows every tick, so the common answer is
   // "nothing changed". When the sorted set is equal, the known/other split
@@ -277,7 +277,7 @@ function deriveWifiState(prev, rows) {
   // walks collapse to one and the previous arrays are handed back rather
   // than rebuilt and discarded. The rows themselves are the fresh
   // snapshots - only the split arrays are reused.
-  var sortedUnchanged = wifiRowsEqual(prevSorted, sorted)
+  let sortedUnchanged = wifiRowsEqual(prevSorted, sorted)
   if (sortedUnchanged
     && prevKnown.length + prevOther.length === sorted.length) {
     return {
@@ -292,9 +292,9 @@ function deriveWifiState(prev, rows) {
     }
   }
 
-  var known = []
-  var other = []
-  for (var j = 0; j < sorted.length; j++) {
+  let known = []
+  let other = []
+  for (let j = 0; j < sorted.length; j++) {
     if (sorted[j].known) known.push(sorted[j])
     else other.push(sorted[j])
   }
@@ -303,12 +303,12 @@ function deriveWifiState(prev, rows) {
   // poll rebuilds the row objects. A null-prototype map, so an SSID that
   // happens to be spelled "constructor" or "__proto__" reads as absent
   // instead of resolving to an inherited Object member.
-  var oldKnown = Object.create(null)
-  for (var o = 0; o < prevKnown.length; o++) {
+  let oldKnown = Object.create(null)
+  for (let o = 0; o < prevKnown.length; o++) {
     if (prevKnown[o]) oldKnown[prevKnown[o].ssid] = true
   }
-  var grew = false
-  for (var q = 0; q < known.length; q++) {
+  let grew = false
+  for (let q = 0; q < known.length; q++) {
     if (!oldKnown[known[q].ssid]) { grew = true; break }
   }
 
@@ -376,7 +376,7 @@ function requiresCredentials(security, openSecurity, oweSecurity) {
 // ran inline: one spelling keeps "no reply" and "reply without dev" the
 // same answer.
 function routeIface(raw) {
-  var m = /\bdev\s+(\S+)/.exec(String(raw || ""))
+  let m = /\bdev\s+(\S+)/.exec(String(raw || ""))
   return m === null ? "" : m[1]
 }
 
@@ -390,10 +390,10 @@ function routeIface(raw) {
 // counters carry forward - they are the boot-to-now totals and stay
 // meaningful across a drop.
 function deriveStats(prev, raw, now) {
-  var p = prev || {}
-  var s = parseStats(raw)
-  var carryRx = Number(p.totalRxBytes) || 0
-  var carryTx = Number(p.totalTxBytes) || 0
+  let p = prev || {}
+  let s = parseStats(raw)
+  let carryRx = Number(p.totalRxBytes) || 0
+  let carryTx = Number(p.totalTxBytes) || 0
 
   if (!s.iface) {
     return {
@@ -406,9 +406,9 @@ function deriveStats(prev, raw, now) {
     }
   }
 
-  var t = Number(now)
+  let t = Number(now)
   if (!isFinite(t)) t = 0
-  var tp = throughputState(p.prevThroughput, s, t)
+  let tp = throughputState(p.prevThroughput, s, t)
   return {
     hasStats: true,
     downloadRate: tp.downloadRate,
@@ -431,10 +431,10 @@ function deriveStats(prev, raw, now) {
 // saved profile; nothing here copies, logs or forwards any field beyond
 // the three booleans, so the DTO cannot leak a secret into the view.
 function profileToggles(map) {
-  var m = (map && typeof map === "object") ? map : null
-  var conn = (m && m.connection && typeof m.connection === "object") ? m.connection : null
-  var v4 = (m && m.ipv4 && typeof m.ipv4 === "object") ? m.ipv4 : null
-  var v6 = (m && m.ipv6 && typeof m.ipv6 === "object") ? m.ipv6 : null
+  let m = (map && typeof map === "object") ? map : null
+  let conn = (m && m.connection && typeof m.connection === "object") ? m.connection : null
+  let v4 = (m && m.ipv4 && typeof m.ipv4 === "object") ? m.ipv4 : null
+  let v6 = (m && m.ipv6 && typeof m.ipv6 === "object") ? m.ipv6 : null
   if (!conn || !v4 || !v6) return null
   return {
     autoconnect: conn.autoconnect !== false,
@@ -529,13 +529,13 @@ function initialSpeedScale() {
 // shrinks mid-run; overshoot past the last stop pins there (the bar
 // clamps at full instead).
 function stepSpeedScale(scale, value) {
-  var stops = SPEED_SCALE_STOPS
-  var s = Number(scale)
+  let stops = SPEED_SCALE_STOPS
+  let s = Number(scale)
   if (!isFinite(s) || s <= 0) s = stops[0]
-  var v = Number(value)
+  let v = Number(value)
   if (!isFinite(v)) v = 0
-  var out = s
-  for (var i = 0; i < stops.length; i++) {
+  let out = s
+  for (let i = 0; i < stops.length; i++) {
     if (stops[i] < s) continue
     out = stops[i]
     if (v <= stops[i]) break
@@ -545,10 +545,10 @@ function stepSpeedScale(scale, value) {
 
 // Scale cap caption: plain Mbps below a gigabit, compact Gbps above.
 function speedScaleLabel(mbps) {
-  var n = Number(mbps)
+  let n = Number(mbps)
   if (!isFinite(n) || n <= 0) n = SPEED_SCALE_STOPS[0]
   if (n < 1000) return String(Math.round(n)) + " Mbps"
-  var g = n / 1000
+  let g = n / 1000
   return (g % 1 === 0 ? String(g) : Format.fixed(g, 1)) + " Gbps"
 }
 
@@ -557,10 +557,10 @@ function speedScaleLabel(mbps) {
 // contain tabs. A malformed matrix returns empty rather than rendering a
 // code that cannot scan.
 function parseQrOutput(raw) {
-  var lines = String(raw || "").trim().split(/\r?\n/).filter(function(line) { return line !== "" })
-  var meta = { iface: "", security: "", ssid: "" }
+  let lines = String(raw || "").trim().split(/\r?\n/).filter(function(line) { return line !== "" })
+  let meta = { iface: "", security: "", ssid: "" }
   if (lines.length > 0 && lines[0].indexOf("meta\t") === 0) {
-    var fields = lines.shift().split("\t")
+    let fields = lines.shift().split("\t")
     meta.iface = fields[1] || ""
     meta.security = fields[2] || ""
     meta.ssid = fields.slice(3).join("\t")
@@ -570,9 +570,9 @@ function parseQrOutput(raw) {
 
 function parseQrMatrix(lines) {
   if (lines.length === 0) return { rows: [], size: 0 }
-  var size = lines[0].length
+  let size = lines[0].length
   if (size !== lines.length) return { rows: [], size: 0 }
-  for (var i = 0; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i++) {
     if (lines[i].length !== size || !/^[01]+$/.test(lines[i])) return { rows: [], size: 0 }
   }
   return { rows: lines, size: size }
