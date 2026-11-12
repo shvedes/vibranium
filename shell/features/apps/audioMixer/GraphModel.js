@@ -258,6 +258,31 @@ function pairPorts(outputs, inputs) {
   return { pairs: pairs, refused: refused }
 }
 
+// Whether ANY pairing exists between two port lists, as a predicate that
+// builds no pair list. `pairPorts(...).pairs.length > 0` is the question the
+// canvas asks on every pointer move and once per node pair on a port read, and
+// answering a boolean by allocating two record arrays, a pair list and a
+// refusal list is work nobody reads. The rule is the SAME rule, not a cheaper
+// approximation: a channel key on an output meets an input with that same key,
+// and the unambiguous single-port case pairs two ports that both carry no key.
+function pairPossible(outputs, inputs) {
+  const outs = toRecords(outputs)
+  const ins = toRecords(inputs)
+  if (outs.length === 0 || ins.length === 0) return false
+  if (outs.length === 1 && ins.length === 1
+    && channelKey(outs[0].port) === "" && channelKey(ins[0].port) === "") return true
+  const wanted = ({})
+  for (let i = 0; i < outs.length; i++) {
+    const key = channelKey(outs[i].port)
+    if (key !== "") wanted[key] = true
+  }
+  for (let j = 0; j < ins.length; j++) {
+    const key = channelKey(ins[j].port)
+    if (key !== "" && wanted[key] === true) return true
+  }
+  return false
+}
+
 function toRecords(list) {
   const out = []
   if (!Array.isArray(list)) return out

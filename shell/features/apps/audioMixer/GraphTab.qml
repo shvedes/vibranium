@@ -218,6 +218,12 @@ Item {
   // republishes the same node set behind fresh wrappers, syncCards hands back
   // the incumbent array and no delegate is rebuilt at all.
   property var _cards: []
+  // node id -> the node object the card is drawn from. A map beside the
+  // delegate array rather than a scan of it: `nodeOf` is read twice per link
+  // end while the curves are built, and the curves are rebuilt on every card
+  // motion, so a linear scan here is a quadratic walk of the card set per
+  // pointer move.
+  property var _nodes: ({})
   // node id -> `{ x, y }`, the places that outlive a rebuild. A separate map
   // rather than a field on the card entry, because the card entry is exactly
   // the thing that is thrown away and rebuilt.
@@ -441,7 +447,11 @@ Item {
   // callLater-plus-timer pair the controller uses for the same reason.
   function _scheduleCards() {
     if (!tab.active) return
-    Qt.callLater(() => cardTimer.restart())
+    // A restart on a non-repeating Timer only moves its deadline, so a burst
+    // of notifications coalesces into one projection without a second hop
+    // through the event loop - and without a deferred closure holding this
+    // tab's ids past the turn in which the tab may be destroyed.
+    cardTimer.restart()
   }
 
   function _rebuildCards() {
@@ -459,6 +469,9 @@ Item {
     const held = Graph.syncCards(tab._cards, next, Model.nodeKey)
     if (held === tab._cards) return
     tab._place(held)
+    const byKey = ({})
+    for (let i = 0; i < held.length; i++) byKey[held[i].key] = held[i].node
+    tab._nodes = byKey
     tab._cards = held
     tab._recomputeConnectable()
   }
@@ -524,17 +537,23 @@ Item {
       ins.push(Graph.recordsOf(tab.controller.inputPorts, name))
       out[cards[i].key] = false
     }
-    // Every ordered pair of distinct cards, once. A pairing is a fact about two
-    // nodes, so one pass marks both ends: a card is connectable if some other
-    // card's input can be paired with one of its outputs, or the other way
-    // round. Quadratic in the card count, which is a handful here, and it runs
-    // on a card arrival and on a port read rather than on a frame.
+    // Every unordered pair of distinct cards, both directions tested once. A
+    // pairing is a fact about two nodes, so one hit marks both ends: a card is
+    // connectable if some other card's input can be paired with one of its
+    // outputs, or the other way round. `pairPossible` answers without building
+    // the pair list `pairPorts` would, which halves the iterations and keeps
+    // the pass from allocating two arrays per candidate pair. It runs on a card
+    // arrival and on a port read, not on a frame.
     for (let i = 0; i < cards.length; i++) {
-      for (let j = 0; j < cards.length; j++) {
-        if (i === j) continue
+      for (let j = i + 1; j < cards.length; j++) {
         if (out[cards[i].key] === true && out[cards[j].key] === true) continue
         if (outs[i].length > 0 && ins[j].length > 0
-          && Graph.pairPorts(outs[i], ins[j]).pairs.length > 0) {
+          && Graph.pairPossible(outs[i], ins[j])) {
+          out[cards[i].key] = true
+          out[cards[j].key] = true
+        }
+        if (outs[j].length > 0 && ins[i].length > 0
+          && Graph.pairPossible(outs[j], ins[i])) {
           out[cards[i].key] = true
           out[cards[j].key] = true
         }
@@ -606,6 +625,12 @@ Item {
     return Array.isArray(groups) ? groups : []
   }
 
+  // One slot answer for the whole link list, derived when that list changes
+  // rather than once per caller. `edgeAt` runs twice per card and again for
+  // every curve end, and each of those calls walked the whole link list to
+  // recompute the same array; this binding derives it once for all of them.
+  readonly property var _slots: Graph.edgeSlots(tab._graphGroups())
+
 
   // A card with no place reads at the world's own margin rather than at the
   // origin, so a card that has not been laid out yet - which is a card the graph
@@ -636,10 +661,8 @@ Item {
   }
 
   function nodeOf(key) {
-    for (let i = 0; i < tab._cards.length; i++) {
-      if (tab._cards[i].key === key) return tab._cards[i].node
-    }
-    return null
+    const node = tab._nodes[key]
+    return node === undefined ? null : node
   }
 
   function labelOf(key) {
@@ -779,7 +802,7 @@ Item {
   // here silently answers with the left edge's ports and the right edge's lines.
   function edgeAt(key, side) {
     const groups = tab._graphGroups()
-    const slots = Graph.edgeSlots(groups)
+    const slots = tab._slots
     const ys = tab.portHandles(key, side !== 1)
     const lines = []
     for (let i = 0; i < groups.length; i++) {
@@ -926,20 +949,21 @@ Item {
 
   // Whether a connect between these two cards could write anything at all: both
   // nodes carry a port in the direction being connected, they are not the same
-  // node, and the ports have been read. The pairing itself is NOT re-derived
-  // here - which ports match is `pairPorts`' question and it answers it on the
-  // release, where the answer costs nothing to be exact. This is the cheap
-  // question a drag can ask on every pointer move without building a pair list,
-  // so "there is nothing here to connect" is visible while the pointer is still
-  // moving.
+  // node, the ports have been read, and at least one channel actually pairs.
+  // `Graph.pairPossible` is the same rule `pairPorts` applies on the release,
+  // stated as a predicate that builds no pair list, so this is exact rather
+  // than a cheaper approximation - a drag between two nodes whose channel
+  // suffixes do not meet is drawn as a band that writes nothing, instead of an
+  // accent promise the release then refuses.
   function _canPair(sourceKey, targetKey) {
     if (tab.controller === null || tab.controller.portsReady !== true) return false
     if (sourceKey === "" || targetKey === "" || sourceKey === targetKey) return false
     const sourceName = Model.nodeName(tab.nodeOf(sourceKey))
     const targetName = Model.nodeName(tab.nodeOf(targetKey))
     if (sourceName === "" || targetName === "") return false
-    return Graph.portsOf(tab.controller.outputPorts, sourceName).length > 0
-      && Graph.portsOf(tab.controller.inputPorts, targetName).length > 0
+    return Graph.pairPossible(
+      Graph.recordsOf(tab.controller.outputPorts, sourceName),
+      Graph.recordsOf(tab.controller.inputPorts, targetName))
   }
 
   // What letting go right now would write, or null. A pair the drag could make

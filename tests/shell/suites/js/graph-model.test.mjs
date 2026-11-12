@@ -153,4 +153,43 @@ group('lineOnMark is exact identity', () => {
   eq('a non-array list', GM.lineOnMark(null, 10), false)
 })
 
+section('pairPossible - the pairing rule as a predicate')
+
+group('it agrees with pairPorts on every shape of the rule', () => {
+  const cases = [
+    [['node:output_FL'], ['node:playback_FL']],
+    [['node:output_FL'], ['node:playback_FR']],
+    [['node:output_FL', 'node:output_FR'], ['node:playback_FR', 'node:playback_FL']],
+    [['node:output_FL'], ['node:playback_FL', 'node:playback_FR']],
+    [['node:Port-0'], ['node:Port-0']],
+    [['node:Port-0'], ['node:playback_FL']],
+    [['node:output_FROB'], ['node:playback_FL']],
+    [['node:playback_FL'], ['node:output_FL']],
+    [[], ['node:playback_FL']],
+    [['node:output_FL'], []]
+  ]
+  for (const [outs, ins] of cases) {
+    eq('a pair exists exactly when pairPorts builds one: '
+      + outs.join(',') + ' / ' + ins.join(','),
+      GM.pairPossible(outs, ins), GM.pairPorts(outs, ins).pairs.length > 0)
+  }
+})
+
+group('it refuses what cannot be paired', () => {
+  eq('absent lists', GM.pairPossible(null, null), false)
+  eq('undefined lists', GM.pairPossible(undefined, undefined), false)
+  eq('only outputs', GM.pairPossible(['node:output_FL'], []), false)
+  eq('two unnumbered ports on each side are not a channel match',
+    GM.pairPossible(['node:Port-0', 'node:Port-1'], ['node:Port-0', 'node:Port-1']), false)
+  eq('a suffix on one side alone is not a match',
+    GM.pairPossible(['node:output_FL'], ['node:Port-0']), false)
+})
+
+group('it accepts the mono single-port case and the shared channel case', () => {
+  eq('one unnamed port either side', GM.pairPossible(['node:Port-0'], ['node:Port-0']), true)
+  eq('a shared channel suffix', GM.pairPossible(['node:output_FL'], ['node:playback_FL']), true)
+  eq('one matching channel among several',
+    GM.pairPossible(['node:output_FL'], ['node:playback_FR', 'node:playback_FL']), true)
+})
+
 finish()
