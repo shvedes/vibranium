@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.services as Svc
+import qs.features.bar
 import "../../../../services/system/PrintersLib.js" as Model
 
 // Printers island. Header: the section-cap style (lib Title level 2,
@@ -389,24 +390,11 @@ Item {
             width: parent.width
             height: 26
 
-            Row {
+            SectionLabel {
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
-              spacing: Ui.s
-
-              Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "list"
-                colorKey: "foreground_1"
-                size: 14
-                opacity: 0.7
-              }
-
-              Title {
-                level: 2
-                anchors.verticalCenter: parent.verticalCenter
-                text: "JOBS - " + contentRoot.jobs.length
-              }
+              icon: "list"
+              text: "JOBS - " + contentRoot.jobs.length
             }
 
             // Clear finished entries: a labeled outline button (default

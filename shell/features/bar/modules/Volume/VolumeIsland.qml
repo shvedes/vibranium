@@ -7,6 +7,7 @@ import Quickshell.Widgets
 import Quickshell.Services.Pipewire
 import qs.common
 import qs.services as Core
+import qs.features.bar
 import "Model.js" as Model
 import "../../../../common/text/Format.js" as Format
 import "../../../../common/math/Range.js" as Range
@@ -1064,24 +1065,11 @@ Item {
       width: parent.width
       height: 26
 
-      Row {
+      SectionLabel {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
-        spacing: Ui.s
-
-        Icon {
-          anchors.verticalCenter: parent.verticalCenter
-          name: "grid"
-          colorKey: "foreground_1"
-          size: 14
-          opacity: 0.7
-        }
-
-        Title {
-          level: 2
-          anchors.verticalCenter: parent.verticalCenter
-          text: "APPLICATIONS"
-        }
+        icon: "grid"
+        text: "APPLICATIONS"
       }
       Title {
         level: 4

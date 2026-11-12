@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Services.UPower
 import qs.common
+import qs.features.bar
 import "../../../../common/power/BatteryModel.js" as Model
 
 // The battery island: a header with the device count, then the device
@@ -209,24 +210,11 @@ Item {
               width: parent.width
               height: 26
 
-              Row {
+              SectionLabel {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Ui.s
-
-                Icon {
-                  anchors.verticalCenter: parent.verticalCenter
-                  name: "battery-3"
-                  colorKey: "foreground_1"
-                  size: 14
-                  opacity: 0.7
-                }
-
-                Title {
-                  level: 2
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "DEVICES"
-                }
+                icon: "battery-3"
+                text: "DEVICES"
               }
             }
 

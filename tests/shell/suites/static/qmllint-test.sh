@@ -129,7 +129,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   word of it is then read as a category name. The sentence that documents this
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
-RECORDED_FILE_COUNT=249
+RECORDED_FILE_COUNT=250
 RECORDED_WARNING_COUNT=135
 RECORDED_INFO_COUNT=51
 
