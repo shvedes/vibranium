@@ -33,7 +33,6 @@ Singleton {
   // because a duration binding re-evaluates on every construction of every
   // animation, which is per frame for anything a tween is re-aiming.
   function duration(ms) {
-    const granted = root.enabled ? ms : 0
-    return granted
+    return root.enabled ? ms : 0
   }
 }
