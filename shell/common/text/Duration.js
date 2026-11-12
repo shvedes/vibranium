@@ -13,13 +13,25 @@
 // Canonical home of BatteryModel formatDuration. Zero/negative/non-finite
 // means "no estimate" and renders as "" so callers can skip the fragment.
 function formatDuration(seconds) {
-  var s = Number(seconds)
+  const s = Number(seconds)
   if (!isFinite(s) || s <= 0) return ""
-  var h = Math.floor(s / 3600)
-  var m = Math.floor((s % 3600) / 60)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
   if (h > 0) return m > 0 ? h + "h " + m + "m" : h + "h"
   if (m > 0) return m + "m"
   return "<1m"
+}
+
+// Whole, non-negative seconds split into clock fields. Non-finite input
+// reads as zero, which is what both clock formatters render.
+function clockFields(seconds) {
+  const n = Number(seconds)
+  const total = isFinite(n) ? Math.max(0, Math.floor(n)) : 0
+  return {
+    h: Math.floor(total / 3600),
+    m: Math.floor((total % 3600) / 60),
+    s: total % 60,
+  }
 }
 
 // Clock-shaped elapsed/remaining time -> "2:05" / "1:02:05".
@@ -27,13 +39,9 @@ function formatDuration(seconds) {
 // countdown, which each built the same fields and the same zero padding.
 // Whole seconds, floored; non-finite input reads as 0:00.
 function formatClock(seconds) {
-  var n = Number(seconds)
-  var s = isFinite(n) ? Math.max(0, Math.floor(n)) : 0
-  var h = Math.floor(s / 3600)
-  var m = Math.floor((s % 3600) / 60)
-  var r = s % 60
-  if (h > 0) return h + ":" + Format.pad2(m) + ":" + Format.pad2(r)
-  return m + ":" + Format.pad2(r)
+  const t = clockFields(seconds)
+  if (t.h > 0) return t.h + ":" + Format.pad2(t.m) + ":" + Format.pad2(t.s)
+  return t.m + ":" + Format.pad2(t.s)
 }
 
 // Track clock with an always-padded minutes field: "00:05" / "01:01" /
@@ -41,26 +49,22 @@ function formatClock(seconds) {
 // column reserved from the track's own length keeps its shape across the
 // hour boundary. Canonical home of NowPlaying fmtDuration.
 function formatTrackClock(seconds) {
-  var n = Number(seconds)
-  var total = isFinite(n) ? Math.max(0, Math.floor(n)) : 0
-  var h = Math.floor(total / 3600)
-  var m = Math.floor((total % 3600) / 60)
-  var s = total % 60
-  var tail = Format.pad2(m) + ":" + Format.pad2(s)
-  return h > 0 ? h + ":" + tail : tail
+  const t = clockFields(seconds)
+  const tail = Format.pad2(t.m) + ":" + Format.pad2(t.s)
+  return t.h > 0 ? t.h + ":" + tail : tail
 }
 
 // Countdown readout -> "1h 2m 3s" / "2m 5s" / "0s".
 // Canonical home of Timer.qml formatDuration. Floor semantics: a
 // countdown shows whole seconds remaining, never a fraction.
 function formatVerboseDuration(secs) {
-  var s = Math.max(0, Math.floor(Number(secs)))
+  let s = Math.max(0, Math.floor(Number(secs)))
   if (!(s > 0)) return "0s"
-  var h = Math.floor(s / 3600)
+  const h = Math.floor(s / 3600)
   s %= 3600
-  var m = Math.floor(s / 60)
-  var sec = s % 60
-  var out = ""
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  let out = ""
   if (h > 0) out += h + "h "
   if (m > 0 || h > 0) out += m + "m "
   out += sec + "s"
@@ -71,19 +75,19 @@ function formatVerboseDuration(secs) {
 // "1:02:00". Canonical home of ClipboardLib formatMediaDuration.
 // Sub-second precision only survives below 10 s; longer media round down.
 function formatMediaDuration(s) {
-  var txt = String(s)
-  var sec = 0
-  var h = /(\d+)\s*h/.exec(txt)
-  var m = /(\d+)\s*min/.exec(txt)
-  var secM = /(\d+(?:\.\d+)?)\s*s/.exec(txt)
-  var ms = /(\d+)\s*ms/.exec(txt)
+  const txt = String(s)
+  let sec = 0
+  const h = /(\d+)\s*h/.exec(txt)
+  const m = /(\d+)\s*min/.exec(txt)
+  const secM = /(\d+(?:\.\d+)?)\s*s/.exec(txt)
+  const ms = /(\d+)\s*ms/.exec(txt)
   if (h !== null) sec += parseInt(h[1], 10) * 3600
   if (m !== null) sec += parseInt(m[1], 10) * 60
   if (secM !== null) sec += parseFloat(secM[1])
   if (ms !== null) sec += parseInt(ms[1], 10) / 1000
   if (!(sec > 0)) return ""
-  var total = Math.floor(sec)
-  var sub = Math.round((sec - total) * 1000)
+  let total = Math.floor(sec)
+  let sub = Math.round((sec - total) * 1000)
   // A fraction that rounds up to a full second carries into the seconds
   // field. Without the carry the tail prints four digits - 2.9996 s renders
   // as "0:02.1000" - because the fraction is rounded before the field split.
@@ -91,9 +95,9 @@ function formatMediaDuration(s) {
     sub = 0
     total += 1
   }
-  var hh = Math.floor(total / 3600)
-  var mm = Math.floor((total % 3600) / 60)
-  var ss = total % 60
+  const hh = Math.floor(total / 3600)
+  const mm = Math.floor((total % 3600) / 60)
+  const ss = total % 60
   if (hh > 0) return hh + ":" + Format.pad2(mm) + ":" + Format.pad2(ss)
   if (total >= 10 || sub === 0) return mm + ":" + Format.pad2(ss)
   return mm + ":" + Format.pad2(ss) + "."
