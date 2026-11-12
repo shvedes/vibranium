@@ -916,7 +916,7 @@ PanelWindow {
   }
 
   function _canonicalPath(path, done) {
-    const proc = canonicalComp.createObject(editor, {
+    const proc = jobComp.createObject(editor, {
       command: Exec.setsidTimeoutCmd(["realpath", "-m", "--", path], 2)
     })
     if (proc === null) {
@@ -935,7 +935,7 @@ PanelWindow {
   }
 
   function _fileIdentity(path, allowMissing, done) {
-    const proc = identityComp.createObject(editor, {
+    const proc = jobComp.createObject(editor, {
       command: Exec.setsidTimeoutCmd(["stat", "-Lc", "%d:%i", "--", path], 2)
     })
     if (proc === null) {
@@ -1064,7 +1064,7 @@ PanelWindow {
       : mime === "image/svg+xml" ? "svg" : "png"
     const target = Paths.screenshotFallbackDir + "/image-" + editor._sessionId + "-"
       + editor._uid + "-" + editor._copySeq + "." + ext
-    const proc = fallbackComp.createObject(editor, {
+    const proc = jobComp.createObject(editor, {
       command: Exec.setsidTimeoutCmd(["cp",
         "--remove-destination", "--", path, target], 10)
     })
@@ -1113,7 +1113,7 @@ PanelWindow {
       editor._setClipboardFallback(path, deleteAfter, then, onFailed)
       return
     }
-    const proc = copyComp.createObject(editor, {
+    const proc = jobComp.createObject(editor, {
       command: Exec.setsidTimeoutCmd(ShotLib.copyImageCmd(path), 10)
     })
     const done = () => {
@@ -1136,35 +1136,10 @@ PanelWindow {
     proc.running = true
   }
 
+  // One process template for every one-shot file job in the editor: a
+  // Component is only a template, so each createObject is its own Process.
   Component {
-    id: copyComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  Component {
-    id: fallbackComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  Component {
-    id: canonicalComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  Component {
-    id: identityComp
+    id: jobComp
 
     Process {
       stdout: StdioCollector {}
