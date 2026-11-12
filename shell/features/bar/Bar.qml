@@ -182,6 +182,10 @@ Singleton {
   // (the keyboard layout code, the weather readout) grow proportionally
   // with them.
   readonly property real textScale: root.iconScale
+  // The one text size every bar pill and countdown uses: the module label
+  // scale with a hair of optical tightening, rounded to whole pixels so a
+  // scaled bar never lays out a fractional text height.
+  readonly property int pillFontSize: Math.round(Ui.fontM * 0.95 * root.textScale)
   // The horizontal inset an icon-only module's glyph gets from the slot /
   // canvas geometry: Icon centers its canvas inside the slot, so painted
   // content sits (slot - canvas) / 2 away from each slot edge. The zone row

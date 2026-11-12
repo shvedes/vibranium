@@ -146,7 +146,7 @@ BarModule {
       anchors.verticalCenter: parent.verticalCenter
       visible: root.tempSlide > 0
       level: 3
-      font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
+      font.pixelSize: Bar.pillFontSize
       text: Core.Weather.reportTempNum !== "" ? Core.Weather.reportTempNum + Core.Weather.tempUnit : "—"
     }
   }

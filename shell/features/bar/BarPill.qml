@@ -43,7 +43,7 @@ Rectangle {
 
     anchors.centerIn: parent
     level: 3
-    font.pixelSize: Math.round(Ui.fontM * 0.95 * Bar.textScale)
+    font.pixelSize: Bar.pillFontSize
     color: root.foreground
     text: root.text
   }

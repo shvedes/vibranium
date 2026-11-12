@@ -335,7 +335,7 @@ BarModule {
       visible: root.nameSlide > 0
       level: 3
       width: Math.min(implicitWidth, 240)
-      font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
+      font.pixelSize: Bar.pillFontSize
       text: root.deviceName
       elide: Text.ElideRight
     }

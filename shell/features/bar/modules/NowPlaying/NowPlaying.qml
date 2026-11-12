@@ -445,7 +445,7 @@ CollapsibleSlot {
       visible: root.titleSlide > 0
       level: 3
       width: Math.min(implicitWidth, 240)
-      font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
+      font.pixelSize: Bar.pillFontSize
       text: root.title
       elide: Text.ElideRight
       // Shift composes with the anchors, so the slide below never

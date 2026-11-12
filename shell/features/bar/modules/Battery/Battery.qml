@@ -503,7 +503,7 @@ CollapsibleSlot {
         visible: root.percentageSlide > 0 && root.flashSlide < 1
         opacity: root.percentageSlide * (1 - root.flashSlide)
         level: 3
-        font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
+        font.pixelSize: Bar.pillFontSize
         color: Ui.solid(root.iconColor)
         text: root.percentageText
       }
@@ -519,7 +519,7 @@ CollapsibleSlot {
         visible: root.flashSlide > 0
         opacity: root.flashSlide
         level: 3
-        font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
+        font.pixelSize: Bar.pillFontSize
         color: Ui.solid(root.iconColor)
         text: root.flashText
       }
