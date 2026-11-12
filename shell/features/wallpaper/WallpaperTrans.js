@@ -31,7 +31,7 @@ function speeds() {
 // slide keys, grow/outer and all wipe keys. Unknown/hand-edited values
 // fall back to the plain crossfade.
 function normalizeKind(raw) {
-  var k = SU.lowerTrim(raw)
+  let k = SU.lowerTrim(raw)
   if (k === "wipe" || k === "wipe-horizontal" || k === "wipe-vertical") return "swipe"
   if (k === "slide-left" || k === "slide-right" || k === "slide-top" || k === "slide-bottom") return "slide"
   if (k === "grow" || k === "outer") return "circle"
@@ -44,24 +44,24 @@ function slideDirections() {
 }
 
 function normalizeDirection(raw) {
-  var d = SU.lowerTrim(raw)
+  let d = SU.lowerTrim(raw)
   return slideDirections().indexOf(d) >= 0 ? d : "left"
 }
 
 // Resolve one swap's kind. `rand01` is injectable so tests stay
 // deterministic (the view passes Math.random()).
 function resolveKind(raw, rand01) {
-  var k = normalizeKind(raw)
+  let k = normalizeKind(raw)
   if (k !== "random") return k
-  var pool = randomPool()
-  var r = Number(rand01)
+  let pool = randomPool()
+  let r = Number(rand01)
   if (isNaN(r) || r < 0) r = 0
   if (r >= 1) r = 0.999999
   return pool[Math.floor(r * pool.length)]
 }
 
 function normalizeSpeed(raw) {
-  var s = SU.lowerTrim(raw)
+  let s = SU.lowerTrim(raw)
   if (s === "slow" || s === "fast") return s
   return "default"
 }
@@ -69,7 +69,7 @@ function normalizeSpeed(raw) {
 // Every kind follows the selected speed preset; curves stay hardcoded
 // per kind in the view.
 function durationFor(speed) {
-  var table = speeds()
+  let table = speeds()
   if (speed === "slow") return table.slow
   if (speed === "fast") return table.fast
   return table.def
@@ -89,9 +89,9 @@ function isSwipeKind(kind) {
 // full screen off the named edge to rest. `from` is rolled per swap;
 // w/h are the surface size.
 function slideOffset(from, progress, w, h) {
-  var p = clamp01(progress)
-  var rest = 1 - p
-  var d = normalizeDirection(from)
+  let p = clamp01(progress)
+  let rest = 1 - p
+  let d = normalizeDirection(from)
   // + 0 normalizes -0 (rest = 0) to 0 for strict consumers.
   if (d === "left") return { x: -rest * w + 0, y: 0 }
   if (d === "right") return { x: rest * w + 0, y: 0 }
@@ -102,18 +102,18 @@ function slideOffset(from, progress, w, h) {
 // Scalar axis helpers for the per-tick slide bindings: one call per axis,
 // zero object allocs. Object form above stays for tests and compat.
 function slideX(from, progress, w) {
-  var p = clamp01(progress)
-  var rest = 1 - p
-  var d = normalizeDirection(from)
+  let p = clamp01(progress)
+  let rest = 1 - p
+  let d = normalizeDirection(from)
   if (d === "left") return -rest * w + 0
   if (d === "right") return rest * w + 0
   return 0
 }
 
 function slideY(from, progress, h) {
-  var p = clamp01(progress)
-  var rest = 1 - p
-  var d = normalizeDirection(from)
+  let p = clamp01(progress)
+  let rest = 1 - p
+  let d = normalizeDirection(from)
   if (d === "top") return -rest * h + 0
   if (d === "bottom") return rest * h + 0
   return 0
@@ -129,27 +129,27 @@ function slideY(from, progress, h) {
 // stays exactly shut. Returns frame-space center, full size and the
 // echoed angle for a centered rectangle.
 function swipeBandRect(progress, w, h, centerFracX, centerFracY, angleDeg) {
-  var p = clamp01(progress)
-  var cx = w * fracOr(centerFracX, 0.5)
-  var cy = h * fracOr(centerFracY, 0.5)
-  var a = Number(angleDeg) * Math.PI / 180
+  let p = clamp01(progress)
+  let cx = w * fracOr(centerFracX, 0.5)
+  let cy = h * fracOr(centerFracY, 0.5)
+  let a = Number(angleDeg) * Math.PI / 180
   if (isNaN(a)) a = 0
   // Long-axis unit of a tall rect rotated by a (QML convention), plus
   // its perpendicular.
-  var ux = -Math.sin(a)
-  var uy = Math.cos(a)
-  var vx = Math.cos(a)
-  var vy = Math.sin(a)
-  var needA = 0
-  var needP = 0
-  var corners = [[0 - cx, 0 - cy], [w - cx, 0 - cy], [0 - cx, h - cy], [w - cx, h - cy]]
-  for (var i = 0; i < corners.length; i++) {
-    var ta = Math.abs(corners[i][0] * ux + corners[i][1] * uy)
-    var tp = Math.abs(corners[i][0] * vx + corners[i][1] * vy)
+  let ux = -Math.sin(a)
+  let uy = Math.cos(a)
+  let vx = Math.cos(a)
+  let vy = Math.sin(a)
+  let needA = 0
+  let needP = 0
+  let corners = [[0 - cx, 0 - cy], [w - cx, 0 - cy], [0 - cx, h - cy], [w - cx, h - cy]]
+  for (let i = 0; i < corners.length; i++) {
+    let ta = Math.abs(corners[i][0] * ux + corners[i][1] * uy)
+    let tp = Math.abs(corners[i][0] * vx + corners[i][1] * vy)
     if (ta > needA) needA = ta
     if (tp > needP) needP = tp
   }
-  var degrees = Number(angleDeg)
+  let degrees = Number(angleDeg)
   if (isNaN(degrees)) degrees = 0
   return {
     cx: cx,
@@ -166,12 +166,12 @@ function swipeBandRect(progress, w, h, centerFracX, centerFracY, angleDeg) {
 // the farthest corner from there, so p = 1 (grow) always fills the
 // frame from any origin. invert flips the sweep for the shrink variant.
 function discDiameter(progress, w, h, centerFracX, centerFracY, invert) {
-  var p = clamp01(progress)
-  var cx = w * fracOr(centerFracX, 0.5)
-  var cy = h * fracOr(centerFracY, 0.5)
-  var dx = Math.max(cx, w - cx)
-  var dy = Math.max(cy, h - cy)
-  var diameter = 2 * Math.sqrt(dx * dx + dy * dy) * 1.04
+  let p = clamp01(progress)
+  let cx = w * fracOr(centerFracX, 0.5)
+  let cy = h * fracOr(centerFracY, 0.5)
+  let dx = Math.max(cx, w - cx)
+  let dy = Math.max(cy, h - cy)
+  let diameter = 2 * Math.sqrt(dx * dx + dy * dy) * 1.04
   return invert ? diameter * (1 - p) : diameter * p
 }
 
