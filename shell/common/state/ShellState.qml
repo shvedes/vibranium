@@ -62,7 +62,7 @@ Singleton {
   // String field read with fallback: trimmed string or `fallback`.
   function string(sectionName, field, fallback) {
     const s = root.section(sectionName)
-    const v = s ? String(s[String(field)] ?? "") : ""
+    const v = s ? String(s[field] ?? "") : ""
     const fb = typeof fallback === "string" ? fallback : ""
     return v !== "" ? v : fb
   }
