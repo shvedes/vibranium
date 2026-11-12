@@ -11,7 +11,7 @@
 
 // Icon basenames under shell/assets/icons (resolved by Icons.url via
 // Menu.resolveIcon in the views). Canonical home of ClipboardLib ICONS.
-let ICONS = {
+var ICONS = {
   text: "text",
   math: "math",
   calculator: "calculator",
@@ -40,7 +40,7 @@ let ICONS = {
 // entry for entry (animated formats excluded in both - see ImageExts):
 // FileIcons carries the merged vocabulary for icon consumers, ImageExts
 // keeps the literal table the still gate and the themes suite pin.
-let IMAGE_EXTS = {
+var IMAGE_EXTS = {
   png: 1, jpg: 1, jpeg: 1, jfif: 1, webp: 1, ppm: 1, pgm: 1, pbm: 1,
   pnm: 1, tiff: 1, tif: 1, bmp: 1, svg: 1, svgz: 1, jp2: 1, jpx: 1,
   j2k: 1, jpc: 1, tga: 1, ico: 1, icns: 1, wbmp: 1
@@ -48,29 +48,29 @@ let IMAGE_EXTS = {
 
 // Extension sets that steer preview rendering and row icons.
 // Canonical home of the ClipboardLib extension tables.
-let ARCHIVE_EXTS = {
+var ARCHIVE_EXTS = {
   zip: 1, tar: 1, gz: 1, tgz: 1, bz2: 1,
   xz: 1, "7z": 1, rar: 1, zst: 1, lz: 1, lzma: 1
 }
 
-let VIDEO_EXTS = {
+var VIDEO_EXTS = {
   mp4: 1, mkv: 1, webm: 1, mov: 1, avi: 1, m4v: 1
 }
 
-let PDF_EXTS = { pdf: 1 }
-let SHEET_EXTS = { xls: 1, xlsx: 1, ods: 1, csv: 1, tsv: 1 }
-let DB_EXTS = {
+var PDF_EXTS = { pdf: 1 }
+var SHEET_EXTS = { xls: 1, xlsx: 1, ods: 1, csv: 1, tsv: 1 }
+var DB_EXTS = {
   db: 1, sqlite: 1, sqlite3: 1, sql: 1, mdb: 1, accdb: 1
 }
-let DIFF_EXTS = { diff: 1, patch: 1, rej: 1 }
-let FONT_EXTS = {
+var DIFF_EXTS = { diff: 1, patch: 1, rej: 1 }
+var FONT_EXTS = {
   ttf: 1, otf: 1, woff: 1, woff2: 1, eot: 1, fon: 1, pfb: 1
 }
-let MUSIC_EXTS = {
+var MUSIC_EXTS = {
   mp3: 1, flac: 1, ogg: 1, oga: 1, opus: 1, wav: 1,
   m4a: 1, aac: 1, wma: 1, mid: 1, midi: 1, it: 1, xm: 1
 }
-let CODE_EXTS = {
+var CODE_EXTS = {
   rs: 1, ts: 1, tsx: 1, js: 1, jsx: 1, mjs: 1, cjs: 1,
   py: 1, c: 1, h: 1, cc: 1, cpp: 1, hh: 1, hpp: 1,
   go: 1, rb: 1, java: 1, kt: 1, kts: 1, swift: 1,
@@ -94,7 +94,7 @@ let CODE_EXTS = {
 // unknown falls back to image/png. Canonical home of the ClipboardLib
 // IMAGE_MIMES table. Null-prototype: an extension named like an Object
 // member ("constructor") must miss rather than answer with a function.
-let IMAGE_MIMES = Object.assign(Object.create(null), {
+var IMAGE_MIMES = Object.assign(Object.create(null), {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
   webp: "image/webp", gif: "image/gif", bmp: "image/bmp",
   tiff: "image/tiff", tif: "image/tiff", svg: "image/svg+xml",

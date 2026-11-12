@@ -14,7 +14,7 @@
 // The level at or below which a glyph reads as silence. PipeWire reports
 // 0..1 fractions and the shell's own steps land exactly on 0, so the
 // threshold only absorbs float dust; it is not a "quiet" band.
-let SILENT_LEVEL = 0.01
+var SILENT_LEVEL = 0.01
 
 // Whether a level reads as silence: explicitly muted, or driven to zero.
 // This is the glyph's own question - volume-off is the answer for both -
