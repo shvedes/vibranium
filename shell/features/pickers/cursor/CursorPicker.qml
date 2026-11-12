@@ -262,7 +262,7 @@ Singleton {
             return MiscSettings.setOption("misc.cursorTheme", theme) ? "ok" : "error"
         }
         root._currentTheme = theme
-        const proc = themeSetProc.createObject(root, { command: ["vb-cursor-set", theme] })
+        const proc = setProc.createObject(root, { command: ["vb-cursor-set", theme] })
         proc.exited.connect(() => { root._readStateFile(); root._ensureSizes(theme); proc.destroy() })
         proc.running = true
         return "ok"
@@ -274,21 +274,16 @@ Singleton {
             return MiscSettings.setOption("misc.cursorSize", n) ? "ok" : "error"
         }
         root._currentSize = n
-        const proc = sizeSetProc.createObject(root, { command: ["vb-cursor-set", "--size", String(n)] })
+        const proc = setProc.createObject(root, { command: ["vb-cursor-set", "--size", String(n)] })
         proc.exited.connect(() => { root._readStateFile(); proc.destroy() })
         proc.running = true
         return "ok"
     }
 
+    // One process template for both one-shot setters: each createObject is
+    // its own Process, and only its exit notification matters.
     Component {
-        id: themeSetProc
-        Process {
-            stdout: StdioCollector {}
-            stderr: StdioCollector {}
-        }
-    }
-    Component {
-        id: sizeSetProc
+        id: setProc
         Process {
             stdout: StdioCollector {}
             stderr: StdioCollector {}
