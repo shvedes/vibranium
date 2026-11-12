@@ -10,16 +10,16 @@
 
 // Human label for a device: deviceName/name, falling back to the address.
 function deviceLabel(device) {
-  var d = device || {}
-  var name = String(d.deviceName || d.name || "").trim()
+  let d = device || {}
+  let name = String(d.deviceName || d.name || "").trim()
   if (name !== "") return name
-  var addr = String(d.address || "")
+  let addr = String(d.address || "")
   return addr === "" ? "Unknown device" : addr
 }
 
 // Is the device remembered (paired/bonded/trusted)?
 function isKnown(device) {
-  var d = device || {}
+  let d = device || {}
   return !!d.paired || !!d.bonded || !!d.trusted
 }
 
@@ -50,7 +50,7 @@ function deviceRow(device) {
 // shares one equality shape.
 function deviceRowsEqual(a, b) {
   return DeviceList.rowsEqual(a, b, function(r) {
-    var o = r || {}
+    let o = r || {}
     return [(o.address || ""), (o.name || ""), (o.icon || ""),
       (!!o.connected), (!!o.known), (!!o.pairing), (!!o.trusted),
       (!!o.batteryAvailable), (Number(o.battery) || 0)].join("\u0001")
@@ -61,7 +61,7 @@ function deviceRowsEqual(a, b) {
 // every module shares one class matcher. Empty when the class is
 // unknown - callers fall back to the bluetooth icon.
 function deviceIconName(row) {
-  var r = row || {}
+  let r = row || {}
   return DeviceIcons.iconForDeviceClass(r.icon)
 }
 
@@ -94,7 +94,7 @@ function sortDeviceRows(rows) {
 // declaration, and this module's surface is pinned by its suite.
 function sectionTitleFor(index, rows) {
   function tierOf(row) {
-    var r = row || {}
+    let r = row || {}
     if (r.connected) return "connected"
     return r.known ? "paired" : "available"
   }
@@ -103,7 +103,7 @@ function sectionTitleFor(index, rows) {
     return tier === "paired" ? "PAIRED DEVICES" : "AVAILABLE DEVICES"
   }
   return DeviceList.sectionTitleFor(index, rows, function(row, prev, i) {
-    var tier = tierOf(row)
+    let tier = tierOf(row)
     if (i === 0 || tierOf(prev) !== tier) return titleOf(tier)
     return ""
   })
@@ -112,9 +112,9 @@ function sectionTitleFor(index, rows) {
 // Subtext for a device row: the battery level when the device reports one,
 // otherwise whether it is remembered ("Paired") or brand new ("Available").
 function subtextFor(row) {
-  var r = row || {}
+  let r = row || {}
   if (r.batteryAvailable) {
-    var battery = Number(r.battery)
+    let battery = Number(r.battery)
     if (isFinite(battery)) return "Battery " + Format.percentInt(battery) + "%"
   }
   return r.known ? "Paired" : "Available"
