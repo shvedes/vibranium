@@ -229,6 +229,7 @@ qs.features.apps.audioMixer.AudioMixer
 qs.features.apps.audioMixer.AudioMixerController
 qs.features.apps.audioMixer.AudioMixerWindow
 qs.features.apps.audioMixer.DeviceRow
+qs.features.apps.audioMixer.GraphCanvas
 qs.features.apps.audioMixer.GraphLegend
 qs.features.apps.audioMixer.GraphNode
 qs.features.apps.audioMixer.GraphTab
@@ -348,7 +349,7 @@ supplied.qs.common.LyricsPane=player: null"
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=242
+EXPECTED_DECLARED_COUNT=243
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -368,7 +369,7 @@ EXPECTED_DECLARED_COUNT=242
 # qs.common.Vignette is in the same class: a plain Item over a Shape and a
 # radial gradient, with no singleton and no window behind it.
 EXPECTED_CLEAN_COUNT=115
-EXPECTED_NEEDS_COUNT=104
+EXPECTED_NEEDS_COUNT=105
 EXPECTED_UNCREATABLE_COUNT=22
 
 # --------------------------------------------------------------------------
