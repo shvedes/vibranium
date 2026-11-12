@@ -18,10 +18,10 @@ common   ──────►  nothing but Qt/Quickshell + sibling common code
 
 ## Files
 
-| Layer | Files |
+| Layer | QML files |
 | --- | --- |
 | `boot/` | 4 |
-| `common/` | 150 |
-| `features/` | 170 |
-| `services/` | 25 |
+| `common/` | 97 |
+| `features/` | 126 |
+| `services/` | 20 |
 | `shell.qml` | 1 |
