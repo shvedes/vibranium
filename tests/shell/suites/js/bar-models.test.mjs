@@ -1324,13 +1324,12 @@ group('playbackStreams keeps list order and only live playback app rows', () => 
   const rows = [
     app('spotify'),
     { isStream: false, isSink: false, type: 'Audio/Sink', name: 'alsa_output.pci', audio: {} },
-    app('omarchy_speaker_tuning'),
     node({ isSink: false, type: 'Stream/Input/Audio', name: 'mic', audio: {} }),
     app('eq_band'),
     node({ isSink: true, type: 'Stream/Output/Audio', name: 'noaudio' }),
     app('firefox'),
   ]
-  eq('devices, tuners, captures and audioless rows are out',
+  eq('devices, filters, captures and audioless rows are out',
     VO.playbackStreams(rows).map((n) => n.name), ['spotify', 'firefox'])
   eq('an empty list', VO.playbackStreams([]), [])
   eq('null', VO.playbackStreams(null), [])

@@ -118,7 +118,6 @@ Singleton {
       var n = root.nodes[i]
       if (!n || !n.isStream) continue
       if (!includeSinkSide && n.isSink) continue
-      if (String(n.name || "").indexOf("omarchy_speaker_tuning") === 0) continue
       if (!n.audio) continue
       if (!root._isCaptureStream(n)) continue
       list.push(n)

@@ -38,7 +38,6 @@ function playbackStreams(list) {
     var n = list[i]
     if (!n || !n.isStream) continue
     if (!isPlaybackStream(n)) continue
-    if (String(n.name || "").indexOf("omarchy_speaker_tuning") === 0) continue
     if (String(n.name || "").indexOf("eq_") === 0) continue
     if (!n.audio) continue
     out.push(n)

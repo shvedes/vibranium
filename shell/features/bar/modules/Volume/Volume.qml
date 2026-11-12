@@ -62,7 +62,6 @@ BarModule {
       var n = root.nodes[i]
       if (!n || !n.isStream) continue
       if (n.isSink) continue
-      if (String(n.name || "").indexOf("omarchy_speaker_tuning") === 0) continue
       if (!n.audio) continue
       if (!Model.isCaptureStream(n) && n.isSink !== false) continue
       list.push(n)
