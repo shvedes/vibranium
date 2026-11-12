@@ -45,36 +45,11 @@ CollapsibleSlot {
 
   // Countdown pill (the Recording module shape, recolored): theme
   // background with foreground text instead of the red alert pill.
-  Rectangle {
+  BarPill {
     id: pill
 
-    // Right air mirrors the left inset: the zone row has zero gap and
-    // icon-only neighbors center their glyphs, so a flush box would
-    // ride half a gap closer to the right module.
-    anchors.right: parent.right
-    anchors.rightMargin: Bar.slotInset
-    anchors.verticalCenter: parent.verticalCenter
-    width: timeText.implicitWidth + 8
-    height: timeText.implicitHeight
-    radius: RoundingPolicy.radius
-    color: Ui.solid("background_2")
+    text: root.formatted
     visible: root.finiteShown && root.pillSlide > 0
-    // Countdown text narrows as digits drop (10:00 -> 9:59): glide the
-    // width so the pill breathes instead of snapping every tick.
-    Behavior on width {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.slowMs }
-    }
-
-    Title {
-      id: timeText
-
-      anchors.centerIn: parent
-      level: 3
-      font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
-      color: Ui.solid("foreground_0")
-      text: root.formatted
-    }
   }
 
   Icon {

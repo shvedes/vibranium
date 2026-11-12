@@ -89,30 +89,14 @@ CollapsibleSlot {
   // No MouseArea here: the module fill covers the whole slot, so a
   // left-click anywhere on the pill stops the recording through
   // onClicked below.
-  Rectangle {
+  BarPill {
     id: pill
 
-    // Left air mirrors the right inset: the zone row has zero gap and
-    // icon-only neighbors center their glyphs, so a flush box would
-    // ride half a gap closer to the left module.
-    anchors.left: parent.left
-    anchors.leftMargin: Bar.slotInset
-    anchors.verticalCenter: parent.verticalCenter
-    width: timeText.implicitWidth + 8
-    height: timeText.implicitHeight
-    radius: RoundingPolicy.radius
-    color: Ui.solid("red")
+    alignRight: false
+    backgroundKey: "red"
+    foreground: "black"
+    text: root.elapsed
     visible: root.elapsedPill && root.active && root.slide > 0
-
-    Title {
-      id: timeText
-
-      anchors.centerIn: parent
-      level: 3
-      font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
-      color: "black"
-      text: root.elapsed
-    }
   }
 
   // Left click stops the recording through the bus request path; middle

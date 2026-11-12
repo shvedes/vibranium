@@ -54,36 +54,12 @@ CollapsibleSlot {
 
   // Countdown pill on the right: theme background with foreground text
   // (red fill once expired), text only - no icon inside.
-  Rectangle {
+  BarPill {
     id: pill
 
-    // Right air mirrors the left inset: the zone row has zero gap and
-    // icon-only neighbors center their glyphs, so a flush box would
-    // ride half a gap closer to the right module.
-    anchors.right: parent.right
-    anchors.rightMargin: Bar.slotInset
-    anchors.verticalCenter: parent.verticalCenter
-    width: timeText.implicitWidth + 8
-    height: timeText.implicitHeight
-    radius: RoundingPolicy.radius
-    color: root.expired ? Ui.solid("red") : Ui.solid("background_2")
+    backgroundKey: root.expired ? "red" : "background_2"
+    text: root.formatted
     visible: root.shown && root.slide > 0
-    // Countdown text narrows as digits drop: glide the width so the
-    // pill breathes instead of snapping every tick.
-    Behavior on width {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.slowMs }
-    }
-
-    Title {
-      id: timeText
-
-      anchors.centerIn: parent
-      level: 3
-      font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
-      color: Ui.solid("foreground_0")
-      text: root.formatted
-    }
   }
 
   // The remaining time, live: the text re-evaluates on every tick. The

@@ -2,6 +2,7 @@ module qs.features.bar
 
 singleton Bar 1.0 Bar.qml
 BarModule 1.0 BarModule.qml
+BarPill 1.0 BarPill.qml
 CollapsibleSlot 1.0 CollapsibleSlot.qml
 BarView 1.0 BarView.qml
 ToolTipBind 1.0 ToolTipBind.qml
