@@ -29,7 +29,7 @@ var NAME_RE = /^[A-Za-z0-9._+-]+$/
 // A leading FORCE_PREFIX is one escape rather than a mode: the plugin answers
 // the same row either way, and only the launcher's gate reads the difference.
 function binaryQuery(text) {
-  var raw = String(text === undefined || text === null ? "" : text).trim()
+  let raw = String(text === undefined || text === null ? "" : text).trim()
   if (raw.charAt(0) === FORCE_PREFIX) raw = raw.substring(1).trim()
   if (raw === "") return ""
   if (raw.charAt(0) === "-") return ""
@@ -48,12 +48,12 @@ function binaryQuery(text) {
 // duplicates here - LS and ls are two different files on a case-sensitive
 // filesystem, and the first one PATH reaches is the one a launch would run.
 function binaryIndex(names) {
-  var out = Object.create(null)
-  var list = Array.isArray(names) ? names : []
-  for (var i = 0; i < list.length; i++) {
-    var n = String(list[i] === undefined || list[i] === null ? "" : list[i])
+  let out = Object.create(null)
+  let list = Array.isArray(names) ? names : []
+  for (let i = 0; i < list.length; i++) {
+    let n = String(list[i] === undefined || list[i] === null ? "" : list[i])
     if (n === "") continue
-    var key = n.toLowerCase()
+    let key = n.toLowerCase()
     if (out[key] === undefined) out[key] = n
   }
   return out
@@ -62,8 +62,8 @@ function binaryIndex(names) {
 // The installed spelling of `name`, or "" when PATH holds no such binary.
 function binaryMatch(index, name) {
   if (index === null || index === undefined) return ""
-  var key = String(name === undefined || name === null ? "" : name).toLowerCase()
-  var hit = index[key]
+  let key = String(name === undefined || name === null ? "" : name).toLowerCase()
+  let hit = index[key]
   return typeof hit === "string" ? hit : ""
 }
 
