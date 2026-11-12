@@ -628,21 +628,19 @@ Item {
   // longer device name rather than a longer bar.
   readonly property int textReserve: 240
 
-  // The profile chip has no fixed width either: `profileMinW` is the floor it
-  // may shrink to before its own label elides, and `profileChrome` is the label
-  // plus the caret and the insets, so the chip's preferred width is its own
-  // text. A profile description is arbitrary length - "Analog Stereo Output
-  // (2 sinks, 0 sources)" is a fifth wider than "Off (disabled)" - so a
-  // constant column truncated the modes that need reading most. Measured
-  // on a live 760px configuration row against a four-profile card: a 288px
-  // chip, where the 220px column elided it.
+  // The profile chip's slot, and the SAME slot the Apps tab's device picker
+  // takes (`Model.CHIP_W`): preferred and minimum carry one number, in the same
+  // two steps the stream row uses, so the two tabs' dropdowns line up instead
+  // of one tab's being a ragged column of its own. A label wider than the slot
+  // elides inside it; the list the chip opens is sized to its own content, so a
+  // profile name too long for the chip is printed in full one click away.
   //
   // No `Layout.fillWidth` here either: a filler claims slack in proportion to
-  // (preferred - minimum), and this chip's preferred width IS its own text, so it
-  // has almost no spread to claim and would take the row's width instead of its
-  // own. Nothing here decides the level column's width either - this chip is in
-  // the configuration mode, which draws no fader and no meter at all.
-  readonly property int profileMinW: 160
+  // (preferred - minimum), and these two are equal, so a chip that filled would
+  // take the row's width rather than its own slot. Nothing here decides the
+  // level column's width either - this chip is in the configuration mode, which
+  // draws no fader and no meter at all.
+  readonly property int profileShare: Model.CHIP_W
   readonly property int profileChrome: 2 * Ui.s + 12 + 2
 
   // The bar volume island's 200% boost toggle, lifted rather than reinvented.
@@ -1023,8 +1021,9 @@ Item {
       Rectangle {
         id: profileChip
 
-        Layout.minimumWidth: row.profileMinW
-        Layout.preferredWidth: profileLabel.implicitWidth + row.profileChrome
+        Layout.minimumWidth: row.profileShare
+        Layout.preferredWidth: Math.min(profileLabel.implicitWidth + row.profileChrome,
+          row.profileShare)
         Layout.preferredHeight: 24
         Layout.alignment: Qt.AlignVCenter
         visible: row.configuration

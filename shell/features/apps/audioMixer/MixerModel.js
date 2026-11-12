@@ -1084,6 +1084,14 @@ var PROFILE_AVAIL_RE = /available:\s*([A-Za-z]+)/
 var OFF_PROFILE = "off"
 var OFF_DESCRIPTION = "Off (disabled)"
 
+// The width of a row's dropdown, in pixels: ONE number because it is one
+// control drawn by two tabs. The Apps tab's device picker and the
+// Configuration tab's profile picker are the same chip in the same slot, and a
+// tab whose chips are ragged beside a tab whose chips line up reads as two
+// different shells. A label longer than this elides in the chip; the list the
+// chip opens is sized to its own content, so the full text is one click away.
+var CHIP_W = 200
+
 // Key prefixes. The form is what makes a key safe to index by: "analog-stereo"
 // is an input profile on one card and an output profile on another, while
 // "card:46" names one card and nothing else.

@@ -217,7 +217,11 @@ Item {
   // up to this width and elides past it, and the row's fader never moves either
   // way. Measured on this machine's two sinks: an 18-character name measured a
   // 131px label, which is inside the 170px of text this leaves.
-  readonly property int pickerShare: 200
+  //
+  // The number itself lives in MixerModel.CHIP_W rather than here: the
+  // Configuration tab's profile chip is this same control in another tab, and a
+  // second literal is how the two tabs drift apart.
+  readonly property int pickerShare: Model.CHIP_W
   // The fader's length is `VolumeSlider.implicitWidth` and nothing else - a
   // hardcoded 200 that this row reads rather than restates, so a device row, a
   // stream row and a per-channel row cannot drift apart. What is left of the row
