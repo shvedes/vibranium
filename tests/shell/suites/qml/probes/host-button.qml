@@ -20,7 +20,7 @@
 //   * the HyprlandFocusGrab block: it dispatches a real focus grab through the
 //     compositor whenever root.open is true, which a test must never do
 // `visible` is KEPT - it is a real Item property here, and the same
-// `root.open || card.opacity > 0` expression is what gates the real window.
+// `root.open || cardItem.opacity > 0` expression is what gates the real window.
 //
 // The rewrite reports the lines it removed and the functions that survived, and
 // the driver asserts both, so a source change it no longer understands fails
@@ -663,7 +663,7 @@ ShellRoot {
     kv("hl.keepsCard", root.hostText.indexOf('objectName: "islandCard"') >= 0)
     kv("hl.keepsSaveCall", root.hostText.indexOf("FP.save(root._footprint, root._key, w, h)") >= 0)
     kv("hl.keepsCapacityBind", root.hostText.indexOf("FP.create(root.frozenCapacity)") >= 0)
-    kv("hl.keepsVisible", root.hostText.indexOf("visible: root.open || card.opacity > 0") >= 0)
+    kv("hl.keepsVisible", root.hostText.indexOf("visible: root.open || cardItem.opacity > 0") >= 0)
     kv("hl.keepsPositionCard", root.hostText.indexOf("function positionCard()") >= 0)
     kv("hl.keepsKeyFor", root.hostText.indexOf("function _keyFor(anchor)") >= 0)
     kv("hl.relativeImportsRerooted", root.relativeImportsRerooted)
