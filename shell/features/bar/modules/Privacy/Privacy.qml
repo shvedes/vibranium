@@ -2,8 +2,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.common
-import qs.features.bar
 import qs.services as Core
+import qs.features.bar
 
 // Bar face of the privacy service (qs.services.privacy): a static right-zone
 // launcher for the privacy island. The capture dots themselves are NOT drawn

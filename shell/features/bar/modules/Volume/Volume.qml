@@ -1,8 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.services as Core
 import qs.common
+import qs.services as Core
 import qs.features.bar
 import "Model.js" as Model
 import "../../../../common/text/Format.js" as Format

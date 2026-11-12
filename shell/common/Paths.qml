@@ -1,7 +1,7 @@
 pragma Singleton
 
-import Quickshell
 import QtCore
+import Quickshell
 import "text/StringUtils.js" as SU
 import "text/FileUri.js" as FileUri
 

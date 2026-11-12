@@ -7,8 +7,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Polkit
-import qs.services as Svc
 import qs.common
+import qs.services as Svc
 import "PolkitTrace.js" as PolkitTrace
 import "../../common/text/UnitIpc.js" as UnitIpc
 

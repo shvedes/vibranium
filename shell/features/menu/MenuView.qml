@@ -3,8 +3,8 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import Quickshell
-import qs.features.menu
 import qs.common
+import qs.features.menu
 
 // Menu overlay: every screen gets a dimming scrim at the
 // compositor-independent Quickshell level, the primary screen alone hosts

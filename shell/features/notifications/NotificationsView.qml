@@ -5,8 +5,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.common
-import "../../common/math/Range.js" as Range
 import qs.features.notifications
+import "../../common/math/Range.js" as Range
 import "NotificationsLib.js" as NotificationsLib
 
 // The notification pile. A full-screen transparent layer-shell window with

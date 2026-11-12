@@ -2,8 +2,8 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.common
-import qs.features.bar
 import qs.services as Core
+import qs.features.bar
 
 // Weather module. Static right-zone module showing a condition SVG +
 // temperature; left click opens the forecast island, middle refreshes.

@@ -4,8 +4,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Services.Mpris
 import qs.common
-import qs.features.bar
 import qs.services as Core
+import qs.features.bar
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/capture/ShotLib.js" as ShotLib
 import "../../../../common/text/Format.js" as Format

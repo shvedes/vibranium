@@ -2,8 +2,8 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
-import qs.features.menu
 import qs.common
+import qs.features.menu
 import "../../common/text/Format.js" as Format
 
 // Expansion editor shell for range/number/text rows: the validating

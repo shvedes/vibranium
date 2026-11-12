@@ -6,7 +6,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.common
-import "../../common/math/Range.js" as Range
 import qs.features.bar
 import qs.features.bar.modules.Clock
 import qs.features.bar.modules.KeyboardLayout
@@ -30,6 +29,7 @@ import qs.features.bar.modules.Tray
 import qs.features.bar.modules.Printers
 import qs.features.bar.modules.NowPlaying
 import qs.features.bar.modules.Workspaces
+import "../../common/math/Range.js" as Range
 import "BarLib.js" as BarLib
 import "../../common/text/UnitIpc.js" as UnitIpc
 

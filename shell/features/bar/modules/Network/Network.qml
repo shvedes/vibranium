@@ -4,8 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Networking
 import qs.common
-import qs.features.bar
 import qs.services as Core
+import qs.features.bar
 import "Model.js" as Model
 import "../../../../common/capture/ShotLib.js" as ShotLib
 

@@ -5,13 +5,13 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
 import Qt.labs.folderlistmodel
+import qs.common
+import qs.features.wallpaper
 import "ImageViewerMeta.js" as Meta
 import "../../../common/text/Format.js" as Format
 import "../../../common/capture/ShotLib.js" as ShotLib
 import "../../../common/text/StringUtils.js" as SU
 import "../../../common/math/Range.js" as Range
-import qs.common
-import qs.features.wallpaper
 
 // The image viewer window: one image, its neighbours in the folder, and a
 // floating frosted toolbar and status bar over it.

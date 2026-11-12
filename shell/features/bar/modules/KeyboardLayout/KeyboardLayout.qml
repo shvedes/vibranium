@@ -1,8 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.services
 import qs.common
+import qs.services
 import qs.features.bar
 
 // Keyboard layout indicator: the active layout as a lowercased two-letter

@@ -4,8 +4,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import Quickshell.Wayland
-import qs.services
 import qs.common
+import qs.services
 import qs.features.lock
 
 // One surface per screen, created by the WlSessionLock in Lockscreen.qml.

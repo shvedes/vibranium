@@ -9,8 +9,8 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pam
-import qs.services
 import qs.common
+import qs.services
 import qs.features.osd
 import qs.features.wallpaper
 import "../../common/text/UnitIpc.js" as UnitIpc
