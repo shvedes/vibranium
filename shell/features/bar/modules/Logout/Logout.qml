@@ -36,13 +36,7 @@ BarModule {
     PowerMenu.toggle()
   }
 
-  ToolTipBind {
-    active: root.hovered
-    text: "Session - power options"
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipText: "Session - power options"
 
   // Hover is the tray's expansion trigger (see BarView.trayTriggerHovered):
   // while the mouse sits on this icon the tray module stays slid out, so

@@ -228,14 +228,9 @@ BarModule {
     root.openIsland()
   }
 
-  ToolTipBind {
-    active: root.hovered && root.showSeconds && root.showSecondsInTooltip
-      && !root.barWindow.islandHost.isOpenFor(root)
-    text: root.tipText
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.hovered && root.showSeconds && root.showSecondsInTooltip
+    && !root.barWindow.islandHost.isOpenFor(root)
+  barTipText: root.tipText
 
   Component {
     id: islandComp

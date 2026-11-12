@@ -113,18 +113,13 @@ CollapsibleSlot {
   fillButtons: Qt.LeftButton
   onClicked: mouse => root.openIsland()
 
-  ToolTipBind {
-    active: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
-    text: root.vmUnavailable ? "Printers - not available in a VM"
-      : root.failed || root.printerDown ? "Printers - attention"
-      : Svc.Printers.anyPrinting ? "Printers - printing"
-      : Svc.Printers.hasActiveJobs ? "Printers - " + root.activeJobCount + (root.activeJobCount === 1 ? " job" : " jobs")
-      : Svc.Printers.state === "error" ? "Printers - unreachable" : "Printers"
-    lines: root.tipLines
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
+  barTipText: root.vmUnavailable ? "Printers - not available in a VM"
+    : root.failed || root.printerDown ? "Printers - attention"
+    : Svc.Printers.anyPrinting ? "Printers - printing"
+    : Svc.Printers.hasActiveJobs ? "Printers - " + root.activeJobCount + (root.activeJobCount === 1 ? " job" : " jobs")
+    : Svc.Printers.state === "error" ? "Printers - unreachable" : "Printers"
+  barTipLines: root.tipLines
 
   Component {
     id: islandComp

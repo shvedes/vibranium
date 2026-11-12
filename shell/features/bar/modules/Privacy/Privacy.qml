@@ -38,14 +38,9 @@ BarModule {
   // literal reads as a plain sentence (the island already shows the same
   // words, with no prefix). Active rows render through the host's shared
   // lines path like every compact tooltip, so the bubble insets match.
-  ToolTipBind {
-    active: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
-    text: Core.Privacy.active ? "" : "No apps using your devices"
-    lines: Core.Privacy.active ? Core.Privacy.tooltipRows : []
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
+  barTipText: Core.Privacy.active ? "" : "No apps using your devices"
+  barTipLines: Core.Privacy.active ? Core.Privacy.tooltipRows : []
 
   Component {
     id: islandComp

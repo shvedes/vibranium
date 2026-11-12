@@ -92,13 +92,8 @@ CollapsibleSlot {
     ? "Timer: Time's up!"
     : "Timer: " + (root.state?.formatted ?? "") + " remaining"
 
-  ToolTipBind {
-    active: root.shown && root.hovered
-    text: root.tooltipText
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.shown && root.hovered
+  barTipText: root.tooltipText
 
   // Left click stops the countdown or dismisses the expired alarm (the
   // same confirmation the menu owns stays untouched); middle and right

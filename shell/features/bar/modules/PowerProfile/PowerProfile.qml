@@ -45,11 +45,5 @@ CollapsibleSlot {
   // surface exists to reach.
   fillButtons: Qt.NoButton
 
-  ToolTipBind {
-    active: root.hovered
-    text: "Power profile: " + Svc.PowerProfile.profileName
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipText: "Power profile: " + Svc.PowerProfile.profileName
 }

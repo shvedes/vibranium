@@ -537,14 +537,9 @@ CollapsibleSlot {
     { icon: "volume-max", text: root.player ? Format.percent(root.player.volume ?? 0) : "--" }
   ]
 
-  ToolTipBind {
-    active: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
-    text: root.hasTrack ? root.title : "Now Playing"
-    lines: root.tipLines
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
+  barTipText: root.hasTrack ? root.title : "Now Playing"
+  barTipLines: root.tipLines
 
   Component {
     id: islandComp

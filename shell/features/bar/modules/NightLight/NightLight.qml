@@ -58,13 +58,8 @@ CollapsibleSlot {
     }
   }
 
-  ToolTipBind {
-    active: root.shown && root.hovered
-    text: root.active ? "Night Light active" : "Night Light suspended"
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.shown && root.hovered
+  barTipText: root.active ? "Night Light active" : "Night Light suspended"
 
   function _toggle() {
     // Optimistic flip - the pill and icon move on frame one; the script

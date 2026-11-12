@@ -165,14 +165,9 @@ BarModule {
     root.openIsland()
   }
 
-  ToolTipBind {
-    active: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
-    text: Core.Weather.tooltipText
-    lines: Core.Weather.tooltipLines
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
+  barTipText: Core.Weather.tooltipText
+  barTipLines: Core.Weather.tooltipLines
 
   Component {
     id: islandComp

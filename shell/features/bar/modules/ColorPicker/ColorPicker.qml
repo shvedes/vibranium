@@ -1139,13 +1139,7 @@ BarModule {
     }
   }
 
-  ToolTipBind {
-    active: root.hovered
-    text: "Click to pick a color"
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipText: "Click to pick a color"
 
   // --- IPC bridge registration ---
   // The module instantiates once per bar window (per monitor), but an

@@ -87,14 +87,8 @@ BarModule {
     }
   }
 
-  ToolTipBind {
-    active: root.hovered
-    text: root.tooltipText
-    lines: root.tipLines
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipText: root.tooltipText
+  barTipLines: root.tipLines
 
   Component {
     id: islandComp

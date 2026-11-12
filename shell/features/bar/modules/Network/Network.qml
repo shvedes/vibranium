@@ -402,15 +402,9 @@ BarModule {
   // connection" on a wired link, "Wi-Fi off" when the radio is disabled,
   // or a "No network" hint when there is no connection (the tooltip
   // shows in all states).
-  ToolTipBind {
-    active: root.hovered
-    text: root.tooltipText
-    lines: root.tipLines
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-    maxWidth: 0
-  }
+  barTipText: root.tooltipText
+  barTipLines: root.tipLines
+  barTipMaxWidth: 0
 
   Component {
     id: islandComp

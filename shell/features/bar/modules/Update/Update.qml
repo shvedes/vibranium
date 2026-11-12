@@ -46,11 +46,6 @@ CollapsibleSlot {
   onClicked: mouse => root.clickCommand("leftClick", "vb-launch-tui -- vb-update")
 
   // Shown only while an update is pending and hovered.
-  ToolTipBind {
-    active: root.on && root.hovered
-    text: root.state?.tooltipText ?? ""
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.on && root.hovered
+  barTipText: root.state?.tooltipText ?? ""
 }

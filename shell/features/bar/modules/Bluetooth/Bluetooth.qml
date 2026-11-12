@@ -361,14 +361,8 @@ BarModule {
 
   // One shared tooltip bubble: the connection state, or a hint when the
   // adapter is off/missing (the tooltip shows in both states).
-  ToolTipBind {
-    active: root.hovered
-    text: root.tooltipText
-    lines: root.tipLines
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipText: root.tooltipText
+  barTipLines: root.tipLines
 
   Component {
     id: islandComp

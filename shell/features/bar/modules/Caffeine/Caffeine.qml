@@ -107,12 +107,7 @@ CollapsibleSlot {
 
   // Active explains the control; a finite inhibit adds the live
   // countdown. Infinite stays generic with no suffix.
-  ToolTipBind {
-    active: root.active && root.hovered
-    text: root.infinite ? "Inhibiting sleep"
-      : "Inhibiting sleep for " + root.formatted
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.active && root.hovered
+  barTipText: root.infinite ? "Inhibiting sleep"
+    : "Inhibiting sleep for " + root.formatted
 }

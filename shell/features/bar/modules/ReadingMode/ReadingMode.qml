@@ -78,15 +78,10 @@ CollapsibleSlot {
     if (root._presence !== null) FilePresence.refresh(root._presence)
   }
 
-  ToolTipBind {
-    active: root.active && root.hovered
     // First line states the mode; the note carries the warning that
     // grayscale shows up in screenshots and screen recordings. The label
     // wraps on its own.
-    text: "Reading mode is active\n\n"
-      + "Note that grayscale effect will be visible on screenshots and screen records"
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.active && root.hovered
+  barTipText: "Reading mode is active\n\n"
+    + "Note that grayscale effect will be visible on screenshots and screen records"
 }

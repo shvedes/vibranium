@@ -541,13 +541,8 @@ CollapsibleSlot {
   fillButtons: Qt.LeftButton
   onClicked: root.openIsland()
 
-  ToolTipBind {
-    active: root.shown && root.hovered
-    lines: root.tooltipLines
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.shown && root.hovered
+  barTipLines: root.tooltipLines
 
   Component {
     id: islandComp

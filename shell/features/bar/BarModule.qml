@@ -60,6 +60,29 @@ Item {
     return true
   }
 
+  // Tooltip contract: a module declares what the bubble should say while
+  // hovered, and this base owns the single ToolTipBind that reports to the
+  // shared host. Every module used to repeat the anchor/barWindow/host trio
+  // and its own hover gate; the gate now defaults to `hovered` and a module
+  // only narrows it when the bubble must also follow its own state.
+  property string barTipText: ""
+  property var barTipLines: []
+  property bool barTipMarkup: false
+  property int barTipMaxWidth: 260
+  property bool barTipActive: root.hovered
+
+  ToolTipBind {
+    host: root.barWindow ? root.barWindow.toolTipHost : null
+    anchor: root
+    barWindow: root.barWindow
+    active: root.barTipActive
+      && (root.barTipText !== "" || root.barTipLines.length > 0)
+    text: root.barTipText
+    lines: root.barTipLines
+    markup: root.barTipMarkup
+    maxWidth: root.barTipMaxWidth
+  }
+
   // The built-in fill surface. Modules whose content already covers the
   // whole module with its own MouseAreas set this to false and keep theirs.
   property bool builtinFill: true
