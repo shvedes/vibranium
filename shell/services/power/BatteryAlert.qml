@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Services.UPower
 import qs.common
 import "../../common/power/BatteryModel.js" as Model
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // Low battery alerts, announced over D-Bus through `notify-send`.
 //
@@ -93,9 +94,7 @@ Singleton {
   }
 
   function _store(key: string, entry: var) {
-    const next = Object.assign({}, root._entries)
-    next[key] = entry
-    root._entries = next
+    root._entries = EntryMap.withEntry(root._entries, key, entry)
   }
 
   // One key, its watcher and its fired set go together. A device that
@@ -106,9 +105,7 @@ Singleton {
     const entry = root._entries[key]
     if (entry === undefined) return
     if (entry.watcher !== null && entry.watcher !== undefined) entry.watcher.destroy()
-    const next = Object.assign({}, root._entries)
-    delete next[key]
-    root._entries = next
+    root._entries = EntryMap.withoutEntry(root._entries, key)
   }
 
   // The device SET moved: a watcher per arriving device, and the key,

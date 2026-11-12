@@ -11,6 +11,7 @@ import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "PrivacyLib.js" as PrivacyLib
 import "../../common/process/JobResult.js" as Job
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // Privacy service - single source of truth for capture indicators (mic,
 // camera, screenshare). Owns the per-app usage ledger, the severed-link
@@ -514,9 +515,7 @@ Singleton {
       // Nothing was remembered to re-link (the cut landed on a target that
       // was already unlinked), so there is no restore to perform: the mark is
       // dropped and the click is reported instead of quietly doing nothing.
-      const next = Object.assign({}, root.severed)
-      delete next[slot]
-      root.severed = next
+      root.severed = EntryMap.withoutEntry(root.severed, slot)
       root._refuse(app, key, "nothing_to_restore")
       return "error"
     }
@@ -597,9 +596,7 @@ Singleton {
       root._refuse(app, key, "gate_refused")
       return null
     }
-    const runs = Object.assign({}, root._runs)
-    runs[slot] = { phase: "dump", pending: 0, failed: false, jobs: [] }
-    root._runs = runs
+    root._runs = EntryMap.withEntry(root._runs, slot, { phase: "dump", pending: 0, failed: false, jobs: [] })
     return Object.freeze({
       handle: Object.freeze({
         id: generation, scope: root._gateScope, key: gateKey
@@ -631,9 +628,7 @@ Singleton {
 
   function _dropRun(slot) {
     if (root._runs[slot] === undefined) return
-    const next = Object.assign({}, root._runs)
-    delete next[slot]
-    root._runs = next
+    root._runs = EntryMap.withoutEntry(root._runs, slot)
   }
 
   // Terminal path of the whole operation, whatever the outcome: the
@@ -754,9 +749,7 @@ Singleton {
     if (ids.length === 0) {
       // Nothing linked (already torn down externally): remember the bare
       // state so the row still reads cut.
-      const next = Object.assign({}, root.severed)
-      next[root._slot(app, key)] = { links: [] }
-      root.severed = next
+      root.severed = EntryMap.withEntry(root.severed, root._slot(app, key), { links: [] })
       // It is a cut that had nothing to cut, not a failure: the mark is what
       // the user asked for, and the later restore reports `nothing_to_restore`
       // off it.
@@ -791,9 +784,7 @@ Singleton {
     if (!RequestGate.current(record.handle)) return
     const links = Job.succeeded(result)
       ? PrivacyLib.linkQuads(String(result.stdout || ""), record.ids) : []
-    const next = Object.assign({}, root.severed)
-    next[record.slot] = { links: links }
-    root.severed = next
+    root.severed = EntryMap.withEntry(root.severed, record.slot, { links: links })
     root._cutByIds(record)
   }
 
@@ -860,9 +851,7 @@ Singleton {
           // The graph still carries the link, so the cut did not take: the
           // mark goes and the row reads connected again, which is what the
           // graph says, and the toast says the cut never landed.
-          const next = Object.assign({}, root.severed)
-          delete next[root._slot(w.app, w.key)]
-          root.severed = next
+          root.severed = EntryMap.withoutEntry(root.severed, root._slot(w.app, w.key))
           root._notify(root._shortApp(w.app), w.key, "still linked after the cut")
         } else if (w.mode === "restore" && live === 0) {
           // Nothing came back. The mark stays, so the row keeps reading cut

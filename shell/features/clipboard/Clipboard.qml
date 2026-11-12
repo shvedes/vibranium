@@ -10,6 +10,7 @@ import "ClipboardLib.js" as CL
 import "../../common/text/StringUtils.js" as SU
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/process/PanelList.js" as PanelList
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // Clipboard service in the shell's own process - no helper daemon. Fast
 // in-memory history, image/credential/pinning/preview support; history
@@ -686,9 +687,7 @@ Singleton {
   function finishDelete(id) {
     root.optimistic.confirm(id)
     if (root._captured) {
-      const n = Object.assign({}, root._captured)
-      delete n[id]
-      root._captured = n
+      root._captured = EntryMap.withoutEntry(root._captured, id)
     }
     root._dropPreviewData([{ id: id }])
     // Pinned mode with nothing pinned left goes back to normal only

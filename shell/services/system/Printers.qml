@@ -8,6 +8,7 @@ import Quickshell.Io
 import qs.common
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "PrintersLib.js" as Model
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // CUPS queue service. Reads printers + not-completed jobs over IPP with
 // ipptool templates colocated in ipptool/, and watches org.cups.cupsd.Notifier
@@ -668,9 +669,7 @@ Singleton {
     if (code !== 0) return
     const rows = Model.parseReport(text, "notify-subscription-id")
     if (rows.length === 0) return
-    const next = Object.assign({}, root._subs)
-    next[name] = String(rows[0]["notify-subscription-id"] || "")
-    root._subs = next
+    root._subs = EntryMap.withEntry(root._subs, name, String(rows[0]["notify-subscription-id"] || ""))
   }
 
   // Subscription lease renewal, named: 12h against a 24h lease.
@@ -764,9 +763,7 @@ Singleton {
     // queue, is refused: the click does nothing.
     if (!row) return
     if (Model.isActiveJobState(row["job-state"])) return
-    const next = Object.assign({}, root.dismissed)
-    next[id] = true
-    root.dismissed = next
+    root.dismissed = EntryMap.withEntry(root.dismissed, id, true)
     root._saveDismissed()
     root._maybeAllDone(next)
   }
@@ -816,9 +813,9 @@ Singleton {
     const qname = String(name ?? "").trim()
     if (qname === "") return false
     const clean = String(label ?? "").trim()
-    const cur = Object.assign({}, root.aliases)
-    if (clean === "") delete cur[qname]
-    else cur[qname] = clean
+    const cur = clean === ""
+      ? EntryMap.withoutEntry(root.aliases, qname)
+      : EntryMap.withEntry(root.aliases, qname, clean)
     root.aliases = cur
     ShellState.updateSection("printers", { aliases: cur })
     return true

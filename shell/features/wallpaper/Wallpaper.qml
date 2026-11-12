@@ -12,6 +12,7 @@ import "../../common/text/ImageExts.js" as ImageExts
 import "../../common/text/StringUtils.js" as SU
 import "../../common/text/DropPayload.js" as DropPayload
 import "../../common/process/JobResult.js" as Job
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // Pure-wallpaper renderer. The shell owns the *entire* decision stack: the
 // cycle, per-theme memory and current pointer live in a native JSON cache
@@ -142,8 +143,7 @@ Singleton {
     root._retire(key, "superseded")
     const generation = RequestGate.begin(root._gateScope, key)
     if (generation === 0) return null
-    const runs = Object.assign({}, root._runs)
-    runs[key] = {
+    root._runs = EntryMap.withEntry(root._runs, key, {
       job: null,
       temp: typeof carried.temp === "string" ? carried.temp : "",
       // The device and inode the filesystem reports for the source and for
@@ -153,8 +153,7 @@ Singleton {
       // known while the record is opened.
       ids: [],
       steps: null
-    }
-    root._runs = runs
+    })
     return Object.freeze(Object.assign({
       handle: Object.freeze(root._handle(generation, key)),
       key: key
@@ -177,9 +176,7 @@ Singleton {
     if (run === undefined) return false
     const job = run.job
     const temp = run.temp
-    const next = Object.assign({}, root._runs)
-    delete next[key]
-    root._runs = next
+    root._runs = EntryMap.withoutEntry(root._runs, key)
     Job.stopJob(job, reason)
     if (temp !== "") root._cleanupPath(temp)
     return true

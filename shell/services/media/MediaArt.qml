@@ -6,6 +6,7 @@ import Quickshell
 // The media set is owned by MediaState, so the warmer rides that state
 // instead of taking a second subscription to the MPRIS backend.
 import qs.services as Core
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // Media art warmer: decodes covers up front and holds them, so island /
 // OSD / bar Images hit the shared pixmap cache instead of fetching on
@@ -130,14 +131,12 @@ Singleton {
       root._refused += 1
       return false
     }
-    const next = Object.assign({}, root._entries)
-    next[want] = {
+    root._store(EntryMap.withEntry(root._entries, want, {
       url: want,
       refs: (current ? current.refs : 0) + 1,
       active: current ? current.active : false,
       order: ++root._clock,
-    }
-    root._store(next)
+    }))
     return true
   }
 
@@ -147,15 +146,13 @@ Singleton {
     const want = String(url || "")
     const current = root._entries[want]
     if (!current) return false
-    const next = Object.assign({}, root._entries)
     const refs = current.refs - 1
-    next[want] = {
+    root._store(EntryMap.withEntry(root._entries, want, {
       url: want,
       refs: refs > 0 ? refs : 0,
       active: current.active,
       order: current.order,
-    }
-    root._store(next)
+    }))
     return true
   }
 

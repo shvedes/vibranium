@@ -13,6 +13,7 @@ import "../../common/process/ProcControl.js" as ProcControl
 import "../../common/capture/RectMath.js" as RectMath
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/StringUtils.js" as SU
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // Headless capture protocol, IPC and state owner. A mode resolves its
 // target, grabs one physical frame, probes its decoded size, saves it
@@ -109,9 +110,7 @@ Singleton {
   property double _t0: 0
 
   function _mark(name) {
-    const next = Object.assign({}, root._marks)
-    next[name] = Date.now()
-    root._marks = next
+    root._marks = EntryMap.withEntry(root._marks, name, Date.now())
   }
 
   function _armClock() {

@@ -396,7 +396,7 @@ Singleton {
         return null
       }
       entry = { key: key, node: node, monitor: monitor, handles: [] }
-      root._peakEntries = Object.assign({}, root._peakEntries, { [key]: entry })
+      root._peakEntries = EntryMap.withEntry(root._peakEntries, key, entry)
       root._peakNodeCount += 1
     }
     let handle = null
@@ -418,9 +418,8 @@ Singleton {
     // so the monitor is never bound to a node with no consumer holding it.
     entry.monitor.peakTarget = node
     entry.monitor.peakHandles = entry.handles.concat([handle])
-    root._peakEntries = Object.assign({}, root._peakEntries, {
-      [key]: Object.assign({}, entry, { handles: entry.monitor.peakHandles })
-    })
+    root._peakEntries = EntryMap.withEntry(root._peakEntries, key,
+      Object.assign({}, entry, { handles: entry.monitor.peakHandles }))
     return handle
   }
 
@@ -444,9 +443,8 @@ Singleton {
     handle.peakMonitor = null
     if (remaining.length > 0) {
       entry.monitor.peakHandles = remaining
-      root._peakEntries = Object.assign({}, root._peakEntries, {
-        [key]: Object.assign({}, entry, { handles: remaining })
-      })
+      root._peakEntries = EntryMap.withEntry(root._peakEntries, key,
+        Object.assign({}, entry, { handles: remaining }))
       return true
     }
     // Last hold for this node: unbind, then destroy.
@@ -457,9 +455,7 @@ Singleton {
     } catch (ignored) {
       // A monitor that is already gone is the outcome we wanted anyway.
     }
-    const next = Object.assign({}, root._peakEntries)
-    delete next[key]
-    root._peakEntries = next
+    root._peakEntries = EntryMap.withoutEntry(root._peakEntries, key)
     root._peakNodeCount = Math.max(0, root._peakNodeCount - 1)
     return true
   }
