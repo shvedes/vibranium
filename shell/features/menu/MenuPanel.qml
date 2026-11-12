@@ -2819,16 +2819,14 @@ Rectangle {
     if (list._lastSeatCause !== "step" && list._lastSeatCause !== "click") return
     const idx = list.currentIndex
     if (idx < 0 || idx >= panel.rowsModel.length) return
-    // Mid-swap guard: a dying delegate from the previous model is still
-    // truthy here, but its payload no longer matches the model slot -
-    // persisting that transient would clobber the remembered cursor.
+    // A dying delegate from the previous model generation is still truthy
+    // here; its uid must match the live rowsModel slot or persisting that
+    // transient would clobber the remembered cursor. The restore-pending
+    // check above already ran, and nothing between it and here changes the
+    // frame, so re-testing it was a second answer to one question.
     const row = panel.gridMode ? grid.currentItem : list.currentItem
-    // A dying delegate from the previous model generation is still
-    // truthy here; uid must match the live rowsModel slot or the
-    // transient would clobber the remembered cursor.
     const mItem = panel.rowsModel[idx]
     if (!row || !mItem || !row.itm || row.itm.uid !== mItem.uid) return
-    if (Menu.frame && Menu._restorePending[Menu.frame.id] === true) return
     Menu.saveFrame(idx, panel.gridMode ? grid.contentY : list.contentY, mItem.uid)
   }
 
