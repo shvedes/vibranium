@@ -122,10 +122,7 @@ Singleton {
     if (slot.view) {
       slot.view.slotData = clean
     } else {
-      const next = Object.assign({}, slot, { data: clean })
-      const nextSlots = Object.assign({}, root._slots)
-      nextSlots[key] = next
-      root._slots = nextSlots
+      root._publish(key, clean)
       root.rev++
       root._scheduleFlush(key)
     }
@@ -265,14 +262,23 @@ Singleton {
     root._scheduleFlush(key)
   }
 
+  // Replace one slot entry's published payload, leaving the view and the
+  // default alone. Copy-on-write: every slot reader binds to `_slots`.
+  function _publish(key, data) {
+    const slot = root._slots[key]
+    if (!slot) return false
+    const nextSlots = Object.assign({}, root._slots)
+    nextSlots[key] = Object.assign({}, slot, { data: data })
+    root._slots = nextSlots
+    return true
+  }
+
   // Mirror the adapter payload into the slot entry after the synchronous
   // ensure load; later mutations mirror through _onSlotDataChanged.
   function _syncMirror(key) {
     const slot = root._slots[key]
     if (!slot || !slot.view) return
-    const nextSlots = Object.assign({}, root._slots)
-    nextSlots[key] = Object.assign({}, slot, { data: slot.view.slotData })
-    root._slots = nextSlots
+    root._publish(key, slot.view.slotData)
   }
 
   // Adapter payload changed (local set or external reload): mirror it
@@ -280,9 +286,7 @@ Singleton {
   function _onSlotDataChanged(key) {
     const slot = root._slots[key]
     if (!slot || !slot.view) return
-    const nextSlots = Object.assign({}, root._slots)
-    nextSlots[key] = Object.assign({}, slot, { data: slot.view.slotData })
-    root._slots = nextSlots
+    root._publish(key, slot.view.slotData)
     root.rev++
   }
 
