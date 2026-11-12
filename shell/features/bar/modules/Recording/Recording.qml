@@ -65,25 +65,24 @@ CollapsibleSlot {
 
     precision: SystemClock.Seconds
     enabled: root.active
-    onDateChanged: {
-      if (root._seenSince <= 0) root._seenSince = Date.now()
-      root.nowMs = Date.now()
-    }
+    onDateChanged: root._seed()
   }
-  Component.onCompleted: {
-    if (root.active) {
-      if (root._seenSince <= 0) root._seenSince = Date.now()
-      root.nowMs = Date.now()
-    }
-  }
+  Component.onCompleted: root._seed()
   onActiveChanged: {
-    if (root.active) {
-      if (root._seenSince <= 0) root._seenSince = Date.now()
-      root.nowMs = Date.now()
-    } else {
+    if (root.active) root._seed()
+    else {
       root._seenSince = 0
       root.nowMs = 0
     }
+  }
+
+  // First paint while active: seed the fallback stamp once and read the
+  // clock, so the pill never flashes 0:00. A no-op while idle, which is
+  // what makes it safe to call from all three triggers.
+  function _seed() {
+    if (!root.active) return
+    if (root._seenSince <= 0) root._seenSince = Date.now()
+    root.nowMs = Date.now()
   }
 
   // GNOME-style pill: solid red oblong with the black elapsed time.
@@ -124,11 +123,6 @@ CollapsibleSlot {
 
   // Shown only while recording and hovered; the hidden state keeps no
   // tooltip surface alive.
-  ToolTipBind {
-    active: root.active && root.hovered
-    text: root.elapsedPill ? "Screen recording is active" : "Recording " + root.elapsed
-    anchor: root
-    barWindow: root.barWindow
-    host: root.barWindow ? root.barWindow.toolTipHost : null
-  }
+  barTipActive: root.active && root.hovered
+  barTipText: root.elapsedPill ? "Screen recording is active" : "Recording " + root.elapsed
 }
