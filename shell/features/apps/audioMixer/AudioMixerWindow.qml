@@ -781,16 +781,32 @@ QtObject {
               // stacks these vertically, so one entry's band never overlaps its
               // neighbours' and the wider hit area cannot steal a click from the
               // row below it.
+              //
+              // This target is enabled for EVERY entry, choosable or not, and it
+              // is the row's hover reporter. A refused row used to switch the
+              // target off, which took the row out of the hit-test chain: no
+              // hover was reported for it, so the highlight stayed on the last
+              // choosable row while the pointer sat on a dimmed one. Handing that
+              // report to a passive handler instead fails the other way - an
+              // enabled mouse target accepts the hover before anything passive
+              // behind it sees the pointer, so the same switch-off that silences
+              // a refused row would then silence every row that has a working
+              // target, which is most of the list.
+              //
+              // So the target answers the pointer for every row and the CLICK is
+              // what distinguishes them. Hover only moves the highlight: nothing
+              // is written until the pointer clicks or Enter commits. A selector
+              // that routed on hover would fire a `pactl` move every time the
+              // pointer crossed a row - and on a refused row it would fire the
+              // move that row exists to prevent.
               width: pop.entryW
               height: parent.height
-              enabled: opt.usable
               hoverEnabled: true
               cursorShape: opt.usable ? Qt.PointingHandCursor : Qt.ArrowCursor
-              // Hover only MOVES the highlight: nothing is written until the
-              // pointer clicks it or Enter commits it. A selector that routed
-              // on hover would fire a `pactl` move every time the pointer
-              // crossed a row.
               onEntered: pop.pointed(opt.index)
+              // The refusal is not repeated here: `commitPop` rejects any entry
+              // whose `enabled` is not true before it closes the list, so a click
+              // on a refused row closes nothing and commits nothing.
               onClicked: pop.activated(opt.modelData)
             }
 
