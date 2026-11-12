@@ -6,7 +6,6 @@ import QtQml
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
-import qs.common
 
 // Authoritative Hyprland keyboard state: the caps lock flag and the active
 // layout, queried from the compositor request socket whenever a consumer
