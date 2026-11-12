@@ -91,12 +91,10 @@ Singleton {
     if (typeof key !== "string" || key === "") {
       return null
     }
-    const def = StoreGuards.isPlainObject(defaultValue)
-      ? Object.assign({}, defaultValue) : (defaultValue !== undefined ? defaultValue : {})
     if (root._slots[key] !== undefined) {
       return root._slots[key].data
     }
-    root._ensureSlot(key, def, scope, file)
+    root._ensureSlot(key, defaultValue, scope, file)
     return root._slots[key].data
   }
 
@@ -209,16 +207,16 @@ Singleton {
     // Single view per slot: atomic writes, watch, reload. The JsonAdapter
     // child owns JSON parse plus stringify plus echo suppression.
     const view = slotComp.createObject(root, { slotKey: key })
-    const def = defaultValue !== undefined ? defaultValue : {}
-    const defClone = StoreGuards.isPlainObject(def)
-      ? Object.assign({}, def) : def
-    view.slotData = defClone
+    const def = StoreGuards.isPlainObject(defaultValue)
+      ? Object.assign({}, defaultValue)
+      : (defaultValue !== undefined ? defaultValue : {})
+    view.slotData = def
     view.path = path
 
     const nextSlots = Object.assign({}, root._slots)
     nextSlots[key] = {
       path: path,
-      data: defClone,
+      data: def,
       defaultValue: def,
       view: view
     }
