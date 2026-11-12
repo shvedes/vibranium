@@ -59,7 +59,6 @@ Item {
   property bool gitReady: false
 
   property string passBinary: "unknown" // unknown | present | missing
-  readonly property bool passInstalled: root.passBinary !== "missing"
 
   property var _unlockCb: null
   property string _gitNext: ""

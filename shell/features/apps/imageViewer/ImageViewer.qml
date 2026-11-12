@@ -76,7 +76,6 @@ Singleton {
   readonly property alias constructions: lease.constructions
 
   // --- public read surface (projected) ---
-  readonly property var _controller: lease.controller
 
   // The file the window is showing, or "" for no controller, no window, or a
   // window holding no image. One projection so `status()` and any in-process

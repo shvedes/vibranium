@@ -132,7 +132,6 @@ Item {
   readonly property real uploadRate: StatsSampler.uploadRate
   readonly property real totalRxBytes: StatsSampler.totalRxBytes
   readonly property real totalTxBytes: StatsSampler.totalTxBytes
-  readonly property string statsIface: StatsSampler.iface
 
   // The sampler's route fork stands down while our speed test owns the link,
   // and comes back on its own when the test ends.

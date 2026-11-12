@@ -205,7 +205,6 @@ Item {
   // two ends of the pan agree about how much of the edge to leave behind.
   readonly property int margin: 80
   readonly property int colStep: tab.cardW + tab.gapX
-  readonly property int rowStep: tab.cardH + tab.gapY
 
   // The world's own extent, from the LAYOUT rather than from the card count.
   //

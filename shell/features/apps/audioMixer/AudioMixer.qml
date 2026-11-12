@@ -96,7 +96,6 @@ Singleton {
   readonly property alias constructions: lease.constructions
 
   // --- public read surface (projected) ---
-  readonly property var _controller: lease.controller
   readonly property bool routingReady: lease.controller !== null
     ? lease.controller.routingReady : false
   readonly property string routingError: lease.controller !== null

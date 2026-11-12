@@ -1555,10 +1555,6 @@ ListView {
   // where its own edges are, and a cursor drawn by the view would have to
   // guess at a delegate's insets.
   property bool focusBorder: false
-  // One flag for "a row can take the cursor", exposed so a delegate does not
-  // have to re-derive the currentIndex === index comparison and risk answering
-  // the cursor for a row `isSelectable` refuses.
-  readonly property bool cursorVisible: root.currentIndex >= 0
 
   // Enter on the current row. A delegate that implements activate() owns the
   // press (a row with an action of its own), and anything else reports

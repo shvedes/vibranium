@@ -263,7 +263,6 @@ Singleton {
   readonly property string passBinary: lease.controller !== null ? lease.controller.passBinary : "unknown"
   readonly property bool gitReady: lease.controller !== null ? lease.controller.gitReady : false
   readonly property var keyChoices: lease.controller !== null ? lease.controller.keyChoices : []
-  readonly property bool passInstalled: root.passBinary !== "missing"
 
   Component.onCompleted: {
     Registry.offer("pass", {

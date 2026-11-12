@@ -28,8 +28,6 @@ Singleton {
 
   // "memory" until a validated helper answers, "helper" once one has.
   readonly property string posture: root._helperOk ? "helper" : "memory"
-  // True only while a validated helper holds values across sessions.
-  readonly property bool persistent: root._helperOk
   readonly property int count: root._count
 
   // Maintained alongside _slots: count is read from a binding, and

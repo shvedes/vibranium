@@ -141,7 +141,6 @@ BarModule {
   readonly property real uploadRate: StatsSampler.uploadRate
   readonly property real totalRxBytes: StatsSampler.totalRxBytes
   readonly property real totalTxBytes: StatsSampler.totalTxBytes
-  readonly property string statsIface: StatsSampler.iface
 
   onHoveredChanged: {
     if (root.hovered) StatsSampler.acquire()

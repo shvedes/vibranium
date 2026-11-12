@@ -18,7 +18,6 @@ Item {
   // is only ever read for its LENGTH.
   required property var modelData
   required property int index
-  readonly property string rowKey: row.modelData ? String(row.modelData.uid || "") : ""
   // A rebaked row supersedes whatever close it still owed: the new role
   // owns the slot from here, so the release a cancelled close was holding
   // goes with the rebake - the swap that installed these rows is the one
