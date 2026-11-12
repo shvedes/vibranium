@@ -1436,8 +1436,8 @@ function buildPages(schema, values) {
   }
 
   // The index row that opens a section. desc is ctrl-i-only copy; the count
-  // sub line is a per-section opt-in and reflects what is visible right now,
-  // so showIf-hidden options do not count.
+  // sub line is a per-section opt-in over the rows the page carries. A gated
+  // row is muted, not removed, so the count does not move as values change.
   function sectionLink(section) {
     const link = {
       type: "submenu",
@@ -1453,6 +1453,9 @@ function buildPages(schema, values) {
 
   for (let s = 0; s < src.length; s++) {
     const section = src[s]
+    // Zero here means the page has no row at all (every option is hidden),
+    // not that its rows are gated off: gated rows stay on the page and are
+    // muted, so a section link never flickers as values change.
     if (visibleItemCount(section, schema.byKey, values) === 0) continue
 
     pages.push({
@@ -1488,16 +1491,18 @@ function buildBundle(schema, values) {
   return { pages: pages }
 }
 
-// The visible-content walk both counters below share: non-hidden options
-// whose showIf passes, then custom items with separators dropped.
-// `objectItems` is the subset that is a real row rather than a bare marker,
-// so each caller keeps its own answer for those without re-walking.
+// The content walk both counters below share: non-hidden options, then custom
+// items with separators dropped. `objectItems` is the subset that is a real
+// row rather than a bare marker, so each caller keeps its own answer for
+// those without re-walking.
+//
+// showIf is deliberately not read here: a gated row keeps its slot (the menu
+// mutes it), so the counters describe the page's static shape and a value
+// change cannot make a section link or its count appear and disappear.
 function _visibleContent(section, byKey, values) {
   let options = 0
   for (let o = 0; o < section.options.length; o++) {
-    const opt = section.options[o]
-    if (opt.hidden) continue
-    if (opt.showIf && !conditionsMet(byKey, values, opt.showIf)) continue
+    if (section.options[o].hidden) continue
     options++
   }
   let items = 0
@@ -1511,19 +1516,19 @@ function _visibleContent(section, byKey, values) {
   return { options: options, items: items, objectItems: objectItems }
 }
 
-// Currently-visible row count of a section: non-hidden options whose
-// showIf passes, plus custom items (separators are chrome, not content).
-// Zero means the submenu hides completely - no page, no link, no search
-// entries. The caller re-derives this when values change.
+// Row count of a section: non-hidden options plus custom items (separators
+// are chrome, not content). Zero means the section has no row to show at all,
+// so it gets no page and no link. The count is static - a gated row is muted,
+// not dropped - so the caller need not rebuild it when values change.
 function visibleItemCount(section, byKey, values) {
   const c = _visibleContent(section, byKey, values)
   return c.options + c.items
 }
 
-// Visible content of a section at the given values: non-hidden options
-// whose showIf currently passes, plus custom items (separators are
-// chrome, not content). The caller re-derives this when values change so
-// the number never drifts from what the section actually shows.
+// The count label of a section: non-hidden options plus custom items
+// (separators are chrome, not content). The noun follows whether the page has
+// any custom item, and the number is the page's shape rather than the number
+// of rows currently enabled.
 function itemCountLabel(section, byKey, values) {
   const c = _visibleContent(section, byKey, values)
   const n = c.options + c.objectItems

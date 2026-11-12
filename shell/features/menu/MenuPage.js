@@ -43,7 +43,7 @@ function defaultsFor(type) {
     enabled: true,
 
     // Guard expressions evaluated in one batched bash run per load:
-    // when     hide the row while the expression fails
+    // when     mute the row while the expression fails
     // checked  append a checkmark while the expression succeeds
     // disabled row stays listed but goes dim and unselectable
     when: "",

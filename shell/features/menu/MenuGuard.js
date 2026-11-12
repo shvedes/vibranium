@@ -95,7 +95,8 @@ function requiresExpr(requires) {
 }
 
 // Structured requires ({chassis} and/or {binary}) emitted as a `w` guard
-// in the same batch shape. An unknown shape hides the row.
+// in the same batch shape. An unknown shape refuses the row (it renders
+// muted, never usable).
 //
 // It does not LOG one, and the previous version of this comment said it did.
 // A pure library has no logger, and a row silently deleted by a typo in a

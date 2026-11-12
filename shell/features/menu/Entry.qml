@@ -124,11 +124,13 @@ Item {
     Menu.rev
     return searchResult || !itm ? null : Menu.stateOf(itm)
   }
-  // A listed row whose store-gated (showIf) condition fails: drawn under a
-  // mute box, skipped by the cursor, inert. condRev is read so a store write
-  // re-answers this binding - a condition flip never changes the row set.
+  // A row that cannot be used right now (see Menu.isUnavailable): drawn under
+  // a mute box, skipped by the cursor, inert. rev and condRev are read so a
+  // guard verdict, a dead link or a store write re-answers this binding - none
+  // of them changes the row set.
   readonly property bool unavailable_: {
     Menu.condRev
+    Menu.rev
     return itm && !searchResult ? Menu.isUnavailable(itm) : false
   }
   readonly property bool enabled_: itm && !searchResult
@@ -2272,11 +2274,12 @@ Item {
     }
   }
 
-  // Store-gated row that cannot be used right now: a card-toned fill over the
-  // whole row mutes the copy underneath instead of the row vanishing, and it
-  // fades out the moment the condition starts holding. Drawn last so it covers
-  // the open slots too. No outline: the fill is the card colour, so it only
-  // mutes what is behind it and consecutive muted rows read as one area.
+  // A row that cannot be used right now (see Menu.isUnavailable): a card-toned
+  // fill over the whole row mutes the copy underneath instead of the row
+  // vanishing, and it fades out the moment every condition starts holding.
+  // Drawn last so it covers the open slots too. No outline: the fill is the
+  // card colour, so it only mutes what is behind it and consecutive muted rows
+  // read as one area.
   //
   // The fade is an explicit tween started by the verdict's own change, not a
   // Behavior on the opacity binding. A Behavior also eases the binding's first

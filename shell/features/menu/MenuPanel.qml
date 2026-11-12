@@ -178,9 +178,9 @@ Rectangle {
   property var installedPage: null
   property string installedPageId: ""
 
-  // Listed rows: guard-hidden rows are filtered out, while store-gated
-  // (showIf) rows stay installed and render muted. Managed identity-stable
-  // model (a naive binding would rebuild delegates mid-interaction).
+  // The page's rows: every declared row stays installed, and one that cannot
+  // be used renders muted (Menu.isUnavailable). Managed identity-stable model
+  // (a naive binding would rebuild delegates mid-interaction).
   property var rowsModel: []
   property real _latchedListH: -1
   property bool _fitPending: false
@@ -579,9 +579,9 @@ Rectangle {
       // mid-swap cursor churn pollute the destination's saved state.
       const pg = panel.installedPage
       const src = pg ? pg.items : []
-      // isListed, not isVisible: a store-gated row keeps its slot while its
-      // condition fails and is drawn under a mute box, so the row set only
-      // changes when a guard verdict or a dead link takes a row away.
+      // isListed, not isVisible: a blocked row keeps its slot and is drawn
+      // under a mute box, so the row set only changes when the page itself is
+      // rebuilt.
       candidate = src.filter(item => Menu.isListed(item))
       // Grid pages weave section headers and row-fill spacers into the
       // flat slot list; search results stay flat (no chrome mid-filter).
@@ -3655,9 +3655,10 @@ Rectangle {
     return -1
   }
 
-  // A store change can strand the cursor on a row whose condition just stopped
-  // holding. The row stays installed (it only turns muted), so no install moves
-  // the cursor: step to the next row that can take it, forward first, else back.
+  // A store write or guard verdict can strand the cursor on a row that just
+  // went muted. The row stays installed (it only turns muted), so no install
+  // moves the cursor: step to the next row that can take it, forward first,
+  // else back.
   function seatPastUnavailable() {
     const idx = panel.gridMode ? grid.currentIndex : list.currentIndex
     if (idx < 0 || idx >= panel.rowsModel.length) return

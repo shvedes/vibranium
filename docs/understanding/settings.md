@@ -122,8 +122,10 @@ Three layers - pick by what the condition depends on.
   references (shell rows gated on `hypr.*`) stay intact: the file holds
   every key, and each entry resolves in its own store at runtime.
 - A row whose condition fails stays listed: it renders muted, in a box that
-  fades away once the condition holds, and the cursor steps over it. Search
-  only surfaces rows whose condition holds.
+  fades away once the condition holds, and the cursor steps over it. Rows
+  never appear or disappear while a menu is open, so the card keeps its shape;
+  a section link whose rows are all muted is muted with them. Search only
+  surfaces rows whose condition holds.
 - **UI-only.** Hidden options keep their value and stay projected into the
   env file; scripts never see menu visibility.
 - Self references are pruned at load with a warning.
@@ -138,6 +140,10 @@ bash; options may not):
   "requires": { "chassis": "laptop" }
 }
 ```
+
+A failed requirement behaves like a failed `showIf`: the row keeps its slot,
+renders muted and unselectable, and leaves search. Nothing is removed from a
+page once it has been declared.
 
 Rule of thumb: preference-dependent -> `showIf`; world-dependent with a
 fixed shape (laptop-only, not-a-VM, needs a binary) -> `requires`;

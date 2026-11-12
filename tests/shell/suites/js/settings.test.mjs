@@ -1502,7 +1502,7 @@ group('buildItem fills a flow stage from the option it belongs to', () => {
   eq('no flow means no flow key', 'flow' in SL.buildItem(opt({ key: 'A', type: 'bool', default: false }, 'env'), true), false)
 })
 
-group('visibleItemCount and itemCountLabel count what the page shows NOW', () => {
+group('visibleItemCount and itemCountLabel describe the page, not the gate', () => {
   const c = catalog('{"pages":[{"id":"media","label":"Media","showItemCount":true,"options":[' +
     '{"key":"A_INT","type":"int","default":30},' +
     '{"key":"GATED","type":"bool","default":false,"showIf":{"key":"A_INT","eq":60}},' +
@@ -1511,11 +1511,11 @@ group('visibleItemCount and itemCountLabel count what the page shows NOW', () =>
   const sch = SL.buildSchema(c.sections, 0, '')
   const sec = c.sections[0]
   const at = (fps) => Object.assign(Object.fromEntries(Object.entries(sch.byKey).map(([k, o]) => [k, o.default])), { A_INT: fps })
-  eq('a hidden option does not count', SL.visibleItemCount(sec, sch.byKey, at(30)), 2)
-  eq('a showIf-satisfied option counts', SL.visibleItemCount(sec, sch.byKey, at(60)), 3)
-  eq('a separator is chrome, not content', SL.visibleItemCount(sec, sch.byKey, at(30)), 2)
-  eq('the label is plural for two', SL.itemCountLabel(sec, sch.byKey, at(30)), '2 items')
-  eq('and three', SL.itemCountLabel(sec, sch.byKey, at(60)), '3 items')
+  eq('a hidden option does not count', SL.visibleItemCount(sec, sch.byKey, at(30)), 3)
+  eq('a showIf-gated option still counts', SL.visibleItemCount(sec, sch.byKey, at(60)), 3)
+  eq('a separator is chrome, not content', SL.visibleItemCount(sec, sch.byKey, at(30)), 3)
+  eq('the label is plural for three', SL.itemCountLabel(sec, sch.byKey, at(30)), '3 items')
+  eq('and does not move when the gate flips', SL.itemCountLabel(sec, sch.byKey, at(60)), '3 items')
   // The noun follows whether the page has custom items at all.
   const optsOnly = SL.parseSection({ label: 'O', options: [{ key: 'shell.a', type: 'bool', default: true }] }, 'x', true, 'shell')
   eq('an options-only page says "option"', SL.itemCountLabel(optsOnly, sch.byKey, {}), '1 option')
@@ -1533,7 +1533,7 @@ group('visibleItemCount and itemCountLabel count what the page shows NOW', () =>
   eq('and visibleItemCount agrees', SL.visibleItemCount(sepOnly, sch.byKey, {}), 0)
   const empty = SL.parseSection({ label: 'E' }, 'x', true, 'shell')
   eq('an empty page is "0 options"', SL.itemCountLabel(empty, sch.byKey, {}), '0 options')
-  eq('which is the signal a submenu hides completely on', SL.visibleItemCount(empty, sch.byKey, {}), 0)
+  eq('which is the signal a section gets no page at all', SL.visibleItemCount(empty, sch.byKey, {}), 0)
   eq('a non-object item is counted by visibleItemCount but not by the label', (() => {
     const s = SL.parseSection({ label: 'X', items: [5] }, 'x', true, 'shell')
     return [SL.visibleItemCount(s, sch.byKey, {}), SL.itemCountLabel(s, sch.byKey, {})]

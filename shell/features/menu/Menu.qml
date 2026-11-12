@@ -71,15 +71,11 @@ Singleton {
   property var guardChecked: ({})
   property var guardDisabled: ({})
 
-  // uid -> true for submenu links whose target page currently renders
-  // no visible rows. Bash `when` guards live in guardWhen (menu-side),
-  // so the settings schema counter cannot see them - e.g. the Power
-  // page on a machine without PPD keeps its link while the page itself
-  // renders nothing. isVisible consults this map, hiding the link from
-  // page rows AND search results (groupSearchResults filters through
-  // isVisible). Recomputed to a fixpoint: a link is dead when its
-  // target has no live row, where live excludes already-dead links -
-  // transitive empties collapse in repeated passes.
+  // uid -> true for submenu links whose target page currently has nothing
+  // usable on it: a page that never arrived, or one whose selectable rows are
+  // all blocked by a condition. The link keeps its slot and is muted by
+  // isUnavailable; search stops offering it because isVisible answers false
+  // (groupSearchResults filters through isVisible).
   property var _deadLinks: ({})
 
   // Current search query; non-empty flips panels into results mode.
@@ -784,10 +780,9 @@ Singleton {
   }
 
   // Re-derive the "N items" sub line of every counted section row on the
-  // settings root. Counting runs against the BUILT page with live listing -
-  // bash when-guards and provider vetoes resolve here, and store-gated
-  // (showIf) rows count even while muted - so the number always matches what
-  // entering the section shows.
+  // settings root. Counting runs over the BUILT page: every declared row is
+  // listed, and gated rows stay on it while muted, so the number describes
+  // the page's shape and does not move as conditions flip.
   // In-place mutation + rev bump: the mirror holds these same objects,
   // so patched strings reach delegates without any model rebuild.
   function refreshSectionCounts() {
@@ -1342,103 +1337,97 @@ Singleton {
   function recomputeDeadLinks() {
     if (!root.bundle) return
     // A missing target while the settings stores are still landing is not a
-    // dead link - it is a page that has not arrived. Marking it dead hid the
-    // "Settings" entry on a cold-boot Main summon; the install that put it
-    // back then landed above the seat (Help clamped from the warm view),
-    // which is the reported Help > Install > Settings walk. Treat it as
-    // alive until the stores are ready; the bundle rebuild on the next open
+    // dead link - it is a page that has not arrived. Marking it dead muted
+    // the "Settings" entry on a cold-boot Main summon. Treat it as usable
+    // until the stores are ready; the bundle rebuild on the next open
     // (cache keys on sval/hrev/mrev) supplies the real page.
     const storesReady = Settings.ready === true
       && HyprlandSettings.ready === true && MiscSettings.ready === true
     const dead = {}
-    let changed = true
-    while (changed) {
-      changed = false
-      for (let p = 0; p < root.bundle.pages.length; p++) {
-        const pg = root.bundle.pages[p]
-        for (let i = 0; i < pg.items.length; i++) {
-          const it = pg.items[i]
-          if (!it || it.type !== "submenu" || dead[it.uid]) continue
-          const tpg = typeof it.page === "string" && it.page !== ""
-            ? root.bundle.byId[it.page] : null
-          if (!tpg) {
-            if (!storesReady) continue
-            dead[it.uid] = true
-            changed = true
-            continue
-          }
-          let alive = false
-          for (let j = 0; j < tpg.items.length; j++) {
-            const tIt = tpg.items[j]
-            if (!tIt || !tIt.selectable || dead[tIt.uid]) continue
-            if (!root.isListed(tIt)) continue
-            alive = true
-            break
-          }
-          if (!alive) {
-            dead[it.uid] = true
-            changed = true
-          }
+    for (let p = 0; p < root.bundle.pages.length; p++) {
+      const pg = root.bundle.pages[p]
+      for (let i = 0; i < pg.items.length; i++) {
+        const it = pg.items[i]
+        if (!it || it.type !== "submenu") continue
+        const tpg = typeof it.page === "string" && it.page !== ""
+          ? root.bundle.byId[it.page] : null
+        if (!tpg) {
+          if (storesReady) dead[it.uid] = true
+          continue
         }
+        // A page whose every selectable row is blocked has nothing to offer
+        // either, so its link mutes. The test is one level deep on purpose:
+        // asking a nested submenu about its own target would recurse through
+        // pages that can point back at each other.
+        let usable = false
+        for (let j = 0; j < tpg.items.length; j++) {
+          const tIt = tpg.items[j]
+          if (!tIt || !tIt.selectable) continue
+          if (root._rowBlocked(tIt)) continue
+          usable = true
+          break
+        }
+        if (!usable) dead[it.uid] = true
       }
     }
+    const prev = root._deadLinks
+    const keys = Object.keys(dead)
+    let same = Object.keys(prev).length === keys.length
+    for (let k = 0; same && k < keys.length; k++) {
+      if (prev[keys[k]] !== true) same = false
+    }
+    if (same) return
     root._deadLinks = dead
+    // The mute is a row binding, so the dead set is an availability input.
+    root.rev++
   }
 
-  // Whether a row is listed at all. Bash when/requires guards, dead links and
-  // provider vetoes remove a row outright; a store-gated (showIf) row stays
-  // listed even while its condition fails - it is drawn muted and the cursor
-  // steps over it (see isUnavailable), so a page keeps its shape and turning
-  // a parent option off leaves its dependents visible where they are.
+  // Every row a page declares stays in its row set. A failing condition mutes
+  // the row (see isUnavailable) instead of removing it, so browsing a menu
+  // never changes its shape and the cursor's neighbors stay where they were.
   function isListed(item) {
-    if (!item) return true
-    const v = root.guardWhen[item.uid]
-    if (v === false) return false
-    // Fail-closed while a `when`/`requires` verdict is still pending: the
-    // batch runs async after the summon, so fail-open painted the row for a
-    // frame and then removed it (Utilities "Copy current track" appearing
-    // with no icon, then vanishing, yanking focus). A pending guard is not
-    // listed; a verdict of true lists. Boot-time prewarm (see _maybePrewarm)
-    // fills the verdicts before the first summon, so the pending state is
-    // only the cold-boot edge, not every open.
-    if (v === undefined) {
-      const w = item.when
-      if (w !== undefined && w !== null && String(w).trim() !== "") return false
-      const rq = item.requires
-      if (rq !== undefined && rq !== null) return false
-    }
-    if (item.type === "submenu" && root._deadLinks[item.uid]) return false
-    // Provider visibility predicate: clearUsageHistory hides when history
-    // is empty (frequency sort's companion row). Providers may veto
-    // visibility of any row they own; everything else stays visible.
+    return item !== undefined && item !== null
+  }
+
+  // A row the user may act on right now. Search, the search index and every
+  // path that offers a row to act on read this; the page view lists every row
+  // and mutes whatever is unavailable.
+  function isVisible(item) {
+    return !!item && !root.isUnavailable(item)
+  }
+
+  // A listed row that cannot be used right now: a store-gated (showIf)
+  // condition fails, a bash when/requires guard is false or still pending, a
+  // provider vetoes it, or it opens a page with nothing usable on it. It
+  // renders under a card-toned box that mutes it, the cursor steps over it,
+  // and nothing activates it.
+  function isUnavailable(item) {
+    if (!item) return false
+    if (root._rowBlocked(item)) return true
+    return item.type === "submenu" && root._deadLinks[item.uid] === true
+  }
+
+  // Whether a row's own conditions block it, independent of the page a
+  // submenu opens. Split out because the dead-link pass asks the same
+  // question about a target page's rows without recursing into its submenus.
+  function _rowBlocked(item) {
+    if (!item) return false
+    if (item.showIf !== undefined && item.showIf !== null
+      && !root.conditionsMet(item.showIf)) return true
+    // when/requires share one `w` verdict (MenuGuard). A gated row is muted
+    // until that verdict arrives, so a guard batch can only turn it active -
+    // it never paints an unproven row as usable.
+    const gated = (typeof item.when === "string" && item.when.trim() !== "")
+      || (item.requires !== undefined && item.requires !== null)
+    if (gated && root.guardWhen[item.uid] !== true) return true
+    // Provider visibility predicate: clearUsageHistory declares itself
+    // unusable while history is empty (frequency sort's companion row).
     if (item.id) {
       const p = root._providerFor(item.id)
-      if (p && typeof p.visible === "function") {
-        if (p.visible(item, root._hookCtx(item)) === false) return false
-      }
+      if (p && typeof p.visible === "function"
+        && p.visible(item, root._hookCtx(item)) === false) return true
     }
-    return true
-  }
-
-  // Full visibility: listed AND its store-driven condition holds. Search, the
-  // search index and every path that offers a row to act on read this; the
-  // page view reads isListed and mutes whatever isUnavailable.
-  function isVisible(item) {
-    if (!item) return true
-    if (!root.isListed(item)) return false
-    // Store-driven conditions (showIf), each leg against its owning store.
-    if (item.showIf !== undefined && item.showIf !== null) {
-      if (!root.conditionsMet(item.showIf)) return false
-    }
-    return true
-  }
-
-  // A listed row whose showIf condition currently fails: it renders under a
-  // card-toned box that mutes it, the cursor steps over it, and nothing
-  // activates it.
-  function isUnavailable(item) {
-    if (!item || item.showIf === undefined || item.showIf === null) return false
-    return !root.conditionsMet(item.showIf)
+    return false
   }
 
   // EmojiPicker prewarm hook – delegates to the active panel when present.
@@ -1742,9 +1731,9 @@ Singleton {
 
   // Jump anywhere in the bundle: fresh stack rooted at the target page
   // with the target row preselected, bypassing any remembered position.
-  // Used by search activation. `row` indexes the RAW items array; the
-  // selection lands on the row's LISTED position since guard-hidden rows
-  // never make it into the list model, while store-gated rows stay listed.
+  // Used by search activation. `row` indexes the RAW items array; every
+  // declared row is listed, so the listed position counts the skipped chrome
+  // only (isListed is still the one question the walk asks).
   function visibleIndexOf(page, rawRow) {
     let n = 0
     const items = page ? page.items : []
