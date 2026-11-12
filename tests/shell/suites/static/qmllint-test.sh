@@ -84,10 +84,9 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   probe was measured to return the new body where the bare reload returned
 #   the old one.
 #
-# RECORDED_INFO_COUNT: 55 "Info:" diagnostics: 1 `[unused-imports]` and 54
-#   untagged "X is a member of a parent element" notes. Untagged at the tail,
-#   and a severity this suite counts separately, so neither reaches the warning
-#   total above.
+# RECORDED_INFO_COUNT: 54 untagged "X is a member of a parent element" notes.
+#   Untagged at the tail, and a severity this suite counts separately, so they
+#   do not reach the warning total above.
 #
 #   The unused-import count is a verdict, not a defect count. qmllint decides
 #   the verdict without modelling a module resolving its own members, so an
@@ -128,7 +127,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   reason. Do not start a comment line with the tool's name.
 RECORDED_FILE_COUNT=242
 RECORDED_WARNING_COUNT=144
-RECORDED_INFO_COUNT=55
+RECORDED_INFO_COUNT=54
 README_WARNING_COUNT=144
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
