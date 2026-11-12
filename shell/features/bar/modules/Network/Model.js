@@ -463,17 +463,14 @@ function profilePatch(key, on) {
 // Escape for RichText labels: SSIDs are arbitrary bytes and must never
 // break out of the markup.
 //
-// NOT StringUtils.styledMarkup, though that is the shared home for the same
-// three replacements. styledMarkup is a formatter for text that is ALREADY
-// markup: it deliberately restores &lt;b&gt; to a live <b> and turns a
-// newline into <br>, because its callers pass styled bodies. This is the
-// inverse contract - an SSID is hostile input and every tag in it must
-// survive as text - so adopting it would let a network called `<b>x</b>`
-// render as a bold x. The shared three replacements and this function agree
-// on every non-markup input and disagree on exactly those two cases.
-// Escape for RichText labels, canonicalized in StringUtils.escapeHtml.
-// The inverse contract documented below is why this stays a wrapper over
-// the SHARED three replacements rather than over styledMarkup.
+// Canonicalized in StringUtils.escapeHtml, and deliberately not
+// StringUtils.styledMarkup even though that is the shared home for the same
+// three replacements: styledMarkup formats text that is ALREADY markup - it
+// restores &lt;b&gt; to a live <b> and turns a newline into <br>, because its
+// callers pass styled bodies. This is the inverse contract, where an SSID is
+// hostile input and every tag in it must survive as text, so adopting it
+// would let a network called `<b>x</b>` render as a bold x. The two agree on
+// every non-markup input and disagree on exactly those cases.
 function escapeHtml(s) {
   return SU.escapeHtml(s)
 }
