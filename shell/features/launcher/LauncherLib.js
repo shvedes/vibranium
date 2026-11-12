@@ -240,9 +240,9 @@ function buildAppIndex(entries, sortMethod, usageMap, missingTryExec) {
   // frequency mode: the druncache count is the primary key there, with
   // relevance separating equally-used apps. Alphabetical mode ranks filtered
   // search by fuzzy relevance alone, which is the strict matcher's order.
-  // - alphabetical: classic A→Z (default)
+  // - alphabetical: classic A-Z (default)
   // - frequency: most-used first (cached across sessions),
-  //   tie → alphabetical.
+  //   tie -> alphabetical.
   //
   // The comparator runs O(n log n) times, so its inputs are computed once per
   // record instead of per comparison: a lowercase label and, on the frequency
