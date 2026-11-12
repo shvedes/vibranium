@@ -26,15 +26,6 @@ function clampOr(value, lo, hi, fallback) {
   return clamp(n, lo, hi)
 }
 
-// A clamp that also rejects infinite input. `fallback` answers both NaN and
-// +-Infinity, which is the contract colour channels use: a channel is a finite
-// number or it is the default, never an unbounded one.
-function clampFinite(value, lo, hi, fallback) {
-  const n = Number(value)
-  if (!isFinite(n)) return fallback
-  return clamp(n, lo, hi)
-}
-
 // Round to `decimals` places. The decimal count is floored and clamped at
 // zero, so a caller cannot ask for a fractional or negative digit count.
 function round(value, decimals) {
@@ -48,7 +39,6 @@ if (typeof module !== "undefined") {
     clamp: clamp,
     clamp01: clamp01,
     clampOr: clampOr,
-    clampFinite: clampFinite,
     round: round
   }
 }
