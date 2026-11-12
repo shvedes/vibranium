@@ -1281,7 +1281,7 @@ Rectangle {
         if (!panel.shown && !panel.searching && !panel.scopedSearching
           && panel.expansionNeedH <= 0 && !Menu.slotClosing) panel.fitFromModel()
       }
- 
+
     Idle.run(() => {
       if (panel._swapGen !== g || panel._pendingGen !== generation) {
         if (panel._swapGen === g) panel._releaseSwap()

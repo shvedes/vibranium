@@ -178,7 +178,7 @@ Singleton {
         "ping",
       ]
     })
-  
+
     // The UPower device set, seeded without reporting: devices already on the
     // bus when the shell starts were not registered by anything this shell
     // observed. QML allows one Component.onCompleted per object, so this rides

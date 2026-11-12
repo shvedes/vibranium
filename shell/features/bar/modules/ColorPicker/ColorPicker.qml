@@ -565,7 +565,7 @@ BarModule {
   readonly property int _copySpawnWindowMs: 1500
   readonly property int _copyDeadlineMs: 5000
 
-  
+
 
   // Copy `text` and report the outcome through cb(ok) when given. Island
   // copies pass the onCopyDone bridge; the pick path passes null.

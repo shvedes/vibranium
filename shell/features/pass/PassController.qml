@@ -645,7 +645,7 @@ Item {
     }
   }
 
-  
+
 
   // Bounded HEAD poll after an edit launch (5s x 120 = 10min max): pushes
   // exactly when the edit committed, stays silent on view-only quits and
