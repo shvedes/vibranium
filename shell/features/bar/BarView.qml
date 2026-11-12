@@ -258,7 +258,7 @@ PanelWindow {
     const verdict = DropPayload.resolve(drop)
     const uri = verdict.ok === true ? String(verdict.uri) : ""
     const error = verdict.ok === true ? "" : String(verdict.error)
-    const screen = String(win.screen?.name ?? "").trim().replace(/[^A-Za-z0-9._-]/g, "_")
+    const screen = String(win.screen.name ?? "").trim().replace(/[^A-Za-z0-9._-]/g, "_")
     DesktopActions.wallpaperDrop(uri, screen, error)
   }
 
@@ -307,7 +307,7 @@ PanelWindow {
   }
 
   function refreshMoveRegistration() {
-    const key = String(win.screen?.name ?? "")
+    const key = String(win.screen.name ?? "")
     if (key === win.moveRegistrationKey) return
     if (win.moveRegistrationKey !== "") Bar.unregisterMoveView(win)
     win.moveRegistrationKey = key
@@ -318,7 +318,7 @@ PanelWindow {
   }
 
   Component.onCompleted: {
-    win.moveRegistrationKey = String(win.screen?.name ?? "")
+    win.moveRegistrationKey = String(win.screen.name ?? "")
     if (win.moveRegistrationKey !== "") Bar.registerMoveView(win)
   }
   onScreenChanged: win.refreshMoveRegistration()

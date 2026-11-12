@@ -2,7 +2,7 @@
 # Suite: qmllint - the reproducible lint baseline from shell/README.md.
 #
 # The README publishes one invocation and a measured baseline: 230 files,
-# 0 errors, 144 warnings, and 71 informational diagnostics. Exit status alone
+# 0 errors, 141 warnings, and 71 informational diagnostics. Exit status alone
 # cannot distinguish a resolved tree from one whose imports became warnings,
 # so this suite checks the diagnostic stream too.
 #
@@ -35,7 +35,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   below always describe the same tree. A file added here with a root object
 #   Quickshell registers from C++ adds no new unresolved name and no
 #   missing-property, so it can move the file count without moving either.
-# RECORDED_WARNING_COUNT: 144 "Warning:" diagnostics. This is the sum of the
+# RECORDED_WARNING_COUNT: 141 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
 #   the total legible is the breakdown, which is why every kind is pinned
@@ -48,7 +48,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   that shape and the total are not independent facts and a total recorded
 #   against a tree that has one is only satisfiable while the defect is there.
 #   53 `missing-property` warnings is the current measured figure, and the
-#   warning total is 144. Eleven additional dynamic/property-access diagnostics
+#   warning total is 141. Eleven additional dynamic/property-access diagnostics
 #   are retained rather than suppressed; the component probes pin those runtime
 #   contracts separately. A reader who sees the total fall with
 #   `missing-property` should identify the exact reads that changed before
@@ -84,7 +84,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   probe was measured to return the new body where the bare reload returned
 #   the old one.
 #
-# RECORDED_INFO_COUNT: 54 untagged "X is a member of a parent element" notes.
+# RECORDED_INFO_COUNT: 51 untagged "X is a member of a parent element" notes.
 #   Untagged at the tail, and a severity this suite counts separately, so they
 #   do not reach the warning total above.
 #
@@ -126,9 +126,9 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
 RECORDED_FILE_COUNT=242
-RECORDED_WARNING_COUNT=144
-RECORDED_INFO_COUNT=54
-README_WARNING_COUNT=144
+RECORDED_WARNING_COUNT=141
+RECORDED_INFO_COUNT=51
+README_WARNING_COUNT=141
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -152,7 +152,6 @@ eval 1
 id-shadows-member 2
 missing-property 53
 property-override 5
-redundant-optional-chaining 3
 uncreatable-type 3
 unqualified 68
 unresolved-type 5"
