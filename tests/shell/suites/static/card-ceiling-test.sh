@@ -44,6 +44,7 @@ VIEWS=(
   "clipboard/ClipboardView"
   "powerMenu/PowerMenuView"
   "wallpaperPicker/WallpaperPickerView"
+  "pickers/theme/ThemePickerView"
 )
 
 t_section "the shared primitive exists and owns the rule"
@@ -94,7 +95,7 @@ for v in "${VIEWS[@]}"; do
   t_contains "$name binds the growth ceiling" "hardMaxHeight: ceiling.hardMaxHeight" "$src"
   CONSUMERS=$((CONSUMERS + 1))
 done
-t_eq "and the scan cannot shrink: five views are pinned" "5" "$CONSUMERS"
+t_eq "and the scan cannot shrink: six views are pinned" "6" "$CONSUMERS"
 t_note "a card's ceiling is a share of a SCREEN (ScreenCeiling); the window a card lives in is sized from that card, so reading it is a loop that resolves after the first paint"
 
 t_summary

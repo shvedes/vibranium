@@ -153,17 +153,12 @@ function defaultsFor(type) {
     // the bash guard for the store-driven cases.
     active: false,
 
-    // theme picker: palette swatches extracted from colors.list (hex
-    // strings like "#719cd6"). Rendered as a row of filled dots under
-    // the label in Entry.qml; ignored by search indexing and guards.
-    // Kept as a plain array so normalize copies it and hay builders skip
-    // it intentionally - hex codes are not useful search tokens.
+    // theme remover: palette swatches extracted from colors.list (hex
+    // strings like "#719cd6"). Rendered as a row of filled dots under the
+    // label in Entry.qml; ignored by search indexing and guards. Kept as a
+    // plain array so normalize copies it and hay builders skip it on purpose:
+    // hex codes are not useful search tokens.
     palette: [],
-
-    // theme picker: Light/Dark flag derived from theme.info LIGHT field
-    // or folder-name heuristic. Shown as "Light" / "Dark" after the icon
-    // with a dot separator; not searchable.
-    light: "",
     previewFontFamily: "",
 
     // Trailing accent word for the sub line ("active"): plain text in, a
@@ -409,8 +404,7 @@ function buildPage(id, title, width, rawItems, opts) {
 // An option is described by its label, falling back to its value (a JSON
 // boolean or a zero is a label, not a missing one - `!== null && !== undefined`,
 // never `||`), and anything it carries that a row cannot hold is dropped at the
-// boundary rather than copied through: a non-array palette becomes no palette,
-// a non-string light flag becomes none.
+// boundary rather than copied through.
 function buildOptionsPage(sel) {
   const parent = sel || {}
   const uid = parent.uid
@@ -429,9 +423,7 @@ function buildOptionsPage(sel) {
       label: labelled ? o.label : String(o.value),
       value: o.value,
       onSelect: parent.onSelect,
-      onCall: parent.onCall,
-      palette: StoreGuards.asList(o.palette),
-      light: typeof o.light === "string" ? o.light : ""
+      onCall: parent.onCall
     }, id, i)
     // The back-link is a page fact, not a row field: it names the select this
     // page expands, so it is stamped here rather than declared in defaultsFor

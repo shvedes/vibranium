@@ -38,6 +38,15 @@ Rectangle {
   readonly property bool focused: input.activeFocus
   // Border hue while the field owns focus.
   property color focusColor: Theme.color("accent")
+  // Force the focus-coloured border without taking the keyboard. A consumer
+  // that drives the query while another item keeps focus (the theme deck's
+  // type-to-filter) sets this so the field still reads as active.
+  property bool engaged: false
+  // Plain Up/Down and Tab/Backtab are consumed ahead of editing and emitted
+  // as navigationRequested, for a consumer whose field owns the caret but a
+  // deck around it still owns those keys. Left/Right keep their text-caret
+  // meaning, as do Ctrl/Alt/Meta/Shift combinations.
+  property bool forwardNavigation: false
   // Clear affordance on the right; embedders with tight space turn it
   // off and regain symmetric text insets.
   property bool clearable: true
@@ -126,6 +135,7 @@ Rectangle {
 
   signal accepted(string text)
   signal edited(string text)
+  signal navigationRequested(int key, int modifiers)
   // Escape is consumed here and handed to the consumer as a signal so
   // focus position never decides who handles it.
   signal escaped()
@@ -204,7 +214,7 @@ Rectangle {
   radius: RoundingPolicy.radius
   color: Theme.color("background_1")
   border.width: 1
-  border.color: input.activeFocus ? root.focusColor : Theme.color("background_3")
+  border.color: input.activeFocus || root.engaged ? root.focusColor : Theme.color("background_3")
 
   Behavior on border.color {
     ColorAnim {}
@@ -361,6 +371,17 @@ Rectangle {
     // would keep the destructive-key branch from ever seeing them.
     Keys.priority: Keys.BeforeItem
     Keys.onPressed: event => {
+      if (root.forwardNavigation) {
+        const plain = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier
+          | Qt.MetaModifier | Qt.ShiftModifier)) === 0
+        if (event.key === Qt.Key_Backtab
+            || (plain && (event.key === Qt.Key_Tab
+              || event.key === Qt.Key_Up || event.key === Qt.Key_Down))) {
+          event.accepted = true
+          root.navigationRequested(event.key, event.modifiers)
+          return
+        }
+      }
       if (event.matches(StandardKey.SelectAll)) {
         input.selectAll()
         event.accepted = true

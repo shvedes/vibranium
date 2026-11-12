@@ -448,7 +448,6 @@ group('hayFromItem concatenates every searchable role, lowercased and deduped', 
   // "Kept as a plain array so normalize copies it and hay builders skip it
   // intentionally - hex codes are not useful search tokens."
   eq('palette swatches are not indexed', M.hayFromItem({ label: 'Theme', palette: ['#719cd6', '#a1b3c1'] }), 'theme')
-  eq('the light/dark flag is not indexed', M.hayFromItem({ label: 'Theme', light: 'Light' }), 'theme')
 })
 
 group('requiresExpr separates "no requirement" from "a refused one"', () => {
@@ -544,7 +543,7 @@ group('defaultsFor fills every key a row renderer branches on', () => {
   // README: "normalizeItem must fill every role the row renderer reads, so
   // views never branch on a missing key." The count is the contract; a new
   // role has to show up as a diff here.
-  eq('51 roles', Object.keys(d).length, 51)
+  eq('50 roles', Object.keys(d).length, 50)
   const expected = [
     'type', 'id', 'label', 'sub', 'icon', 'glyph', 'desc', 'warning', 'enabled',
     'when', 'checked', 'disabled', 'requires', 'command', 'call', 'page',
@@ -552,7 +551,7 @@ group('defaultsFor fills every key a row renderer branches on', () => {
     'marker', 'editValue', 'editText', 'editCall', 'keepOpen', 'hideValue',
     'flow', 'infoOnly', 'min', 'max', 'step', 'unit', 'onChange',
     'placeholder', 'onSubmit', 'progressValue', 'body', 'section',
-    'delCommand', 'var', 'showIf', 'active', 'palette', 'light',
+    'delCommand', 'var', 'showIf', 'active', 'palette',
     'previewFontFamily', 'subAccent', 'subLead', 'confirm',
   ]
   eq('and they are exactly these', Object.keys(d).sort(), expected.slice().sort())
@@ -821,8 +820,8 @@ group('buildOptionsPage turns a select into one option row per choice', () => {
   eq('the commit command is carried to every row', op.items.map(i => i.onSelect), ['commit', 'commit', 'commit'])
   eq('and so is the call command', op.items.map(i => i.onCall), ['call %v', 'call %v', 'call %v'])
   eq('every row links back to the parent', op.items.map(i => i._parentUid), ['pg#0', 'pg#0', 'pg#0'])
-  eq('palette rides through per option', op.items.map(i => i.palette), [[], [], ['#fff']])
-  eq('and the light/dark flag', op.items.map(i => i.light), ['', '', 'Light'])
+  eq('option palette is not carried', op.items.map(i => i.palette), [[], [], []])
+  eq('nor is the retired light flag', op.items.map(i => i.light === undefined), [true, true, true])
 })
 
 group('buildOptionsPage fills the option row from label-or-value', () => {
@@ -841,7 +840,6 @@ group('buildOptionsPage fills the option row from label-or-value', () => {
   // `raw[key] !== undefined` guard.
   eq('a zero value survives', build([{ label: 'L', value: 0 }])[0].value, 0)
   eq('a false value survives', build([{ label: 'L', value: false }])[0].value, false)
-  eq('a non-string light flag is dropped', build([{ label: 'L', value: 1, light: 5 }])[0].light, '')
   eq('a non-array palette is dropped', build([{ label: 'L', value: 1, palette: 'x' }])[0].palette, [])
   eq('the option hay indexes label and value', build([{ label: 'DuckDuckGo', value: 'ddg' }])[0].hay, 'duckduckgo ddg')
   eq('an empty options list yields an empty page', M.buildOptionsPage({ uid: 'u', label: 'L', options: [] }).items.length, 0)
@@ -3902,11 +3900,11 @@ group('the rule reads the row record and the provider sub line', () => {
   eq('a blank sub does not', M.restKind({ sub: '' }), 'line')
   eq('a leading accent spends it', M.restKind({ subLead: 'timer' }), 'sub')
   eq('a trailing accent spends it', M.restKind({ subAccent: 'active' }), 'sub')
-  eq('a theme row spends it on swatches', M.restKind({ light: 'dark', palette: [] }), 'theme')
+  eq('a theme row spends it on swatches', M.restKind({ palette: ['#fff'] }), 'theme')
   // The strip IS the second line, so a theme row that also carries sub copy
   // stays a theme row: the alternative reserves a third line for a row that
   // renders two.
-  eq('and a theme row stays one whatever copy it carries', M.restKind({ light: 'dark', sub: 'x' }), 'theme')
+  eq('and a theme row stays one whatever copy it carries', M.restKind({ palette: ['#fff'], sub: 'x' }), 'theme')
   eq('a provider sub line spends it', M.restKind({ label: 'A' }, 'now playing'), 'sub')
   eq('an empty provider sub declares nothing', M.restKind({ label: 'A' }, ''), 'line')
   eq('nor does a null one', M.restKind({ label: 'A' }, null), 'line')
@@ -3917,7 +3915,7 @@ group('the rule reads the row record and the provider sub line', () => {
   // A verdict, never a string: the vocabulary is closed to the three shapes
   // RowRule has a height for.
   eq('the vocabulary is closed', [...new Set([M.restKind({}), M.restKind({ sub: 'x' }),
-    M.restKind({ light: 'l' })])].sort(), ['line', 'sub', 'theme'])
+    M.restKind({ palette: ['#fff'] })])].sort(), ['line', 'sub', 'theme'])
 })
 
 group('every row of the shipped catalog classifies, and the copy agrees', () => {

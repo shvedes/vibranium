@@ -1253,7 +1253,7 @@ Singleton {
       }
       // Merge, don't replace: the batch only covers the CURRENT bundle, but
       // the verdict maps are global. Replacing dropped every other bundle's
-      // answers, so a ThemePicker > Utilities jump re-opened Utilities with
+      // answers, so a cross-page jump re-opened Utilities with
       // no verdict for "Copy current track", which then flashed. Uids in
       // this bundle are overwritten (or cleared when the row carries no
       // guard, which reads as visible); uids from other bundles are

@@ -141,15 +141,6 @@ Item {
     font.family: Ui.fontFamily
     textFormat: Text.PlainText
   }
-  Text {
-    id: measureOptLight
-
-    visible: false
-    font.pixelSize: Ui.fontXs
-    font.family: Ui.fontFamily
-    textFormat: Text.PlainText
-  }
-
   // Family the row probes shape with. Assigning font.family on a probe writes
   // the font GROUP, and Qt counts a group write from inside a binding
   // evaluation as a loop on that binding whether or not the binding reads
@@ -367,37 +358,29 @@ Item {
   // full-width at fontM: a long option fits the slot's reservation on the row
   // and still clips inside its own expansion. Shaped at OptionRow's own size,
   // through the same grid and inner margins the expansion renders (optsGrid
-  // inset, option side margins, the gap kept from an optional light note).
+  // inset, option side margins).
   // Two-column dropdowns (>6 options) hold half a row per cell, so the grid
   // needs twice the widest entry plus the column gap. Input kinds need nothing:
   // their editors live in the value slot the trail already reserves.
   function _dropdownNeedW(itm) {
     const opts = itm.options ?? []
     let maxOpt = 0
-    let maxLight = 0
     for (let k = 0; k < opts.length; k++) {
       const o = opts[k] ?? {}
       const label = o.label ?? String(o.value ?? "")
-      const light = String(o.light ?? "")
-      const shaped = root._shape("opt\u0001" + label + "\u0001" + light, () => {
+      const shaped = root._shape("opt\u0001" + label, () => {
         measureOptLabel.text = label
-        let lw = 0
-        if (light !== "") {
-          measureOptLight.text = light
-          lw = measureOptLight.implicitWidth
-        }
-        return { o: measureOptLabel.implicitWidth, l: lw }
+        return measureOptLabel.implicitWidth
       })
-      if (shaped.o > maxOpt) maxOpt = shaped.o
-      if (shaped.l > maxLight) maxLight = shaped.l
+      if (shaped > maxOpt) maxOpt = shaped
     }
     if (opts.length === 0) return 0
     // Card coordinates: rowChromeW carries the card padding, the row side
     // margins and the label spacing; the remainder is the dropdown's own chrome
-    // (grid inset, option side margins, light gap) plus the text.
+    // (grid inset, option side margins) plus the text.
     if (MenuLib.optionColumnCount(opts.length) > 1)
-      return root.rowChromeW() + 5 * Ui.m - Ui.s + 16 + 2 * (maxOpt + maxLight)
-    return root.rowChromeW() + 2 * Ui.m - Ui.s + 8 + maxOpt + maxLight
+      return root.rowChromeW() + 5 * Ui.m - Ui.s + 16 + 2 * maxOpt
+    return root.rowChromeW() + 2 * Ui.m - Ui.s + 8 + maxOpt
   }
 
   // The width the CURRENT page declares for itself, or 0 when it declares

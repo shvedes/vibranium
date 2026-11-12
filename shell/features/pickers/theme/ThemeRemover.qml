@@ -12,11 +12,11 @@ import "../../../common/text/UnitIpc.js" as UnitIpc
 import "./ThemeScan.js" as ThemeScan
 import "../../../common/text/StringUtils.js" as SU
 
-// Theme remover service. Same looks as the main theme picker (ThemePicker):
-// a Menu page whose rows carry a `palette` array (hex swatches) rendered as
-// little filled dots under the label in Entry.qml - but listing only
-// community themes (user dirs with no official counterpart, the set
-// vb-theme-remove takes) and running the removal backend per row.
+// Theme remover service. Unlike the picker's overlay deck, this remains a
+// Menu page whose rows carry a `palette` array (hex swatches) rendered as
+// little filled dots under the label in Entry.qml. It lists only community
+// themes (user dirs with no official counterpart, the set vb-theme-remove
+// takes) and runs the removal backend per row.
 //
 // Discovery mirrors vb-theme-set but entirely in the shell: enumerates
 // $VIBRANIUM/themes (exclusion names only) and $XDG_CONFIG_HOME/vibranium/
@@ -289,10 +289,10 @@ Singleton {
     }
     const bundleText = JSON.stringify(page)
     try {
-      // Both injects opt out of the global index: uninstall rows are meant to
-      // be reachable from the theme picker's own menu, where the scoped
-      // filter trims them, and not as answers to a search in every other
-      // menu. The page still registers, so navigation and the push/peel
+      // Both injects opt out of the global index: uninstall rows are meant
+      // to be reachable from the menu's theme-removal entry, where the
+      // scoped filter trims them, and not as answers to a search in every
+      // other menu. The page still registers, so navigation and the push/peel
       // below are the same either way.
       if (roots.isPageOpen(root.pageId)) {
         // Live update the already-open picker: re-inject the page so the

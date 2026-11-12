@@ -2,3 +2,6 @@ module qs.features.pickers.theme
 singleton ThemePicker 1.0 ThemePicker.qml
 singleton ThemeRemover 1.0 ThemeRemover.qml
 ThemeRoots 1.0 ThemeRoots.qml
+ThemePickerView 1.0 ThemePickerView.qml
+ThemePickerPanel 1.0 ThemePickerPanel.qml
+ThemePreview 1.0 ThemePreview.qml

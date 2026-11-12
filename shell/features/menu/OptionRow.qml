@@ -33,11 +33,8 @@ Rectangle {
 
   signal picked(var value)
 
-  readonly property var palette: modelData && modelData.palette ? modelData.palette : []
-  readonly property string light: modelData && modelData.light ? String(modelData.light) : ""
-
   width: parent.width
-  height: palette.length > 0 ? 38 : 28
+  height: 28
   radius: RoundingPolicy.radius
   // Always transparent: the dropdown's sliding cursor bar (see Entry
   // optionsComp) paints the selection behind the rows. Per-row fades
@@ -52,7 +49,7 @@ Rectangle {
     Column {
       id: midCol
       anchors.left: parent.left
-      anchors.right: lightRow.left
+      anchors.right: parent.right
       anchors.rightMargin: 8
       anchors.verticalCenter: parent.verticalCenter
       spacing: 2
@@ -83,36 +80,6 @@ Rectangle {
           ColorAnim {}
         }
       }
-
-      Row {
-        visible: opt.palette.length > 0
-        spacing: 3
-        Repeater {
-          model: opt.palette
-          delegate: Rectangle {
-            required property var modelData
-            required property int index
-            width: 6
-            height: 6
-            radius: RoundingPolicy.radius
-            color: modelData
-            border.width: 0.5
-            border.color: Ui.tint("background_3", 0.5)
-          }
-        }
-      }
-    }
-
-    Text {
-      id: lightRow
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      visible: opt.light !== ""
-      text: opt.light
-      color: Ui.tint("foreground_1", 0.55)
-      font.pixelSize: Ui.fontXs
-      font.family: Ui.fontFamily
-      textFormat: Text.PlainText
     }
   }
 

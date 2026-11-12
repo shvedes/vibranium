@@ -71,13 +71,13 @@ function nextFlowIndex(item, from, stored) {
 // hand anyway because it renders it. An empty or non-string provider value is
 // "no override", and the row's own copy decides on its own.
 //
-// ORDER MATTERS. A theme row spends its second line on the swatch strip, so
+// ORDER MATTERS. A row with swatches spends its second line on the strip, so
 // "theme" is asked first, whatever copy the row carries; a row with any sub
 // copy - provider, declared, leading or trailing accent - is "sub"; a row with
 // none is a single title line.
 function restKind(item, providerSub) {
   if (!item) return "line"
-  if (typeof item.light === "string" && item.light !== "") return "theme"
+  if (Array.isArray(item.palette) && item.palette.length > 0) return "theme"
   if (typeof providerSub === "string" && providerSub !== "") return "sub"
   if (item.sub !== undefined && item.sub !== null && String(item.sub) !== "") return "sub"
   if (typeof item.subLead === "string" && item.subLead !== "") return "sub"

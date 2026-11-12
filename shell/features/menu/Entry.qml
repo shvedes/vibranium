@@ -357,19 +357,15 @@ Item {
     return g
   }
   readonly property bool hasIconSlot: row.iconName !== "" || row.glyphText !== ""
-  // The theme columns name the record directly as well as through `itm`,
+  // The swatch columns name the record directly as well as through `itm`,
   // because `itm` is a settable alias and a caller that hands this row a
   // normalized payload of its own (a search index entry) is not obliged to
-  // have carried the theme fields into it.
+  // have carried the palette into it.
   readonly property var palette: itm && itm.palette ? itm.palette
     : (modelData && modelData.palette ? modelData.palette : [])
-  // Swatch gate -> the palette Repeater reads this, so non-theme rows
-  // instantiate no dot delegates while theme rows render unchanged.
+  // Swatch gate -> the palette Repeater reads this, so rows without swatches
+  // instantiate no dot delegates.
   readonly property bool hasPalette: !!(itm && itm.palette && itm.palette.length > 0)
-  readonly property string lightLabel: itm && typeof itm.light === "string" ? itm.light
-    : (modelData && typeof modelData.light === "string" ? modelData.light : "")
-  readonly property bool isThemeRow: (modelData && typeof modelData.light === "string" && modelData.light !== "")
-    || (itm && typeof itm.light === "string" && itm.light !== "")
 
   // --- numeric views ---
   readonly property real minimum: itm ? Number(itm.min) : 0
@@ -707,9 +703,8 @@ Item {
 
   // Drive the select value swap. Called from selectText's own text
   // change: the outgoing label is what the slot was showing, the
-  // incoming one is already in the live Text. A first fill (blank
-  // before) and a slot that renders nothing (action-select, theme rows)
-  // swap plain.
+  // incoming one is already in the live Text. A first fill (blank before)
+  // and a slot that renders nothing (action-select) swap plain.
   function onSelectValueChanged() {
     const incoming = selectText.text
     const outgoing = row._selShown
@@ -1144,11 +1139,9 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       size: Ui.rowIconW
       name: row.iconName
-      // The active theme's accent belongs to its NAME alone. The glyph stays
-      // in the ordinary foreground so the row reads as "this one is marked"
-      // rather than three separate things lighting up, and so the swatch
-      // strip below - which is painted in the theme's real colours and is the
-      // whole point of the row - is the only place colour is sampled.
+      // The glyph stays in the ordinary foreground so the swatch strip below
+      // - painted in the theme's real colours - is the only place colour is
+      // sampled.
       colorKey: "foreground_0"
       accentKey: row.iconAccentKey
     }
@@ -1202,10 +1195,8 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       spacing: 1
 
-        // Title line. The theme's own colours and the word qualifying them
-        // take the line below rather than riding the name: the name is what
-        // the row is picked by, and a qualifier hanging off it in a muted
-        // grey only competes with the accent an active row paints it in.
+        // Title line. A swatch strip takes the line below rather than riding
+        // the name: the name is what the row is picked by.
         Text {
           id: lbl
           // Sized to the NAME: the swatch line below is full width in its own
@@ -1220,21 +1211,13 @@ Item {
           height: row.labelLineH
           verticalAlignment: Text.AlignVCenter
           text: row.displayLabel
-          color: (row.isThemeRow && row.mark) ? Theme.color("accent") : Theme.color("foreground_0")
+          color: Theme.color("foreground_0")
           font.pixelSize: Ui.fontL
           font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
           elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
           clip: row.textReveal < 1
           opacity: row.textReveal
           textFormat: Text.PlainText
-        }
-
-        // Sizing row kept for height compat, hidden
-        Row {
-          id: themeSubRow
-          width: parent.width
-          visible: false
-          height: 0
         }
 
         // Second line: optional leading accent word (command), the muted
@@ -1304,11 +1287,10 @@ Item {
             // styledMarkup - search rows show the live sub, because the
             // group header above names the breadcrumb.
             //
-            // Empty rather than hidden when there is no muted copy to show: a theme
-            // row spends the second line on its own light label, so the two
-            // never both draw. The Row above measures `text`, which is why
-            // nothing here needs a visibility flag.
-            text: row.lightLabel !== "" || row.subText === "" ? ""
+            // Empty rather than hidden when there is no muted copy to show.
+            // The Row above measures `text`, which is why nothing here needs a
+            // visibility flag.
+            text: row.subText === "" ? ""
               : MenuLib.styledMarkup(row.subText)
                 + (subTail.implicitWidth > 0 ? " •" : "")
             // Search hits read the default muted copy: the group header
@@ -1337,19 +1319,17 @@ Item {
           }
         }
 
-        // Swatch line: the theme's own colours as 8px dots, and nothing else.
-        // The mode is the row's icon now, and a family's variant count is
-        // what its own dropdown is for, so a second text column here would
-        // only repeat what the glyph and the list already say. The line is
-        // the strip alone, so its height is the dot's own size.
+        // Swatch line: a theme-remover row's own colours as 8px dots, and
+        // nothing else. The line is the strip alone, so its height is the
+        // dot's own size.
         Row {
           id: paletteRow
           width: parent.width
           visible: !!(itm && itm.palette && itm.palette.length > 0)
           spacing: 4
           Repeater {
-            // Gated on the row actually carrying a palette -> non-theme
-            // rows own no dot delegates; theme rows fill as before.
+            // Gated on the row actually carrying a palette, so ordinary rows
+            // own no dot delegates.
             model: row.hasPalette ? itm.palette : []
             delegate: Rectangle {
               required property var modelData
@@ -1610,7 +1590,7 @@ Item {
 
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      visible: row.isSelect && !row.isActionSelect && row.lightLabel === ""
+      visible: row.isSelect && !row.isActionSelect
       // Width probe (house pattern, see valueMetrics): sizing off the
       // item's own implicitWidth loops the binding and freezes the box
       // stale after picking a longer option. A select value never joins

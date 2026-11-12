@@ -28,14 +28,14 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 243 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 248 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
 #   below always describe the same tree. A file added here with a root object
 #   Quickshell registers from C++ adds no new unresolved name and no
 #   missing-property, so it can move the file count without moving either.
-# RECORDED_WARNING_COUNT: 140 "Warning:" diagnostics. This is the sum of the
+# RECORDED_WARNING_COUNT: 139 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
 #   the total legible is the breakdown, which is why every kind is pinned
@@ -48,7 +48,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   that shape and the total are not independent facts and a total recorded
 #   against a tree that has one is only satisfiable while the defect is there.
 #   52 `missing-property` warnings is the current measured figure, and the
-#   warning total is 140. One of them left with the wallpaper picker's old
+#   warning total is 139. One of them left with the wallpaper picker's old
 #   two-pane panel, whose entry read `ListView.view` from outside a ListView:
 #   the cascade rewrite keeps the deck's cells in a Repeater instead, so that
 #   read is gone rather than suppressed. Eleven additional
@@ -129,10 +129,10 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   word of it is then read as a category name. The sentence that documents this
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
-RECORDED_FILE_COUNT=245
-RECORDED_WARNING_COUNT=140
+RECORDED_FILE_COUNT=248
+RECORDED_WARNING_COUNT=139
 RECORDED_INFO_COUNT=51
-README_WARNING_COUNT=140
+README_WARNING_COUNT=139
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -155,7 +155,7 @@ RECORDED_WARNING_KINDS="confusing-expression-statement 4
 eval 1
 id-shadows-member 2
 missing-property 52
-property-override 5
+property-override 4
 uncreatable-type 3
 unqualified 68
 unresolved-type 5"

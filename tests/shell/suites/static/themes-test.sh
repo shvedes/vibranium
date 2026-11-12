@@ -4,10 +4,9 @@
 #
 # Nothing in the tree tests this surface. The settings suites cover
 # shell/common/settings/catalog.jsonc, the assets suite covers shell/assets/, and the
-# theme picker is only ever probed with a synthetic /tmp tree
-# (ThemePicker.qml:153), so the 30 real themes, their 14-colour palettes and
-# their 183 wallpapers are untested data that a single dropped `colors.list`
-# key silently degrades.
+# theme surfaces are only probed with a synthetic /tmp tree, so the 30 real
+# themes, their 14-colour palettes and their 183 wallpapers are untested data
+# that a single dropped `colors.list` key silently degrades.
 #
 # The required colour set is DERIVED, not copied. Four independent sources in
 # the tree name colour keys, and they are read back here rather than restated:
@@ -22,8 +21,8 @@
 #   default/themed/qs.json.tpl        the palette the shell reads
 #   shell/common/theme/Theme.qml      the keys Theme.qml binds and the fallbacks
 #                                      in color(), which are the same set
-#   shell/features/pickers/theme/     the 7 swatches ThemePicker.qml and
-#                                      ThemeRemover.qml read out of colors.list
+#   shell/features/pickers/theme/     the 7 swatches ThemeRemover.qml reads out
+#                                      of colors.list
 #
 # A key is a `_suffix` of a base key (`_rgb`, `_hsl`, `_lower`, ...), so
 # `background_0_lower` needs `background_0` and not `background_0_lower`. A
@@ -48,10 +47,10 @@ THEME_QML="$SHELL_DIR/common/theme/Theme.qml"
 THEME_PICKER="$SHELL_DIR/features/pickers/theme/ThemePicker.qml"
 THEME_REMOVER="$SHELL_DIR/features/pickers/theme/ThemeRemover.qml"
 THEME_ROOTS="$SHELL_DIR/features/pickers/theme/ThemeRoots.qml"
-# The palette reader both theme pages call. The rules below are stated here
-# rather than in either page: the two had carried identical copies of the
-# key set and the hex check, and a key added to one page was invisible to a
-# test that only read the other.
+# The colour reader both theme surfaces call. The rules below are stated here
+# rather than in either page: the picker reads colors.list for its previews and
+# the remover reads it for its swatches, so a key added to one path cannot be
+# invisible to the other.
 THEME_SCAN="$SHELL_DIR/features/pickers/theme/ThemeScan.js"
 IMAGE_EXTS="$SHELL_DIR/common/text/ImageExts.js"
 THEME_SET="$VIBRANIUM_DIR/bin/vb-theme-set"
@@ -168,8 +167,8 @@ palette_value() {
   return 1
 }
 
-# info_field <file> <key> - one theme.info value, read the way vb-theme-set:147
-# and ThemePicker.qml:390 do: split on the first "=" and take the right side.
+# info_field <file> <key> - one theme.info value, read the way vb-theme-set and
+# ThemePicker.qml do: split on the first "=" and take the right side.
 # The `|| [[ -n $key ]]` arm is not decoration: 20 of the 30 theme.info files
 # end without a newline, so a plain `while read` silently drops the last field
 # of each of them - which is LIGHT, the field both tools care most about.
@@ -362,7 +361,7 @@ t_eq "and it is the one named after the project" "vibranium" \
     [[ -z "${family//[[:space:]]/}" ]] && printf '%s' "$theme"
   done)"
 t_eq "4 of the 30 themes declare LIGHT=true" "4" "$INFO_LIGHT"
-t_note "the picker falls back to a folder-name heuristic when theme.info has no LIGHT (ThemePicker.qml:423, /(light|latte|dawn)\$/i) and vb-theme-set-templates resolves it to dark instead (bin/vb-theme-set-templates:39); all 30 declare the field, so the two fallbacks are never reached and a future theme that omits it would get the heuristic from one tool and dark from the other"
+t_note "the picker falls back to a folder-name heuristic when theme.info has no LIGHT (ThemePicker.qml, /(light|latte|dawn)\$/i) and vb-theme-set-templates resolves it to dark instead (bin/vb-theme-set-templates:39); all 30 declare the field, so the two fallbacks are never reached and a future theme that omits it would get the heuristic from one tool and dark from the other"
 
 # --------------------------------------------------------------------------
 # colors.list
@@ -593,20 +592,19 @@ t_count "and the shell's 14 outputs come from 10 palette keys" "10" \
     resolve_key "$src"; printf '\n'
   done | LC_ALL=C sort -u | grep -c .)"
 t_note "4 of the 14 are background_1/2/3 and foreground_1, which no palette declares: they are ramp levels off background and foreground, and Theme.qml binds them by that name regardless of which theme is active. That is why the ramp has to be a template operation rather than a palette key - the shell's key set cannot move with the palette"
-PICKER_KEYS="$(grep -m1 '^const PALETTE_KEYS' "$THEME_SCAN" |
+SWATCH_KEYS="$(grep -m1 '^const PALETTE_KEYS' "$THEME_SCAN" |
   grep -o '"[a-z]*"' | tr -d '"' | LC_ALL=C sort -u)"
 t_eq "the shared palette reader takes 7 swatch colours" "7" \
-  "$(printf '%s\n' "$PICKER_KEYS" | grep -c .)"
+  "$(printf '%s\n' "$SWATCH_KEYS" | grep -c .)"
 t_eq "all 7 are inside the required palette" "" \
-  "$(printf '%s\n' "$PICKER_KEYS" | while read -r k; do
+  "$(printf '%s\n' "$SWATCH_KEYS" | while read -r k; do
     printf '%s\n' "$DOC_KEYS" | grep -qxF -- "$k" || printf '%s ' "$k"
   done)"
-# Both pages read the swatches through that one reader, so neither can hold a
-# key set of its own: a page that grew a private copy would stop answering
-# this suite's question, which is the drift the extraction removed.
-t_contains "the picker reads the swatches through it" \
-  'ThemeScan.extractPalette' "$(<"$THEME_PICKER")"
-t_contains "and so does the remover" \
+# Both surfaces read colors.list through that one module: the picker for its
+# preview colors, the remover for its swatch strip.
+t_contains "the picker reads its colors through it" \
+  'ThemeScan.extractColors' "$(<"$THEME_PICKER")"
+t_contains "and the remover reads its swatches through it" \
   'ThemeScan.extractPalette' "$(<"$THEME_REMOVER")"
 t_contains "the reader drops a line with no #rrggbb on it" \
   'const m = line.match(/#[0-9a-fA-F]{6}/)' "$(<"$THEME_SCAN")"
@@ -766,10 +764,10 @@ for theme in "${THEMES[@]}"; do
   fi
   t_ne "$theme's picker label is not empty" "" \
     "$(printf '%s' "$key" | tr -d '[:space:]')"
-  # ThemePicker.qml:412-414 builds the label as family + " " + variant with
-  # every hyphen turned into a space, so a field carrying a leading or trailing
-  # space would render a row whose label differs from the key the bash tool
-  # writes into theme.name.
+  # ThemePicker.qml builds the label as family + " " + variant with every
+  # hyphen turned into a space, so a field carrying a leading or trailing space
+  # would render a row whose label differs from the key the bash tool writes
+  # into theme.name.
   t_eq "$theme's FAMILY carries no leading, trailing or doubled space" "" \
     "$(whitespace_defect "$family")"
   t_eq "$theme's VARIANT carries no leading, trailing or doubled space" "" \

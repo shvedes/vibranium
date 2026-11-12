@@ -26,10 +26,9 @@ import qs.features.menu
 Item {
   id: root
 
-  // Whether the menu is showing one of the theme pages right now. Both
-  // pages ask this before closing, rescanning or reopening, and the check
-  // is one expression so the picker and the remover cannot disagree about
-  // what "this page is open" means.
+  // Whether the menu is showing the remover's page right now. The remover
+  // asks this before closing, rescanning or reopening; the check stays here
+  // beside the listings both theme surfaces share.
   function isPageOpen(pageId) {
     return Menu.open && Menu.frame !== null && Menu.frame !== undefined
       && Menu.frame.id === pageId
@@ -178,9 +177,8 @@ Item {
     return true
   }
 
-  // The page verbs both theme pages publish. They are one rule each and the
-  // pages differ only in what open() builds, so the policy lives beside the
-  // page-open test it reads.
+  // The page verbs the remover publishes. They are one rule each, so the
+  // policy lives beside the page-open test it reads.
   function refreshPage(page) {
     if (!root.listed) return "error"
     page._cached = null

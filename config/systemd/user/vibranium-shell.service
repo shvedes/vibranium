@@ -1,12 +1,8 @@
 [Unit]
 Description=Vibranium Shell
 PartOf=graphical-session.target
-# PartOf only propagates stop/restart; BindsTo is what also stops the shell when
-# the target it belongs to goes away.
 BindsTo=graphical-session.target
 After=graphical-session.target
-# A namespaced value (Hyprland:something) is the same desktop, and the exact
-# ConditionEnvironment match silently skipped the whole shell for it.
 ExecCondition=/bin/sh -c 'case "${XDG_CURRENT_DESKTOP:-}" in *Hyprland*) exit 0 ;; *) exit 1 ;; esac'
 
 [Service]
@@ -14,17 +10,8 @@ Type=simple
 Environment=QS_CONFIG_PATH=%h/.local/share/vibranium/shell
 Environment=VIBRANIUM=%h/.local/share/vibranium
 Environment="MALLOC_CONF=thp:never,narenas:4,dirty_decay_ms:3000"
-# Hot-reload watchers are a development feature: they register one inotify
-# watch per QML file for a session that never edits them.
 Environment=VIBRANIUM_SHELL_WATCH=0
-# The boot figures are measured from the process start, not from the first QML
-# object that happens to ask: stamping here is the only point that includes Qt
-# initialisation and the shell module's own compilation. `%%` is a literal
-# percent for systemd's specifier expansion.
 ExecStart=/bin/sh -c 'export VIBRANIUM_SHELL_START_MS=$(date +%%s%%3N); exec qs'
-# Restart=always without a delay turns a crash loop into a spin. A second
-# between attempts, and give up after ten in two minutes rather than hammering
-# a compositor that is not ready yet.
 Restart=always
 RestartSec=1s
 StartLimitIntervalSec=120

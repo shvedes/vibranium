@@ -1754,7 +1754,7 @@ Rectangle {
         // the previous bundle, and the swap that follows discards the result.
         //
         // That is not theoretical. The summon reached Utilities with the
-        // warm view still holding index 3 from ThemePicker, no seat ran at
+        // warm view still holding index 3 from the previous page, no seat ran at
         // all, and the cursor was never placed anywhere - it was left where
         // the previous menu left it. Utilities composes 9 rows, a guard takes
         // one to 8, and the view clamps the inherited index to count-1, which
@@ -1855,7 +1855,7 @@ Rectangle {
   // something reads it - so seating a new stack leaves this whole chain
   // clean and stale, answering from the page that was on screen before. A
   // clean binding is not re-evaluated by reading it, so nothing on the open
-  // path could correct it in time: the first fit of a theme picker open was
+  // path could correct it in time: the first fit of a picker open was
   // committed against the previous ceiling and the resulting 542px card was
   // the first painted frame, one frame at a 177px lower top edge before the
   // corrected 365px fit landed. Depending on Menu.frame makes the chain dirty
@@ -1905,7 +1905,7 @@ Rectangle {
   // allows and what 10 rows need, so a page whose rows are tall gets fewer
   // and a page that declares its own maxHeight gets fewer still. Nothing in
   // the tree declared one - three undeclared constants did, across the
-  // pickers, and the smallest of them silently cost the theme picker half
+  // pickers, and the smallest of them silently cost a picker half
   // its rows while making the card shorter than pages showing more.
   // `rowPolicyBound` below reports which of the two is holding the size, so
   // an override is something a reader can see rather than infer.
@@ -4371,7 +4371,6 @@ Rectangle {
     // shows the mode glyph above the copy (bar-island pattern):
     // scoped "/" filter -> filter-x + "No matches", global search ->
     // search-alert + "No results", both two-tone with a red indicator.
-    // The ThemePicker page ("themes") keeps its palette glyph instead.
     // A truly empty page stays text-only.
     EmptyState {
       anchors.centerIn: parent
@@ -4380,14 +4379,12 @@ Rectangle {
       text: panel.searching ? "No results" : panel.scopedSearching ? "No matches" : "Empty page"
       iconName: {
         if (!panel.searching && !panel.scopedSearching) return ""
-        if (panel.currentPageId === "themes") return "theme"
         if (panel.searching) return "search-alert"
         return "filter-x"
       }
       iconColorKey: "foreground_1"
       iconAccentKey: {
         if (!panel.searching && !panel.scopedSearching) return ""
-        if (panel.currentPageId === "themes") return ""
         return "red"
       }
     }
