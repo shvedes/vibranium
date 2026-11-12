@@ -6725,7 +6725,7 @@ group('a plugin that drifts would be reported by name, not by a count', () => {
   // The shape of the report, proven on a synthetic pair rather than by waiting
   // for a real divergence: a function that exists on both sides and differs.
   const libA = pluginInternals(path.join(PLUGIN_ROOT, 'calc', 'main.js'))
-  const mutated = libA.fns.tryEvaluate.toString().replace('var s = raw.trim()', 'var s = String(raw).trim()')
+  const mutated = libA.fns.tryEvaluate.toString().replace('let s = raw.trim()', 'let s = String(raw).trim()')
   is('a one-token body change is detected by toString',
     [mutated, libA.fns.tryEvaluate.toString()],
     (pair) => pair[0] !== pair[1], 'two different sources')
