@@ -23,12 +23,12 @@ Rectangle {
 
   Behavior on opacity {
     NumberAnimation {
-      duration: 150
+      duration: MotionPolicy.duration(150)
     }
   }
   Behavior on scale {
     NumberAnimation {
-      duration: 150
+      duration: MotionPolicy.duration(150)
     }
   }
 
