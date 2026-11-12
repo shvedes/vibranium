@@ -615,6 +615,19 @@ Item {
   // recompute the same array; this binding derives it once for all of them.
   readonly property var _slots: Graph.edgeSlots(tab._graphGroups())
 
+  // The slots for a group list, with the cached binding's answer used only when
+  // it is about THIS list. `_slots` is a binding over the controller's links and
+  // a binding is evaluated lazily, so a link list that grew between two reads
+  // leaves the cached array one short and `slots[i].from` becomes a read of
+  // undefined rather than a missing relation. Deriving from the list in hand
+  // answers the ordinary case from the same function, and the length test is
+  // what makes the two answers the same one.
+  function _slotsFor(groups) {
+    const held = tab._slots
+    if (Array.isArray(held) && held.length === groups.length) return held
+    return Graph.edgeSlots(groups)
+  }
+
 
   // A card with no place reads at the world's own margin rather than at the
   // origin, so a card that has not been laid out yet - which is a card the graph
@@ -673,7 +686,7 @@ Item {
   // the pan agree about how much edge to leave behind: the bound is stated once
   // and the world's own padding is built out of it.
   function _clampPan() {
-    const p = Model.clampPan(tab.panX, tab.panY, tab.viewW, tab.viewH,
+    const p = Graph.clampPan(tab.panX, tab.panY, tab.viewW, tab.viewH,
       tab.worldW, tab.worldH, tab.zoom, tab.margin)
     tab.panX = p.x
     tab.panY = p.y
@@ -690,7 +703,7 @@ Item {
   // already as immediate as the compositor allows.
   function zoomBy(notches, atX, atY, fine) {
     const step = fine === true ? tab.zoomStepFine : tab.zoomStep
-    const next = Model.zoomPan(tab.panX, tab.panY, tab.zoom, notches, step,
+    const next = Graph.zoomPan(tab.panX, tab.panY, tab.zoom, notches, step,
       tab.minZoom, tab.maxZoom, atX, atY)
     if (next.zoom === tab.zoom) return
     tab.zoom = next.zoom
@@ -703,7 +716,7 @@ Item {
   // of the position map, which is what the view is fitted to and what the pan
   // clamp's own bound stands in for.
   function _contentBox() {
-    return Model.contentBox(tab._positions, tab.cardW, tab.cardH)
+    return Graph.contentBox(tab._positions, tab.cardW, tab.cardH)
   }
 
   // The whole graph in the viewport, and never larger than 1:1.
@@ -714,7 +727,7 @@ Item {
   // connected from where the user is looking. The fit never zooms IN past 1:1,
   // because a small graph blown up is not more readable than a small graph.
   function resetView() {
-    const fit = Model.fitView(tab._contentBox(), tab.viewW, tab.viewH,
+    const fit = Graph.fitView(tab._contentBox(), tab.viewW, tab.viewH,
       Ui.m, tab.minZoom, tab.maxZoom)
     tab.zoom = fit.zoom
     tab.panX = fit.panX
@@ -786,7 +799,7 @@ Item {
   // here silently answers with the left edge's ports and the right edge's lines.
   function edgeAt(key, side) {
     const groups = tab._graphGroups()
-    const slots = tab._slots
+    const slots = tab._slotsFor(groups)
     const ys = tab.portHandles(key, side !== 1)
     const lines = []
     for (let i = 0; i < groups.length; i++) {
@@ -840,7 +853,7 @@ Item {
   // cannot have two of.
   function _edgeLines() {
     const groups = tab._graphGroups()
-    const slots = tab._slots
+    const slots = tab._slotsFor(groups)
     const byEdge = ({})
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i]
