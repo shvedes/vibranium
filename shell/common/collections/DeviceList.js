@@ -15,13 +15,13 @@
 // tier (localeCompare on a label, signal strength, ...). The input is
 // never mutated; a sorted copy is returned.
 function sortRows(rows, rankOf, knownOf, tiebreak) {
-  var list = StoreGuards.copyList(rows)
+  let list = StoreGuards.copyList(rows)
   list.sort(function(a, b) {
-    var ra = rankOf ? !!rankOf(a) : false
-    var rb = rankOf ? !!rankOf(b) : false
+    let ra = rankOf ? !!rankOf(a) : false
+    let rb = rankOf ? !!rankOf(b) : false
     if (ra !== rb) return ra ? -1 : 1
-    var ka = knownOf ? !!knownOf(a) : false
-    var kb = knownOf ? !!knownOf(b) : false
+    let ka = knownOf ? !!knownOf(a) : false
+    let kb = knownOf ? !!knownOf(b) : false
     if (ka !== kb) return ka ? -1 : 1
     if (typeof tiebreak === "function") return tiebreak(a, b)
     return 0
@@ -34,12 +34,12 @@ function sortRows(rows, rankOf, knownOf, tiebreak) {
 // resets the ListView model and recreates every delegate, so callers
 // skip the assignment when the keys agree.
 function rowsEqual(a, b, keyOf) {
-  var x = StoreGuards.asList(a)
-  var y = StoreGuards.asList(b)
+  let x = StoreGuards.asList(a)
+  let y = StoreGuards.asList(b)
   if (x.length !== y.length) return false
-  for (var i = 0; i < x.length; i++) {
-    var kx = keyOf ? keyOf(x[i], i) : ""
-    var ky = keyOf ? keyOf(y[i], i) : ""
+  for (let i = 0; i < x.length; i++) {
+    let kx = keyOf ? keyOf(x[i], i) : ""
+    let ky = keyOf ? keyOf(y[i], i) : ""
     if (String(kx) !== String(ky)) return false
   }
   return true
@@ -50,10 +50,10 @@ function rowsEqual(a, b, keyOf) {
 // the label forward (instead of letting ListView paint a blank header
 // for "") stays with the caller - see Network deriveWifiState.
 function sectionTitleFor(index, rows, titleOf) {
-  var list = StoreGuards.asList(rows)
+  let list = StoreGuards.asList(rows)
   if (index < 0 || index >= list.length) return ""
   if (typeof titleOf !== "function") return ""
-  var prev = index > 0 ? list[index - 1] : null
+  let prev = index > 0 ? list[index - 1] : null
   return titleOf(list[index], prev, index)
 }
 
@@ -63,11 +63,11 @@ function sectionTitleFor(index, rows, titleOf) {
 // when trailingTitle is set a closing header is always appended even
 // when its section has no rows, so a scan control stays reachable.
 function sectionedEntries(sorted, titleOf, entryOf, trailingTitle) {
-  var list = StoreGuards.asList(sorted)
-  var entries = []
-  var cur = ""
-  for (var i = 0; i < list.length; i++) {
-    var t = sectionTitleFor(i, list, titleOf)
+  let list = StoreGuards.asList(sorted)
+  let entries = []
+  let cur = ""
+  for (let i = 0; i < list.length; i++) {
+    let t = sectionTitleFor(i, list, titleOf)
     if (t !== "") {
       cur = t
       entries.push({ type: "header", title: t })
@@ -88,9 +88,9 @@ function displayKey(row, namespace, label) {
 // Viewport cap for an island list: the content height, at most one page
 // of rows. Single source for the wifi-list 250px cap idiom.
 function viewportH(contentHeight, maxH) {
-  var content = Number(contentHeight)
+  let content = Number(contentHeight)
   if (!isFinite(content) || content <= 0) return 0
-  var cap = Number(maxH)
+  let cap = Number(maxH)
   if (!isFinite(cap) || cap <= 0) cap = 250
   return Math.min(content, cap)
 }
