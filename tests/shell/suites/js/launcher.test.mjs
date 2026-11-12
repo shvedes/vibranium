@@ -4506,6 +4506,13 @@ group('unit: a bare quantity answers with a row per reading, capped and same-dim
   // An explicit target is an intention, so it stays one row.
   eq('an explicit target is still one row', impl.items('5 mb in gb').length, 1)
   eq('and it is the one that was asked for', impl.items('5 mb in gb')[0].label, '5 MB = 0.005 GB')
+  // A snapshot row drifts, and the adapter is what hands it the clock: the
+  // card therefore shows the distance at the moment it was built, in the same
+  // six rows either way.
+  eq('a bare Voyager is six rows', impl.items('voyager 1').map((r) => r.uid),
+    ['unit:km', 'unit:au', 'unit:lmin', 'unit:lh', 'unit:ld', 'unit:ly'])
+  eq('each one carries a number to copy',
+    impl.items('voyager 1').every((r) => r.unitValue !== '' && r.incomplete === false), true)
   eq('a compound bare source fans out from the sum, not from one term',
     impl.items('6 ft 2 in')[0].label, '6 ft + 2 in = 1.8796 m')
   eq('and every row of it names the whole sum',
@@ -6210,7 +6217,7 @@ group('every shared data table is byte-identical', () => {
     eq(`${p.name}: no data value differs`, p.valueDiffs, [])
   }
   const unit = TWINNED.find((p) => p.name === 'unit')
-  eq('unit: the UNITS table has 361 entries on both sides', unit.libFns.UNITS.length, 361)
+  eq('unit: the UNITS table has 363 entries on both sides', unit.libFns.UNITS.length, 363)
   eq('unit: the same table', unit.plugFns.UNITS.length, unit.libFns.UNITS.length)
   eq('unit: the SPEED_LEN shorthand has five entries', Object.keys(unit.libFns.SPEED_LEN).length, 5)
   eq('unit: the default-target ladders are the two documented shapes', unit.libFns.DEF_LADDER, {
@@ -6345,6 +6352,7 @@ group('every shared data table is byte-identical', () => {
     'Towers',
     'Tsar',
     'Usain',
+    'Voyager',
     'Wales',
     '\u00b0Celsius',
     '\u00b0Fahrenheit',
@@ -6560,6 +6568,7 @@ const PARITY_CORPUS = {
     ['tryConvert', ['5 Cal in J']], ['tryConvert', ['5 cal in J']], ['tryConvert', ['5 m in n']],
     ['tryConvert', ['1 kN in N']], ['tryConvert', ['5 Nm in lbf ft']], ['tryConvert', ['5 N·m in lbf·ft']],
     ['tryConvert', ['30 mpg in km/l']], ['tryConvert', ['1 GB']], ['tryConvert', ['100 KB']], ['tryConvert', ['0 d']],
+    ['tryConvert', ['voyager 1']], ['tryConvert', ['voyager 2 in km']],
     ['tryConvert', ['how many km in 5 mi']], ['tryConvert', ['convert 5 km to mi']],
     ['tryConvert', ['1e308t in mg']], ['tryConvert', ['1 KN in N']], ['tryConvert', ['1 kwh in wh']],
   ],

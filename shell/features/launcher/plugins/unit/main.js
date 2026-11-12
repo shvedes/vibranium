@@ -912,6 +912,33 @@ addUnit("lunar distance", "length", 3.84399e8, "km",
   ["lunardistance", "lunardistances", "moondistance", "moondistances"],
   ["lunar distance", "lunar distances"]);
 
+// The two Voyagers are the only distances anybody checks up on, and they are a
+// SNAPSHOT rather than a conversion: this table reads no clock, so a figure
+// pinned to an epoch is the honest shape. Both are measured from EARTH, which
+// is what the missions publish, and both recede by about three astronomical
+// units a year - the Earth's own orbit moves the reading by up to one AU either
+// way, so the last digit is a date more than a measurement.
+//
+// Voyager 1 crossed one light-day from Earth on 2026-11-18 at 25.902 billion
+// kilometres, NASA's own figure for that milestone, and Voyager 2 was 21.66
+// billion kilometres (144.8 AU) from Earth the same week - what its 15.3 km/s
+// adds to the 119 AU it had reached when it entered interstellar space in
+// November 2018.
+//
+// Both are bare, so the name is the whole query, and both carry `spread`: the
+// six readings the distance is actually said in. That list is not the length
+// shortlist because readable() drops the kilometre and the light-year as five
+// decades out of a person's range, and those two are the whole point.
+var VOYAGER_SPREAD = ["km", "au", "lmin", "lh", "ld", "ly"];
+addUnit("Voyager 1", "length", 2.5902e13, "au",
+  ["voyager1", "voyager1distance", "voyager1distances"],
+  ["distance from Earth to Voyager 1", "distances from Earth to Voyager 1"],
+  { bare: true, spread: VOYAGER_SPREAD });
+addUnit("Voyager 2", "length", 2.1658e13, "au",
+  ["voyager2", "voyager2distance", "voyager2distances"],
+  ["distance from Earth to Voyager 2", "distances from Earth to Voyager 2"],
+  { bare: true, spread: VOYAGER_SPREAD });
+
 addUnit("ozt", "mass", 0.0311034768, "g", ["ozt", "troyounce", "troyounces"],
   ["troy ounce", "troy ounces"]);
 addUnit("Mearth", "mass", 5.9722e24, "kg", ["mearth", "earthmass", "earthmasses"],
@@ -1763,6 +1790,18 @@ function pickDefault(value, from) {
 // in its place. That is also why it survives a query whose every conversion
 // overflows, where the checks then report the failure against it.
 function pickTargets(value, from) {
+  // A named constant may carry a row list of its own. The dimension shortlist
+  // answers "what is this quantity in", and readable() is the bound that keeps
+  // that list to numbers a person has a feel for; a pinned snapshot is the
+  // other case, so a `spread` row answers exactly the units it is quoted in.
+  if (from.spread !== undefined) {
+    var spread = [];
+    for (var s = 0; s < from.spread.length && spread.length < MAX_TARGETS; s++) {
+      var pick = symLookup(from.spread[s]);
+      if (pick !== null && pick.sym !== from.sym) spread.push(pick.sym);
+    }
+    if (spread.length > 0) return spread;
+  }
   function readable(v) {
     var a = Math.abs(v);
     if (!isFinite(a) || a < MIN_FRACTION) return false;

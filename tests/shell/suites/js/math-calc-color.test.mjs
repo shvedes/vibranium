@@ -2490,8 +2490,8 @@ group('the blend is over the channels, and the result is opaque', () => {
 // ---------------------------------------------------------------------------
 section('UnitLib - the UNITS table')
 
-group('the table is 361 entries across 24 dimensions with no duplicate symbol', () => {
-  eq('361 entries', UL.UNITS.length, 361)
+group('the table is 363 entries across 24 dimensions with no duplicate symbol', () => {
+  eq('363 entries', UL.UNITS.length, 363)
   eq('the dimensions', [...new Set(UL.UNITS.map((u) => u.dim))],
     ['length', 'mass', 'volume', 'speed', 'temperature', 'area', 'time', 'energy', 'power', 'pressure', 'data', 'angle',
       'frequency', 'force', 'torque', 'fuel', 'concentration', 'molarity', 'fraction', 'flow',
@@ -2813,7 +2813,7 @@ group('an unknown or empty key is null, never a wrong unit', () => {
 
 group('aliasMap is built once and covers every name exactly once', () => {
   const m = UL.aliasMap()
-  eq('1194 aliases', Object.keys(m).length, 1194)
+  eq('1200 aliases', Object.keys(m).length, 1200)
   eq('and it is the cached instance on the second call', UL.aliasMap() === m, true)
   eq('the alias count matches the name count', Object.keys(m).length,
     UL.UNITS.reduce((n, u) => n + u.names.length, 0))
@@ -3588,7 +3588,7 @@ group('the twelve newer dimensions: frequency, force, torque, fuel, concentratio
   approx('and a crore is ten million', cvOut('1 crore in item'), 1e7, 1e-3)
 })
 
-group('every one of the 361 rows is structurally sound', () => {
+group('every one of the 363 rows is structurally sound', () => {
   // Three invariants over the WHOLE table, because the interesting failures in a
   // table this size are not wrong answers - they are a row that resolves to
   // nothing, a noun that was never written, or a pair that does not survive the
@@ -3975,6 +3975,41 @@ group('a named constant is its own phrase, with the article and no 1', () => {
   eq('and an ordinary unit still needs a value', UL.tryConvert('km'), null)
 })
 
+group('the Voyagers are pinned snapshot distances, answered in six readings', () => {
+  // A spacecraft is a length, and the two Voyagers are the only lengths a
+  // person checks up on. The table reads no clock, so each is a SNAPSHOT at the
+  // epoch in its comment rather than a live reading, and each is measured from
+  // Earth - which is why the row is bare (the name is the query) and why it
+  // carries its own row list: readable() would drop the kilometre and the
+  // light-year for being five decades out of a person's range, and those two
+  // are the whole point of the query.
+  eq('voyager 1 is a query on its own', UL.isPotentialUnit('voyager 1'), true)
+  eq('with its article', UL.isPotentialUnit('the voyager 1'), true)
+  eq('voyager 2 likewise', UL.isPotentialUnit('voyager 2'), true)
+  eq('a bare voyager names nothing', UL.tryConvert('voyager'), null)
+  eq('the row is a length', UL.lookup('voyager 1').dim, 'length')
+  eq('voyager 1 is the light-day figure from Earth', cvOut('voyager 1 in km'), 25902000000)
+  approx('which is 173.1 AU', cvOut('voyager 1 in au'), 2.5902e13 / 1.495978707e11, 1e-9)
+  approx('and just under one light-day', cvOut('voyager 1 in ld'), 2.5902e13 / 2.59020683712e13, 1e-9)
+  eq('voyager 2 is 21.66 billion km', cvOut('voyager 2 in km'), 21658000000)
+  approx('which is 144.8 AU', cvOut('voyager 2 in au'), 2.1658e13 / 1.495978707e11, 1e-9)
+  eq('the bare list is the spread, not the length shortlist',
+    UL.tryAll('voyager 1').map((r) => r.to), ['km', 'au', 'lmin', 'lh', 'ld', 'ly'])
+  eq('with those readings', UL.tryAll('voyager 1').map((r) => r.formatted),
+    ['25902000000', '173.144', '1440', '23.9999', '0.999997', '0.00273784'])
+  eq('voyager 2 answers the same six', UL.tryAll('voyager 2').map((r) => r.to),
+    ['km', 'au', 'lmin', 'lh', 'ld', 'ly'])
+  eq('the label reads as the subject', cvOk('voyager 1').label, 'the Voyager 1 = 173.144 au')
+  eq('the sub names the distance and where it is measured from', cvOk('voyager 1').phrase,
+    'the distance from Earth to Voyager 1 is 173.144 astronomical units')
+  eq('an explicit target still answers with one row', UL.tryAll('voyager 1 in ly').length, 1)
+  eq('and converts there', cvOk('voyager 1 in ly').to, 'ly')
+  // It is a length like any other, so the neighbour conversion and the
+  // dimension check apply to it unchanged.
+  eq('a length target reaches the row', cvOk('1 au in voyager 1').to, 'Voyager 1')
+  eq('and a mass target is refused', cvHint('voyager 1 in kg').error, 'incompatible')
+})
+
 // ---------------------------------------------------------------------------
 section('UnitLib - the bare-query default target')
 
@@ -4277,7 +4312,7 @@ group('dimUnits, dimHint and dimNote are the three hint strings, on their own', 
   const g = (s) => UL.lookup(s)
   // dimUnits is the hint's vocabulary: one dimension, in table order, so a
   // suggestion list is the engine's own ordering rather than a sorted guess.
-  eq('the length dimension has 56 units', UL.dimUnits('length').length, 56)
+  eq('the length dimension has 58 units', UL.dimUnits('length').length, 58)
   eq('and they come out smallest first', UL.dimUnits('length').slice(0, 4), ['A', 'nm', 'um', 'thou'])
   eq('the mass dimension', UL.dimUnits('mass').slice(-3), ['grain of rice', 'paperclip', 'stick of butter'])
   eq('the five temperature scales', UL.dimUnits('temperature'), ['C', 'F', 'K', 'Re', 'R'])
