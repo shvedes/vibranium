@@ -3083,10 +3083,8 @@ Rectangle {
     // -1 = keep whatever viewSettle positioned (jump-to-row navigation):
     // forcing y=0 after positionViewAtIndex would yank a below-the-fold
     // target back to the top and hide the cursor.
-    let keepY = false
     if (pending >= 0) {
       sel = pending
-      keepY = true
       const vs = Object.assign({}, Menu.viewState)
       delete vs[f.id]
       Menu.viewState = vs
