@@ -470,8 +470,8 @@ Item {
   // the daemon calls the mode, then the availability, then the sink/source
   // counts the parser published - which is the whole reason the list is read
   // rather than guessed. The counts are left off the disable profile: 0 sinks
-  // and 0 sources is what "disables the device" means, and the description
-  // already says it.
+  // and 0 sources is what "disabled" means, and the description already says
+  // it.
   function profileText(entry) {
     if (entry === null || entry === undefined) return ""
     let out = String(entry.description !== "" ? entry.description : entry.name)
@@ -548,6 +548,10 @@ Item {
   // the node itself changing under a delegate that is reused, and the node's
   // own channel map arriving after the first attempt.
   onNodeChanged: row._syncPeak()
+  // A delegate that is rebuilt in the other mode has the same question to ask:
+  // configuration rows take no hold at all, so a row retargeted at that mode
+  // gives back the one it had.
+  onConfigurationChanged: row._syncPeak()
 
   Connections {
     target: row.audio
@@ -567,6 +571,15 @@ Item {
   // the dependent binding has re-evaluated. Reading the property chain here
   // makes the answer a function of the node alone and not of handler order.
   function _syncPeak() {
+    // A configuration row never draws the level stack, the mute toggle or the
+    // readout - all three are `!row.configuration` - so there is no meter for a
+    // hold to feed and it must not take one. A hold is not free: it is a capture
+    // stream on the daemon, taken and given back for every visible row on the
+    // tab. A row that draws no meter pays none of that.
+    if (row.configuration === true) {
+      row._releasePeak()
+      return
+    }
     if (row._peakNode !== row.node) row._releasePeak()
     if (row.peak !== null) return
     const node = row.node
@@ -619,8 +632,8 @@ Item {
   // may shrink to before its own label elides, and `profileChrome` is the label
   // plus the caret and the insets, so the chip's preferred width is its own
   // text. A profile description is arbitrary length - "Analog Stereo Output
-  // (2 sinks, 0 sources)" is a fifth wider than "Off (disables the device)" -
-  // so a constant column truncated the modes that need reading most. Measured
+  // (2 sinks, 0 sources)" is a fifth wider than "Off (disabled)" - so a
+  // constant column truncated the modes that need reading most. Measured
   // on a live 760px configuration row against a four-profile card: a 288px
   // chip, where the 220px column elided it.
   //
