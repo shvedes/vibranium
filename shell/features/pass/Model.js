@@ -13,18 +13,18 @@
 // Approximate `sort -V`: numeric chunks compare by value, the rest by
 // code point. Close enough for stable entry ordering in the panel.
 function versionCompare(a, b) {
-  var ra = String(a || "").split(/([0-9]+)/);
-  var rb = String(b || "").split(/([0-9]+)/);
-  var n = Math.max(ra.length, rb.length);
-  for (var i = 0; i < n; i++) {
-    var x = ra[i] === undefined ? "" : ra[i];
-    var y = rb[i] === undefined ? "" : rb[i];
+  let ra = String(a || "").split(/([0-9]+)/);
+  let rb = String(b || "").split(/([0-9]+)/);
+  let n = Math.max(ra.length, rb.length);
+  for (let i = 0; i < n; i++) {
+    let x = ra[i] === undefined ? "" : ra[i];
+    let y = rb[i] === undefined ? "" : rb[i];
     if (x === y) continue;
-    var xn = /^[0-9]+$/.test(x);
-    var yn = /^[0-9]+$/.test(y);
+    let xn = /^[0-9]+$/.test(x);
+    let yn = /^[0-9]+$/.test(y);
     if (xn && yn) {
-      var xs = x.replace(/^0+/, "");
-      var ys = y.replace(/^0+/, "");
+      let xs = x.replace(/^0+/, "");
+      let ys = y.replace(/^0+/, "");
       if (xs.length !== ys.length) return xs.length < ys.length ? -1 : 1;
       if (xs !== ys) return xs < ys ? -1 : 1;
       continue;
@@ -35,14 +35,14 @@ function versionCompare(a, b) {
 }
 
 function stripGpg(p) {
-  var s = String(p || "");
+  let s = String(p || "");
   if (s.length > 4 && s.substring(s.length - 4) === ".gpg")
     return s.substring(0, s.length - 4);
   return s;
 }
 
 function splitEntry(path) {
-  var p = String(path || "");
+  let p = String(path || "");
   return { path: p, dir: SU.dirname(p), name: SU.basename(p) };
 }
 
@@ -55,7 +55,7 @@ function storeDirPath(env) {
 }
 
 function _storeDir(path) {
-  var dir = String(path || "");
+  let dir = String(path || "");
   if (dir.length > 1 && dir.charAt(dir.length - 1) === "/")
     dir = dir.substring(0, dir.length - 1);
   return dir;
@@ -67,7 +67,7 @@ function _storeDir(path) {
 // folder and everything below it alike, where matching only a prefix or a
 // `/.git/` infix let a nested repository's folder through.
 function _storedPath(dir, raw) {
-  var f = String(raw === undefined || raw === null ? "" : raw);
+  let f = String(raw === undefined || raw === null ? "" : raw);
   if (f.length > 0 && f.charAt(f.length - 1) === "\r")
     f = f.substring(0, f.length - 1);
   if (f === "") return null;
@@ -84,18 +84,18 @@ function _storedPath(dir, raw) {
 // folders (the store root itself prints an empty rel and is dropped).
 // .git bookkeeping never surfaces on either side.
 function parseFindOutput(storeDir, lines) {
-  var dir = _storeDir(storeDir);
-  var files = [];
-  var dirs = [];
-  var seen = {};
-  var arr = Array.isArray(lines) ? lines : String(lines || "").split("\n");
-  for (var i = 0; i < arr.length; i++) {
-    var line = String(arr[i] === undefined || arr[i] === null ? "" : arr[i]);
+  let dir = _storeDir(storeDir);
+  let files = [];
+  let dirs = [];
+  let seen = {};
+  let arr = Array.isArray(lines) ? lines : String(lines || "").split("\n");
+  for (let i = 0; i < arr.length; i++) {
+    let line = String(arr[i] === undefined || arr[i] === null ? "" : arr[i]);
     if (line.length > 0 && line.charAt(line.length - 1) === "\r")
       line = line.substring(0, line.length - 1);
     if (line.length < 3 || line.charAt(1) !== " ") continue;
-    var kind = line.charAt(0);
-    var f = _storedPath(dir, line.substring(2));
+    let kind = line.charAt(0);
+    let f = _storedPath(dir, line.substring(2));
     if (f === null) continue;
     if (kind === "f") {
       if (f.length > 4 && f.substring(f.length - 4) === ".gpg") files.push(f);
@@ -111,20 +111,20 @@ function parseFindOutput(storeDir, lines) {
 // listEntries(storeDir, files); with a store dir, absolute paths are
 // relativized first. .git bookkeeping never surfaces as entries.
 function listEntries(a, b) {
-  var dir = "";
-  var files = [];
+  let dir = "";
+  let files = [];
   if (Array.isArray(a)) {
     files = a;
   } else {
     dir = _storeDir(a);
     if (Array.isArray(b)) files = b;
   }
-  var out = [];
-  for (var i = 0; i < files.length; i++) {
-    var f = _storedPath(dir, files[i]);
+  let out = [];
+  for (let i = 0; i < files.length; i++) {
+    let f = _storedPath(dir, files[i]);
     if (f === null) continue;
     if (f.length <= 4 || f.substring(f.length - 4) !== ".gpg") continue;
-    var logical = f.substring(0, f.length - 4);
+    let logical = f.substring(0, f.length - 4);
     if (logical === "") continue;
     out.push(splitEntry(logical));
   }
@@ -136,7 +136,7 @@ function listEntries(a, b) {
 // anywhere, allowlist [a-zA-Z0-9._ @-] only (no slashes or meta chars).
 function isValidName(name) {
   if (typeof name !== "string") return false;
-  var s = name.replace(/^\s+/, "").replace(/\s+$/, "");
+  let s = name.replace(/^\s+/, "").replace(/\s+$/, "");
   if (s === "") return false;
   if (s.charAt(0) === ".") return false;
   if (s.indexOf("..") !== -1) return false;
@@ -148,25 +148,25 @@ function isValidName(name) {
 // XDG_DATA_HOME, then ~/.local/share. Takes an env map so QML passes
 // Quickshell.env values in and node tests pass a stub.
 function storeDir(env) {
-  var e = env;
+  let e = env;
   if (e === undefined || e === null) {
     if (typeof process !== "undefined" && process.env) e = process.env;
     else e = {};
   }
-  var psd = e.PASSWORD_STORE_DIR;
+  let psd = e.PASSWORD_STORE_DIR;
   if (typeof psd === "string" && psd !== "") return psd;
-  var xdg = e.XDG_DATA_HOME;
+  let xdg = e.XDG_DATA_HOME;
   if (typeof xdg === "string" && xdg !== "") return xdg + "/password-store";
-  var home = e.HOME;
+  let home = e.HOME;
   if (typeof home === "string" && home !== "") return home + "/.local/share/password-store";
   return "~/.local/share/password-store";
 }
 
 // Password is line 1 only; printf %s semantics (no trailing newline out).
 function firstLine(text) {
-  var s = String(text === undefined || text === null ? "" : text);
-  var idx = s.indexOf("\n");
-  var line = idx === -1 ? s : s.substring(0, idx);
+  let s = String(text === undefined || text === null ? "" : text);
+  let idx = s.indexOf("\n");
+  let line = idx === -1 ? s : s.substring(0, idx);
   if (line.length > 0 && line.charAt(line.length - 1) === "\r")
     line = line.substring(0, line.length - 1);
   return line;
@@ -177,13 +177,13 @@ function firstLine(text) {
 // extraDirs folds in folders the entry scan cannot see (empty ones from
 // the dirs probe) so they browse exactly like populated folders.
 function childrenOf(entries, dir, extraDirs) {
-  var d = String(dir || "");
-  var dirs = [];
-  var seen = {};
-  var files = [];
-  var extra = StoreGuards.asList(extraDirs);
-  var i, e, rest, head;
-  var consider = function (dirPath) {
+  let d = String(dir || "");
+  let dirs = [];
+  let seen = {};
+  let files = [];
+  let extra = StoreGuards.asList(extraDirs);
+  let i, e, rest, head;
+  let consider = function (dirPath) {
     if (dirPath === d) return;
     if (d === "") {
       if (dirPath === "" || dirPath.indexOf("/") !== -1) return;
@@ -210,7 +210,7 @@ function childrenOf(entries, dir, extraDirs) {
     consider(e.dir);
   }
   for (i = 0; i < extra.length; i++) {
-    var x = String(extra[i] || "");
+    let x = String(extra[i] || "");
     if (x === "") continue;
     consider(x);
     // An empty folder listed exactly at this level still counts when no
@@ -225,14 +225,14 @@ function childrenOf(entries, dir, extraDirs) {
 // direct children). The trailing slash keeps sibling prefixes
 // ("mail" vs "mail2") apart. dir "" counts the whole vault.
 function countUnder(entries, dir) {
-  var d = String(dir || "");
+  let d = String(dir || "");
   if (d === "") return StoreGuards.asList(entries).length;
-  var n = 0;
-  var arr = StoreGuards.asList(entries);
-  for (var i = 0; i < arr.length; i++) {
-    var e = arr[i];
+  let n = 0;
+  let arr = StoreGuards.asList(entries);
+  for (let i = 0; i < arr.length; i++) {
+    let e = arr[i];
     if (!e) continue;
-    var ed = String(e.dir || "");
+    let ed = String(e.dir || "");
     if (ed === d || ed.indexOf(d + "/") === 0) n++;
   }
   return n;
@@ -240,10 +240,10 @@ function countUnder(entries, dir) {
 
 // Flat case-insensitive substring filter over pass paths.
 function filterEntries(entries, query) {
-  var q = String(query || "").toLowerCase();
+  let q = String(query || "").toLowerCase();
   if (q === "") return entries.slice();
-  var out = [];
-  for (var i = 0; i < entries.length; i++) {
+  let out = [];
+  for (let i = 0; i < entries.length; i++) {
     if (entries[i] && String(entries[i].path || "").toLowerCase().indexOf(q) !== -1)
       out.push(entries[i]);
   }
@@ -253,18 +253,18 @@ function filterEntries(entries, query) {
 // Vault-wide substring search: entries match on full path, dirs on
 // their relative path. Both sides sort -V like the browser.
 function searchVault(entries, allDirs, query) {
-  var q = String(query || "").toLowerCase();
+  let q = String(query || "").toLowerCase();
   if (q === "") return { entries: [], dirs: [] };
-  var hits = [];
-  for (var i = 0; i < entries.length; i++) {
-    var e = entries[i];
+  let hits = [];
+  for (let i = 0; i < entries.length; i++) {
+    let e = entries[i];
     if (e && String(e.path || "").toLowerCase().indexOf(q) !== -1) hits.push(e);
   }
   hits.sort(function (x, y) { return versionCompare(x.path, y.path); });
-  var ds = [];
-  var dirs = StoreGuards.asList(allDirs);
-  for (var j = 0; j < dirs.length; j++) {
-    var d = String(dirs[j] || "");
+  let ds = [];
+  let dirs = StoreGuards.asList(allDirs);
+  for (let j = 0; j < dirs.length; j++) {
+    let d = String(dirs[j] || "");
     if (d !== "" && d.toLowerCase().indexOf(q) !== -1) ds.push(d);
   }
   ds.sort(versionCompare);
@@ -274,13 +274,13 @@ function searchVault(entries, allDirs, query) {
 // GPG colon output -> secret-key fingerprints. For each "sec" record the
 // next "fpr" line carries the fingerprint in field 10 (index 9).
 function parseKeyFingerprints(text) {
-  var lines = String(text || "").split("\n");
-  var out = [];
-  for (var i = 0; i < lines.length; i++) {
-    var cols = lines[i].split(":");
+  let lines = String(text || "").split("\n");
+  let out = [];
+  for (let i = 0; i < lines.length; i++) {
+    let cols = lines[i].split(":");
     if (cols[0] !== "sec") continue;
     if (i + 1 >= lines.length) continue;
-    var next = lines[i + 1].split(":");
+    let next = lines[i + 1].split(":");
     if (next[0] === "fpr" && next[9] !== undefined && next[9] !== "")
       out.push(next[9]);
   }
@@ -346,9 +346,9 @@ function newTokenMap() {
 // and an empty name each produce a line that reads as a token and matches
 // nothing, which is the right failure for a redactor.
 function token(map, kind, raw) {
-  var m = map === null || map === undefined || typeof map !== "object" ? newTokenMap() : map
-  var k = kind === null || kind === undefined ? "" : String(kind)
-  var bucket = m[k]
+  let m = map === null || map === undefined || typeof map !== "object" ? newTokenMap() : map
+  let k = kind === null || kind === undefined ? "" : String(kind)
+  let bucket = m[k]
   if (bucket === null || bucket === undefined || typeof bucket !== "object") {
     bucket = Object.create(null)
     m[k] = bucket
@@ -357,11 +357,11 @@ function token(map, kind, raw) {
   if (bucket.seen === null || bucket.seen === undefined || typeof bucket.seen !== "object") {
     bucket.seen = Object.create(null)
   }
-  var name = raw === null || raw === undefined ? "" : String(raw)
-  var have = bucket.seen[name]
+  let name = raw === null || raw === undefined ? "" : String(raw)
+  let have = bucket.seen[name]
   if (typeof have === "string" && have.length > 0) return have
   bucket.n = bucket.n + 1
-  var out = k + "#" + bucket.n
+  let out = k + "#" + bucket.n
   bucket.seen[name] = out
   return out
 }
@@ -380,13 +380,13 @@ function _wordish(ch) {
 // its own kind of wrong.
 function _swap(text, name, tok) {
   if (name === "" || tok === undefined || tok === null || tok === "") return text
-  var out = ""
-  var i = 0
+  let out = ""
+  let i = 0
   for (;;) {
-    var at = text.indexOf(name, i)
+    let at = text.indexOf(name, i)
     if (at === -1) break
-    var before = at > 0 ? text.charAt(at - 1) : ""
-    var after = text.charAt(at + name.length)
+    let before = at > 0 ? text.charAt(at - 1) : ""
+    let after = text.charAt(at + name.length)
     out = out + text.substring(i, at)
     if (_wordish(before) || _wordish(after)) {
       out = out + name
@@ -412,18 +412,18 @@ function _swap(text, name, tok) {
 // be replaced before "email" or the entry token would then be searched for
 // in a string whose folder prefix has already become a folder token.
 function redact(text, map, maxChars) {
-  var s = String(text === null || text === undefined ? "" : text)
-  var cap = typeof maxChars === "number" && maxChars > 0 ? Math.round(maxChars) : 160
+  let s = String(text === null || text === undefined ? "" : text)
+  let cap = typeof maxChars === "number" && maxChars > 0 ? Math.round(maxChars) : 160
   s = s.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim()
   if (s === "") return ""
-  var pairs = []
+  let pairs = []
   if (map !== null && map !== undefined && typeof map === "object") {
-    for (var k in map) {
-      var bucket = map[k]
+    for (let k in map) {
+      let bucket = map[k]
       if (bucket === null || bucket === undefined || typeof bucket !== "object") continue
-      var seen = bucket.seen
+      let seen = bucket.seen
       if (seen === null || seen === undefined || typeof seen !== "object") continue
-      for (var name in seen) {
+      for (let name in seen) {
         if (name === "") continue
         pairs.push([name, seen[name], k])
       }
@@ -440,7 +440,7 @@ function redact(text, map, maxChars) {
     if (a[0] !== b[0]) return a[0] < b[0] ? -1 : 1
     return a[1] < b[1] ? -1 : 1
   })
-  for (var i = 0; i < pairs.length; i++) s = _swap(s, pairs[i][0], pairs[i][1])
+  for (let i = 0; i < pairs.length; i++) s = _swap(s, pairs[i][0], pairs[i][1])
   if (s.length > cap) return s.substring(0, cap - 3) + "..."
   return s
 }
@@ -456,13 +456,13 @@ function redact(text, map, maxChars) {
 // One trailing empty element is dropped first: it is the newline that ended
 // the last line, not a blank field the user left behind.
 function fieldCounts(text) {
-  var s = String(text === null || text === undefined ? "" : text)
-  var lines = s.split("\n")
+  let s = String(text === null || text === undefined ? "" : text)
+  let lines = s.split("\n")
   if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop()
-  var fields = 0
-  var empty = 0
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i]
+  let fields = 0
+  let empty = 0
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i]
     if (line.length > 0 && line.charAt(line.length - 1) === "\r") line = line.substring(0, line.length - 1)
     if (line.replace(/^[ \t]+/, "").replace(/[ \t]+$/, "") === "") {
       // A blank before the first value is leading whitespace in the file,
@@ -483,18 +483,18 @@ function fieldCounts(text) {
 // something - the difference between a small vault and a broken scan, which
 // is otherwise the same two numbers.
 function storeStats(files, dirs) {
-  var farr = StoreGuards.asList(files)
-  var darr = StoreGuards.asList(dirs)
-  var depth = 0
+  let farr = StoreGuards.asList(files)
+  let darr = StoreGuards.asList(dirs)
+  let depth = 0
   function depthOf(p) {
-    var s = String(p === null || p === undefined ? "" : p)
+    let s = String(p === null || p === undefined ? "" : p)
     if (s === "") return 0
-    var n = 1
-    for (var i = 0; i < s.length; i++) if (s.charAt(i) === "/") n++
+    let n = 1
+    for (let i = 0; i < s.length; i++) if (s.charAt(i) === "/") n++
     return n
   }
-  var i
-  var d
+  let i
+  let d
   for (i = 0; i < farr.length; i++) { d = depthOf(farr[i]); if (d > depth) depth = d }
   for (i = 0; i < darr.length; i++) { d = depthOf(darr[i]); if (d > depth) depth = d }
   return { entries: farr.length, folders: darr.length, depth: depth }
@@ -538,7 +538,7 @@ function statusError(controllerError, copyError) {
 function navigationBack(mode, dir) {
   if (mode === "action" || mode === "create") return { mode: "browse" };
   if (mode === "browse") {
-    var d = String(dir || "");
+    let d = String(dir || "");
     if (d === "") return { mode: "menu" };
     return { mode: "browse", dir: SU.dirname(d) };
   }
