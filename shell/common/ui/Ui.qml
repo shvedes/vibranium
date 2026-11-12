@@ -191,40 +191,6 @@ Singleton {
     return Qt.alpha(c, a)
   }
 
-  // WCAG relative luminance of a palette leaf, or null when the value is not a
-  // hex color. The leaves arrive as strings off the JsonAdapter, so this parses
-  // rather than reading a QColor, and it ignores alpha - which is what makes a
-  // SOLID fill the only legal argument: luminance over a translucent color is
-  // the luminance of whatever is behind it, which is the wallpaper.
-  function luminance(c) {
-    let hex = String(c === undefined || c === null ? "" : c).trim()
-    if (hex.charAt(0) !== "#") return null
-    hex = hex.slice(1)
-    if (hex.length === 3) {
-      hex = hex.charAt(0) + hex.charAt(0) + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2)
-    }
-    if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null
-    const channel = v => {
-      const n = parseInt(v, 16) / 255
-      return n <= 0.03928 ? n / 12.92 : Math.pow((n + 0.055) / 1.055, 2.4)
-    }
-    return 0.2126 * channel(hex.slice(0, 2))
-      + 0.7152 * channel(hex.slice(2, 4))
-      + 0.0722 * channel(hex.slice(4, 6))
-  }
-
-  // The palette color that READS on top of `key`'s own solid fill.
-  //
-  // A filled surface inverts the relationship between a label and its
-  // background, and an accent is free to land on either side of that line
-  // between themes - so the answer is measured per palette rather than
-  // assumed. Both candidates are the palette's own near-black and near-white,
-  // which keeps this a palette decision instead of an invented color.
-  //
-  // The two contrast ratios are compared against each other rather than
-  // against a brightness threshold: both candidates move with the theme, so a
-  // threshold tuned for one palette misreads the next.
-
   // Card geometry helpers re-exported for declarative panels (no JS import needed).
   function chromeHeight(outerPad, filterH, listTopGap) {
     if (listTopGap === undefined) listTopGap = root.listTopGap
