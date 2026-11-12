@@ -444,6 +444,23 @@ Item {
   property var rows29: mk(29)
   property var rows30b: mk(30)
 
+  // Stable-model fixture: the replacement goes through `stableModel`, the
+  // property the component documents for a wholesale data change, rather than
+  // through `model`. Its restore is a chain of deferred retries, and each of
+  // its own seats bumps the seat epoch - so a chain that captured the epoch
+  // once retired itself on its first write and left the offset asserted
+  // against content that had not finished measuring. The offset is sampled
+  // three turns later, past the whole chain.
+  List {
+    id: stable
+    width: 300
+    height: 120
+    model: root.rows30
+    delegate: Component { Item { width: ListView.view.width; height: Ui.rowMinH } }
+  }
+  property var stableRows: mk(30)
+  property real stableY: 0
+
   // Settle fixture: the same shape as the swap-scroll one, and for the
   // same reason - a list with room to scroll is the only shape where a
   // removal at the tail of the content costs the view anything.
@@ -525,6 +542,8 @@ Item {
     "settleSample", "settleSample", "settleSample", "settleSample",
     "settleLanded",
     "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+    "stablePark", "", "stableSample", "", "stableSample", "",
+    "stableSample", "", "stableCheck", "", "stableShortCheck",
     "animLanded", "animRest", "final", "finish"
   ]
 
@@ -933,6 +952,41 @@ Item {
     kv("ms.emptyMove", base.move(1))
     kv("ms.emptyTableTotal", base.tableTotal())
     kv("ms.emptyClamp", base.clampY(Infinity))
+  }
+
+  // --- the stableModel replacement path ----------------------------------
+  //
+  // `stableModel` is the documented wholesale-replacement property. What is
+  // asserted is the retry chain's own bookkeeping: the offset captured before
+  // the write is the offset after the chain, and a shorter replacement clamps
+  // onto the new bottom instead of restoring the old offset into space that
+  // no longer exists. Both are read several turns after the write, because a
+  // measurement taken in the write's turn would only see the transient the
+  // retries exist to repair.
+  function stablePark() {
+    stable.settle(0, false)
+    stable.jumpEnd(true)
+    root.stableY = stable.contentY
+    kv("sm.parked", root.stableY > 0)
+    kv("sm.height", stable.contentHeight)
+    stable.stableModel = root.stableRows
+    kv("sm.writeY", stable.contentY)
+    // The restore's first write is synchronous, and on its own it is short:
+    // the retries are what carry the offset to the healed bound. This records
+    // that the write did something, not that it was enough.
+    kv("sm.writeMoved", stable.contentY !== root.stableY)
+  }
+  function stableSample() { kv("sm.sampleY", stable.contentY) }
+  function stableCheck() {
+    kv("sm.finalY", stable.contentY)
+    kv("sm.kept", Math.abs(stable.contentY - root.stableY) < 0.5)
+    stable.stableModel = root.rows29
+    kv("sm.shortCount", stable.count)
+  }
+  function stableShortCheck() {
+    kv("sm.shortY", stable.contentY)
+    kv("sm.shortBottom", stable.contentY === stable.clampY(Infinity))
+    kv("sm.shortNotTop", stable.contentY > 0)
   }
 
   // A pinned bar origin. What it is FOR: a consumer seats a repair target

@@ -489,6 +489,16 @@ qp_assert "shorter content clamps onto the new bottom" ss.shorterIsBottom true
 qp_assert "and never back to the top" ss.shorterNotTop true
 qp_assert "a consumer seat inside the window wins over the restore" ss.consumerSeatWins true
 
+# --- stableModel: the restore owns its own retries --------------------------
+#
+t_section "a stableModel replacement restores the offset its own retry chain"
+qp_assert "the fixture is parked away from the top" sm.parked true
+qp_assert "the restore's first write lands in the write's own turn" sm.writeMoved false
+qp_assert "and the parked offset is back by the end of the retry chain" sm.kept true
+qp_assert "the shorter replacement takes the new count" sm.shortCount 29
+qp_assert "and clamps onto the new bottom rather than restoring the old offset" sm.shortBottom true
+qp_assert "never back to the top" sm.shortNotTop true
+
 t_section "a tail swap walks the view to the healed bottom, not to the transient one"
 t_note "THE list jump, sampled over the turns after the write. A model write destroys the delegates that were giving the content its extent, and the replacements report their floor until their payload lays out, so every bound taken in the write's own turn is short and Qt enforces the same short bound on contentY. A removal at the END of the model then leaves the view parked where the half-built content put it - short of the healed bottom by the row that is still coming - and the heal cannot walk it back, because the healed bound only ever admits what is already there. Whatever seats next (a reveal, a pursuit, a commit repair) then glides it the rest of the way, and the user watches the list leave and come back. The fixture's rows are born at their floor on purpose: with settled rows the swap heals inside its own turn and there is nothing here to survive."
 qp_assert "the fixture is parked at its bottom before the swap" st.before 406
@@ -877,11 +887,11 @@ t_section "a contested identity is refused for learning and reported verbatim"
 qp_assert "six rows claiming one identity are reported" tb.dupeError duplicate_identity
 qp_assert "as a string a consumer can show" tb.dupeError.isString true
 qp_assert "and nothing is learned for them" tb.dupeKnown '{}'
-qp_assert "the fingerprint records the collision" tb.dupeFingerprint '0@6:same|same'
+qp_assert "the fingerprint records the collision" tb.dupeFingerprint '0@6:same|same|same'
 qp_assert "fixing the identity and declaring the revision clears it" tb.dupeErrorCleared ''
-qp_assert "and the fingerprint becomes revision@count:first|last" tb.dupeFingerprintAfter '1@6:0|5'
+qp_assert "and the fingerprint becomes revision@count:first|middle|last" tb.dupeFingerprintAfter '1@6:0|3|5'
 qp_assert "after which the table learns again" tb.dupeLearns 6
-t_note "clearing the collision needs the revision, not just the new rowIdentity: the fingerprint at List.qml:282-283 is built from identityRevision, count and the two endpoint identities, so an in-place identity swap with the same count and endpoints is invisible without it. A consumer that mutates identities without declaring one leaves the code permanently - documented at List.qml:238-252."
+t_note "clearing the collision needs the revision, not just the new rowIdentity: the fingerprint at List.qml:282-283 is built from identityRevision, count and the identities at the two ends and the middle, so an in-place swap at one of those three positions is visible without it and a swap anywhere else is not. A consumer that mutates identities off the sampled positions without declaring a revision leaves the code until the next sync - documented at List.qml:238-252."
 
 t_section "restingContentHeight: a claim that the content fits holds the seat"
 qp_assert "row 6 has a real centre seat" tb.restingTargetExists true
@@ -907,7 +917,7 @@ qp_assert "its entry count is its own" is.siblingCount 3
 qp_assert "its average is its own" is.siblingAvg 34
 qp_assert "its ownership map is its own" is.siblingOwner '{"0":0,"1":1,"2":2,"3":3,"4":4,"5":5}'
 qp_assert "its touch stamps are its own" is.siblingTouch '{"0":1,"1":2,"2":3}'
-qp_assert "its fingerprint is its own" is.siblingFingerprint '0@6:0|5'
+qp_assert "its fingerprint is its own" is.siblingFingerprint '0@6:0|3|5'
 qp_assert "its follow claim is its own" is.siblingFollow 0
 qp_assert "its pursuit claim is its own" is.siblingPursuit -1
 qp_assert "and its bar duration is unaffected" is.siblingDuration 120

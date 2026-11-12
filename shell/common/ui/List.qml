@@ -573,10 +573,11 @@ ListView {
   // _rowKey below instead of taking down every handler that reads one.
   property var rowIdentity: index => index
   // Identity epoch for the table, declared by the consumer. A model
-  // that swaps a row's identity in place - same count, same first and
-  // last identity - is invisible to the endpoint fingerprint below, so
-  // such a consumer binds its identity changes here. 0 means a static
-  // model and keeps the fingerprint's pre-revision behaviour exactly.
+  // that swaps a row's identity in place - same count, same identities at
+  // the two ends and the middle - is invisible to the sampled fingerprint
+  // below, so such a consumer binds its identity changes here. A swap AT one
+  // of those three positions is caught by the fingerprint itself. 0 means a
+  // static model and keeps the fingerprint's pre-revision behaviour exactly.
   property int identityRevision: 0
   // Retained identities. A session measures a few hundred distinct
   // rows at most (pass navigation alone touches ~140 view keys), while
@@ -765,8 +766,17 @@ ListView {
   // identity swap visible here; the prune then drops exactly the keys
   // the current row set no longer claims.
   function _syncIdentitySet() {
+    // The endpoints alone cannot see an in-place identity swap in the MIDDLE
+    // of a row set, which is the shape every "row edited" mutation has: the
+    // count is unchanged and neither end moved. The middle row is the third
+    // probe, so the common mutation is visible without a declared revision.
+    // It is a probe and not a scan on purpose - the scan is what this
+    // fingerprint exists to avoid on every seat - so a consumer that swaps an
+    // identity at some other position still has to declare `identityRevision`,
+    // whose term here makes every such write visible exactly.
+    const mid = root.count > 1 ? root._rowKey(Math.floor(root.count / 2)) : ""
     const fp = root.identityRevision + "@" + root.count + ":" + (root.count > 0
-      ? root._rowKey(0) + "|" + root._rowKey(root.count - 1)
+      ? root._rowKey(0) + "|" + mid + "|" + root._rowKey(root.count - 1)
       : "")
     if (fp === root._idFingerprint) return
     root._idFingerprint = fp
@@ -1276,6 +1286,12 @@ ListView {
   // duration.
   function seatTo(y, animated, tag, paceMs) {
     root._syncIdentitySet()
+    // Bumped for a no-op seat too, and deliberately: the epoch is the token a
+    // deferred retry compares against to learn that a NEWER seat exists, and
+    // "the target is already held" is a newer intent that retires the retry
+    // just as much as a move does. Bumping only on a real move would let a
+    // stale retry fire after the no-op and drag the view off the position
+    // the no-op just confirmed.
     root._seatEpoch++
     const target = root.clampY(y)
     // Claims are released before the no-op return: a seat that lands where
