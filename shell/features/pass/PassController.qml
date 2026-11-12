@@ -75,21 +75,6 @@ Item {
   // for. The facade reads it to keep its idle release off a decrypting
   // controller; nothing else has to know.
   readonly property bool copyPending: root._showProc !== null
-  // Whether any child this object owns is still running, so the facade can
-  // ask before it hands the controller back. Every flow that starts a child
-  // also closes the panel - insert, generate, copy, push and pull all return
-  // to the surface at once - and the child that has to report back lives
-  // here, so a teardown on the close fade kills the process before its
-  // onExited runs and the answer is lost with it. Process truth rather than
-  // the busy flag, which only the write flows maintain and which no git
-  // child ever sets. The dynamic `pass show` is the one child with no fixed
-  // owner here, so it is read through copyPending instead.
-  readonly property bool childBusy: findProc.running || mkdirProc.running
-    || rmdirProc.running || gpgProc.running || termProc.running
-    || headProc.running || writeProc.running || genProc.running
-    || mvProc.running || rmProc.running || initProc.running
-    || keysProc.running || gitRemoteProc.running || gitPushProc.running
-    || gitPullProc.running || root.copyPending
   // Handles this flow opened and has not released yet. The list is what
   // destruction walks, so two overlapping flows (an insert still committing
   // while a copy is being prepared) each release exactly their own slot.

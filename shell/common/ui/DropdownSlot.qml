@@ -303,9 +303,4 @@ Item {
     root._syncNested()
   }
 
-  Component.onCompleted: {
-  }
-
-  Component.onDestruction: {
-  }
 }
