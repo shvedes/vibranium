@@ -254,13 +254,13 @@ var _namedMap = null;
 
 function namedMap() {
   if (_namedMap !== null) return _namedMap;
-  var m = {};
-  for (var i = 0; i < CURRENCIES.length; i++) {
-    var c = CURRENCIES[i];
+  let m = {};
+  for (let i = 0; i < CURRENCIES.length; i++) {
+    let c = CURRENCIES[i];
     // `named` is what the bare-query path gates on, so it is set here once
     // rather than repeated as a field on every entry.
     m[c.code.toLowerCase()] = { code: c.code, named: true };
-    for (var j = 0; j < c.names.length; j++) {
+    for (let j = 0; j < c.names.length; j++) {
       m[normalizeCurrency(c.names[j])] = { code: c.code, named: true };
     }
   }
@@ -271,7 +271,7 @@ function namedMap() {
 // Lowercase, drop spaces/underscores/dashes, so "us dollars" and
 // "US-Dollars" reach the same entry.
 function normalizeCurrency(s) {
-  var t = String(s === undefined || s === null ? "" : s).toLowerCase().trim();
+  let t = String(s === undefined || s === null ? "" : s).toLowerCase().trim();
   t = t.replace(/[_-]+/g, "");
   t = t.replace(/\s+/g, "");
   t = t.replace(/\.+$/g, "");
@@ -289,7 +289,7 @@ function num(v) {
 // product, not after it.
 function rateOf(rates, code) {
   if (rates === null || rates === undefined || code === null || code === undefined) return null;
-  var v = num(rates[code]);
+  let v = num(rates[code]);
   return v === null || v === 0 ? null : v;
 }
 
@@ -298,9 +298,9 @@ function rateOf(rates, code) {
 // the rate table, in tryConvert. Named entries are the ones a bare query
 // may stand on.
 function resolveCode(spec) {
-  var k = normalizeCurrency(spec);
+  let k = normalizeCurrency(spec);
   if (k === "") return null;
-  var m = namedMap();
+  let m = namedMap();
   if (Object.prototype.hasOwnProperty.call(m, k)) return m[k];
   if (k.length === 3 && /^[a-z]+$/.test(k)) return { code: k.toUpperCase(), named: false };
   return null;
@@ -309,15 +309,15 @@ function resolveCode(spec) {
 // A currency symbol at the very front ("$100 in eur"), longest spelling
 // first. Returns "" when the text does not open with one.
 function leadingSymbol(s) {
-  var t = String(s === undefined || s === null ? "" : s).trim();
-  for (var i = 0; i < SYMBOLS.length; i++) {
+  let t = String(s === undefined || s === null ? "" : s).trim();
+  for (let i = 0; i < SYMBOLS.length; i++) {
     if (t.indexOf(SYMBOLS[i].sym) === 0) return SYMBOLS[i].sym;
   }
   return "";
 }
 
 function symbolCode(sym) {
-  for (var i = 0; i < SYMBOLS.length; i++) {
+  for (let i = 0; i < SYMBOLS.length; i++) {
     if (sym === SYMBOLS[i].sym) return SYMBOLS[i].code;
   }
   return "";
@@ -328,7 +328,7 @@ function symbolCode(sym) {
 // Plain app names ("firefox"), pure math ("2+2") and "time in X" all fail
 // here before any table is touched.
 function isPotentialFx(query) {
-  var t = String(query === undefined || query === null ? "" : query).trim();
+  let t = String(query === undefined || query === null ? "" : query).trim();
   if (t === "" || t.length > 128) return false;
   if (t.indexOf("\n") >= 0 || t.indexOf("\r") >= 0) return false;
   if (!RE_AMOUNT.test(t) && leadingSymbol(t) === "") return false;
@@ -340,9 +340,9 @@ function isPotentialFx(query) {
 // currency whose own name contains one ("100 try in usd", where the Turkish
 // lira is TRY) still splits at the separator and not inside the code.
 function splitExplicit(body) {
-  var m = String(body).match(/^(.*)\s+(in|to|as|->|=)\s+(.+?)\s*$/i);
+  let m = String(body).match(/^(.*)\s+(in|to|as|->|=)\s+(.+?)\s*$/i);
   if (m) return { head: m[1], key: m[2], tail: m[3] };
-  var m2 = String(body).match(/^(.*)\s+(in|to|as|->|=)\s*$/i);
+  let m2 = String(body).match(/^(.*)\s+(in|to|as|->|=)\s*$/i);
   if (m2) return { head: m2[1], key: m2[2], tail: "" };
   return null;
 }
@@ -396,16 +396,16 @@ function rankTargets(from, def, history) {
   // it, and wherever SUGGEST lists it. Starting from SUGGEST as written put
   // CAD ahead of EUR for "100 usd", because USD is skipped as the source and
   // CAD is what was left at the front - against the header's own promise.
-  var base = [def];
-  for (var b = 0; b < SUGGEST.length; b++) {
+  let base = [def];
+  for (let b = 0; b < SUGGEST.length; b++) {
     if (SUGGEST[b] !== def) base.push(SUGGEST[b]);
   }
-  var counts = history !== null && typeof history === "object" ? history : {};
-  var ranked = [];
-  for (var i = 0; i < base.length; i++) {
-    var code = base[i];
+  let counts = history !== null && typeof history === "object" ? history : {};
+  let ranked = [];
+  for (let i = 0; i < base.length; i++) {
+    let code = base[i];
     if (code === from) continue;
-    var raw = counts[code];
+    let raw = counts[code];
     ranked.push({
       code: code,
       count: typeof raw === "number" && isFinite(raw) && raw > 0 ? raw : 0,
@@ -416,8 +416,8 @@ function rankTargets(from, def, history) {
     if (a.count !== b.count) return b.count - a.count;
     return a.base - b.base;
   });
-  var out = [];
-  for (var j = 0; j < ranked.length; j++) out.push(ranked[j].code);
+  let out = [];
+  for (let j = 0; j < ranked.length; j++) out.push(ranked[j].code);
   return out;
 }
 
@@ -426,8 +426,8 @@ function rankTargets(from, def, history) {
 function unnamedClaimable(from, toSpec, snapshot) {
   if (tableState(snapshot) === "ok") return rateOf(snapshot.rates, from.code) !== null;
   if (toSpec === null || toSpec === "") return false;
-  var tSym = leadingSymbol(toSpec);
-  var to = tSym !== "" ? resolveCode(symbolCode(tSym)) : resolveCode(toSpec);
+  let tSym = leadingSymbol(toSpec);
+  let to = tSym !== "" ? resolveCode(symbolCode(tSym)) : resolveCode(toSpec);
   return to !== null && to.named === true;
 }
 
@@ -436,7 +436,7 @@ function unnamedClaimable(from, toSpec, snapshot) {
 // candidate.
 function tableState(snapshot) {
   if (snapshot === null || snapshot === undefined || !snapshot.rates) return "none";
-  for (var k in snapshot.rates) {
+  for (let k in snapshot.rates) {
     if (Object.prototype.hasOwnProperty.call(snapshot.rates, k)) return "ok";
   }
   return "empty";
@@ -447,33 +447,33 @@ function tableState(snapshot) {
 // table, so an unadorned three-letter run ("100 abc") falls through to the
 // app list instead of claiming the keystroke and then failing.
 function parseQuery(query, snapshot) {
-  var raw = String(query === undefined || query === null ? "" : query).trim();
+  let raw = String(query === undefined || query === null ? "" : query).trim();
   if (raw === "") return null;
   if (!isPotentialFx(raw)) return null;
   // An unpadded arrow gets its spaces, as the unit engine does it: "$->eur"
   // and "100 usd->eur" otherwise have no separator for the split to find. The
   // pattern needs a ">", so a leading minus on an amount is untouched.
   raw = raw.replace(RE_ARROW, " -> ");
-  var body = raw;
-  var lead = leadingSymbol(body);
+  let body = raw;
+  let lead = leadingSymbol(body);
   if (lead !== "") body = body.substring(lead.length).trim();
-  var am = body.match(RE_AMOUNT);
-  var synthetic = false;
+  let am = body.match(RE_AMOUNT);
+  let synthetic = false;
   // A symbol with no amount is one unit of it: "$" is "1 USD" and "$ in eur"
   // is "1 USD in eur". Only a symbol earns that, and only when nothing or a
   // separator follows it, so "$HOME" and "$foo" are still not money.
   if (!am && lead !== "") {
-    var bareSplit = body === "" ? null : splitExplicit(" " + body);
+    let bareSplit = body === "" ? null : splitExplicit(" " + body);
     if (body === "" || (bareSplit !== null && bareSplit.head.trim() === "")) {
       am = ["1"];
       synthetic = true;
     }
   }
   if (!am) return null;
-  var value = Number(am[0].replace(/,/g, ""));
+  let value = Number(am[0].replace(/,/g, ""));
   if (isNaN(value) || !isFinite(value)) return null;
   // A synthesized "1" consumed no text, so the whole body is still to read.
-  var rest = body.substring(synthetic ? 0 : am[0].length).trim();
+  let rest = body.substring(synthetic ? 0 : am[0].length).trim();
   // A leading symbol makes an empty rest a bare amount ("$100"); without one
   // there is no currency named at all.
   if ((rest === "" && lead === "") || /^[0-9]/.test(rest.charAt(0))) return null;
@@ -481,16 +481,16 @@ function parseQuery(query, snapshot) {
   // in front of it does: "100$ in eur" and "100 in $" are both real typing.
   // It is read off the REST, not off the whole remainder, so it cannot eat
   // the target ("100$ in eur" takes the "$" and leaves "in eur" alone).
-  var glued = leadingSymbol(rest);
+  let glued = leadingSymbol(rest);
   if (glued !== "") rest = rest.substring(glued.length).trim();
   // The rest is split with a space in front of it: a symbol-led query leaves
   // "in eur" with nothing before the keyword, and the separator pattern wants
   // whitespace on its left, so "$100 in eur" would read as a bare amount and
   // answer with the whole list instead of the one pair that was asked for.
-  var split = splitExplicit(" " + rest);
-  var fromSpec;
-  var toSpec;
-  var bare;
+  let split = splitExplicit(" " + rest);
+  let fromSpec;
+  let toSpec;
+  let bare;
   if (split !== null) {
     fromSpec = split.head.trim();
     toSpec = split.tail.trim();
@@ -505,8 +505,8 @@ function parseQuery(query, snapshot) {
   // keyword split ("in eur" leaves nothing on the head) cannot stand in for
   // one. "R$100" is the reason the longest symbol is tried first, so the "R"
   // is not stripped as a stray letter and "$" is not left to mean USD.
-  var sym = lead !== "" ? lead : glued;
-  var from = sym !== "" ? resolveCode(symbolCode(sym)) : resolveCode(fromSpec);
+  let sym = lead !== "" ? lead : glued;
+  let from = sym !== "" ? resolveCode(symbolCode(sym)) : resolveCode(fromSpec);
   if (from === null) return null;
   if (bare && from.named !== true) return null;
   // An unnamed source is any three letters, so "100 mph in kph" and
@@ -515,13 +515,13 @@ function parseQuery(query, snapshot) {
   // the other engines. With no table yet, only a named target keeps the claim
   // (the pending row is what starts the fetch); two unnamed sides wait for a
   // table that something else has to request.
-  var sourceUnclaimed = from.named !== true && !unnamedClaimable(from, toSpec, snapshot);
-  var inputText = am[0] + " " + from.code;
+  let sourceUnclaimed = from.named !== true && !unnamedClaimable(from, toSpec, snapshot);
+  let inputText = am[0] + " " + from.code;
   // `written` is the amount as typed, grouping commas and all. The label
   // echoes it and the row's sub line does too, and keeping it beside `value`
   // is what lets the sentence say "1,234.56 US dollars" rather than running
   // the money formatter over a number the user had already written down.
-  var written = am[0];
+  let written = am[0];
   if (sourceUnclaimed) return null;
   if (toSpec === null) {
     return { value: value, written: written, from: from, to: null, bare: true,
@@ -534,8 +534,8 @@ function parseQuery(query, snapshot) {
   // The target may be a symbol too, and the same longest-first scan decides
   // it, so "100 usd in R$" reads as BRL rather than as an unknown currency
   // ending in a dollar sign.
-  var toSym = leadingSymbol(toSpec);
-  var to = toSym !== "" ? resolveCode(symbolCode(toSym)) : resolveCode(toSpec);
+  let toSym = leadingSymbol(toSpec);
+  let to = toSym !== "" ? resolveCode(symbolCode(toSym)) : resolveCode(toSpec);
   if (to === null) {
     return { value: value, written: written, from: from, to: null, bare: false,
       incomplete: false, inputText: inputText, toSpec: toSpec };
@@ -548,16 +548,16 @@ function parseQuery(query, snapshot) {
 // string: a value rendered in exponential form has no integer part to group
 // and must not be mangled into one.
 function groupThousands(s) {
-  var t = String(s);
+  let t = String(s);
   if (t.indexOf("e") >= 0 || t.indexOf("E") >= 0) return t;
-  var dot = t.indexOf(".");
-  var head = dot < 0 ? t : t.substring(0, dot);
-  var tail = dot < 0 ? "" : t.substring(dot);
-  var neg = head.charAt(0) === "-";
+  let dot = t.indexOf(".");
+  let head = dot < 0 ? t : t.substring(0, dot);
+  let tail = dot < 0 ? "" : t.substring(dot);
+  let neg = head.charAt(0) === "-";
   if (neg) head = head.substring(1);
   if (head.length <= 3) return (neg ? "-" : "") + head + tail;
-  var out = "";
-  for (var i = 0; i < head.length; i++) {
+  let out = "";
+  for (let i = 0; i < head.length; i++) {
     if (i > 0 && (head.length - i) % 3 === 0) out += ",";
     out += head.charAt(i);
   }
@@ -575,15 +575,15 @@ function formatAmount(v) {
   // Checked before num() on purpose: num() admits a finite number only, so
   // testing it first would report an infinity as NaN and lose the sign.
   if (!isFinite(v)) return v > 0 ? "Infinity" : "-Infinity";
-  var abs = Math.abs(v);
+  let abs = Math.abs(v);
   if (abs !== 0 && (abs >= 1e12 || abs < 1e-4)) {
-    var exp = v.toExponential(6);
+    let exp = v.toExponential(6);
     exp = exp.replace(/(\.\d*?[1-9])0+e/, "$1e").replace(/\.0+e/, "e");
     return exp;
   }
   if (v === 0) return "0.00";
   if (abs >= 1) return groupThousands(v.toFixed(2));
-  var s = v.toPrecision(6);
+  let s = v.toPrecision(6);
   if (s.indexOf("e") >= 0 || s.indexOf("E") >= 0) {
     return s.replace(/(\.\d*?[1-9])0+e/, "$1e").replace(/\.0+e/, "e");
   }
@@ -596,11 +596,11 @@ function formatAmount(v) {
 // prints ("0.8784210526315789"), and exponential form at the extremes.
 function formatRate(v) {
   if (typeof v !== "number" || !isFinite(v)) return "NaN";
-  var abs = Math.abs(v);
+  let abs = Math.abs(v);
   if (abs !== 0 && (abs >= 1e9 || abs < 1e-4)) {
     return v.toExponential(5).replace(/(\.\d*?[1-9])0+e/, "$1e").replace(/\.0+e/, "e");
   }
-  var s = v.toPrecision(6);
+  let s = v.toPrecision(6);
   if (s.indexOf("e") >= 0) return String(Number(s));
   if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
   return s;
@@ -686,9 +686,9 @@ var MINOR_WORDS = { "per": true, "of": true };
 // library that imported a helper could not be. The suite pins the two against
 // each other on the same inputs, so the copy cannot drift unnoticed.
 function sentenceCase(name) {
-  var words = String(name).split(" ");
-  for (var i = 0; i < words.length; i++) {
-    var w = words[i];
+  let words = String(name).split(" ");
+  for (let i = 0; i < words.length; i++) {
+    let w = words[i];
     if (i > 0 && MINOR_WORDS[w.toLowerCase()] === true) continue;
     words[i] = w.charAt(0).toUpperCase() + w.substring(1);
   }
@@ -699,7 +699,7 @@ function sentenceCase(name) {
 // value of exactly one takes the singular and everything else the plural,
 // which is the English rule and the reason the table above has both.
 function currencyWord(code, value) {
-  var pair = CURRENCY_NOUN[code];
+  let pair = CURRENCY_NOUN[code];
   if (pair === undefined) return String(code);
   return sentenceCase(Math.abs(value) === 1 ? pair[0] : pair[1]);
 }
@@ -725,9 +725,9 @@ function phrase(written, fromCode, out, toCode, value) {
 // captcha page, an error document or a truncated reply reads as "no rates"
 // instead of as a table of undefined.
 function parseRates(text) {
-  var raw = String(text === undefined || text === null ? "" : text).trim();
+  let raw = String(text === undefined || text === null ? "" : text).trim();
   if (raw === "") return null;
-  var parsed;
+  let parsed;
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
@@ -736,7 +736,7 @@ function parseRates(text) {
   if (!parsed || typeof parsed !== "object") return null;
   if (parsed.result !== undefined && parsed.result !== "success") return null;
   if (!parsed.rates || typeof parsed.rates !== "object") return null;
-  var base = String(parsed.base_code || RATE_BASE).toUpperCase();
+  let base = String(parsed.base_code || RATE_BASE).toUpperCase();
   if (num(parsed.rates[base]) === null) return null;
   return {
     base: base,
@@ -756,7 +756,7 @@ function convertParsed(q, snapshot, to, state) {
     return { ok: false, error: "incomplete", expr: q.inputText,
       label: q.inputText, sub: "Continue typing..." };
   }
-  var from = q.from;
+  let from = q.from;
   if (to === null) {
     return { ok: false, error: "unknown-target", expr: q.inputText,
       label: "Unknown currency '" + String(q.toSpec) + "'",
@@ -791,25 +791,25 @@ function convertParsed(q, snapshot, to, state) {
   // A rate of zero is a provider fault, not a rate. Taking it at face value
   // prints "100 USD = 0.00 EUR" and a zero source divides to infinity, so
   // both read as a missing rate instead - which is what they are.
-  var rFrom = rateOf(snapshot.rates, from.code);
-  var rTo = rateOf(snapshot.rates, to.code);
+  let rFrom = rateOf(snapshot.rates, from.code);
+  let rTo = rateOf(snapshot.rates, to.code);
   if (rFrom === null || rTo === null) {
-    var missing = rFrom === null ? from.code : to.code;
+    let missing = rFrom === null ? from.code : to.code;
     return { ok: false, error: "unsupported", expr: q.inputText,
       label: "No rate for " + missing,
       sub: "The rate table does not quote it" };
   }
-  var rate = rTo / rFrom;
-  var out = q.value * rate;
+  let rate = rTo / rFrom;
+  let out = q.value * rate;
   if (isNaN(out) || !isFinite(out)) {
     return { ok: false, error: "out-of-range", expr: q.inputText,
       label: "Result out of range", sub: "e.g. 100 usd in eur" };
   }
-  var formatted = formatAmount(out);
-  var copy = formatted + " " + to.code;
+  let formatted = formatAmount(out);
+  let copy = formatted + " " + to.code;
   // Coerced once: a caller that assembled its own snapshot object can leave
   // this absent, and "Rates updated undefined" is worse than no second line.
-  var updated = String(snapshot.updated === undefined || snapshot.updated === null
+  let updated = String(snapshot.updated === undefined || snapshot.updated === null
     ? "" : snapshot.updated);
   return { ok: true, pending: false, value: q.value, from: from.code,
     to: to.code, out: out, rate: rate, formatted: formatted, copy: copy,
@@ -824,7 +824,7 @@ function convertParsed(q, snapshot, to, state) {
 // unparseable query is null (the caller falls through to app search) and a
 // missing rate table is a pending row (the caller has a fetch in flight).
 function tryConvert(query, snapshot) {
-  var q = parseQuery(query, snapshot);
+  let q = parseQuery(query, snapshot);
   if (q === null) return null;
   return convertParsed(q, snapshot, q.bare ? resolveCode(defaultTarget(q.from.code)) : q.to);
 }
@@ -854,20 +854,20 @@ function tryConvert(query, snapshot) {
 // the query is a bare amount, because that is the one shape that ranks, and a
 // caller whose history lives behind a cache read should not pay it per keystroke.
 function tryAll(query, snapshot, history) {
-  var q = parseQuery(query, snapshot);
+  let q = parseQuery(query, snapshot);
   if (q === null) return null;
-  var state = tableState(snapshot);
+  let state = tableState(snapshot);
   if (q.bare !== true) return [convertParsed(q, snapshot, q.to, state)];
-  var def = resolveCode(defaultTarget(q.from.code));
-  var gate = convertParsed(q, snapshot, def, state);
+  let def = resolveCode(defaultTarget(q.from.code));
+  let gate = convertParsed(q, snapshot, def, state);
   if (gate.ok !== true && (gate.pending === true || gate.error === "unavailable")) return [gate];
-  var codes = rankTargets(q.from.code, def.code, typeof history === "function" ? history() : history);
-  var out = [];
-  var numbers = [];
-  for (var i = 0; i < codes.length && out.length < MAX_TARGETS; i++) {
-    var code = resolveCode(codes[i]);
+  let codes = rankTargets(q.from.code, def.code, typeof history === "function" ? history() : history);
+  let out = [];
+  let numbers = [];
+  for (let i = 0; i < codes.length && out.length < MAX_TARGETS; i++) {
+    let code = resolveCode(codes[i]);
     if (code === null) continue;
-    var r = convertParsed(q, snapshot, code, state);
+    let r = convertParsed(q, snapshot, code, state);
     if (r.ok !== true || r.pending === true) continue;
     if (numbers.indexOf(r.formatted) >= 0) continue;
     numbers.push(r.formatted);
