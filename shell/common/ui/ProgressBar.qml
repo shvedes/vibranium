@@ -95,10 +95,6 @@ Rectangle {
     Glide { duration: root.glideMs }
   }
 
-  // The reported value and the ratio it clamps to. Both travel together
-  // because a sender streaming past 100 is the case where the two disagree,
-  // and which of the two the fill followed is the question.
-
   Rectangle {
     id: fill
 
