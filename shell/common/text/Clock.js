@@ -14,7 +14,7 @@
 // Canonical home of the fold Clock.qml:timePart and
 // NotificationsLib:clockLabel share.
 function foldHour12(hours) {
-  var h = Number(hours)
+  let h = Number(hours)
   if (!isFinite(h)) return 12
   return (Math.floor(h) % 12) || 12
 }
@@ -25,11 +25,11 @@ function foldHour12(hours) {
 // that is not a number, which is what an entry that never recorded an
 // arrival carries.
 function clockLabel(atMs, use12h) {
-  var ms = Number(atMs)
+  let ms = Number(atMs)
   if (!isFinite(ms)) return ""
-  var at = new Date(ms)
-  var hours = at.getHours()
-  var suffix = ""
+  let at = new Date(ms)
+  let hours = at.getHours()
+  let suffix = ""
   if (use12h === true) {
     suffix = hours < 12 ? " AM" : " PM"
     hours = foldHour12(hours)
@@ -41,7 +41,7 @@ function clockLabel(atMs, use12h) {
 // dial, "21:00" on the 24-hour one. The hour is data, not a Date, because a
 // forecast entry carries its target-zone wall hour rather than an instant.
 function formatHour(hours, use12h) {
-  var h = Number(hours)
+  let h = Number(hours)
   if (!isFinite(h)) return ""
   if (use12h === true) {
     return foldHour12(h) + (Math.floor(h) % 24 < 12 ? " AM" : " PM")
@@ -56,15 +56,15 @@ function formatHour(hours, use12h) {
 // is a function of the calendar day and the locale, neither of which moves
 // within a session, so it is cached by day and the cache is emptied whole
 // when it fills rather than tracked for eviction.
-var DAY_LABEL_MAX = 64
-var _dayLabels = ({})
-var _dayLabelCount = 0
+let DAY_LABEL_MAX = 64
+let _dayLabels = ({})
+let _dayLabelCount = 0
 
 function dayLabelOf(d) {
-  var key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()
-  var hit = _dayLabels[key]
+  let key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()
+  let hit = _dayLabels[key]
   if (hit !== undefined) return hit
-  var day
+  let day
   try {
     day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
   } catch (e) {
@@ -87,20 +87,20 @@ function formatTime(ts, now, use12h) {
   // A timestamp that is not a number has no clock reading: the label is "",
   // the same answer clockLabel gives, rather than the "Invalid Date NaN:NaN"
   // an invalid Date renders as.
-  var ms = Number(ts)
+  let ms = Number(ts)
   if (!isFinite(ms)) return ""
-  var d = new Date(ms)
-  var ref = now !== undefined ? new Date(now) : new Date()
-  var sameDay = d.getFullYear() === ref.getFullYear()
+  let d = new Date(ms)
+  let ref = now !== undefined ? new Date(now) : new Date()
+  let sameDay = d.getFullYear() === ref.getFullYear()
     && d.getMonth() === ref.getMonth()
     && d.getDate() === ref.getDate()
-  var hours = d.getHours()
-  var suffix = ""
+  let hours = d.getHours()
+  let suffix = ""
   if (use12h === true) {
     suffix = hours < 12 ? " AM" : " PM"
     hours = foldHour12(hours)
   }
-  var time = Format.pad2(hours) + ":" + Format.pad2(d.getMinutes()) + suffix
+  let time = Format.pad2(hours) + ":" + Format.pad2(d.getMinutes()) + suffix
   if (sameDay) return time
   return dayLabelOf(d) + " " + time
 }

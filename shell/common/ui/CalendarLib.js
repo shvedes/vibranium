@@ -33,21 +33,21 @@ function keyForDate(date) {
 var WEEKDAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
 
 function normalizeWeekStart(value, fallback) {
-  var configured = null
+  let configured = null
   if (typeof value === "number") {
     if (isFinite(value)) configured = ((Math.round(value) % 7) + 7) % 7
   } else {
-    var text = String(value === undefined || value === null ? "" : value)
+    let text = String(value === undefined || value === null ? "" : value)
       .replace(/^\s+|\s+$/g, "").toLowerCase()
-    for (var i = 0; i < WEEKDAY_NAMES.length; i++)
+    for (let i = 0; i < WEEKDAY_NAMES.length; i++)
       if (WEEKDAY_NAMES[i] === text || WEEKDAY_NAMES[i].substr(0, 3) === text) { configured = i; break }
     if (configured === null) {
-      var parsed = parseInt(text, 10)
+      let parsed = parseInt(text, 10)
       if (isFinite(parsed)) configured = ((parsed % 7) + 7) % 7
     }
   }
   if (configured !== null) return configured
-  var fallbackStart = null
+  let fallbackStart = null
   if (typeof fallback === "number") fallbackStart = normalizeWeekStart(fallback, null)
   else if (typeof fallback === "string") fallbackStart = normalizeWeekStart(fallback, null)
   return fallbackStart === null ? 1 : fallbackStart
@@ -55,9 +55,9 @@ function normalizeWeekStart(value, fallback) {
 
 // Weekday indices in display order for a given week start.
 function weekdayOrder(weekStart) {
-  var start = normalizeWeekStart(weekStart, 1)
-  var out = []
-  for (var i = 0; i < 7; i++) out.push((start + i) % 7)
+  let start = normalizeWeekStart(weekStart, 1)
+  let out = []
+  for (let i = 0; i < 7; i++) out.push((start + i) % 7)
   return out
 }
 
@@ -74,7 +74,7 @@ function daysInYear(year) {
 // Share of the year already behind you: whole days completed over days in
 // the year, so January 1 reads 0% and December 31 reads 100%.
 function yearProgress(year, month, day) {
-  var total = daysInYear(year)
+  let total = daysInYear(year)
   if (total <= 0) return 0
   return Range.clamp01((dayOfYear(year, month, day) - 1) / total)
 }
@@ -91,16 +91,16 @@ function yearProgressPercent(year, month, day) {
 // a stable key, the real year/month/day, whether the day belongs to the
 // viewed month, whether it is a weekend, and whether it is today.
 function monthGrid(year, month, weekStart, todayKey) {
-  var start = normalizeWeekStart(weekStart, 1)
-  var leading = (new Date(year, month, 1).getDay() - start + 7) % 7
-  var cursor = new Date(year, month, 1 - leading)
-  var today = String(todayKey || "")
-  var cells = []
+  let start = normalizeWeekStart(weekStart, 1)
+  let leading = (new Date(year, month, 1).getDay() - start + 7) % 7
+  let cursor = new Date(year, month, 1 - leading)
+  let today = String(todayKey || "")
+  let cells = []
 
-  for (var i = 0; i < 42; i++) {
-    var cellYear = cursor.getFullYear()
-    var cellMonth = cursor.getMonth()
-    var cellDay = cursor.getDate()
+  for (let i = 0; i < 42; i++) {
+    let cellYear = cursor.getFullYear()
+    let cellMonth = cursor.getMonth()
+    let cellDay = cursor.getDate()
     cells.push({
       key: dateKey(cellYear, cellMonth, cellDay),
       year: cellYear,
@@ -117,7 +117,7 @@ function monthGrid(year, month, weekStart, todayKey) {
 }
 
 function stepMonth(year, month, delta) {
-  var target = new Date(year, Number(month) + Number(delta), 1)
+  let target = new Date(year, Number(month) + Number(delta), 1)
   return { year: target.getFullYear(), month: target.getMonth() }
 }
 
