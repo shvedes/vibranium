@@ -101,7 +101,6 @@ Item {
 
   width: root.targetSize
   height: root.targetSize
-  enabled: true
   opacity: root.enabled ? 1 : 0.4
 
   // Press push (the Button lib contract): 0.97 while held, linear back.

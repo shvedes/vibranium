@@ -74,7 +74,6 @@ Item {
 
   implicitWidth: row.implicitWidth + 2 * root.padH
   implicitHeight: Ui.buttonHeight
-  enabled: true
   opacity: root.live ? 1 : 0.45
 
   scale: root.pressed ? 0.97 : 1

@@ -147,7 +147,6 @@ Singleton {
   readonly property int pulseMs: 1400
 
   // Visual helpers.
-  readonly property real dimWhenEmpty: 0.4
   readonly property real disabledOpacity: 0.45
   readonly property real dimmedOpacity: 0.55
 
