@@ -173,13 +173,6 @@ function contains(routes, route) {
   return false
 }
 
-function containsEndpoints(routes, route) {
-  for (let i = 0; Array.isArray(routes) && i < routes.length; i++) {
-    if (sameRoute(routes[i], route)) return true
-  }
-  return false
-}
-
 function sameRouteIdentity(a, b) {
   if (!a || !b) return false
   if (a.output !== b.output || a.input !== b.input) return false
@@ -221,7 +214,7 @@ function addOwned(owned, desired, command) {
   for (let i = 0; Array.isArray(desired) && i < desired.length; i++) {
     const route = desired[i]
     if (!route || route.output !== command.argv[1] || route.input !== command.argv[2]
-      || containsEndpoints(routes, route)) continue
+      || contains(routes, route)) continue
     routes.push(route)
     break
   }
@@ -234,7 +227,7 @@ function persistableRoutes(routes) {
   for (let i = 0; i < valid.length; i++) {
     const route = valid[i]
     const copy = { output: route.output, input: route.input }
-    if (!containsEndpoints(out, copy)) out.push(copy)
+    if (!contains(out, copy)) out.push(copy)
   }
   return out
 }
@@ -250,7 +243,7 @@ function validPairs(pairs) {
     const pair = pairs[i]
     if (!pair || !safePath(pair.output) || !safePath(pair.input)) continue
     const copy = { output: pair.output, input: pair.input }
-    if (containsEndpoints(out, copy)) continue
+    if (contains(out, copy)) continue
     out.push(copy)
   }
   return out
