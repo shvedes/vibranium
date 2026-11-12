@@ -1,4 +1,5 @@
 import QtQml
+import "EntryMap.js" as EntryMap
 
 // OptimisticSet - pendingDeletes pattern for Clipboard + WallpaperPicker.
 // Instances per consumer: Clipboard.optimistic and WallpaperPicker.optimistic
@@ -17,26 +18,20 @@ QtObject {
 
   function mark(key) {
     if (!key || root.pending[key] !== undefined) return false
-    const next = Object.assign({}, root.pending)
-    next[key] = true
-    root.pending = next
+    root.pending = EntryMap.withEntry(root.pending, key, true)
     return true
   }
 
   function confirm(key) {
     if (!key || root.pending[key] === undefined) return false
-    const next = Object.assign({}, root.pending)
-    delete next[key]
-    root.pending = next
+    root.pending = EntryMap.withoutEntry(root.pending, key)
     root.settled(key)
     return true
   }
 
   function cancel(key) {
     if (!key || root.pending[key] === undefined) return false
-    const next = Object.assign({}, root.pending)
-    delete next[key]
-    root.pending = next
+    root.pending = EntryMap.withoutEntry(root.pending, key)
     return true
   }
 

@@ -16,6 +16,16 @@ function withEntry(entries, key, entry) {
   return next
 }
 
+// The same rule for a removal. A map that does not hold the key answers a
+// copy of itself, so a caller can assign the result unconditionally and a
+// binding still sees a new value.
+function withoutEntry(entries, key) {
+  const base = entries !== null && typeof entries === "object" ? entries : {}
+  const next = Object.assign({}, base)
+  delete next[key]
+  return next
+}
+
 // Handle-list arithmetic for a refcounted entry store.
 //
 // A store's `handles` array IS its reference count: one element per
