@@ -1508,7 +1508,6 @@ ListView {
         if (!scrollAnim.running && !root._highlightHandoff) root._sweepMs = -1
         return true
       }
-      if (!root.wrap && n === count - 1) return false
     }
     return false
   }
