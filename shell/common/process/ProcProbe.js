@@ -21,13 +21,8 @@
 // `running=false, processId=null`. Only `started` confirms a spawn, and the
 // absence of that confirmation is observable solely as a deadline expiring.
 
-/**
- * Whether `proc` is a live child.
- *
- * @param {object} proc A Quickshell.Io Process, or any handle exposing
- *                       `running` and `processId`.
- * @returns {boolean} false for a null, undefined, or destroyed handle.
- */
+// Whether `proc` is a live child. A null, undefined or destroyed handle
+// answers false.
 function alive(proc) {
   if (proc === null || proc === undefined) return false
   try {

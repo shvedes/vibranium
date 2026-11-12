@@ -17,26 +17,14 @@
 // the one given. A missing or non-array list is treated as empty rather than
 // throwing into a Component.onDestruction handler.
 
-/**
- * Append `panel` to `list`, returning a new array.
- *
- * @param {Array|undefined|null} list The current panel list.
- * @param {*} panel The panel instance to add.
- * @returns {Array} A new list with `panel` appended.
- */
+// Append `panel` to `list` and return a new array.
 function attach(list, panel) {
   var next = StoreGuards.copyList(list)
   next.push(panel)
   return next
 }
 
-/**
- * Remove every entry identical to `panel` from `list`, returning a new array.
- *
- * @param {Array|undefined|null} list The current panel list.
- * @param {*} panel The panel instance to remove.
- * @returns {Array} A new list without `panel`.
- */
+// Remove every entry identical to `panel` from `list` and return the rest.
 function detach(list, panel) {
   if (!Array.isArray(list)) return []
   return list.filter(function (entry) { return entry !== panel })
