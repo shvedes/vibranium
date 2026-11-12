@@ -5,6 +5,7 @@ AudioMixerController 1.0 AudioMixerController.qml
 AudioMixerWindow 1.0 AudioMixerWindow.qml
 GraphTab 1.0 GraphTab.qml
 GraphCanvas 1.0 GraphCanvas.qml
+GraphChrome 1.0 GraphChrome.qml
 GraphLegend 1.0 GraphLegend.qml
 GraphNode 1.0 GraphNode.qml
 DeviceRow 1.0 DeviceRow.qml

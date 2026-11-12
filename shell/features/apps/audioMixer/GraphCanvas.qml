@@ -1,11 +1,11 @@
 pragma ComponentBehavior: Bound
 
 // qmllint disable unqualified
-// `host` is deliberately untyped. It is the tab, and typing it would make this
-// component and GraphTab name each other's types; every read below is then a
-// member of a property qmllint cannot resolve, which is exactly the warning
-// this file suppresses and nothing else. The members are still checked at
-// runtime, and construction-test builds this type with its host attached.
+// `host` is the tab, and it stays untyped: this component is part of the same
+// module as GraphTab, so naming that type here does not resolve either (the
+// members then read as unqualified exactly as they do now). The members are
+// checked at runtime, and construction-test builds this type with its host.
+
 
 // The graph canvas: the viewport, the world, the cards and the wire.
 //

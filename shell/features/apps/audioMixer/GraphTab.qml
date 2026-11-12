@@ -114,64 +114,6 @@ Item {
   // hand-built: `Chip` centres its label in the whole pill, and it has no way
   // to be red - which the Disconnect action has to be, because it is the one
   // control on this canvas that cuts a link the user may be listening through.
-  component GraphTabAction: Rectangle {
-    id: action
-
-    property string text: ""
-    // The destroying action. Red chrome, so Disconnect does not read as one more
-    // label beside three neutral ones.
-    property bool danger: false
-    property bool hover: false
-    property bool press: false
-
-    signal triggered()
-
-    implicitWidth: actionLabel.implicitWidth + 2 * Ui.s
-    implicitHeight: Math.max(22, actionLabel.implicitHeight + Ui.s)
-    radius: RoundingPolicy.radius
-    color: !action.enabled ? Ui.tint("foreground_1", 0.03)
-      : (action.press ? Ui.tint(action.danger ? "red" : "accent", 0.22)
-        : (action.hover ? Ui.tint(action.danger ? "red" : "accent", 0.12)
-          : Ui.tint("foreground_1", 0.05)))
-    border.width: 1
-    border.color: action.danger
-      ? Ui.tint("red", 0.55)
-      : Ui.tint("background_3", 0.8)
-
-    Behavior on color { ColorAnim {} }
-    Behavior on border.color { ColorAnim {} }
-
-    Title {
-      id: actionLabel
-
-      anchors.centerIn: parent
-      level: 5
-      text: action.text
-      elide: Text.ElideRight
-      font.bold: action.danger
-      color: !action.enabled ? Ui.tint("foreground_1", 0.4)
-        : action.danger ? Ui.solid("red") : Ui.solid("foreground_1")
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      enabled: action.enabled
-      hoverEnabled: action.enabled
-      cursorShape: action.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-      onPressed: action.press = true
-      onReleased: action.press = false
-      onExited: action.press = false
-      onCanceled: action.press = false
-      onClicked: action.triggered()
-    }
-
-    HoverHandler {
-      onHoveredChanged: action.hover = hovered
-    }
-
-    Accessible.role: Accessible.Button
-    Accessible.name: action.text
-  }
 
   required property var controller
   // Whether this tab is the one on screen. The window empties the model as well
@@ -1524,95 +1466,27 @@ Item {
 
   // --- the chrome ---
   //
-  // A toolbar across the top of the viewport, not a panel across the foot of it,
-  // and anchored to no armed operation because there is no armed operation: a
-  // wire dragged from a port handle and released over a card IS the connect, and
-  // a line's own end dragged onto a card IS the reroute. What is left to say is
-  // the one line of status - what the gesture in hand would write, or the last
-  // refusal - beside the standing actions that were never part of a gesture.
-  //
-  // A child of the tab and not of the canvas, so it does not pan and does not
-  // scale: a refusal printed at 0.35 zoom is unreadable, and a button that moves
-  // while the pointer is on it is a button that cannot be clicked. The canvas's
-  // top edge is this row's bottom edge, so what the canvas may paint stops here
-  // rather than merely being painted over.
-  Row {
+  // The toolbar, status line and legend are a component of their own
+  // (`GraphChrome`), held to the tab through the four values it reads and the
+  // five requests it makes. Anchored to the tab rather than to the canvas, so
+  // it neither pans nor scales, and the canvas's top edge is this component's
+  // bottom edge.
+  GraphChrome {
     id: chrome
 
     anchors.top: parent.top
+    anchors.left: parent.left
     anchors.right: parent.right
     anchors.margins: Ui.m
-    spacing: Ui.s
 
-    GraphTabAction {
-      text: "Rescan ports"
-      onTriggered: tab.controller.refreshPorts()
-    }
-
-    GraphTabAction {
-      text: "Reset layout"
-      onTriggered: tab.resetLayout()
-    }
-
-    GraphTabAction {
-      text: "Reset view"
-      onTriggered: tab.resetView()
-    }
-
-    GraphTabAction {
-      text: "Disconnect"
-      danger: true
-      enabled: tab.link !== null
-      onTriggered: tab.commitDisconnect()
-    }
-
-    // The one control in this row that writes nothing: the shipped `info` mark,
-    // wearing the shell's own icon button so it hovers and presses like every
-    // other icon in the tree. Its hover tip names it; the click pins the legend
-    // below it, which is a tooltip with more in it than a line of text.
-    IconButton {
-      id: helpButton
-
-      name: "info"
-      tipText: "How the graph works"
-      slotSize: 24
-      // Eighteen in a twenty-four slot rather than fifteen: the difference has
-      // to be even for the glyph to land on a whole pixel, and the info mark
-      // needs the room - at fifteen its dot merges into the stem and the glyph
-      // reads as leaning off its own centre.
-      iconSize: 18
-      onClicked: tab.legendOpen = !tab.legendOpen
-    }
-  }
-
-  Title {
-    id: statusLine
-
-    anchors.left: parent.left
-    anchors.leftMargin: Ui.m
-    anchors.right: chrome.left
-    anchors.rightMargin: Ui.m
-    anchors.verticalCenter: chrome.verticalCenter
-    level: 5
-    text: tab.status.text
-    elide: Text.ElideRight
-    // The status function's empty states carry no colour, and a Title with a
-    // blank colour is a runtime error rather than an invisible one.
-    color: tab.status.color !== "" ? tab.status.color : "transparent"
-  }
-
-  // --- the legend ---
-  //
-  // The canvas's whole language is a mark and a gesture, and neither can say
-  // what it is. The panel that says it is a component of its own: it is a
-  // self-contained picture of the vocabulary, it shares nothing with the canvas
-  // but the row it hangs under, and a second copy here would be two
-  // descriptions of one legend, free to disagree about a colour or a gesture.
-  GraphLegend {
-    id: legend
-
-    open: tab.legendOpen
-    // The chrome row the bubble hangs under, and whose right edge it shares.
-    anchorItem: chrome
+    legendOpen: tab.legendOpen
+    canDisconnect: tab.link !== null
+    statusText: tab.status.text
+    statusColor: tab.status.color
+    onRescanRequested: tab.controller.refreshPorts()
+    onLayoutResetRequested: tab.resetLayout()
+    onViewResetRequested: tab.resetView()
+    onDisconnectRequested: tab.commitDisconnect()
+    onHelpToggled: tab.legendOpen = !tab.legendOpen
   }
 }

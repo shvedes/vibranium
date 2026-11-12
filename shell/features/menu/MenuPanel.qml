@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import qs.common
 import qs.features.menu
+import "MenuFit.js" as MenuFit
 import "MenuLib.js" as MenuLib
 import "MenuLayout.js" as MenuLayout
 import "MenuRows.js" as MenuRows
@@ -745,8 +746,9 @@ Rectangle {
     }
     function retryFit(reason) {
       if (fitGen !== panel._fitGen || !panel._fitPending) return
-      if (panel._fitAttempts < 8) {
-        panel._fitAttempts++
+      const next = MenuFit.retry(panel._fitAttempts, MenuFit.FIT_RETRY_BUDGET)
+      if (next >= 0) {
+        panel._fitAttempts = next
         fitRetryTimer.fitCallback = tryFit
         fitRetryTimer.restart()
         return
@@ -764,8 +766,9 @@ Rectangle {
       // long as the condition holds, competing with the row transitions it
       // was waiting for, and when the condition does clear late the card
       // is still sized from the fit it was waiting to replace.
-      if (panel._fitAttempts < 24) {
-        panel._fitAttempts++
+      const next = MenuFit.retry(panel._fitAttempts, MenuFit.SETTLE_RETRY_BUDGET)
+      if (next >= 0) {
+        panel._fitAttempts = next
         fitRetryTimer.fitCallback = tryFit
         fitRetryTimer.restart()
         return

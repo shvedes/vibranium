@@ -4350,4 +4350,36 @@ group('MenuState.pruneSlotCloses keeps only rows the model still lists', () => {
   is('nothing to prune reuses the map it was handed', MS.pruneSlotCloses(empty, []), (v) => v === empty)
 })
 
+// ---------------------------------------------------------------------------
+// MenuFit.js: the bounded fit retry
+// ---------------------------------------------------------------------------
+// The retry only has to be bounded, and the boundary is the whole rule: an
+// off-by-one that lets N+1 through, or a counter that never reaches the
+// budget, is an unbounded loop once the condition stays false.
+const MF = loadLib(path.join(SHELL_DIR, 'features/menu/MenuFit.js'))
+
+group('MenuFit bounds a fit retry and never counts past its budget', () => {
+  eq('the delegate budget is eight frames', MF.FIT_RETRY_BUDGET, 8)
+  eq('the settle budget is twenty-four frames', MF.SETTLE_RETRY_BUDGET, 24)
+  eq('the first retry is attempt one', MF.retry(0, 8), 1)
+  eq('the last permitted retry is attempt eight', MF.retry(7, 8), 8)
+  eq('and attempt eight is the end', MF.retry(8, 8), -1)
+  eq('a settle retry may run to its own budget', MF.retry(23, 24), 24)
+  eq('and stops there', MF.retry(24, 24), -1)
+  eq('a missing count reads as no attempts yet', MF.retry(undefined, 8), 1)
+  eq('a negative count does not extend the budget', MF.retry(-5, 8), 1)
+  eq('a missing budget is spent, not unbounded', MF.retry(0, undefined), -1)
+  eq('and a zero budget is spent too', MF.retry(0, 0), -1)
+  // A starved loop: the condition never clears, so every pass asks again.
+  // It must terminate at the budget and never hand back a count past it.
+  let n = 0
+  let turns = 0
+  while (n >= 0 && turns < 100) {
+    n = MF.retry(n, MF.SETTLE_RETRY_BUDGET)
+    turns++
+  }
+  eq('a starved settle loop ends at its budget', turns, 25)
+  eq('having never counted past it', n, -1)
+})
+
 finish()
