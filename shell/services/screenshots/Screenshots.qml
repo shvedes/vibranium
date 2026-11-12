@@ -408,7 +408,7 @@ Singleton {
     const c = job.crop
     const argv = Exec.setsidTimeoutCmd(["magick", full, "-crop",
       c.w + "x" + c.h + "+" + c.x + "+" + c.y, "+repage", dst], 15)
-    const proc = cropComp.createObject(root, { command: argv })
+    const proc = jobComp.createObject(root, { command: argv })
     if (proc === null) {
       root._removeJobPaths(full, dst)
       root._fail(job.win, "crop process failed", flowId, jobId)
@@ -814,13 +814,13 @@ Singleton {
       + "\"$active\" -delete 2>/dev/null || true; "
       + "else find \"$fb\" -type f -mmin +1440 -delete 2>/dev/null || true; fi"
     const sweepArgv = Exec.setsidTimeoutCmd(["sh", "-c", sweepScript], 15)
-    const sweepProc = startupComp.createObject(root, { command: sweepArgv })
+    const sweepProc = jobComp.createObject(root, { command: sweepArgv })
     if (sweepProc !== null) {
       sweepProc.exited.connect((code) => { sweepProc.destroy() })
       sweepProc.running = true
     }
     const argv = Exec.setsidTimeoutCmd(["sh", "-c", mkdirScript], 15)
-    const proc = startupComp.createObject(root, { command: argv })
+    const proc = jobComp.createObject(root, { command: argv })
     if (proc === null) {
       root._runtimeFailed = true
       root._daemonNotify("Screenshot", "Runtime directory initialization failed")
@@ -1124,7 +1124,7 @@ Singleton {
   function _statRegularFile(path, done) {
     const argv = Exec.setsidTimeoutCmd(["sh", "-c",
       "test -f \"$1\" && test -r \"$1\"", "sh", path], 2)
-    const proc = statComp.createObject(root, { command: argv })
+    const proc = jobComp.createObject(root, { command: argv })
     if (proc === null) {
       done(false)
       return
@@ -1940,7 +1940,7 @@ Singleton {
       + root._copySeq + "." + ext
     const argv = Exec.setsidTimeoutCmd(["cp",
       "--remove-destination", "--", path, target], 10)
-    const proc = fallbackComp.createObject(root, { command: argv })
+    const proc = jobComp.createObject(root, { command: argv })
     if (proc === null) {
       Exec.rm(target)
       if (typeof failed === "function") failed()
@@ -1998,7 +1998,7 @@ Singleton {
     }
     if (!SU.isUnder(String(path), root.runtimeDir)) root._forgetPath(path)
     const argv = Exec.setsidTimeoutCmd(ShotLib.copyImageCmd(path), 10)
-    const proc = copyComp.createObject(root, { command: argv })
+    const proc = jobComp.createObject(root, { command: argv })
     if (proc === null) {
       root._setClipboardFallback(path, deleteAfter, fileType, owner, done, failed)
       return
@@ -2093,7 +2093,7 @@ Singleton {
   function _mkdirOutputDir(cb, flowId, jobId, screen) {
     const argv = Exec.setsidTimeoutCmd(["mkdir", "-p",
       Paths.screenshotsDir], 15)
-    const proc = mkdirComp.createObject(root, { command: argv })
+    const proc = jobComp.createObject(root, { command: argv })
     if (proc === null) {
       root._fail(root._activeShot, "cannot create " + Paths.screenshotsDir, flowId, jobId)
       return
@@ -2137,57 +2137,11 @@ Singleton {
     printErrors: false
   }
 
+  // One process template for every one-shot job this service runs. The exit
+  // code is the answer, so each createObject call gets its own Process and
+  // there is no reason to declare the same wrapper six times.
   Component {
-    id: statComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  Component {
-    id: startupComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  Component {
-    id: mkdirComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  // One-shot clipboard offers (see _copyImage): needs its own Process
-  // to read the exit code and publish the URI-list offer.
-  Component {
-    id: copyComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  // Region cuts (see _finishTail): needs its own Process to gate
-  // delivery on the cropper's exit code.
-  Component {
-    id: cropComp
-
-    Process {
-      stdout: StdioCollector {}
-      stderr: StdioCollector {}
-    }
-  }
-
-  Component {
-    id: fallbackComp
+    id: jobComp
 
     Process {
       stdout: StdioCollector {}
