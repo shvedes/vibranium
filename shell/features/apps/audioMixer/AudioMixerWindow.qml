@@ -204,9 +204,10 @@ QtObject {
   // be two things that can drift.
   readonly property var outputDevices: mixer.controller.outputDevices
   readonly property var inputDevices: mixer.controller.inputDevices
-  // The cards the graph has no node for, projected through this holder like the
-  // four lists above it: the Configuration tab reads the window, never the
-  // controller, so a list it needs has to exist HERE as well.
+  // The cards the graph has no node for. Kept as their own pair rather than
+  // merged into the two lists above: the Configuration tab draws them with their
+  // own Repeaters, one model per kind of entry. See the Repeater pair under
+  // OUTPUT DEVICES for why mixing the two in one model is not an option.
   readonly property var disabledOutputDevices: mixer.controller.disabledOutputDevices
   readonly property var disabledInputDevices: mixer.controller.disabledInputDevices
   readonly property var playbackStreams: mixer.controller.playbackStreams
@@ -216,15 +217,6 @@ QtObject {
   readonly property var graphNodes: mixer.controller.graphNodes
   readonly property var graphLinks: mixer.controller.graphLinks
 
-  // The Configuration tab's two lists: the devices the graph carries, plus the
-  // cards it does not. A device switched off is a CARD with no node, so it is on
-  // this tab and nowhere else - the profile picker that turns it back on lives
-  // on the row that lists it, and a list built by classifying nodes would drop
-  // exactly that row. See AudioMixerController.disabledOutputDevices.
-  readonly property var configurationOutputs:
-    mixer.outputDevices.concat(mixer.disabledOutputDevices)
-  readonly property var configurationInputs:
-    mixer.inputDevices.concat(mixer.disabledInputDevices)
 
   // One row's identity: the node's PipeWire id, or the card key a card with no
   // node carries. The row reads it the same way (see DeviceRow.nodeKey), so the
@@ -1322,7 +1314,31 @@ QtObject {
           }
 
           Repeater {
-            model: mixer.tab === "configuration" ? mixer.configurationOutputs : []
+            model: mixer.tab === "configuration" ? mixer.outputDevices : []
+
+            delegate: DeviceConfigRow {
+              width: columns.width
+              mixerRef: mixer
+            }
+          }
+
+          // The cards the graph has no node for, in a Repeater of their own
+          // rather than merged into the list above. A device switched off is a
+          // CARD with no sink and no source, so it is on this tab and nowhere
+          // else - the profile picker that turns it back on lives on the row
+          // that lists it, and a list built by classifying nodes would drop
+          // exactly that row.
+          //
+          // Two models, one heading, rather than one model of both: a node row
+          // carries a PwNode (a QObject the backend owns) and a card row carries
+          // a plain JS object this shell built. Merging the two into one model
+          // crashed the shell on the disable action - QQuickRepeater::regenerate
+          // -> incubation -> a fault inside QtQmlModels, with the model holding
+          // both kinds. Kept apart, each Repeater regenerates over one kind of
+          // entry, and the heading reads the same because a column draws one
+          // Repeater after the other.
+          Repeater {
+            model: mixer.tab === "configuration" ? mixer.disabledOutputDevices : []
 
             delegate: DeviceConfigRow {
               width: columns.width
@@ -1341,7 +1357,18 @@ QtObject {
           }
 
           Repeater {
-            model: mixer.tab === "configuration" ? mixer.configurationInputs : []
+            model: mixer.tab === "configuration" ? mixer.inputDevices : []
+
+            delegate: DeviceConfigRow {
+              width: columns.width
+              mixerRef: mixer
+            }
+          }
+
+          // The switched-off input cards, for the reason written above the
+          // OUTPUT DEVICES pair: one model per kind of entry, never one of both.
+          Repeater {
+            model: mixer.tab === "configuration" ? mixer.disabledInputDevices : []
 
             delegate: DeviceConfigRow {
               width: columns.width
