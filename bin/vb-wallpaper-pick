@@ -1,0 +1,161 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+SELF="${0##*/}"
+
+VERBOSE=${VERBOSE:-false}
+
+# The formats the wallpaper service accepts, mirroring
+# shell/common/text/ImageExts.js: the static formats Qt decodes natively, with
+# the animated ones left out because the picker caches every frame as RGBA.
+# The chooser offers this set and nothing else, so it cannot hand the service a
+# file the service would refuse.
+declare -gr WALLPAPER_EXTENSIONS=(
+  bmp icns ico jfif j2k jpc jpeg jpg jp2 jpx pbm pgm png pnm ppm svg svgz
+  tga tif tiff wbmp webp
+)
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTIONS] [FILE]
+
+Pick a wallpaper with a file chooser and apply it to the current theme.
+
+Without a FILE the chooser opens, filtered to the formats the wallpaper
+service accepts. With a FILE that file is applied directly.
+
+Options:
+  -v, --verbose   Enable verbose output
+  -h, --help      Display this help and exit
+EOF
+}
+
+# Zenity reads a filter as "<label> | <glob> [<glob>...]", so one glob per
+# supported extension follows the separator as a single space-separated list.
+_image_filter() {
+  local -n _image_filter_out=$1
+  local globs=""
+  local ext
+  for ext in "${WALLPAPER_EXTENSIONS[@]}"; do
+    globs+=" *.$ext"
+  done
+  _image_filter_out="Images |$globs"
+}
+
+# Absolute form of a path without an external resolver. The wallpaper service
+# takes an absolute file path and copies it through its own policy, so a
+# lexical resolution is all this needs; a symlink is left as the link the user
+# chose. The file test above already followed the path to decide it exists.
+_absolute_path() {
+  local -n _absolute_out=$1
+  local path=$2
+  local part
+  local -a parts=()
+  local -a stack=()
+
+  if [[ $path != /* ]]; then
+    path="$PWD/$path"
+  fi
+
+  local IFS=/
+  read -ra parts <<< "$path"
+
+  for part in "${parts[@]}"; do
+    case "$part" in
+      '' | '.')
+        ;;
+      '..')
+        if ((${#stack[@]} > 0)); then
+          unset 'stack[${#stack[@]}-1]'
+        fi
+        ;;
+      *)
+        stack+=("$part")
+        ;;
+    esac
+  done
+
+  if ((${#stack[@]} == 0)); then
+    _absolute_out="/"
+    return
+  fi
+
+  local joined=
+  printf -v joined '%s/' "${stack[@]}"
+  _absolute_out="/${joined%/}"
+}
+
+while (($# > 0)); do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      log Error "Unknown option: $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+chosen="${1:-}"
+
+if [[ -z "$chosen" ]]; then
+  if ! command -v zenity > /dev/null; then
+    log Error "zenity is not installed"
+    notify-send -r 4 -a "Vibranium" -u critical -t 5000 "Wallpaper" \
+      "zenity is not installed - it provides the file chooser"
+    exit 1
+  fi
+
+  filter=
+  _image_filter filter
+  chosen="$(zenity --file-selection --title="Choose a Wallpaper" --file-filter="$filter" 2> /dev/null)" || {
+    log Info "No wallpaper chosen"
+    exit 0
+  }
+
+  # A chooser that answered more than one path still names one wallpaper.
+  chosen="${chosen%%$'\n'*}"
+fi
+
+if [[ -z "$chosen" ]]; then
+  log Info "No wallpaper chosen"
+  exit 0
+fi
+
+if [[ ! -f "$chosen" ]]; then
+  log Error "Not a file: $chosen"
+  exit 1
+fi
+
+absolute=
+_absolute_path absolute "$chosen"
+if [[ -z "$absolute" ]]; then
+  log Error "Cannot resolve path: $chosen"
+  exit 1
+fi
+
+# The service copies a file outside the theme's own backgrounds directory into
+# it and applies the copy, so any path the chooser can reach is a supported
+# input.
+if ! answer="$(vb-shell wallpaper set "$absolute" 2>&1)"; then
+  log Error "Wallpaper set failed: $answer"
+  notify-send -r 4 -a "Vibranium" -u critical -t 5000 "Wallpaper" "$answer"
+  exit 1
+fi
+
+log Info "Applied $absolute"

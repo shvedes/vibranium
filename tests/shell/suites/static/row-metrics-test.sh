@@ -2,8 +2,8 @@
 # Suite: row-metrics - "how tall is this list" is answered once.
 #
 # Two cards asked the same question and each wrote the loop itself:
-# PanelCard (features/clipboard, launcher, pass, powerMenu, wallpaperPicker)
-# and MenuPanel (features/menu), which deliberately stays a plain Rectangle
+# PanelCard (features/clipboard, launcher, pass, powerMenu) and MenuPanel
+# (features/menu), which deliberately stays a plain Rectangle
 # because of its grid mode, its ten-row resting cap and its per-row fonts.
 # The delta is real and stays local. The ARITHMETIC was not different: the
 # same walk, the same inter-row gap, the same stop at the row boundary.
@@ -116,7 +116,6 @@ CARDS=(
   "launcher/LauncherPanel"
   "pass/PassPanel"
   "powerMenu/PowerMenuPanel"
-  "wallpaperPicker/WallpaperPickerPanel"
 )
 BOUND=0
 for c in "${CARDS[@]}"; do
@@ -125,7 +124,7 @@ for c in "${CARDS[@]}"; do
   t_contains "$(basename "$c") reads the list's spacing" "rowSpacing: list.spacing" "$src"
   BOUND=$((BOUND + 1))
 done
-t_eq "and the scan cannot shrink: five cards are pinned" "5" "$BOUND"
+t_eq "and the scan cannot shrink: four cards are pinned" "4" "$BOUND"
 t_contains "and the menu reads its own" "readonly property real rowSpacing: list.spacing" "$MENU_SRC"
 
 t_section "a row the vocabulary cannot read is not measured as empty"

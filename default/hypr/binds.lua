@@ -399,7 +399,7 @@ hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_raw("vb-shell power toggle"), { descr
 hl.bind(mainMod .. " + ALT + ESCAPE", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
 hl.bind("XF86PowerOff", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
 
-hl.bind("CTRL + ALT + W", hl.dsp.exec_raw("vb-shell wallpaper next"), { description = "Change background" })
+hl.bind("CTRL + ALT + W", hl.dsp.exec_raw("vb-shell wallpaperPicker toggle"), { description = "Wallpaper picker" })
 hl.bind("CTRL + ALT + T", hl.dsp.exec_raw("vb-shell themePicker toggle"), { description = "Change theme" })
 
 hl.bind(mainMod .. " + A", hl.dsp.exec_raw("vb-shell appLauncher toggle"), { description = "App launcher" })

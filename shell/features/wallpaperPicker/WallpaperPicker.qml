@@ -20,7 +20,7 @@ import "../../common/text/StringUtils.js" as SU
 import "../../common/process/JobResult.js" as Job
 import "../../common/process/PanelList.js" as PanelList
 
-// Efficient user wallpaper picker – clipboard-like two-pane window.
+// Efficient user wallpaper picker - the cascade overlay's data service.
 //
 // Data source: $XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds
 // For community themes (theme dir has .git), only git-untracked files in
@@ -32,8 +32,8 @@ import "../../common/process/PanelList.js" as PanelList
 // - One FolderListModel per backgrounds dir (Qt's async, watches for changes)
 // - Git ls-files as a bounded registry job, only for .git themes, re-run
 //   whenever the backgrounds dir changes so drops show up live
-// - Filtered list derived via JS, not rescanning FS on every keystroke
-// - Preview Image is asynchronous + cached, only current selection loads
+// - The deck's rows derived via JS, never a rescan of the FS
+// - The deck decodes a bounded window of previews, asynchronously
 // - Delete via one bounded rm job, list mutated in-place, no full rescan
 Singleton {
     id: root
@@ -42,7 +42,6 @@ Singleton {
     property bool visible: false
     readonly property bool isOpen: root.visible
 
-    property string query: ""
     property string currentTheme: ""
     property string backgroundsDir: ""
     property string themeDir: ""
@@ -80,9 +79,8 @@ Singleton {
     property var _rawFiles: []
     // User wallpapers after git filter (basenames)
     property var _userFiles: []
-    // Filtered by query
+    // The deck's rows: one record per user wallpaper, in listing order.
     property var filtered: []
-    property int matchedCount: 0
 
     // Cache for git untracked set
     property var _gitUntracked: null
@@ -710,36 +708,11 @@ Singleton {
         bgModel.folder = root._bgUrl
     }
 
-    // --- filtering ---
-    function submit(text) {
-        root.query = String(text || "").trim()
-        root._recomputeFiltered()
-    }
-    function clearQuery() {
-        if (root.query !== "") {
-            root.query = ""
-            root._recomputeFiltered()
-            return true
-        }
-        return false
-    }
+    // --- rows ---
+    // The listing is the only input: this is a mapping, not a filter. The deck
+    // has no query, so selecting a wallpaper never narrows the set it browses.
     function _recomputeFiltered() {
-        const q = root.query.toLowerCase().trim()
-        if (q === "") {
-            root.filtered = root._userFiles.map(f => ({ label: f, value: f }))
-            root.matchedCount = root.filtered.length
-            return
-        }
-        const out = []
-        for (let i = 0; i < root._userFiles.length; i++) {
-            const f = root._userFiles[i]
-            if (f.toLowerCase().indexOf(q) >= 0) out.push({ label: f, value: f })
-        }
-        root.filtered = out
-        root.matchedCount = out.length
-        // Per keystroke, like the vault search, so DEBUG and gated: the
-        // query and the match count are the pair that explains a filter
-        // that looks like it missed something.
+        root.filtered = root._userFiles.map(f => ({ label: f, value: f }))
     }
 
     // --- IPC / visibility ---
@@ -786,14 +759,18 @@ Singleton {
             Exec.notify("No user wallpapers found for current theme", null, { replaceId: 1 })
             return "ok"
         }
-        root.query = ""
-        root._recomputeFiltered()
         root.visible = true
         return "ok"
     }
+    // The close is the end of the visit, so the menu chain that summoned the
+    // deck goes with it. Applying no longer dismisses (the deck sets the wall
+    // while it is still up), which leaves this as the one place that unwinds
+    // the stack; without it a menu opened behind the picker would still be up
+    // once the deck is gone. Menu.close() is a no-op when no menu is open.
     function close() {
         if (!root.visible) return "ok"
         root.visible = false
+        Registry.call("menu", "close")
         return "ok"
     }
     function toggle() {
@@ -801,31 +778,39 @@ Singleton {
     }
 
     // --- actions ---
-    // A selection is the end of the visit: the picker dismisses itself and the
-    // menu chain that summoned it goes with it, so the desktop is left showing
-    // the wallpaper that was just chosen. Menu.close() unwinds the whole stack
-    // rather than one level, which is what "close the chain" means here - the
-    // picker is usually summoned from a submenu, and popping a single level
-    // would leave the menu sitting on the page it was opened from.
+    // Apply one wallpaper without ending the visit, for callers that own the
+    // end themselves. The picker's accept path is setWallpaper below, which
+    // applies and dismisses in one act.
     //
-    // A refused path sets nothing, so it dismisses nothing: the picker stays up
-    // with its selection and its filter intact, which is the only state the
-    // next attempt can be made from. The refusal itself is already recorded
-    // where the panel's status verb reads it.
-    function setWallpaper(fileName) {
+    // The wallpaper path is built from the theme name, so the same policy
+    // decides it as the deletion path: a name the themes root does not contain
+    // never reaches Wallpaper.set, and a refusal sets nothing.
+    function apply(fileName) {
         const name = String(fileName)
-        // The wallpaper path is built from the theme name, so the same
-        // policy decides it as the deletion path: a name the themes root
-        // does not contain never reaches Wallpaper.set.
         const src = root._checkedPath(name, Paths.themesUserRoot, String(root.currentTheme) + "/backgrounds/" + name, {
             mode: "read", operation: "wallpaper_source", allowLeaf: true, allowExisting: true
         })
         if (!src.ok) {
             root._refuse(src.code)
-            return
+            return false
         }
         root._refusal = ""
         Wallpaper.set(src.path)
+        return true
+    }
+
+    // Apply and end the visit: the deck's accept path and the IPC/menu callers
+    // both land here. close() unwinds the whole menu stack rather than one
+    // level, which is what "close the chain" means here - the picker is
+    // usually summoned from a submenu, and popping a single level would leave
+    // the menu sitting on the page it was opened from.
+    //
+    // A refused path set nothing, so it dismisses nothing: the picker stays up
+    // with its selection and its filter intact, which is the only state the
+    // next attempt can be made from. The refusal itself is already recorded
+    // where the panel's status verb reads it.
+    function setWallpaper(fileName) {
+        if (root.apply(fileName) !== true) return
         root.dismiss()
     }
 
@@ -835,7 +820,6 @@ Singleton {
     // picker still closes.
     function dismiss() {
         root.close()
-        Registry.call("menu", "close")
     }
     // Triple-buffered deletion via OptimisticSet (K3)
     property OptimisticSet optimistic: OptimisticSet {}
