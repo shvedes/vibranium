@@ -777,9 +777,6 @@ Item {
               // keyboard cursor across rows that cannot scroll.
               wheelSteps: false
               delegate: rowDelegate
-              // No focus border: with no keyboard cursor there is nothing to
-              // mark, and a ring would read as a selection nobody made.
-              focusBorder: false
               // The model assignment above seats index 0 synchronously, so
               // this clears it back in the same turn (see _resetCursor):
               // the transient never paints.

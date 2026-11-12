@@ -1545,17 +1545,6 @@ ListView {
     return root.move(dir)
   }
 
-  // Draw the keyboard cursor as a FOCUS BORDER on the current row instead of
-  // the shared sliding selection bar. Default off, because the bar is right
-  // for a plain list and wrong for a banded one - a bar behind a zebra stripe
-  // reads as "this row is brighter", not "the cursor is here".
-  //
-  // A border is a per-delegate decoration, so it lives in the delegate rather
-  // than in this file's chrome: the delegate is the only thing that knows
-  // where its own edges are, and a cursor drawn by the view would have to
-  // guess at a delegate's insets.
-  property bool focusBorder: false
-
   // Enter on the current row. A delegate that implements activate() owns the
   // press (a row with an action of its own), and anything else reports
   // through `activated` so a consumer that binds the click on the row itself
