@@ -21,8 +21,8 @@
 // parseFloat("Infinity") succeeds, and an out-of-range pair is a
 // malformed request to every provider, not a usable location.
 function coordinatesOf(latitude, longitude) {
-  var lat = parseFloat(String(latitude))
-  var lon = parseFloat(String(longitude))
+  let lat = parseFloat(String(latitude))
+  let lon = parseFloat(String(longitude))
   if (!isFinite(lat) || !isFinite(lon)) return null
   if (lat < -90 || lat > 90) return null
   if (lon < -180 || lon > 180) return null
@@ -33,11 +33,11 @@ function coordinatesOf(latitude, longitude) {
 // Missing, blank, or unparseable means IP auto-detect; so does a pair that
 // fails the range check, which lands in the same name-only state.
 function parseLocationFile(raw) {
-  var unset = { name: "", latitude: null, longitude: null }
+  let unset = { name: "", latitude: null, longitude: null }
   try {
-    var data = JSON.parse(String(raw || ""))
+    let data = JSON.parse(String(raw || ""))
     if (!data || typeof data !== "object") return unset
-    var pair = coordinatesOf(data.latitude, data.longitude)
+    let pair = coordinatesOf(data.latitude, data.longitude)
     return {
       name: typeof data.name === "string" ? data.name.trim() : "",
       latitude: pair === null ? null : pair.latitude,
@@ -52,23 +52,23 @@ function parseLocationFile(raw) {
 // both are present and in range, the URL-encoded name as fallback
 // (hand-edited files may only carry a name), empty for IP auto-detect.
 function wttrLocationQuery(location, latitude, longitude) {
-  var pair = coordinatesOf(latitude, longitude)
+  let pair = coordinatesOf(latitude, longitude)
   if (pair !== null) return pair.latitude + "," + pair.longitude
-  var name = String(location || "").trim()
+  let name = String(location || "").trim()
   return name === "" ? "" : encodeURIComponent(name)
 }
 
 // Open-Meteo geocoding response -> suggestion rows for the location picker.
 function parseGeocodingResults(raw) {
   try {
-    var data = JSON.parse(String(raw || "{}"))
-    var results = data.results
+    let data = JSON.parse(String(raw || "{}"))
+    let results = data.results
     if (!results || !results.length) return []
-    var out = []
-    for (var i = 0; i < results.length; i++) {
-      var r = results[i]
+    let out = []
+    for (let i = 0; i < results.length; i++) {
+      let r = results[i]
       if (!r || !r.name || r.latitude === undefined || r.longitude === undefined) continue
-      var region = [r.admin1, r.country].filter(function (part) { return !!part }).join(", ")
+      let region = [r.admin1, r.country].filter(function (part) { return !!part }).join(", ")
       out.push({
         name: String(r.name),
         description: region,
@@ -83,11 +83,11 @@ function parseGeocodingResults(raw) {
 }
 
 function locationCommit(text, suggestions, selectedIndex) {
-  var name = String(text || "").trim()
+  let name = String(text || "").trim()
   if (name === "") return { name: "", latitude: null, longitude: null }
-  var choices = suggestions || []
-  var index = Range.clamp(parseInt(selectedIndex, 10) || 0, 0, Math.max(0, choices.length - 1))
-  var suggestion = choices[index]
+  let choices = suggestions || []
+  let index = Range.clamp(parseInt(selectedIndex, 10) || 0, 0, Math.max(0, choices.length - 1))
+  let suggestion = choices[index]
   if (suggestion) return suggestion
   return { name: name, latitude: null, longitude: null }
 }
@@ -98,12 +98,12 @@ function isFutureForecastDate(dateString, todayString) {
 }
 
 function roundedTemp(value) {
-  var n = Format.numberOrNull(value)
+  let n = Format.numberOrNull(value)
   return n === null ? "" : String(Math.round(n))
 }
 
 function celsiusToFahrenheit(value) {
-  var n = Format.numberOrNull(value)
+  let n = Format.numberOrNull(value)
   return n === null ? "" : (n * 9 / 5) + 32
 }
 
@@ -115,7 +115,7 @@ function formatTemp(value, useImperial) {
 // One decimal, for readings whose integer part alone is too coarse to be
 // honest: 0.4 mm of rain rounds to no rain at all.
 function oneDecimal(value) {
-  var n = Format.numberOrNull(value)
+  let n = Format.numberOrNull(value)
   return n === null ? "" : String(Range.round(n, 1))
 }
 
@@ -123,12 +123,12 @@ function oneDecimal(value) {
 // unit under its older name); imperial reads it in inHg. The divisor
 // spells the constant rather than carrying a pre-multiplied factor.
 function hpaToInHg(value) {
-  var n = Format.numberOrNull(value)
+  let n = Format.numberOrNull(value)
   return n === null ? "" : String(Range.round(n / 33.8639, 2))
 }
 
 function mmToInches(value) {
-  var n = Format.numberOrNull(value)
+  let n = Format.numberOrNull(value)
   return n === null ? "" : String(Range.round(n / 25.4, 2))
 }
 
@@ -137,14 +137,14 @@ function normalizedUnit(value) {
 }
 
 function localeUsesImperial(localeName) {
-  var name = String(localeName || "").replace(".", "_")
+  let name = String(localeName || "").replace(".", "_")
   return /^en[_-]US($|[_.-])/.test(name)
     || /^en[_-]LR($|[_.-])/.test(name)
     || /^my($|[_.-])/.test(name)
 }
 
 function countryUsesImperial(countryName) {
-  var country = String(countryName || "").trim().replace(/[._-]+/g, " ").toLowerCase()
+  let country = String(countryName || "").trim().replace(/[._-]+/g, " ").toLowerCase()
   if (!country) return null
   if (country === "us" || country === "usa"
     || country === "united states" || country === "united states of america") return true
@@ -155,35 +155,35 @@ function countryUsesImperial(countryName) {
 // Precedence: explicit setting override > wttr-reported country >
 // system locale. Mirrors Omarchy so US users get °F out of the box.
 function shouldUseImperial(unitOverride, localeName, countryName) {
-  var unit = normalizedUnit(unitOverride)
+  let unit = normalizedUnit(unitOverride)
   if (unit === "imperial") return true
   if (unit === "metric") return false
-  var countryPreference = countryUsesImperial(countryName)
+  let countryPreference = countryUsesImperial(countryName)
   if (countryPreference !== null) return countryPreference
   return localeUsesImperial(localeName)
 }
 
 function dayName(dateString, formatter) {
   if (!dateString) return ""
-  var d = new Date(dateString + "T12:00:00")
+  let d = new Date(dateString + "T12:00:00")
   if (isNaN(d.getTime())) return ""
   if (formatter) return formatter(d)
   return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.getDay()]
 }
 
 function openMeteoForecastDays(dailyForecastReport, todayString, count) {
-  var want = parseInt(count, 10)
+  let want = parseInt(count, 10)
   if (isNaN(want) || want < 1) want = 7
-  var daily = dailyForecastReport && dailyForecastReport.daily ? dailyForecastReport.daily : null
+  let daily = dailyForecastReport && dailyForecastReport.daily ? dailyForecastReport.daily : null
   if (!daily || !daily.time) return []
-  var hourly = dailyForecastReport.hourly || null
-  var result = []
-  for (var i = 0; i < daily.time.length && result.length < want; ++i) {
-    var date = daily.time[i]
+  let hourly = dailyForecastReport.hourly || null
+  let result = []
+  for (let i = 0; i < daily.time.length && result.length < want; ++i) {
+    let date = daily.time[i]
     if (!isFutureForecastDate(date, todayString)) continue
-    var maxC = daily.temperature_2m_max ? daily.temperature_2m_max[i] : ""
-    var minC = daily.temperature_2m_min ? daily.temperature_2m_min[i] : ""
-    var feelsMaxC = daily.apparent_temperature_max ? daily.apparent_temperature_max[i] : ""
+    let maxC = daily.temperature_2m_max ? daily.temperature_2m_max[i] : ""
+    let minC = daily.temperature_2m_min ? daily.temperature_2m_min[i] : ""
+    let feelsMaxC = daily.apparent_temperature_max ? daily.apparent_temperature_max[i] : ""
     result.push({
       date: date,
       maxtempC: roundedTemp(maxC),
@@ -204,7 +204,7 @@ function openMeteoForecastDays(dailyForecastReport, todayString, count) {
 
 // km/h -> mph, ""-tolerant like the temperature helpers.
 function kmhToMph(value) {
-  var n = Format.numberOrNull(value)
+  let n = Format.numberOrNull(value)
   return n === null ? "" : n * 0.621371
 }
 
@@ -217,30 +217,30 @@ function kmhToMph(value) {
 // (hourly.time entries are "YYYY-MM-DDTHH:MM" in the requested timezone).
 // "" when the series is absent - verbose rows then omit humidity.
 function humidityMaxForDate(hourly, dateString) {
-  var day = String(dateString || "").slice(0, 10)
+  let day = String(dateString || "").slice(0, 10)
   if (!day || !hourly || !hourly.time || !hourly.relative_humidity_2m) return ""
-  var times = hourly.time
+  let times = hourly.time
   // The cache rides on the function object: a `.pragma library` publishes its
   // top-level declarations, and this is not part of the library's surface.
   if (humidityMaxForDate._cache === undefined)
     humidityMaxForDate._cache = { times: null, len: -1, map: null }
-  var cache = humidityMaxForDate._cache
+  let cache = humidityMaxForDate._cache
   if (cache.times !== times || cache.len !== times.length) {
-    var map = Object.create(null)
-    var hum = hourly.relative_humidity_2m
-    for (var i = 0; i < times.length; i++) {
-      var key = String(times[i] || "").slice(0, 10)
+    let map = Object.create(null)
+    let hum = hourly.relative_humidity_2m
+    for (let i = 0; i < times.length; i++) {
+      let key = String(times[i] || "").slice(0, 10)
       if (key === "") continue
-      var n = parseFloat(String(hum[i]))
+      let n = parseFloat(String(hum[i]))
       if (isNaN(n)) continue
-      var was = map[key]
+      let was = map[key]
       if (was === undefined || n > was) map[key] = n
     }
     cache.times = times
     cache.len = times.length
     cache.map = map
   }
-  var best = cache.map[day]
+  let best = cache.map[day]
   return best === undefined ? "" : String(Math.round(best))
 }
 
@@ -256,24 +256,24 @@ function humidityMaxForDate(hourly, dateString) {
 // hourly series is absent (wttr fallback) - the island hides the
 // row then.
 function openMeteoHourlyForecast(dailyForecastReport, nowUtcMs, count, step) {
-  var want = parseInt(count, 10)
+  let want = parseInt(count, 10)
   if (isNaN(want) || want < 1) want = 8
-  var every = parseInt(step, 10)
+  let every = parseInt(step, 10)
   if (isNaN(every) || every < 1) every = 1
-  var hourly = dailyForecastReport && dailyForecastReport.hourly ? dailyForecastReport.hourly : null
+  let hourly = dailyForecastReport && dailyForecastReport.hourly ? dailyForecastReport.hourly : null
   if (!hourly || !hourly.time || !hourly.temperature_2m) return []
-  var offsetMs = (parseFloat(dailyForecastReport.utc_offset_seconds) || 0) * 1000
-  var result = []
-  var seen = 0
-  for (var i = 0; i < hourly.time.length && result.length < want; ++i) {
-    var stamp = String(hourly.time[i] || "")
-    var whenMs = Date.parse(stamp + ":00Z") - offsetMs
+  let offsetMs = (parseFloat(dailyForecastReport.utc_offset_seconds) || 0) * 1000
+  let result = []
+  let seen = 0
+  for (let i = 0; i < hourly.time.length && result.length < want; ++i) {
+    let stamp = String(hourly.time[i] || "")
+    let whenMs = Date.parse(stamp + ":00Z") - offsetMs
     if (isNaN(whenMs) || whenMs < nowUtcMs) continue
     // A skipped hour still counts against the step: the walk advances
     // through the series rather than packing entries against the front.
     if (seen % every !== 0) { seen++; continue }
     seen++
-    var tempC = hourly.temperature_2m[i]
+    let tempC = hourly.temperature_2m[i]
     result.push({
       time: stamp,
       hour: parseInt(stamp.slice(11, 13), 10) || 0,
@@ -292,7 +292,7 @@ function openMeteoHourlyForecast(dailyForecastReport, nowUtcMs, count, step) {
 // current_condition shape so the island can use either source
 // interchangeably. Open-Meteo reports metric (°C, km/h).
 function openMeteoCurrentCondition(dailyForecastReport) {
-  var current = dailyForecastReport && dailyForecastReport.current ? dailyForecastReport.current : null
+  let current = dailyForecastReport && dailyForecastReport.current ? dailyForecastReport.current : null
   if (!current || current.temperature_2m === undefined || current.temperature_2m === null) return null
   return {
     temp_C: roundedTemp(current.temperature_2m),
@@ -328,11 +328,11 @@ function provisionalCurrentIcon(current, resolvedIcon) {
 }
 
 function wttrNextForecastDays(report, todayString, count) {
-  var want = parseInt(count, 10)
+  let want = parseInt(count, 10)
   if (isNaN(want) || want < 1) want = 7
-  var days = report && report.weather ? report.weather : []
-  var result = []
-  for (var i = 0; i < days.length && result.length < want; ++i) {
+  let days = report && report.weather ? report.weather : []
+  let result = []
+  for (let i = 0; i < days.length && result.length < want; ++i) {
     // wttr.in only ever ships ~3 days; enrich each with verbose detail
     // from the hourly entry nearest noon so the fallback renders the
     // same rows as the primary source.
@@ -345,7 +345,7 @@ function wttrNextForecastDays(report, todayString, count) {
 // wttr.in day from its noon-hourly entry. Missing pieces stay "" and
 // the verbose line omits them.
 function enrichWttrDay(day) {
-  var h = noonHourly(day) || {}
+  let h = noonHourly(day) || {}
   day.feelsC = roundedTemp(h.FeelsLikeC)
   day.feelsF = roundedTemp(h.FeelsLikeF)
   day.precipProb = roundedTemp(h.chanceofrain)
@@ -358,11 +358,11 @@ function enrichWttrDay(day) {
 // The hourly entry nearest noon: representative conditions for a day.
 function noonHourly(day) {
   if (!day || !day.hourly || day.hourly.length === 0) return null
-  var best = day.hourly[0]
-  var bestDist = 9999
-  for (var i = 0; i < day.hourly.length; ++i) {
-    var t = parseInt(String(day.hourly[i].time || "0"), 10)
-    var dist = Math.abs(t - 1200)
+  let best = day.hourly[0]
+  let bestDist = 9999
+  for (let i = 0; i < day.hourly.length; ++i) {
+    let t = parseInt(String(day.hourly[i].time || "0"), 10)
+    let dist = Math.abs(t - 1200)
     if (dist < bestDist) {
       bestDist = dist
       best = day.hourly[i]
@@ -372,13 +372,13 @@ function noonHourly(day) {
 }
 
 function buildForecastDays(report, dailyForecastReport, todayString) {
-  var days = openMeteoForecastDays(dailyForecastReport, todayString)
+  let days = openMeteoForecastDays(dailyForecastReport, todayString)
   return days.length > 0 ? days : wttrNextForecastDays(report, todayString)
 }
 
 function bareTempForDay(day, kind, useImperial) {
   if (!day) return ""
-  var v = useImperial
+  let v = useImperial
     ? (kind === "max" ? day.maxtempF : day.mintempF)
     : (kind === "max" ? day.maxtempC : day.mintempC)
   if (v === undefined || v === null || v === "") return ""
@@ -388,7 +388,7 @@ function bareTempForDay(day, kind, useImperial) {
 // One hourlyForecast entry -> bare "18°" in the requested unit.
 function hourTemp(entry, useImperial) {
   if (!entry) return ""
-  var v = useImperial ? entry.tempF : entry.tempC
+  let v = useImperial ? entry.tempF : entry.tempC
   return v === undefined || v === null || v === "" ? "" : v + "°"
 }
 
@@ -403,7 +403,7 @@ function dayIcon(day) {
   if (!day) return ""
   if (day.openMeteoWeatherCode !== undefined && day.openMeteoWeatherCode !== null)
     return iconForWmoCode(day.openMeteoWeatherCode, false)
-  var best = noonHourly(day)
+  let best = noonHourly(day)
   if (!best) return ""
   return iconForCode(best.weatherCode, false)
 }
@@ -413,10 +413,10 @@ function dayIcon(day) {
 // Sources may omit fields ("" skips them); "" when nothing is known.
 function dayDetailsLine(day, useImperial) {
   if (!day) return ""
-  var parts = []
-  var feels = useImperial ? day.feelsF : day.feelsC
+  let parts = []
+  let feels = useImperial ? day.feelsF : day.feelsC
   if (feels !== undefined && feels !== null && feels !== "") parts.push("Feels " + feels + "°")
-  var wind = useImperial ? day.windMph : day.windKmph
+  let wind = useImperial ? day.windMph : day.windKmph
   if (wind !== undefined && wind !== null && wind !== "") {
     parts.push("Wind " + wind + (useImperial ? " mph" : " km/h"))
   }
@@ -435,7 +435,7 @@ function dayDetailsLine(day, useImperial) {
 // rain/snow/thunderstorm share one glyph. Unknown codes fall back to
 // overcast rather than an empty box.
 function iconForWmoCode(code, night) {
-  var c = parseInt(String(code == null ? "" : code), 10)
+  let c = parseInt(String(code == null ? "" : code), 10)
   if (isNaN(c)) return "weather-overcast"
   if (c === 0) return night ? "weather-clear-night" : "weather-clear-day"
   if (c === 1 || c === 2) return night ? "weather-partly-cloudy-night" : "weather-partly-cloudy-day"
@@ -453,7 +453,7 @@ function iconForWmoCode(code, night) {
 // Open-Meteo is unreachable). Grouping mirrors Omarchy's mapping so both
 // sources agree on what the user sees.
 function iconForCode(code, night) {
-  var c = parseInt(String(code == null ? "" : code), 10)
+  let c = parseInt(String(code == null ? "" : code), 10)
   if (isNaN(c)) return "weather-overcast"
   switch (c) {
   case 113: return night ? "weather-clear-night" : "weather-clear-day"
@@ -482,8 +482,8 @@ function iconForCode(code, night) {
 //   weather-drizzle,
 //   weather-showers-day, weather-showers-night,
 //   weather-snow-showers-day, weather-snow-showers-night,
-//   weather-sleet, weather-thunderstorm, weather-snow
-// (15 files; weather-overcast doubles as the unknown-code fallback.)
+//   weather-sleet, weather-thunderstorm, weather-snow, weather-rain
+// (16 files; weather-overcast doubles as the unknown-code fallback.)
 
 if (typeof module !== "undefined") {
   module.exports = {

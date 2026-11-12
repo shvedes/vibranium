@@ -2576,20 +2576,20 @@ group('the wttr mapping mirrors the same icon set', () => {
 group('both mappers stay inside the declared icon set', () => {
   // The module ends with the REQUIRED ICON SET and notes that adding a
   // mapping means adding the asset. This is that contract, asserted - with
-  // one correction: the WMO table returns weather-rain, which the comment's
-  // fifteen-name list omits. The asset exists on disk, so nothing renders
-  // broken; the list and its "(15 files" count are what are stale.
+  // The WMO table returns weather-rain, and the comment's sixteen-name
+  // list carries it with the matching "(16 files" count.
   const COMMENTED = [
     'weather-clear-day', 'weather-clear-night',
     'weather-partly-cloudy-day', 'weather-partly-cloudy-night',
     'weather-overcast',
     'weather-fog-day', 'weather-fog-night',
     'weather-drizzle',
+    'weather-rain',
     'weather-showers-day', 'weather-showers-night',
     'weather-snow-showers-day', 'weather-snow-showers-night',
     'weather-sleet', 'weather-thunderstorm', 'weather-snow',
   ]
-  const RETURNED = COMMENTED.concat(['weather-rain'])
+  const RETURNED = COMMENTED
   const used = new Set()
   for (let c = 0; c <= 200; c++) {
     used.add(WM.iconForWmoCode(c, false))
@@ -2597,13 +2597,13 @@ group('both mappers stay inside the declared icon set', () => {
     used.add(WM.iconForCode(c, false))
     used.add(WM.iconForCode(c, true))
   }
-  eq('the comment lists fifteen names', COMMENTED.length, 15)
-  is('no mapper returns a name outside the set plus weather-rain', [...used], (v) => v.every(s => RETURNED.includes(s)), 'subset of the known names')
+  eq('the comment lists sixteen names', COMMENTED.length, 16)
+  is('no mapper returns a name outside the comment', [...used], (v) => v.every(s => RETURNED.includes(s)), 'subset of the known names')
   eq('and the sweep reaches exactly those sixteen', [...used].sort(), RETURNED.slice().sort())
-  eq('weather-rain is the one name the comment omits', [...used].filter(s => !COMMENTED.includes(s)), ['weather-rain'])
+  eq('and the comment names every condition the mappers return', [...used].filter(s => !COMMENTED.includes(s)), [])
   eq('and the WMO rain codes are the ones that return it', WM.iconForWmoCode(61, false), 'weather-rain')
   for (const name of COMMENTED) contains(`the source's icon-set comment lists ${name}`, WM_SRC, name)
-  contains('and states the file count', WM_SRC, '(15 files;')
+  contains('and states the file count', WM_SRC, '(16 files;')
   contains('and names overcast as the unknown-code fallback', WM_SRC, 'weather-overcast doubles as the unknown-code fallback')
 })
 
