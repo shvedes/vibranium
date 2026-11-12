@@ -583,7 +583,9 @@ Item {
         Behavior on color { ColorAnim {} }
         Behavior on border.color { ColorAnim {} }
 
-        Title {
+        // The same slot and the same marquee as the Configuration tab's profile
+        // chip, so a device name too long for it scrolls instead of eliding.
+        ScrollLabel {
           id: pickerLabel
 
           anchors.left: parent.left
@@ -593,7 +595,6 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           level: 5
           text: row.pickerText
-          elide: Text.ElideRight
           color: row.open ? Theme.color("accent") : Ui.solid("foreground_1")
         }
 

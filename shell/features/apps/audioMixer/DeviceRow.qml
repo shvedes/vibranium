@@ -1040,7 +1040,11 @@ Item {
         Behavior on color { ColorAnim {} }
         Behavior on border.color { ColorAnim {} }
 
-        Title {
+        // The chip's slot is one width for every row, so a profile longer than
+        // it scrolls rather than ending in an ellipsis: the same marquee the
+        // bar's Now Playing island and the clipboard rows use. The elide the
+        // label falls back to is the component's, for motion-off.
+        ScrollLabel {
           id: profileLabel
 
           anchors.left: parent.left
@@ -1050,7 +1054,6 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           level: 5
           text: row.profileChipText
-          elide: Text.ElideRight
           color: row.open ? Theme.color("accent") : Ui.solid("foreground_1")
         }
 

@@ -9,5 +9,6 @@ GraphChrome 1.0 GraphChrome.qml
 GraphLegend 1.0 GraphLegend.qml
 GraphNode 1.0 GraphNode.qml
 DeviceRow 1.0 DeviceRow.qml
+ScrollLabel 1.0 ScrollLabel.qml
 StreamRow 1.0 StreamRow.qml
 VolumeSlider 1.0 VolumeSlider.qml
