@@ -44,11 +44,11 @@ var FUNCS = {
 // Strip UI prefixes + trailing '=' down to the plottable body.
 // Returns "" when nothing plottable remains.
 function stripBody(query) {
-    var s = String(query || "").trim()
+    let s = String(query || "").trim()
     if (s === "") return ""
     s = s.replace(/\s*=+\s*$/, "").trim()
     if (s === "") return ""
-    var m = null
+    let m = null
     // f(x) = <body>
     m = s.match(/^f\s*\(\s*x\s*\)\s*=\s*(.+)$/i)
     if (m) return String(m[1]).trim()
@@ -69,7 +69,7 @@ function stripBody(query) {
 // carry an x letter but never as a variable; "x chat" carries one but
 // dies later as an unknown word (see isFunctionIncomplete).
 function isPotentialFunction(query) {
-    var body = stripBody(query)
+    let body = stripBody(query)
     if (body === "" || body.length > 256) return false
     if (body.indexOf("\n") >= 0 || body.indexOf("\r") >= 0) return false
     // standalone x (not inside a longer word like exp/firefox/xterm)
@@ -86,51 +86,51 @@ function isLetter(ch) {
 }
 
 function tokenize(lower) {
-    var tokens = []
-    var n = lower.length
-    var i = 0
+    let tokens = []
+    let n = lower.length
+    let i = 0
 
     function prevIsValue() {
         if (tokens.length === 0) return false
-        var t = tokens[tokens.length - 1]
+        let t = tokens[tokens.length - 1]
         if (t.type === "number" || t.type === "variable") return true
         if (t.type === "paren" && t.value === ")") return true
         return false
     }
 
     while (i < n) {
-        var c = lower[i]
+        let c = lower[i]
         if (c === " " || c === "\t" || c === "\n" || c === "\r") { i++; continue }
         if (isDigit(c) || c === ".") {
-            var start = i
-            var dotCount = 0
+            let start = i
+            let dotCount = 0
             while (i < n && (isDigit(lower[i]) || lower[i] === ".")) {
                 if (lower[i] === ".") dotCount++
                 if (dotCount > 1) throw new Error("invalid number")
                 i++
             }
-            var raw = lower.substring(start, i)
+            let raw = lower.substring(start, i)
             if (raw === "." || raw === "") throw new Error("invalid number")
             // scientific tail: 1e6, 1.5e-3 (exponent wins over `e` const)
             if (i < n && (lower[i] === "e" || lower[i] === "E")) {
-                var j = i + 1
+                let j = i + 1
                 if (j < n && (lower[j] === "+" || lower[j] === "-")) j++
-                var k = j
+                let k = j
                 while (k < n && isDigit(lower[k])) k++
                 if (k > j) {
                     raw = lower.substring(start, k)
                     i = k
                 }
             }
-            var v = Number(raw)
+            let v = Number(raw)
             if (isNaN(v)) throw new Error("invalid number")
             tokens.push({ type: "number", value: v })
             continue
         }
         if (isLetter(c)) {
-            var s2 = i
+            let s2 = i
             while (i < n && isLetter(lower[i])) i++
-            var name = lower.substring(s2, i)
+            let name = lower.substring(s2, i)
             if (name === "x") {
                 tokens.push({ type: "variable", value: "x" })
             } else if (name === "pi") {
@@ -152,7 +152,7 @@ function tokenize(lower) {
             continue
         }
         if ("+-*/%^".indexOf(c) >= 0) {
-            var isUnary = false
+            let isUnary = false
             if ((c === "+" || c === "-") && !prevIsValue()) isUnary = true
             if (isUnary) {
                 tokens.push({ type: "op", value: c === "-" ? "u-" : "u+", unary: true })
@@ -170,7 +170,7 @@ function tokenize(lower) {
 // Insert explicit '*' for juxtaposition: 2x, 2sin(x), x(x+1), )(
 function withImplicitMult(tokens) {
     if (tokens.length < 2) return tokens
-    var out = []
+    let out = []
     function isLeftValue(t) {
         return t.type === "number" || t.type === "variable"
             || (t.type === "paren" && t.value === ")")
@@ -180,10 +180,10 @@ function withImplicitMult(tokens) {
             || t.type === "func"
             || (t.type === "paren" && t.value === "(")
     }
-    for (var i = 0; i < tokens.length; i++) {
+    for (let i = 0; i < tokens.length; i++) {
         out.push(tokens[i])
         if (i + 1 < tokens.length) {
-            var a = tokens[i], b = tokens[i + 1]
+            let a = tokens[i], b = tokens[i + 1]
             // "2sin(x)": number directly before func needs '*', but a func
             // name directly before '(' is its own call - never split those.
             if (a.type === "func" && b.type === "paren" && b.value === "(") continue
@@ -196,31 +196,31 @@ function withImplicitMult(tokens) {
 }
 
 function toRpn(tokens) {
-    var output = []
-    var ops = []
-    var prec = {
+    let output = []
+    let ops = []
+    let prec = {
         "+": 1, "-": 1,
         "*": 2, "/": 2, "%": 2,
         "^": 3,
         "u-": 4, "u+": 4
     }
-    var assoc = {
+    let assoc = {
         "+": "L", "-": "L", "*": "L", "/": "L", "%": "L",
         "^": "R",
         "u-": "R", "u+": "R"
     }
-    for (var i = 0; i < tokens.length; i++) {
-        var t = tokens[i]
+    for (let i = 0; i < tokens.length; i++) {
+        let t = tokens[i]
         if (t.type === "number" || t.type === "variable") {
             output.push(t)
         } else if (t.type === "func") {
             ops.push(t)
         } else if (t.type === "op") {
-            var o1 = t.value
+            let o1 = t.value
             while (ops.length > 0) {
-                var o2 = ops[ops.length - 1]
+                let o2 = ops[ops.length - 1]
                 if (o2.type !== "op") break
-                var p1 = prec[o1], p2 = prec[o2.value], a1 = assoc[o1]
+                let p1 = prec[o1], p2 = prec[o2.value], a1 = assoc[o1]
                 if ((a1 === "L" && p1 <= p2) || (a1 === "R" && p1 < p2)) {
                     output.push(ops.pop())
                 } else break
@@ -229,9 +229,9 @@ function toRpn(tokens) {
         } else if (t.type === "paren" && t.value === "(") {
             ops.push(t)
         } else if (t.type === "paren" && t.value === ")") {
-            var found = false
+            let found = false
             while (ops.length > 0) {
-                var top = ops.pop()
+                let top = ops.pop()
                 if (top.type === "paren" && top.value === "(") { found = true; break }
                 output.push(top)
             }
@@ -242,7 +242,7 @@ function toRpn(tokens) {
         }
     }
     while (ops.length > 0) {
-        var top2 = ops.pop()
+        let top2 = ops.pop()
         if (top2.type === "paren") throw new Error("mismatched parentheses")
         // dangling func without closing paren, e.g. "sin(x" handled above
         // as mismatched; "sin" alone leaves func on the stack -> incomplete
@@ -282,27 +282,27 @@ function applyFunc(name, a) {
 }
 
 function evalRpn(rpn, x) {
-    var stack = []
-    for (var i = 0; i < rpn.length; i++) {
-        var t = rpn[i]
+    let stack = []
+    for (let i = 0; i < rpn.length; i++) {
+        let t = rpn[i]
         if (t.type === "number") {
             stack.push(t.value)
         } else if (t.type === "variable") {
             stack.push(x)
         } else if (t.type === "func") {
             if (stack.length < 1) throw new Error("missing operand")
-            var a = stack.pop()
+            let a = stack.pop()
             stack.push(applyFunc(t.value, a))
         } else if (t.type === "op") {
             if (t.value === "u-" || t.value === "u+") {
                 if (stack.length < 1) throw new Error("missing operand")
-                var u = stack.pop()
+                let u = stack.pop()
                 stack.push(t.value === "u-" ? -u : +u)
             } else {
                 if (stack.length < 2) throw new Error("missing operand")
-                var b = stack.pop()
-                var a2 = stack.pop()
-                var r
+                let b = stack.pop()
+                let a2 = stack.pop()
+                let r
                 switch (t.value) {
                     case "+": r = a2 + b; break
                     case "-": r = a2 - b; break
@@ -321,15 +321,15 @@ function evalRpn(rpn, x) {
 }
 
 function compileBody(body) {
-    var lower = String(body).toLowerCase()
-    var toks = withImplicitMult(tokenize(lower))
+    let lower = String(body).toLowerCase()
+    let toks = withImplicitMult(tokenize(lower))
     if (toks.length === 0) throw new Error("invalid expression")
-    var hasVar = false
-    for (var k = 0; k < toks.length; k++) {
+    let hasVar = false
+    for (let k = 0; k < toks.length; k++) {
         if (toks[k].type === "variable") { hasVar = true; break }
     }
     if (!hasVar) throw new Error("no variable")
-    var rpn = toRpn(toks)
+    let rpn = toRpn(toks)
     return rpn
 }
 
@@ -340,9 +340,9 @@ function compileBody(body) {
 var PROBE_XS = [-5, -3, -2, -1, -0.5, 0, 0.5, 1, 2, 3, 5]
 
 function countFinite(rpn) {
-    var n = 0
-    for (var i = 0; i < PROBE_XS.length; i++) {
-        var y = evalRpn(rpn, PROBE_XS[i])
+    let n = 0
+    for (let i = 0; i < PROBE_XS.length; i++) {
+        let y = evalRpn(rpn, PROBE_XS[i])
         if (isFinite(y)) n++
     }
     return n
@@ -351,12 +351,12 @@ function countFinite(rpn) {
 // Main entry: valid plottable function or null.
 // Returned rpn is ready for per-x sampling (no re-parse per point).
 function tryParseFunction(query) {
-    var body = stripBody(query)
+    let body = stripBody(query)
     if (body === "") return null
     if (!isPotentialFunction(query)) return null
     try {
-        var rpn = compileBody(body)
-        var finite = countFinite(rpn)
+        let rpn = compileBody(body)
+        let finite = countFinite(rpn)
         if (finite < 3) return null
         return {
             expr: body,
@@ -373,19 +373,19 @@ function tryParseFunction(query) {
 // an operator or a function application somewhere around the variable.
 // "2x", "x+1", "sin(x)" pass; bare forms fall through to app search.
 function isBareVariable(body) {
-    var s = String(body || "").trim().toLowerCase()
+    let s = String(body || "").trim().toLowerCase()
     if (s === "") return true
-    var guard = 0
+    let guard = 0
     while (guard++ < 32) {
         s = s.trim()
-        var changed = false
+        let changed = false
         while (s.charAt(0) === "+" || s.charAt(0) === "-") {
             s = s.substring(1).trim()
             changed = true
         }
         if (s.length >= 2 && s.charAt(0) === "(" && s.charAt(s.length - 1) === ")") {
-            var depth = 0, outer = true
-            for (var i = 0; i < s.length; i++) {
+            let depth = 0, outer = true
+            for (let i = 0; i < s.length; i++) {
                 if (s.charAt(i) === "(") depth++
                 else if (s.charAt(i) === ")") {
                     depth--
@@ -409,15 +409,15 @@ function isBareVariable(body) {
 function isFunctionIncomplete(query) {
     if (!isPotentialFunction(query)) return false
     if (tryParseFunction(query) !== null) return false
-    var body = stripBody(query)
+    let body = stripBody(query)
     if (body === "") return false
     try {
-        var rpn = compileBody(body)
+        let rpn = compileBody(body)
         // compiled but <3 finite (e.g. "x/0"): still typing-ish, keep the
         // single entry so apps stay hidden like CalcLib's incomplete.
         return true
     } catch (e) {
-        var msg = String(e && e.message || "")
+        let msg = String(e && e.message || "")
         if (msg.indexOf("unknown function") === 0) return false
         if (msg === "no variable") return false
         // mismatched parentheses / missing operand / invalid expression /
@@ -434,16 +434,16 @@ function isFunctionIncomplete(query) {
 // curve, while x^2-style parabolas still keep their wings.
 function sampleFunction(body, xMin, xMax, n) {
     try {
-        var rpn = compileBody(String(body || ""))
-        var count = Range.clamp(Math.round(n) || 120, 2, 400)
-        var lo = Number(xMin), hi = Number(xMax)
+        let rpn = compileBody(String(body || ""))
+        let count = Range.clamp(Math.round(n) || 120, 2, 400)
+        let lo = Number(xMin), hi = Number(xMax)
         if (!(hi > lo)) return null
-        var ys = new Array(count)
-        var finiteVals = []
-        var valid = 0
-        for (var i = 0; i < count; i++) {
-            var x = lo + (hi - lo) * i / (count - 1)
-            var y
+        let ys = new Array(count)
+        let finiteVals = []
+        let valid = 0
+        for (let i = 0; i < count; i++) {
+            let x = lo + (hi - lo) * i / (count - 1)
+            let y
             try {
                 y = evalRpn(rpn, x)
             } catch (e2) {
@@ -463,46 +463,46 @@ function sampleFunction(body, xMin, xMax, n) {
             valid++
         }
         if (valid === 0) return null
-        var yMin, yMax
+        let yMin, yMax
         if (finiteVals.length >= 10) {
             finiteVals.sort(function(a, b) { return a - b })
-            var p5 = finiteVals[Math.floor(finiteVals.length * 0.05)]
-            var p95 = finiteVals[Math.floor(finiteVals.length * 0.95)]
+            let p5 = finiteVals[Math.floor(finiteVals.length * 0.05)]
+            let p95 = finiteVals[Math.floor(finiteVals.length * 0.95)]
             if (!(p95 > p5)) {
-                var c0 = finiteVals[Math.floor(finiteVals.length / 2)]
-                var pad0 = Math.max(1, Math.abs(c0) * 0.1)
+                let c0 = finiteVals[Math.floor(finiteVals.length / 2)]
+                let pad0 = Math.max(1, Math.abs(c0) * 0.1)
                 yMin = c0 - pad0
                 yMax = c0 + pad0
             } else {
                 yMin = p5
                 yMax = p95
-                var span = yMax - yMin
-                var pad2 = span * 0.18
+                let span = yMax - yMin
+                let pad2 = span * 0.18
                 if (!(pad2 > 0)) pad2 = 1
                 yMin -= pad2
                 yMax += pad2
             }
         } else if (valid === 1) {
-            var c = finiteVals[0]
-            var pad = Math.max(1, Math.abs(c) * 0.1)
+            let c = finiteVals[0]
+            let pad = Math.max(1, Math.abs(c) * 0.1)
             yMin = c - pad
             yMax = c + pad
         } else {
             yMin = Infinity
             yMax = -Infinity
-            for (var k = 0; k < finiteVals.length; k++) {
+            for (let k = 0; k < finiteVals.length; k++) {
                 if (finiteVals[k] < yMin) yMin = finiteVals[k]
                 if (finiteVals[k] > yMax) yMax = finiteVals[k]
             }
             if (!(yMax > yMin)) {
-                var c2 = yMin
+                let c2 = yMin
                 if (!isFinite(c2)) return null
-                var pad3 = Math.max(1, Math.abs(c2) * 0.1)
+                let pad3 = Math.max(1, Math.abs(c2) * 0.1)
                 yMin = c2 - pad3
                 yMax = c2 + pad3
             } else {
-                var span2 = yMax - yMin
-                var pad4 = span2 * 0.12
+                let span2 = yMax - yMin
+                let pad4 = span2 * 0.12
                 if (!(pad4 > 0)) pad4 = 1
                 yMin -= pad4
                 yMax += pad4
