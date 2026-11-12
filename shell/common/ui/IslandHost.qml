@@ -171,8 +171,8 @@ PanelWindow {
       contentLive: root.content !== null,
       keys: fp.keys,
       active: fp.active,
-      cardWidth: Math.round(card.width),
-      cardHeight: Math.round(card.height)
+      cardWidth: Math.round(cardItem.width),
+      cardHeight: Math.round(cardItem.height)
     }
   }
 
@@ -280,7 +280,7 @@ PanelWindow {
   // Full-screen transparent overlay on the bar's screen. Only mapped while
   // open (or fading out) so it never intercepts input when closed.
   screen: root.anchorScreen()
-  visible: root.open || card.opacity > 0
+  visible: root.open || cardItem.opacity > 0
   color: "transparent"
   exclusionMode: ExclusionMode.Ignore
   exclusiveZone: -1
@@ -371,7 +371,7 @@ PanelWindow {
   }
 
   // Exposed for content that needs to inspect card geometry
-  property alias card: card
+  property alias card: cardItem
 
   // The key surface of the island, and the parent of everything below it.
   //
@@ -427,7 +427,7 @@ PanelWindow {
     // the shared Card primitive; the content itself lives behind cardLoader
     // and only exists while the host is open (plus the fade-out window).
     Card {
-      id: card
+      id: cardItem
 
       objectName: "islandCard"
       // Live content size while anything is loaded; the frozen footprint
@@ -480,7 +480,7 @@ PanelWindow {
         // first open is worse than the one-off build cost, and consumers'
         // open-time wiring (focus grabs et al) can assume the item exists
         // by the next event-loop turn.
-        active: root.open || card.opacity > 0
+        active: root.open || cardItem.opacity > 0
         sourceComponent: root.contentComponent
         onLoaded: {
           if (cardLoader.item && cardLoader.item.islandHost !== undefined)
@@ -545,8 +545,8 @@ PanelWindow {
     let y = root.barPosition === "bottom" ? screenH - barH - h - root.margin : barH + root.margin
     x = Range.clamp(x, root.margin, screenW - w - root.margin)
     y = Range.clamp(y, root.margin, screenH - h - root.margin)
-    card.x = Math.round(x)
-    card.y = Math.round(y)
+    cardItem.x = Math.round(x)
+    cardItem.y = Math.round(y)
     // Clearance for the notification pile: this park's target geometry (the
     // clamped x/y/w/h above, the footprint the card is actually parked at)
     // plus the showing flag. Plain data keyed by this window's screen, no-op when

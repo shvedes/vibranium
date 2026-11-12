@@ -130,7 +130,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
 RECORDED_FILE_COUNT=250
-RECORDED_WARNING_COUNT=135
+RECORDED_WARNING_COUNT=133
 RECORDED_INFO_COUNT=51
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
@@ -152,7 +152,6 @@ PanelWindow"
 # would not.
 RECORDED_WARNING_KINDS="confusing-expression-statement 4
 eval 1
-id-shadows-member 2
 missing-property 52
 uncreatable-type 3
 unqualified 68
