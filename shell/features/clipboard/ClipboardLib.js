@@ -107,7 +107,6 @@ const CODE_EXTS = {
 // state), so one instance per pattern is behavior-identical.
 const RE_ANY_WS = /\s/
 const RE_WS_SPLIT = /\s+/
-const RE_WS_COLLAPSE = /\s+/g
 const RE_HTTP_WWW = /^(https?:\/\/|www\.)/i
 const RE_SCHEME_STRIP = /^[a-z0-9+.-]+:\/\//i
 // Scheme (+ optional host) matcher shared by isNetworkUri (scheme only)
@@ -158,7 +157,7 @@ function isNetworkUri(s) {
   const t = String(s).trim()
   const m = t.match(RE_URI_SCHEME_HOST)
   if (!m) return false
-  return NETWORK_SCHEMES[m[1].toLowerCase()] === true
+  return isNetworkScheme(m[1])
 }
 
 // "number" for a bare number ("42", "-3.14"), "expr" for a valid
