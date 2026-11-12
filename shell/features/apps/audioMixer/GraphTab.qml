@@ -474,6 +474,22 @@ Item {
     tab._nodes = byKey
     tab._cards = held
     tab._recomputeConnectable()
+    if (!tab._wireAlive(held)) tab._dropWire()
+  }
+
+  // Whether the gesture in flight still has both ends in the graph. A wire
+  // whose card or line left while the button was down has no release to end
+  // it: the delegate that owned the grab is destroyed with the card, so no
+  // `wireEnded` arrives and the rubber band would hang over the canvas until
+  // the tab was left. A rebuild is the one place that sees the row set before
+  // and after the change, so the gesture is ended there.
+  function _wireAlive(cards) {
+    if (!tab.wiring) return true
+    if (tab.wireLinkKey !== "" && tab._linkGroup(tab.wireLinkKey) === null) return false
+    for (let i = 0; i < cards.length; i++) {
+      if (cards[i].key === tab.wireFromKey) return true
+    }
+    return false
   }
 
   // node key -> whether this node can take part in a connect at all.
