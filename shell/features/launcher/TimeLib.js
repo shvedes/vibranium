@@ -369,7 +369,7 @@ function _str(v) {
 // Normalized lookup key: trim, fold separators, strip diacritics,
 // collapse whitespace, lowercase.
 function normalizeCity(s) {
-    var t = _str(s).trim()
+    let t = _str(s).trim()
     if (t === "") return ""
     t = t.replace(/[_-]+/g, " ")
     try {
@@ -384,10 +384,10 @@ function normalizeCity(s) {
 // is not a time query, otherwise the raw city part trimmed ("" when the
 // user typed only "time in" with nothing after it).
 function parseTimeQuery(query) {
-    var t = _str(query).trim()
+    let t = _str(query).trim()
     if (t === "") return null
     if (/^time\s+in\s*$/i.test(t)) return ""
-    var m = t.match(/^time\s+in\s+(.+?)\s*$/i)
+    let m = t.match(/^time\s+in\s+(.+?)\s*$/i)
     if (!m) return null
     return _str(m[1]).trim()
 }
@@ -395,7 +395,7 @@ function parseTimeQuery(query) {
 function getAllTimeZones() {
     try {
         if (typeof Intl !== "undefined" && Intl.supportedValuesOf) {
-            var z = Intl.supportedValuesOf("timeZone")
+            let z = Intl.supportedValuesOf("timeZone")
             if (z && z.length > 0) return z
         }
     } catch (e) {}
@@ -404,15 +404,15 @@ function getAllTimeZones() {
 
 // Case-insensitive city -> IANA timezone, or null.
 function resolveTimezone(city) {
-    var norm = normalizeCity(city)
+    let norm = normalizeCity(city)
     if (norm === "") return null
     if (Object.prototype.hasOwnProperty.call(CITY_TO_TZ, norm))
         return CITY_TO_TZ[norm]
-    var zones = getAllTimeZones()
-    for (var i = 0; i < zones.length; i++) {
-        var z = zones[i]
-        var slash = z.lastIndexOf("/")
-        var tail = slash >= 0 ? z.substring(slash + 1) : z
+    let zones = getAllTimeZones()
+    for (let i = 0; i < zones.length; i++) {
+        let z = zones[i]
+        let slash = z.lastIndexOf("/")
+        let tail = slash >= 0 ? z.substring(slash + 1) : z
         if (normalizeCity(tail) === norm) return z
     }
     return null
@@ -421,14 +421,14 @@ function resolveTimezone(city) {
 // Display name: title-case each word ("BANGKOK" -> "Bangkok",
 // "new york" -> "New York", "chicago" -> "Chicago").
 function toDisplayName(cityRaw) {
-    var t = _str(cityRaw).trim().replace(/\s+/g, " ")
+    let t = _str(cityRaw).trim().replace(/\s+/g, " ")
     if (t === "") return ""
-    var parts = t.split(" ")
-    for (var i = 0; i < parts.length; i++) {
-        var w = parts[i]
+    let parts = t.split(" ")
+    for (let i = 0; i < parts.length; i++) {
+        let w = parts[i]
         if (w === "") continue
-        var subs = w.split("-")
-        for (var j = 0; j < subs.length; j++) {
+        let subs = w.split("-")
+        for (let j = 0; j < subs.length; j++) {
             if (subs[j].length > 0)
                 subs[j] = subs[j].charAt(0).toUpperCase() + subs[j].substring(1).toLowerCase()
         }
@@ -440,9 +440,9 @@ function toDisplayName(cityRaw) {
 // Continent (first IANA segment): "Europe" for "Europe/Madrid",
 // "America" for "America/Argentina/Buenos_Aires". Pure string split.
 function zoneContinent(tz) {
-    var t = _str(tz)
+    let t = _str(tz)
     if (t === "") return ""
-    var slash = t.indexOf("/")
+    let slash = t.indexOf("/")
     return slash < 0 ? t : t.substring(0, slash)
 }
 
@@ -450,12 +450,12 @@ function zoneContinent(tz) {
 // Node/test-only: needs Intl, which Quickshell's QJSEngine lacks.
 function formatTimeIn(tz, now) {
     try {
-        var d = (now instanceof Date) ? now : ((now === undefined || now === null) ? new Date() : new Date(now))
+        let d = (now instanceof Date) ? now : ((now === undefined || now === null) ? new Date() : new Date(now))
         if (isNaN(d.getTime())) return null
-        var timeFmt = new Intl.DateTimeFormat("en-GB", {
+        let timeFmt = new Intl.DateTimeFormat("en-GB", {
             timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false
         })
-        var dateFmt = new Intl.DateTimeFormat("en-GB", {
+        let dateFmt = new Intl.DateTimeFormat("en-GB", {
             timeZone: tz, weekday: "short", day: "numeric", month: "short"
         })
         return { time: timeFmt.format(d), date: dateFmt.format(d) }
@@ -470,15 +470,15 @@ function formatTimeIn(tz, now) {
 // Node/test-only: needs Intl via formatTimeIn(); QML resolves the zone with
 // resolveTimezone() and formats via the TZ=date process instead.
 function tryTime(query, now) {
-    var city = parseTimeQuery(query)
+    let city = parseTimeQuery(query)
     if (city === null) return null
     if (city === "")
         return { ok: false, city: "", display: "", timezone: "", error: "empty" }
-    var tz = resolveTimezone(city)
+    let tz = resolveTimezone(city)
     if (!tz)
         return { ok: false, city: city, display: toDisplayName(city), timezone: "", error: "unknown" }
-    var base = (now === undefined || now === null) ? new Date() : (now instanceof Date ? now : new Date(now))
-    var fmt = formatTimeIn(tz, base)
+    let base = (now === undefined || now === null) ? new Date() : (now instanceof Date ? now : new Date(now))
+    let fmt = formatTimeIn(tz, base)
     if (!fmt)
         return { ok: false, city: city, display: toDisplayName(city), timezone: tz, error: "format" }
     return { ok: true, city: city, display: toDisplayName(city), timezone: tz, time: fmt.time, date: fmt.date }

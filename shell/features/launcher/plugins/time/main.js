@@ -368,7 +368,7 @@ function _str(v) {
 // Normalized lookup key: trim, fold separators, strip diacritics,
 // collapse whitespace, lowercase.
 function normalizeCity(s) {
-    var t = _str(s).trim()
+    let t = _str(s).trim()
     if (t === "") return ""
     t = t.replace(/[_-]+/g, " ")
     try {
@@ -383,10 +383,10 @@ function normalizeCity(s) {
 // is not a time query, otherwise the raw city part trimmed ("" when the
 // user typed only "time in" with nothing after it).
 function parseTimeQuery(query) {
-    var t = _str(query).trim()
+    let t = _str(query).trim()
     if (t === "") return null
     if (/^time\s+in\s*$/i.test(t)) return ""
-    var m = t.match(/^time\s+in\s+(.+?)\s*$/i)
+    let m = t.match(/^time\s+in\s+(.+?)\s*$/i)
     if (!m) return null
     return _str(m[1]).trim()
 }
@@ -394,7 +394,7 @@ function parseTimeQuery(query) {
 function getAllTimeZones() {
     try {
         if (typeof Intl !== "undefined" && Intl.supportedValuesOf) {
-            var z = Intl.supportedValuesOf("timeZone")
+            let z = Intl.supportedValuesOf("timeZone")
             if (z && z.length > 0) return z
         }
     } catch (e) {}
@@ -403,15 +403,15 @@ function getAllTimeZones() {
 
 // Case-insensitive city -> IANA timezone, or null.
 function resolveTimezone(city) {
-    var norm = normalizeCity(city)
+    let norm = normalizeCity(city)
     if (norm === "") return null
     if (Object.prototype.hasOwnProperty.call(CITY_TO_TZ, norm))
         return CITY_TO_TZ[norm]
-    var zones = getAllTimeZones()
-    for (var i = 0; i < zones.length; i++) {
-        var z = zones[i]
-        var slash = z.lastIndexOf("/")
-        var tail = slash >= 0 ? z.substring(slash + 1) : z
+    let zones = getAllTimeZones()
+    for (let i = 0; i < zones.length; i++) {
+        let z = zones[i]
+        let slash = z.lastIndexOf("/")
+        let tail = slash >= 0 ? z.substring(slash + 1) : z
         if (normalizeCity(tail) === norm) return z
     }
     return null
@@ -420,14 +420,14 @@ function resolveTimezone(city) {
 // Display name: title-case each word ("BANGKOK" -> "Bangkok",
 // "new york" -> "New York", "chicago" -> "Chicago").
 function toDisplayName(cityRaw) {
-    var t = _str(cityRaw).trim().replace(/\s+/g, " ")
+    let t = _str(cityRaw).trim().replace(/\s+/g, " ")
     if (t === "") return ""
-    var parts = t.split(" ")
-    for (var i = 0; i < parts.length; i++) {
-        var w = parts[i]
+    let parts = t.split(" ")
+    for (let i = 0; i < parts.length; i++) {
+        let w = parts[i]
         if (w === "") continue
-        var subs = w.split("-")
-        for (var j = 0; j < subs.length; j++) {
+        let subs = w.split("-")
+        for (let j = 0; j < subs.length; j++) {
             if (subs[j].length > 0)
                 subs[j] = subs[j].charAt(0).toUpperCase() + subs[j].substring(1).toLowerCase()
         }
@@ -439,9 +439,9 @@ function toDisplayName(cityRaw) {
 // Continent (first IANA segment): "Europe" for "Europe/Madrid",
 // "America" for "America/Argentina/Buenos_Aires". Pure string split.
 function zoneContinent(tz) {
-    var t = _str(tz)
+    let t = _str(tz)
     if (t === "") return ""
-    var slash = t.indexOf("/")
+    let slash = t.indexOf("/")
     return slash < 0 ? t : t.substring(0, slash)
 }
 
@@ -449,12 +449,12 @@ function zoneContinent(tz) {
 // Node/test-only: needs Intl, which Quickshell's QJSEngine lacks.
 function formatTimeIn(tz, now) {
     try {
-        var d = (now instanceof Date) ? now : ((now === undefined || now === null) ? new Date() : new Date(now))
+        let d = (now instanceof Date) ? now : ((now === undefined || now === null) ? new Date() : new Date(now))
         if (isNaN(d.getTime())) return null
-        var timeFmt = new Intl.DateTimeFormat("en-GB", {
+        let timeFmt = new Intl.DateTimeFormat("en-GB", {
             timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false
         })
-        var dateFmt = new Intl.DateTimeFormat("en-GB", {
+        let dateFmt = new Intl.DateTimeFormat("en-GB", {
             timeZone: tz, weekday: "short", day: "numeric", month: "short"
         })
         return { time: timeFmt.format(d), date: dateFmt.format(d) }
@@ -469,15 +469,15 @@ function formatTimeIn(tz, now) {
 // Node/test-only: needs Intl via formatTimeIn(); QML resolves the zone with
 // resolveTimezone() and formats via the TZ=date process instead.
 function tryTime(query, now) {
-    var city = parseTimeQuery(query)
+    let city = parseTimeQuery(query)
     if (city === null) return null
     if (city === "")
         return { ok: false, city: "", display: "", timezone: "", error: "empty" }
-    var tz = resolveTimezone(city)
+    let tz = resolveTimezone(city)
     if (!tz)
         return { ok: false, city: city, display: toDisplayName(city), timezone: "", error: "unknown" }
-    var base = (now === undefined || now === null) ? new Date() : (now instanceof Date ? now : new Date(now))
-    var fmt = formatTimeIn(tz, base)
+    let base = (now === undefined || now === null) ? new Date() : (now instanceof Date ? now : new Date(now))
+    let fmt = formatTimeIn(tz, base)
     if (!fmt)
         return { ok: false, city: city, display: toDisplayName(city), timezone: tz, error: "format" }
     return { ok: true, city: city, display: toDisplayName(city), timezone: tz, time: fmt.time, date: fmt.date }
@@ -508,7 +508,7 @@ function tryTime(query, now) {
 // conversion path is pure Date arithmetic (no Intl, no probe) so it answers
 // synchronously. The IIFE below only adapts them.
 (function() {
-  var TZ_ABBR_OFFSETS = {
+  let TZ_ABBR_OFFSETS = {
       "utc": 0, "ut": 0, "z": 0, "gmt": 0,
       "wet": 0, "west": 60,
       "bst": 60,
@@ -534,51 +534,51 @@ function tryTime(query, now) {
       "et": -300, "ct": -360, "mt": -420, "pt": -480
   };
 
-  var MONTH_INDEX = {
+  let MONTH_INDEX = {
       "jan": 0, "feb": 1, "mar": 2, "apr": 3, "may": 4, "jun": 5,
       "jul": 6, "aug": 7, "sep": 8, "sept": 8, "oct": 9, "nov": 10, "dec": 11
   };
 
-  var WD_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  var MO_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  let WD_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  let MO_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   function pad2(n) {
-      var v = Number(n)
+      let v = Number(n)
       return (v < 10 ? "0" : "") + v
   }
 
   // Trailing zone token -> { abbr, offsetMin } or null. Case-insensitive.
   function parseTzToken(tok) {
-      var t = _str(tok).trim()
+      let t = _str(tok).trim()
       if (t === "") return null
-      var low = t.toLowerCase()
+      let low = t.toLowerCase()
       if (Object.prototype.hasOwnProperty.call(TZ_ABBR_OFFSETS, low))
           return { abbr: low.toUpperCase(), offsetMin: TZ_ABBR_OFFSETS[low] }
-      var m = t.match(/^(utc|gmt|ut)\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?\s*$/i)
+      let m = t.match(/^(utc|gmt|ut)\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?\s*$/i)
       if (m) {
-          var sign = m[2] === "-" ? -1 : 1
-          var hh = parseInt(m[3], 10)
-          var mm = m[4] !== undefined && m[4] !== "" ? parseInt(m[4], 10) : 0
+          let sign = m[2] === "-" ? -1 : 1
+          let hh = parseInt(m[3], 10)
+          let mm = m[4] !== undefined && m[4] !== "" ? parseInt(m[4], 10) : 0
           if (hh > 14 || mm > 59) return null
           if (hh === 14 && mm !== 0) return null
-          var off = sign * (hh * 60 + mm)
+          let off = sign * (hh * 60 + mm)
           if (off < -720 || off > 840) return null
           return { abbr: m[1].toUpperCase() + (sign < 0 ? "-" : "+") + hh + (m[4] !== undefined && m[4] !== "" ? ":" + pad2(mm) : ""), offsetMin: off }
       }
       m = t.match(/^([+-])(\d{2})(\d{2})$/)
       if (m) {
-          var s2 = m[1] === "-" ? -1 : 1
-          var h2 = parseInt(m[2], 10)
-          var m2 = parseInt(m[3], 10)
+          let s2 = m[1] === "-" ? -1 : 1
+          let h2 = parseInt(m[2], 10)
+          let m2 = parseInt(m[3], 10)
           if (h2 > 14 || m2 > 59) return null
           if (h2 === 14 && m2 !== 0) return null
           return { abbr: t, offsetMin: s2 * (h2 * 60 + m2) }
       }
       m = t.match(/^([+-])(\d{1,2})(?::(\d{2}))?$/)
       if (m) {
-          var s3 = m[1] === "-" ? -1 : 1
-          var h3 = parseInt(m[2], 10)
-          var m3 = m[3] !== undefined ? parseInt(m[3], 10) : 0
+          let s3 = m[1] === "-" ? -1 : 1
+          let h3 = parseInt(m[2], 10)
+          let m3 = m[3] !== undefined ? parseInt(m[3], 10) : 0
           if (h3 > 14 || m3 > 59) return null
           if (h3 === 14 && m3 !== 0) return null
           return { abbr: t, offsetMin: s3 * (h3 * 60 + m3) }
@@ -588,19 +588,19 @@ function tryTime(query, now) {
 
   // "7:55pm", "7:55 pm", "19:55", "7pm" -> { h24, min, sec, use12, hasSec }.
   function parseTimeString(s) {
-      var t = _str(s).trim()
+      let t = _str(s).trim()
       if (t === "") return null
-      var m = t.match(/^(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*([ap]\s*\.?\s*m\s*\.?)?$/i)
+      let m = t.match(/^(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*([ap]\s*\.?\s*m\s*\.?)?$/i)
       if (!m) return null
-      var h = parseInt(m[1], 10)
-      var mi = m[2] !== undefined ? parseInt(m[2], 10) : 0
-      var se = m[3] !== undefined ? parseInt(m[3], 10) : 0
-      var hasSec = m[3] !== undefined
-      var ampmRaw = m[4] !== undefined ? _str(m[4]).replace(/[\s\.]+/g, "").toLowerCase() : ""
-      var use12 = ampmRaw !== ""
+      let h = parseInt(m[1], 10)
+      let mi = m[2] !== undefined ? parseInt(m[2], 10) : 0
+      let se = m[3] !== undefined ? parseInt(m[3], 10) : 0
+      let hasSec = m[3] !== undefined
+      let ampmRaw = m[4] !== undefined ? _str(m[4]).replace(/[\s\.]+/g, "").toLowerCase() : ""
+      let use12 = ampmRaw !== ""
       if (use12 && ampmRaw !== "am" && ampmRaw !== "pm") return null
       if (mi < 0 || mi > 59 || se < 0 || se > 59) return null
-      var h24;
+      let h24;
       if (use12) {
           if (h < 1 || h > 12) return null
           h24 = (h % 12) + (ampmRaw === "pm" ? 12 : 0)
@@ -625,19 +625,19 @@ function tryTime(query, now) {
   // Date string -> { y, m, d, hasYear } or null. defaultYear fills a
   // missing year; hasYear tells a real 2000 from the placeholder.
   function parseDateString(s, defaultYear) {
-      var t = _str(s).trim().replace(/\s+/g, " ").replace(/,\s*/g, " ")
+      let t = _str(s).trim().replace(/\s+/g, " ").replace(/,\s*/g, " ")
       if (t === "") return null
-      var m = t.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+      let m = t.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
       if (m) {
-          var y = parseInt(m[1], 10), mo = parseInt(m[2], 10), d = parseInt(m[3], 10)
+          let y = parseInt(m[1], 10), mo = parseInt(m[2], 10), d = parseInt(m[3], 10)
           if (!validYMD(y, mo, d)) return null
           return { y: y, m: mo, d: d, hasYear: true }
       }
       m = t.match(/^(\d{1,2})[\/\-\.](\d{1,2})(?:[\/\-\.](\d{2,4}))?$/)
       if (m) {
-          var mo2 = parseInt(m[1], 10), d2 = parseInt(m[2], 10)
-          var hasY2 = m[3] !== undefined
-          var y2 = hasY2 ? parseInt(m[3], 10) : defaultYear
+          let mo2 = parseInt(m[1], 10), d2 = parseInt(m[2], 10)
+          let hasY2 = m[3] !== undefined
+          let y2 = hasY2 ? parseInt(m[3], 10) : defaultYear
           if (hasY2 && String(m[3]).length === 2) y2 = 2000 + y2
           if (y2 === undefined || y2 === null || isNaN(y2)) return null
           if (!validYMD(y2, mo2, d2)) {
@@ -648,11 +648,11 @@ function tryTime(query, now) {
       }
       m = t.match(/^([a-z]+)\s+(\d{1,2})(?:\s+(\d{2,4}))?$/i)
       if (m) {
-          var key = _str(m[1]).toLowerCase()
+          let key = _str(m[1]).toLowerCase()
           if (!Object.prototype.hasOwnProperty.call(MONTH_INDEX, key)) return null
-          var mo3 = MONTH_INDEX[key] + 1, d3 = parseInt(m[2], 10)
-          var hasY3 = m[3] !== undefined
-          var y3 = hasY3 ? parseInt(m[3], 10) : defaultYear
+          let mo3 = MONTH_INDEX[key] + 1, d3 = parseInt(m[2], 10)
+          let hasY3 = m[3] !== undefined
+          let y3 = hasY3 ? parseInt(m[3], 10) : defaultYear
           if (hasY3 && String(m[3]).length === 2) y3 = 2000 + y3
           if (y3 === undefined || y3 === null || isNaN(y3)) return null
           if (!validYMD(y3, mo3, d3)) {
@@ -663,12 +663,12 @@ function tryTime(query, now) {
       }
       m = t.match(/^(\d{1,2})\s+([a-z]+)(?:\s+(\d{2,4}))?$/i)
       if (m) {
-          var d4 = parseInt(m[1], 10)
-          var key4 = _str(m[2]).toLowerCase()
+          let d4 = parseInt(m[1], 10)
+          let key4 = _str(m[2]).toLowerCase()
           if (!Object.prototype.hasOwnProperty.call(MONTH_INDEX, key4)) return null
-          var mo4 = MONTH_INDEX[key4] + 1
-          var hasY4 = m[3] !== undefined
-          var y4 = hasY4 ? parseInt(m[3], 10) : defaultYear
+          let mo4 = MONTH_INDEX[key4] + 1
+          let hasY4 = m[3] !== undefined
+          let y4 = hasY4 ? parseInt(m[3], 10) : defaultYear
           if (hasY4 && String(m[3]).length === 2) y4 = 2000 + y4
           if (y4 === undefined || y4 === null || isNaN(y4)) return null
           if (!validYMD(y4, mo4, d4)) {
@@ -681,21 +681,21 @@ function tryTime(query, now) {
   }
 
   function formatOffset(offMin) {
-      var sign = offMin < 0 ? "-" : "+"
-      var a = offMin < 0 ? -offMin : offMin
+      let sign = offMin < 0 ? "-" : "+"
+      let a = offMin < 0 ? -offMin : offMin
       return sign + pad2(Math.floor(a / 60)) + pad2(a % 60)
   }
 
   function formatClock(h24, mi, se, use12, hasSec) {
       if (use12) {
-          var h12 = h24 % 12
+          let h12 = h24 % 12
           if (h12 === 0) h12 = 12
-          var s = h12 + ":" + pad2(mi)
+          let s = h12 + ":" + pad2(mi)
           if (hasSec) s += ":" + pad2(se)
           s += h24 < 12 ? " AM" : " PM"
           return s
       }
-      var t = pad2(h24) + ":" + pad2(mi)
+      let t = pad2(h24) + ":" + pad2(mi)
       if (hasSec) t += ":" + pad2(se)
       return t
   }
@@ -708,26 +708,26 @@ function tryTime(query, now) {
   // { time, date|null, tz } with time from parseTimeString,
   // date from parseDateString (or null) and tz from parseTzToken.
   function parseConvertQuery(query) {
-      var t = _str(query).trim()
+      let t = _str(query).trim()
       if (t === "" || t.indexOf("\n") >= 0 || t.length > 140) return null
       if (/^time\s+in\b/i.test(t)) return null
-      var toks = t.split(/\s+/)
+      let toks = t.split(/\s+/)
       if (toks.length < 2) return null
-      var tz = parseTzToken(toks[toks.length - 1])
+      let tz = parseTzToken(toks[toks.length - 1])
       if (!tz) return null
-      var rest = toks.slice(0, toks.length - 1).join(" ").trim()
+      let rest = toks.slice(0, toks.length - 1).join(" ").trim()
       if (rest === "") return null
-      var tm = parseTimeString(rest)
+      let tm = parseTimeString(rest)
       if (tm) return { time: tm, date: null, dateRaw: "", tz: tz }
-      var rtoks = rest.split(/\s+/)
-      for (var k = 1; k < rtoks.length; k++) {
-          var left = rtoks.slice(0, k).join(" ")
-          var right = rtoks.slice(k).join(" ")
-          var tl = parseTimeString(left)
-          var dr = parseDateString(right, 2000)
+      let rtoks = rest.split(/\s+/)
+      for (let k = 1; k < rtoks.length; k++) {
+          let left = rtoks.slice(0, k).join(" ")
+          let right = rtoks.slice(k).join(" ")
+          let tl = parseTimeString(left)
+          let dr = parseDateString(right, 2000)
           if (tl && dr) return { time: tl, date: dr, dateRaw: right, tz: tz }
-          var dl = parseDateString(left, 2000)
-          var tr = parseTimeString(right)
+          let dl = parseDateString(left, 2000)
+          let tr = parseTimeString(right)
           if (dl && tr) return { time: tr, date: dl, dateRaw: left, tz: tz }
       }
       return null
@@ -737,41 +737,41 @@ function tryTime(query, now) {
       // A date without a year means this year in the source zone; Feb 29
       // rolls forward to the next leap year instead of vanishing.
       if (!date || date.hasYear) return date
-      var probe = new Date(nowUtc + srcOff * 60000)
-      var srcYear = probe.getUTCFullYear()
-      for (var y = srcYear; y < srcYear + 8; y++) {
-          var real = parseDateString(dateRaw, y)
+      let probe = new Date(nowUtc + srcOff * 60000)
+      let srcYear = probe.getUTCFullYear()
+      for (let y = srcYear; y < srcYear + 8; y++) {
+          let real = parseDateString(dateRaw, y)
           if (real && real.m === date.m && real.d === date.d && validYMD(real.y, real.m, real.d)) return real
       }
       return null
   }
 
   function convertParsed(parsed, now) {
-      var base = (now === undefined || now === null) ? new Date()
+      let base = (now === undefined || now === null) ? new Date()
           : (now instanceof Date ? now : new Date(now))
       if (isNaN(base.getTime())) return null
-      var nowUtc = base.getTime()
-      var srcOff = parsed.tz.offsetMin
-      var y, m, d
+      let nowUtc = base.getTime()
+      let srcOff = parsed.tz.offsetMin
+      let y, m, d
       if (parsed.date) {
-          var filled = resolveMissingYear(parsed.date, parsed.dateRaw, srcOff, nowUtc)
+          let filled = resolveMissingYear(parsed.date, parsed.dateRaw, srcOff, nowUtc)
           if (!filled) return null
           y = filled.y; m = filled.m; d = filled.d
       } else {
-          var shifted = new Date(nowUtc + srcOff * 60000)
+          let shifted = new Date(nowUtc + srcOff * 60000)
           y = shifted.getUTCFullYear()
           m = shifted.getUTCMonth() + 1
           d = shifted.getUTCDate()
       }
       if (!validYMD(y, m, d)) return null
-      var utc = Date.UTC(y, m - 1, d, parsed.time.h24, parsed.time.min, parsed.time.sec)
+      let utc = Date.UTC(y, m - 1, d, parsed.time.h24, parsed.time.min, parsed.time.sec)
           - srcOff * 60000
-      var local = new Date(utc)
+      let local = new Date(utc)
       if (isNaN(local.getTime())) return null
-      var srcWd = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
-      var srcTime = formatClock(parsed.time.h24, parsed.time.min, parsed.time.sec, parsed.time.use12, parsed.time.hasSec)
-      var localTime = formatClock(local.getHours(), local.getMinutes(), local.getSeconds(), parsed.time.use12, parsed.time.hasSec)
-      var localOff = -local.getTimezoneOffset()
+      let srcWd = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+      let srcTime = formatClock(parsed.time.h24, parsed.time.min, parsed.time.sec, parsed.time.use12, parsed.time.hasSec)
+      let localTime = formatClock(local.getHours(), local.getMinutes(), local.getSeconds(), parsed.time.use12, parsed.time.hasSec)
+      let localOff = -local.getTimezoneOffset()
       return {
           utc: utc,
           src: {
@@ -791,19 +791,19 @@ function tryTime(query, now) {
   // Null when not a conversion query, otherwise
   // { ok:true, source, local, label, sub } or { ok:false, error }.
   function tryConvert(query, now) {
-      var parsed = parseConvertQuery(query)
+      let parsed = parseConvertQuery(query)
       if (!parsed) return null
       // Resolve a missing year against the source zone before converting:
       // the placeholder above only proved the month/day.
       if (parsed.date && !parsed.date.hasYear) {
-          var base0 = (now === undefined || now === null) ? new Date()
+          let base0 = (now === undefined || now === null) ? new Date()
               : (now instanceof Date ? now : new Date(now))
           if (isNaN(base0.getTime())) return null
-          var filled = resolveMissingYear(parsed.date, parsed.dateRaw, parsed.tz.offsetMin, base0.getTime())
+          let filled = resolveMissingYear(parsed.date, parsed.dateRaw, parsed.tz.offsetMin, base0.getTime())
           if (!filled) return null
           parsed.date = filled
       }
-      var c = convertParsed(parsed, now)
+      let c = convertParsed(parsed, now)
       if (!c) return null
       return {
           ok: true,
