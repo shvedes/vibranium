@@ -13,21 +13,21 @@
 // guard the weather projections repeat for every measured value.
 function numberOrNull(value) {
   if (value === undefined || value === null || value === "") return null
-  var n = parseFloat(String(value))
+  const n = parseFloat(String(value))
   return isNaN(n) ? null : n
 }
 
 // Two-digit zero padding. Canonical home of the CalendarLib /
 // ClipboardLib / NotificationsLib pad2 triple.
 function pad2(value) {
-  var n = Number(value)
+  const n = Number(value)
   return (n < 10 ? "0" : "") + n
 }
 
 // One decimal unless it rounds away ("1024.0 KB" -> "1024 KB").
 // Canonical home of ClipboardLib trim1.
 function trim1(n) {
-  var s = Number(n).toFixed(1)
+  const s = Number(n).toFixed(1)
   return s.endsWith(".0") ? s.substring(0, s.length - 2) : s
 }
 
@@ -37,7 +37,7 @@ function trim1(n) {
 // Canonical home of the Math.round(volume * 100) + "%" readout repeated by
 // the volume module, its island and the now-playing surfaces.
 function percent(ratio) {
-  var n = Number(ratio)
+  let n = Number(ratio)
   if (!isFinite(n)) n = 0
   return Math.round(n * 100) + "%"
 }
@@ -46,7 +46,7 @@ function percent(ratio) {
 // compare. Unlike percent(), the scale is not clamped: a boosted level may
 // legitimately read above 100. Non-numeric input reads as 0.
 function percentInt(ratio) {
-  var n = Number(ratio)
+  let n = Number(ratio)
   if (!isFinite(n)) n = 0
   return Math.round(n * 100)
 }
@@ -55,7 +55,7 @@ function percentInt(ratio) {
 // floored and clamped at zero, matching the step rules the menu's numeric
 // editors already apply.
 function fixed(value, decimals) {
-  var places = Math.max(0, Math.floor(Number(decimals) || 0))
+  const places = Math.max(0, Math.floor(Number(decimals) || 0))
   return Number(value).toFixed(places)
 }
 
@@ -63,11 +63,11 @@ function fixed(value, decimals) {
 // field stays whole, every larger unit keeps one decimal, and a non-positive
 // or non-finite count reads as "" so a caller can skip the fragment.
 function formatBinaryFileSize(bytes) {
-  var n = Number(bytes)
+  const n = Number(bytes)
   if (!isFinite(n) || n <= 0) return ""
-  var units = ["B", "KiB", "MiB", "GiB", "TiB"]
-  var i = 0
-  var v = n
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"]
+  let i = 0
+  let v = n
   while (v >= 1024 && i < units.length - 1) {
     v /= 1024
     i++
@@ -79,7 +79,7 @@ function formatBinaryFileSize(bytes) {
 // a KiB, one trimmed decimal above it. Canonical home of ClipboardLib
 // formatSize. NaN and non-positive input answer "" rather than a zero size.
 function formatFileSize(bytes) {
-  var b = Number(bytes)
+  const b = Number(bytes)
   if (isNaN(b) || b <= 0) return ""
   if (b < 1024) return b + " B"
   if (b < 1024 * 1024) return trim1(b / 1024) + " KB"
@@ -91,7 +91,7 @@ function formatFileSize(bytes) {
 // Canonical home of Network formatBytes. Floors hostile input at 0 so a
 // missing counter reads as empty rather than NaN.
 function formatBytes(bytes) {
-  var n = Number(bytes)
+  let n = Number(bytes)
   if (!isFinite(n) || n < 0) n = 0
   if (n < 1024) return Math.round(n) + " B"
   if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB"
@@ -110,9 +110,9 @@ function formatByteRate(bytesPerSec) {
 // formatRate. Zero/non-finite means "no reading" and renders as "" so
 // callers can skip the fragment.
 function formatWatts(watts) {
-  var w = Number(watts)
+  const w = Number(watts)
   if (!isFinite(w) || w === 0) return ""
-  var r = Math.round(w * 10) / 10
+  const r = Math.round(w * 10) / 10
   if (r === 0) return ""
   return r.toFixed(1) + " W"
 }

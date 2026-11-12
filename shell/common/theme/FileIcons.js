@@ -105,7 +105,7 @@ var IMAGE_MIMES = Object.assign(Object.create(null), {
 // frame in RAM. webp is NOT listed: an animated webp shows its first
 // frame through the static path.
 function isAnimatedExt(ext) {
-  var e = String(ext || "").toLowerCase()
+  const e = String(ext || "").toLowerCase()
   return e === "gif" || e === "mng"
 }
 
@@ -122,7 +122,7 @@ function extOf(path) {
 // clipboard suite): the basename only, and a leading dot is not an
 // extension (".ts" -> ""), so a dot in a directory never leaks either.
 function extIconName(path) {
-  var e = SU.leafExt(path)
+  const e = SU.leafExt(path)
   if (e === "") return ""
   if (e === "svg") return ICONS.svg
   if (IMAGE_EXTS[e] === 1 || e === "gif" || e === "avif" || e === "heic" || e === "heif") return ICONS.image
@@ -145,7 +145,7 @@ function ok(name) {
 
 // MIME value for an image path, image/png for anything unknown.
 function mimeForExt(path) {
-  var m = IMAGE_MIMES[extOf(path)]
+  const m = IMAGE_MIMES[extOf(path)]
   return m !== undefined ? m : "image/png"
 }
 
