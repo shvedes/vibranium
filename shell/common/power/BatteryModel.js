@@ -30,7 +30,7 @@
 // reads real percent: fractions scale up, anything already above 1
 // passes through untouched.
 function normalizePct(value) {
-  var n = Number(value)
+  let n = Number(value)
   if (!isFinite(n)) return 100
   return n <= 1 ? n * 100 : n
 }
@@ -41,7 +41,7 @@ function normalizePct(value) {
 // are filtered by isTrackedType.
 function batteryIconFor(percentage, charging) {
   if (charging) return "battery-charging"
-  var p = normalizePct(percentage)
+  let p = normalizePct(percentage)
   if (p <= 5) return "battery-0"
   if (p <= 15) return "battery-1"
   if (p <= 30) return "battery-2"
@@ -53,7 +53,7 @@ function batteryIconFor(percentage, charging) {
 // batteryColorFor).
 function batteryAccentFor(percentage, charging) {
   if (charging) return "green"
-  var p = normalizePct(percentage)
+  let p = normalizePct(percentage)
   if (p <= 5) return ""
   if (p <= 15) return "orange"
   if (p <= 30) return "yellow"
@@ -65,7 +65,7 @@ function batteryAccentFor(percentage, charging) {
 // carried by the accent above.
 function batteryColorFor(percentage, charging) {
   if (!charging) {
-    var p = normalizePct(percentage)
+    let p = normalizePct(percentage)
     if (p <= 5) return "red"
   }
   return "foreground_0"
@@ -117,11 +117,11 @@ function isRunningDown(state, charging, fullyCharged, pendingCharge) {
 // Human label for a device: the UPower model (e.g. "Logitech G305"),
 // falling back to the type string ("Mouse") and then the native path.
 function deviceLabel(model, typeString, nativePath) {
-  var m = String(model || "").trim()
+  let m = String(model || "").trim()
   if (m !== "") return m
-  var t = String(typeString || "").trim()
+  let t = String(typeString || "").trim()
   if (t !== "") return t
-  var n = String(nativePath || "").trim()
+  let n = String(nativePath || "").trim()
   return n === "" ? "Unknown device" : n
 }
 
@@ -131,7 +131,7 @@ function deviceLabel(model, typeString, nativePath) {
 // callers fall back to the generic bluetooth mark, mirroring the
 // bluetooth module's unknown-class fallback.
 function deviceIconName(typeString) {
-  var t = String(typeString || "").toLowerCase()
+  let t = String(typeString || "").toLowerCase()
   if (/keyboard/.test(t)) return "keyboard"
   if (/mous/.test(t) || /touchpad/.test(t)) return "mice"
   if (/gaming/.test(t)) return "gamepad"
@@ -154,9 +154,9 @@ function deviceIconName(typeString) {
 // returns spaced compounds ("Fully Charged", "Pending Charge" - probed
 // live), the UI reads them with only the leading word capitalized.
 function prettyState(stateString) {
-  var s = String(stateString || "").trim()
+  let s = String(stateString || "").trim()
   if (s === "") return "Unknown"
-  var map = {
+  let map = {
     Unknown: "Unknown",
     Charging: "Charging",
     Discharging: "Discharging",
@@ -165,7 +165,7 @@ function prettyState(stateString) {
     PendingCharge: "Pending charge",
     PendingDischarge: "Pending discharge"
   }
-  var squashed = s.replace(/\s+/g, "")
+  let squashed = s.replace(/\s+/g, "")
   if (map[squashed] !== undefined) return map[squashed]
   if (map[s] !== undefined) return map[s]
   return squashed.replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -197,18 +197,18 @@ function formatRate(watts) {
 // timeToFull (and UPower leaves timeToEmpty at zero), a discharging one
 // reports timeToEmpty, so neither estimate is read on the wrong side.
 function rowSubtext(row) {
-  var r = row || {}
-  var pct = Math.round(Number(r.percentage))
+  let r = row || {}
+  let pct = Math.round(Number(r.percentage))
   if (!isFinite(pct)) pct = 0
-  var text = pct + "%"
+  let text = pct + "%"
   if (!!r.charging) {
     text += " - charging"
-    var full = formatDuration(r.timeToFull)
+    let full = formatDuration(r.timeToFull)
     if (full !== "") text += " - " + full + " to full"
   } else if (String(r.stateLabel || "") === "Fully charged") {
     text += " - Fully charged"
   } else {
-    var left = formatDuration(r.timeToEmpty)
+    let left = formatDuration(r.timeToEmpty)
     if (left !== "") text += " - " + left + " left"
   }
   return text
@@ -218,10 +218,10 @@ function rowSubtext(row) {
 // label. Operates on plain row objects ({ percentage, label, ... }),
 // never on live QObjects.
 function sortRows(rows) {
-  var list = StoreGuards.copyList(rows)
+  let list = StoreGuards.copyList(rows)
   list.sort(function(a, b) {
-    var pa = Number(a ? a.percentage : NaN)
-    var pb = Number(b ? b.percentage : NaN)
+    let pa = Number(a ? a.percentage : NaN)
+    let pb = Number(b ? b.percentage : NaN)
     if (!isFinite(pa)) pa = 100
     if (!isFinite(pb)) pb = 100
     if (pa !== pb) return pa - pb
@@ -239,27 +239,27 @@ function sortRows(rows) {
 // readable; never returns null (an empty list renders the "no additional
 // information" hint instead).
 function detailRows(info) {
-  var r = info || {}
-  var out = []
+  let r = info || {}
+  let out = []
   function add(label, value) {
-    var v = SU.textOf(value).trim()
+    let v = SU.textOf(value).trim()
     if (v === "") return
     out.push({ label: label, value: v })
   }
-  var pct = Math.round(Number(r.percentage))
+  let pct = Math.round(Number(r.percentage))
   add("State", r.stateLabel)
   if (isFinite(pct)) out.push({ label: "Charge", value: pct + "%" })
-  var tte = formatDuration(r.timeToEmpty)
+  let tte = formatDuration(r.timeToEmpty)
   if (tte !== "") out.push({ label: "Time to empty", value: tte })
-  var ttf = formatDuration(r.timeToFull)
+  let ttf = formatDuration(r.timeToFull)
   if (ttf !== "") out.push({ label: "Time to full", value: ttf })
-  var rate = formatRate(r.changeRate)
+  let rate = formatRate(r.changeRate)
   if (rate !== "") out.push({ label: "Charge rate", value: rate })
-  var energy = Number(r.energy)
+  let energy = Number(r.energy)
   if (isFinite(energy) && energy > 0) out.push({ label: "Energy", value: Format.fixed(energy, 1) + " Wh" })
-  var capacity = Number(r.energyCapacity)
+  let capacity = Number(r.energyCapacity)
   if (isFinite(capacity) && capacity > 0) out.push({ label: "Energy capacity", value: Format.fixed(capacity, 1) + " Wh" })
-  var health = Number(r.healthPercentage)
+  let health = Number(r.healthPercentage)
   if (r.healthSupported && isFinite(health) && health > 0)
     out.push({ label: "Health", value: Math.round(health) + "%" })
   add("Type", r.typeLabel)
@@ -288,15 +288,15 @@ function detailRows(info) {
 // the time to full - the same shape the island entry's sub-line uses. The
 // rest of the telemetry stays in the island's per-device dropdown.
 function tooltipRows(entries) {
-  var list = StoreGuards.asList(entries)
-  var rows = []
-  for (var i = 0; i < list.length; i++) {
-    var e = list[i] || {}
-    var pct = Math.round(Number(e.percentage))
+  let list = StoreGuards.asList(entries)
+  let rows = []
+  for (let i = 0; i < list.length; i++) {
+    let e = list[i] || {}
+    let pct = Math.round(Number(e.percentage))
     if (!isFinite(pct)) pct = 0
-    var text = String(e.label || "Unknown device") + " - " + pct + "%"
+    let text = String(e.label || "Unknown device") + " - " + pct + "%"
     if (!!e.charging) text += " - charging"
-    var full = !!e.charging ? formatDuration(e.timeToFull) : ""
+    let full = !!e.charging ? formatDuration(e.timeToFull) : ""
     if (full !== "") text += " - " + full + " to full"
     rows.push({
       icon: deviceIconName(e.typeString) || batteryIconFor(pct, !!e.charging),
@@ -311,11 +311,11 @@ function tooltipRows(entries) {
 // remembered device that is no longer present resolves to null so the
 // caller can fall back to its own default.
 function rowForKey(rows, key) {
-  var k = String(key === undefined || key === null ? "" : key)
+  let k = String(key === undefined || key === null ? "" : key)
   if (k === "") return null
-  var list = StoreGuards.asList(rows)
-  for (var i = 0; i < list.length; i++) {
-    var r = list[i]
+  let list = StoreGuards.asList(rows)
+  for (let i = 0; i < list.length; i++) {
+    let r = list[i]
     if (r && String(r.key === undefined || r.key === null ? "" : r.key) === k) return r
   }
   return null
@@ -329,24 +329,24 @@ function rowForKey(rows, key) {
 // Returns "" when there is nothing to move to: an empty list, a zero or
 // non-finite step, or a landing row that carries no key.
 function cycleKey(rows, currentKey, step) {
-  var list = StoreGuards.asList(rows)
-  var n = list.length
-  var s = Number(step)
+  let list = StoreGuards.asList(rows)
+  let n = list.length
+  let s = Number(step)
   if (n === 0 || !isFinite(s) || s === 0) return ""
   s = s > 0 ? 1 : -1
-  var cur = String(currentKey === undefined || currentKey === null ? "" : currentKey)
-  var at = -1
+  let cur = String(currentKey === undefined || currentKey === null ? "" : currentKey)
+  let at = -1
   if (cur !== "") {
-    for (var i = 0; i < n; i++) {
-      var r = list[i]
+    for (let i = 0; i < n; i++) {
+      let r = list[i]
       if (r && String(r.key === undefined || r.key === null ? "" : r.key) === cur) {
         at = i
         break
       }
     }
   }
-  var idx = at < 0 ? (s > 0 ? 0 : n - 1) : (at + s + n) % n
-  var hit = list[idx]
+  let idx = at < 0 ? (s > 0 ? 0 : n - 1) : (at + s + n) % n
+  let hit = list[idx]
   if (!hit) return ""
   return String(hit.key === undefined || hit.key === null ? "" : hit.key)
 }
@@ -367,7 +367,7 @@ function cycleKey(rows, currentKey, step) {
 // because a device with no path at all reports "", and a non-string is
 // treated as absent rather than stringified into a key nobody can trace.
 function deviceKey(nativePath, typeString) {
-  var n = typeof nativePath === "string" ? nativePath.trim() : ""
+  let n = typeof nativePath === "string" ? nativePath.trim() : ""
   if (n !== "") return n
   return typeof typeString === "string" ? SU.lowerTrim(typeString) : ""
 }
@@ -389,15 +389,15 @@ function resolveLevels(warnPct, criticalPct) {
   // non-finite because Number("") is 0, which is finite and would clamp
   // up to 1 and read as a deliberate 1% threshold.
   function level(value, fallback) {
-    var raw = String(value === undefined || value === null ? "" : value).trim()
+    let raw = String(value === undefined || value === null ? "" : value).trim()
     if (raw === "") return fallback
-    var n = Number(raw)
+    let n = Number(raw)
     if (!isFinite(n)) return fallback
     return Range.clamp(Math.round(n), 1, 100)
   }
-  var asked = level(criticalPct, 5)
-  var warn = level(warnPct, 20)
-  var critical = asked
+  let asked = level(criticalPct, 5)
+  let warn = level(warnPct, 20)
+  let critical = asked
   if (critical >= warn) critical = warn - 1
   // `warn - 1` left nothing at all, which means warn was 1. Pull warn up
   // to one above the critical level that was asked for rather than let a
@@ -421,8 +421,8 @@ function resolveLevels(warnPct, criticalPct) {
 // 0..1 fraction UPower reports, so a reader can pass it straight
 // through.
 function alertFor(pct, levels) {
-  var p = normalizePct(pct)
-  var l = levels || {}
+  let p = normalizePct(pct)
+  let l = levels || {}
   if (p <= Number(l.critical)) return "critical"
   if (p <= Number(l.warn)) return "warn"
   return ""
@@ -488,9 +488,9 @@ function alertFor(pct, levels) {
 // (NotificationsLib.timeoutMs): an alert that silently expires is the one
 // failure this channel cannot have.
 function notifyArgv(level, label, percentage) {
-  var critical = String(level) === "critical"
-  var tone = critical ? "red" : "orange"
-  var pct = Math.round(normalizePct(percentage))
+  let critical = String(level) === "critical"
+  let tone = critical ? "red" : "orange"
+  let pct = Math.round(normalizePct(percentage))
   if (!isFinite(pct)) pct = 100
   return [
     "notify-send",
