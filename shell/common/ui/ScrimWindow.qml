@@ -34,7 +34,6 @@ PanelWindow {
   onOverlayOpenChanged: scrimFade.enabled = root.animationsEnabled && !root.overlayOpen
 
   Item {
-    id: scrimContent
     anchors.fill: parent
     opacity: root.overlayOpen ? 1 : 0
     // Only the CLOSE animates. Every consumer of this window is summoned by a

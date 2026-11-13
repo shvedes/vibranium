@@ -234,7 +234,6 @@ Item {
   // bubble, so the leftward bubble never touches a clip boundary: it
   // briefly paints over the row's own text instead.
   Rectangle {
-    id: tip
 
     visible: root._tipShown && root.tipText !== "" && root.live
     anchors.right: parent.left

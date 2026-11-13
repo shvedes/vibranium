@@ -163,14 +163,12 @@ Item {
   // ---- month title (with prev/next chevrons) ------------------------------
 
   Item {
-    id: titleRow
 
     y: 0
     width: root.gridW
     height: root.titleH
 
     Text {
-      id: monthTitle
 
       anchors.centerIn: parent
       text: Qt.formatDate(new Date(root.viewYearRolled, root.viewMonthIndex, 1), "MMMM yyyy")
@@ -181,7 +179,6 @@ Item {
     }
 
     Text {
-      id: prevChevron
 
       width: 24
       height: root.titleH
@@ -204,7 +201,6 @@ Item {
     }
 
     Text {
-      id: nextChevron
 
       width: 24
       height: root.titleH
@@ -230,7 +226,6 @@ Item {
   // ---- year progress, under the title -------------------------------------
 
   Item {
-    id: yearBlock
 
     y: root.yearBlockY
     width: root.gridW
@@ -244,7 +239,6 @@ Item {
     }
 
     ProgressBar {
-      id: yearBar
 
       width: root.gridW - 44
       anchors.left: parent.left
@@ -255,7 +249,6 @@ Item {
     }
 
     Text {
-      id: yearPct
 
       width: 36
       anchors.right: parent.right

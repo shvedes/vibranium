@@ -153,7 +153,6 @@ Item {
         spacing: Ui.s
 
         IconImage {
-          id: glyph
 
           visible: root.icon !== ""
           anchors.verticalCenter: parent.verticalCenter

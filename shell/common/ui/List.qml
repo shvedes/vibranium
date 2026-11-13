@@ -475,7 +475,6 @@ ListView {
 
       Behavior on y {
         NumberAnimation {
-          id: highlightMoveAnim
           duration: root.highlightMoveDuration
           easing.type: Easing.OutCubic
           onFinished: {

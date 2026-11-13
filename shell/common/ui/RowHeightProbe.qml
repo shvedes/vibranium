@@ -82,7 +82,6 @@ Item {
   // unresolved width is zero lines tall, and 0 is exactly the value that
   // poisoned the first draft of this cache.
   Text {
-    id: labelProbe
     visible: false
     width: 1
     wrapMode: Text.NoWrap
@@ -92,7 +91,6 @@ Item {
   }
 
   Text {
-    id: subProbe
     visible: false
     width: 1
     wrapMode: Text.NoWrap

@@ -46,7 +46,6 @@ Item {
   }
 
   Timer {
-    id: settleTimer
 
     interval: root.settleMs
     running: true

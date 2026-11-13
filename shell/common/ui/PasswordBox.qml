@@ -375,7 +375,6 @@ Rectangle {
   // rounded square rotated 45deg then stretched horizontally, with a solid
   // round pupil.
   Rectangle {
-    id: revealBadge
 
     anchors.right: root.left
     anchors.rightMargin: 12
@@ -389,7 +388,6 @@ Rectangle {
     opacity: root.revealed ? 1 : 0
 
     transform: Translate {
-      id: badgeRise
 
       // Hidden state sits pushed toward the box; revealing slides the
       // badge up into place instead of popping it.

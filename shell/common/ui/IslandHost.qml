@@ -411,7 +411,6 @@ PanelWindow {
     // router and declared before the card, so the card paints above it and
     // content clicks never fall through to it.
     MouseArea {
-      id: dismissArea
 
       anchors.fill: parent
       enabled: root.open
