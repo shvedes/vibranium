@@ -5,7 +5,6 @@
 // functions are asked about and nothing in this file owns one.
 .pragma library
 
-.import "../../common/text/Format.js" as Format
 .import "../../common/math/Range.js" as Range
 .import "../../common/text/StringUtils.js" as SU
 .import "../../common/text/Clock.js" as ClockFmt
