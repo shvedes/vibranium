@@ -3683,24 +3683,6 @@ Rectangle {
     return true
   }
 
-  // --- search-field word editing (readline parity with LauncherPanel) ---
-
-
-  function eraseWord() {
-    if (panel.mode !== "filter") return
-    searchField.eraseWord()
-  }
-
-  function wordBackward() {
-    if (panel.mode !== "filter") return
-    searchField.wordBackward()
-  }
-
-  function wordForward() {
-    if (panel.mode !== "filter") return
-    searchField.wordForward()
-  }
-
   // Key names the routing table understands, with their Qt codes. The
   // table is a plain .js library and may not name a Qt constant, so the
   // vocabulary lives here - once, and the reverse lookup is derived from
