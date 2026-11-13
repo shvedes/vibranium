@@ -421,7 +421,7 @@ Variants {
         visible: Polkit.supplementary === ""
         text: "ENTER AUTHENTICATE \u00B7 ESC CANCEL"
         color: Ui.tint("foreground_1", 0.45)
-        font.pixelSize: 11
+        font.pixelSize: Ui.fontS
         font.family: Ui.fontFamily
         font.bold: true
         font.letterSpacing: 3

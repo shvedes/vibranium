@@ -392,7 +392,7 @@ WlSessionLockSurface {
       opacity: parent.layoutCode !== "" && Keyboard.layoutCount > 1 ? 0.8 : 0
       text: parent.layoutCode
       color: Theme.color("foreground_1")
-      font.pixelSize: 12
+      font.pixelSize: Ui.fontM
       font.family: Ui.fontFamily
       font.bold: true
       font.letterSpacing: 3

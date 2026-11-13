@@ -248,7 +248,7 @@ Card {
               anchors.verticalCenter: parent.verticalCenter
               text: String(entryRow.modelData.label ?? "")
               color: Ui.solid("foreground_0")
-              font.pixelSize: 12
+              font.pixelSize: Ui.fontM
               font.family: Ui.fontFamily
             }
 
@@ -259,7 +259,7 @@ Card {
               text: "›"
               color: Ui.solid("foreground_0")
               opacity: 0.6
-              font.pixelSize: 12
+              font.pixelSize: Ui.fontM
               font.family: Ui.fontFamily
             }
           }

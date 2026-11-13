@@ -38,7 +38,7 @@ Rectangle {
     anchors.centerIn: parent
     text: "CAPS LOCK"
     color: Theme.color("yellow")
-    font.pixelSize: 11
+    font.pixelSize: Ui.fontS
     font.family: Ui.fontFamily
     font.bold: true
     font.letterSpacing: 2

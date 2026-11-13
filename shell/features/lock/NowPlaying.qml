@@ -347,7 +347,7 @@ Item {
                 text: String(root.artist ?? "")
                 textFormat: Text.PlainText
                 color: Ui.tint("foreground_1", 0.7)
-                font.pixelSize: 12
+                font.pixelSize: Ui.fontM
                 font.family: Ui.fontFamily
                 elide: Text.ElideRight
               }
@@ -371,7 +371,7 @@ Item {
                 text: String(root.album ?? "")
                 textFormat: Text.PlainText
                 color: Ui.tint("foreground_1", 0.55)
-                font.pixelSize: 12
+                font.pixelSize: Ui.fontM
                 font.family: Ui.fontFamily
                 elide: Text.ElideRight
               }

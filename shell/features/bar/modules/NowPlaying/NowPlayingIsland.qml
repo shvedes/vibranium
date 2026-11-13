@@ -1013,7 +1013,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.linkCopied ? "Copied!" : (root.title !== "" ? root.title : "--")
                     color: Ui.solid("foreground_0")
-                    font.pixelSize: 12
+                    font.pixelSize: Ui.fontM
                     font.family: Ui.fontFamily
                     font.bold: true
                     font.underline: root.titleHover && root.hasTrackLink
@@ -1106,7 +1106,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.artist !== "" ? root.artist : "--"
                     color: Ui.tint("foreground_1", 0.7)
-                    font.pixelSize: 11
+                    font.pixelSize: Ui.fontS
                     font.family: Ui.fontFamily
                     elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
                     wrapMode: Text.NoWrap
@@ -1185,7 +1185,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.album !== "" ? root.album : "--"
                     color: Ui.tint("foreground_1", 0.55)
-                    font.pixelSize: 11
+                    font.pixelSize: Ui.fontS
                     font.family: Ui.fontFamily
                     elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
                     wrapMode: Text.NoWrap

@@ -225,7 +225,7 @@ QtObject {
       // event - fill and label brighten together - rather than as a border
       // arriving under an unchanged word.
       color: btn.ghost && !ma.containsMouse ? Ui.tint("foreground_0", 0.78) : Ui.solid("foreground_0")
-      font.pixelSize: 12
+      font.pixelSize: Ui.fontM
       font.family: Ui.fontFamily
 
       Behavior on color { ColorAnimation { duration: 100 } }
@@ -304,7 +304,7 @@ QtObject {
       width: Math.min(implicitWidth, 224)
       text: hint.label
       color: Ui.solid("foreground_0")
-      font.pixelSize: 11
+      font.pixelSize: Ui.fontS
       font.family: Ui.fontFamily
       elide: Text.ElideRight
     }
@@ -430,7 +430,7 @@ QtObject {
       anchors.centerIn: parent
       text: kcap.key
       color: Ui.tint("foreground_0", 0.78)
-      font.pixelSize: 11
+      font.pixelSize: Ui.fontS
       font.family: Ui.fontFamily
     }
   }
@@ -1032,7 +1032,7 @@ QtObject {
             anchors.horizontalCenter: parent.horizontalCenter
             text: "or open one from your file manager"
             color: Ui.tint("foreground_0", 0.56)
-            font.pixelSize: 12
+            font.pixelSize: Ui.fontM
             font.family: Ui.fontFamily
           }
 
@@ -1084,7 +1084,7 @@ QtObject {
           visible: dropZone.containsDrag
           text: "Drop to open"
           color: Ui.solid("foreground_0")
-          font.pixelSize: 13
+          font.pixelSize: Ui.fontL
           font.family: Ui.fontFamily
           font.weight: Font.DemiBold
         }
@@ -1191,7 +1191,7 @@ QtObject {
           // status readout can never report two different scales.
           text: Format.percent(root.fitToWindow ? img.fitScale : root.zoomFactor)
           color: Ui.solid("foreground_0")
-          font.pixelSize: 12
+          font.pixelSize: Ui.fontM
           font.family: Ui.fontFamily
           font.weight: Font.DemiBold
         }
@@ -1373,7 +1373,7 @@ QtObject {
               anchors.verticalCenter: parent.verticalCenter
               text: root.currentFileName === "" ? "no image" : root.currentFileName
               color: Ui.solid("foreground_0")
-              font.pixelSize: 12
+              font.pixelSize: Ui.fontM
               font.family: Ui.fontFamily
               elide: Text.ElideMiddle
               width: Math.min(implicitWidth, root.win.width * 0.35)
@@ -1411,7 +1411,7 @@ QtObject {
                 visible: !cell.separator
                 text: cell.separator ? "" : cell.modelData.text
                 color: cell.modelData.kind === "zoom" ? Ui.solid("accent") : Ui.tint("foreground_0", 0.78)
-                font.pixelSize: 12
+                font.pixelSize: Ui.fontM
                 font.family: Ui.fontFamily
                 font.weight: cell.modelData.kind === "zoom" ? Font.DemiBold : Font.Normal
               }

@@ -43,7 +43,7 @@ Rectangle {
     anchors.centerIn: parent
     text: "\u2713"
     color: Ui.solid("background_0")
-    font.pixelSize: 13
+    font.pixelSize: Ui.fontL
     font.bold: true
     textFormat: Text.PlainText
   }
