@@ -1795,20 +1795,7 @@ group('isMediaPath / mediaBaseName / buildMediaSummary', () => {
 section('ClipboardLib - presentation')
 // ===========================================================================
 
-group('pad2 / trim1 / formatSize', () => {
-  eq('pad 0', CL.pad2(0), '00')
-  eq('pad 9', CL.pad2(9), '09')
-  eq('10 is already two digits', CL.pad2(10), '10')
-  eq('100 is not truncated', CL.pad2(100), '100')
-  // The implementation is `(n < 10 ? "0" : "") + n`, which string-concatenates
-  // rather than formatting, so a negative keeps the pad. Pinned because the
-  // only caller passes a Date component, which is never negative.
-  eq('a negative number keeps the pad', CL.pad2(-3), '0-3')
-  eq('trim1 drops a round tenth', CL.trim1(1024), '1024')
-  eq('trim1 keeps a real tenth', CL.trim1(1.5), '1.5')
-  eq('trim1 rounds to one place then drops a zero tenth', CL.trim1(1.04), '1')
-  eq('trim1 of 1.05 renders as 1.1', CL.trim1(1.05), '1.1')
-  eq('a whole number', CL.trim1(3), '3')
+group('formatSize', () => {
   eq('bytes below 1 KiB', CL.formatSize(1), '1 B')
   eq('the last byte below 1 KiB', CL.formatSize(1023), '1023 B')
   eq('exactly 1 KiB', CL.formatSize(1024), '1 KB')
@@ -2695,8 +2682,7 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 106 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 106)
-  eq('a fresh load of the clipboard lib has 106 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 106)
+  eq('a fresh load of the clipboard lib has 104 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 104)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })

@@ -268,19 +268,8 @@ function formatTime(ts, now, use12h) {
   return ClockFmt.formatTime(ts, now, use12h === true)
 }
 
-// Two-digit zero padding, canonicalized in common/text/Format.js.
-function pad2(n) {
-  return Format.pad2(n)
-}
-
 function formatSize(bytes) {
   return Format.formatFileSize(bytes)
-}
-
-// One decimal unless it rounds away, canonicalized in
-// common/text/Format.js.
-function trim1(n) {
-  return Format.trim1(n)
 }
 
 // Text titles collapse whitespace and cap length, canonicalized in
