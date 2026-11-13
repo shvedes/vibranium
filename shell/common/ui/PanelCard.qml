@@ -65,6 +65,63 @@ Rectangle {
   // "a slot is open" and "the card grows" are different facts about one
   // gesture. See _latchRestingBuffer.
   property bool slotOpen: false
+  // The region a releasing slot leaves the card shrinking FROM, or -1 when no
+  // collapse is in flight.
+  //
+  // An unfold needs no tween here: the consumer's override follows the slot's
+  // own height as it eases out, which is why the height Behavior stands down
+  // above the resting region. A release has no such ramp - the claim goes away
+  // in the turn the slot starts closing - so the card would drop to rest in one
+  // frame under a dropdown that is still visibly collapsing.
+  //
+  // It is a latched, animated number rather than a Behavior on height because
+  // the Behavior's `enabled` is read as a plain member at write time: in the
+  // release turn that write reaches the height before the region comparison
+  // that clears the gate has been re-evaluated, so the shrink takes the bypass
+  // branch and snaps instead of tweening.
+  property real _releaseH: -1
+  // The last region a slot was asking for, kept to be read at the release
+  // edge: the height the card is showing at that moment.
+  property real _releaseFromH: -1
+
+  NumberAnimation {
+    id: releaseAnim
+
+    target: root
+    property: "_releaseH"
+    easing.type: Easing.OutCubic
+    duration: MotionPolicy.duration(Ui.resizeMs)
+    // Landing on the resting region releases the latch, which is the same
+    // height listRegionH answers with once it is gone.
+    onFinished: root._releaseH = -1
+  }
+
+  // The region's two edges. A slot asking for more room is followed frame by
+  // frame, so only its latest value is remembered; the release turns that
+  // value into a tween down to rest.
+  onSlotRegionHChanged: {
+    const base = root.restingListH
+    const want = root.slotRegionH
+    if (want > base + 0.5) {
+      releaseAnim.stop()
+      root._releaseH = -1
+      root._releaseFromH = want
+      return
+    }
+    const from = root._releaseFromH
+    root._releaseFromH = -1
+    releaseAnim.stop()
+    // Nothing grew, or motion is off: there is no collapse to carry.
+    if (!MotionPolicy.enabled || !(from > base + 0.5)) {
+      root._releaseH = -1
+      return
+    }
+    root._releaseH = from
+    releaseAnim.from = from
+    releaseAnim.to = base
+    releaseAnim.restart()
+  }
+
   property real bottomReserve: 0
   property real exactListH: -1
   property bool fitPending: false
@@ -375,6 +432,9 @@ Rectangle {
   // the rows it is showing.
   readonly property real listRegionH: {
     const base = root.restingListH
+    // A collapse in flight owns the region until it lands on rest: the claim
+    // is already gone, so there is no override left to read.
+    if (root._releaseH > 0) return Range.clamp(base, root._releaseH, root.screenMaxListH)
     const want = root.slotRegionH
     if (!(want > 0)) return base
     return Range.clamp(base, want, root.screenMaxListH)
@@ -464,6 +524,11 @@ Rectangle {
     root._restingFitH = -1
     root._fitRecovering = false
     root.restingBufH = 0
+    // An open snaps to its own layout under sizeSnap, so a collapse the last
+    // close left behind must not be inherited by it.
+    releaseAnim.stop()
+    root._releaseH = -1
+    root._releaseFromH = -1
     // contentHeight is NOT cleared: it races delegate birth at open, and the
     // max() floor in restingListH already covers the model side for it.
     showGate.restart()
@@ -490,6 +555,12 @@ Rectangle {
   // follow. So the tween stands down for exactly that case and the
   // height is read as it happens. The children are anchored, so they ride
   // the card and the rows are revealed as it grows.
+  //
+  // The release is the case this gate cannot serve: it clears in the same
+  // turn the region falls back to rest, and the gate is read before that
+  // write. The shrink is therefore carried by `_releaseH` above, which keeps
+  // listRegionH over the resting region for the length of the collapse and
+  // lands it on rest.
   Behavior on height {
     enabled: MotionPolicy.enabled
       && !root.sizeSnap
