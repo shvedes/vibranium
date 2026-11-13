@@ -1645,18 +1645,13 @@ PanelWindow {
       // Pinned explicitly rather than left to the default: the box resizes
       // with the zoom, and a trailing canvasSize addresses a stale backing.
       //
-      // Capped at the document's own pixels. Past that the ink can only be an
-      // upscale of detail the file does not have, while an uncapped backing at
-      // 8x on a 4K shot is a ~140 MB repaint, and a repaint that long holds the
-      // wheel events arriving behind it - the view then answers a whole
-      // queued burst at once, which reads as lagging behind a buffer. The
-      // canvas presents its backing scaled to this item, so the cap costs
-      // sharpness only beyond the document's own resolution.
-      readonly property real _backingK: width > 0 && editor.imgW > 0 && editor.imgH > 0
-        ? Math.min(1, editor.imgW / width, editor.imgH / height) : 1
-      canvasSize: Qt.size(
-        Math.max(1, Math.round(width * _backingK)),
-        Math.max(1, Math.round(height * _backingK)))
+      // The backing is the item, never a fraction of it. A canvas window
+      // smaller than the item is not stretched over it: the scene draws the
+      // window 1:1 in logical pixels from the item's top-left and leaves the
+      // rest bare (measured), so capping the backing shrinks the ink into
+      // that corner and puts every stroke up and to the left of the cursor.
+      canvasSize: Qt.size(Math.max(1, Math.round(width)),
+        Math.max(1, Math.round(height)))
 
       // A fresh overlay window configures fullscreen asynchronously:
       // the probe/load/paint sequence above can run while the stage
@@ -1708,11 +1703,9 @@ PanelWindow {
          ctx.clearRect(0, 0, board.canvasSize.width, board.canvasSize.height)
          // _boardPaintK maps document pixels onto canvas pixels 1:1 (see
          // canvasSize), over the item's own rect, so a document point lands
-         // on the same screen pixel the cursor is over. _backingK folds in the
-         // resolution cap: the canvas is that much smaller than the item and
-         // is presented stretched to it.
-          ctx.setTransform(editor._boardPaintK * board._backingK, 0, 0,
-            editor._boardPaintK * board._backingK, 0, 0)
+         // on the same screen pixel the cursor is over.
+          ctx.setTransform(editor._boardPaintK, 0, 0,
+            editor._boardPaintK, 0, 0)
         // The document backing rotates continuously with _rotAnim;
         // strokes stay in original coordinates and ride the transform
         // (keeps hit tests, crops and grids free of remapping math).
@@ -1750,8 +1743,8 @@ PanelWindow {
         // ---- above this line: strokes (clipped), over boardImage
         // ---- below this line: chrome, never clipped by the frame
         ctx.save()
-        ctx.setTransform(editor._boardPaintK * board._backingK, 0, 0,
-            editor._boardPaintK * board._backingK, 0, 0)
+        ctx.setTransform(editor._boardPaintK, 0, 0,
+            editor._boardPaintK, 0, 0)
         ctx.translate(editor._docW / 2, editor._docH / 2)
         ctx.rotate(editor._rotAnim * Math.PI / 180)
         ctx.translate(-vr.w / 2, -vr.h / 2)
