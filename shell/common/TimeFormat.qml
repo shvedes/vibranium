@@ -11,8 +11,6 @@ import qs.common
 // hours and any future clock all follow one switch, so a format change
 // can never leave half the shell behind.
 Singleton {
-  id: root
-
   readonly property string tag: "timeFormat"
 
   // True for the 12-hour dial. False covers both "24" and an unset key,

@@ -16,8 +16,6 @@ import "../../../common/text/UnitIpc.js" as UnitIpc
 // never picks an emoji parses nothing. No usage tracking, no dynamic
 // shadowing.
 Singleton {
-  id: root
-
   readonly property string tag: "emojiPicker"
 
   Component.onCompleted: {
