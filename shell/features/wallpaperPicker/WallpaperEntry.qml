@@ -140,7 +140,6 @@ Rectangle {
     // trash glyph centered, so the destructive step is aimed at the image it will
     // remove rather than at a line of text elsewhere on the surface.
     Rectangle {
-      id: deletePane
 
       anchors.left: parent.left
       anchors.right: parent.right

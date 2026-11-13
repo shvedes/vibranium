@@ -407,7 +407,6 @@ PanelWindow {
             spacing: root._lineGap
 
             Icon {
-              id: metricIcon1
               anchors.verticalCenter: parent.verticalCenter
               name: String(lineRow.modelData.icon ?? "")
               colorKey: String(lineRow.modelData.iconColor ?? "foreground_0")
@@ -426,7 +425,6 @@ PanelWindow {
             }
             Item { width: root._lineGap; height: 1 }
             Icon {
-              id: metricIcon2
               anchors.verticalCenter: parent.verticalCenter
               name: String(lineRow.modelData.icon2 ?? "")
               colorKey: String(lineRow.modelData.iconColor2 ?? "foreground_0")

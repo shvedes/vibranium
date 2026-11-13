@@ -123,7 +123,6 @@ QtObject {
     // delete path before the object is retained-destroyed, and the content
     // signals are the same object's own property changes.
     Connections {
-      id: notifConnections
 
       target: root.notif
       ignoreUnknownSignals: false

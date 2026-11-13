@@ -133,7 +133,6 @@ Item {
 
 
   Rectangle {
-    id: bg
 
     anchors.fill: parent
     // Always transparent: the List sliding highlight bar paints the
@@ -153,7 +152,6 @@ Item {
   }
 
   MouseArea {
-    id: clickArea
 
     anchors.fill: parent
     enabled: !row.isSep
@@ -212,7 +210,6 @@ Item {
       // pixel at any scale factor. IconImage has no sourceSize, the same
       // reason TrayItem.qml renders through Image.
       Image {
-        id: iconImg
 
         visible: row.iconSource !== ""
         anchors.fill: parent
@@ -238,7 +235,6 @@ Item {
       // transparency lives in the rgba/hsla/hsva readings, and a see-through
       // dot on a themed surface reads as a broken theme rather than a color.
       Rectangle {
-        id: swatchDot
 
         visible: row.swatchFill !== ""
         anchors.fill: parent

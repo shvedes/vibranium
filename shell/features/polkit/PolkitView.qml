@@ -302,7 +302,6 @@ Variants {
     // never moves; the heading hangs above it through the caps slot, so the
     // slot's animated height glides the heading alone.
     Item {
-      id: panel
 
       readonly property real k: win.showK
 
@@ -433,7 +432,6 @@ Variants {
       // lockscreen inhibitor lines, centered and wrapped. Falls back to a
       // generic line when the app provides no message.
       Text {
-        id: reasonText
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: Polkit.supplementary !== "" ? suppText.bottom : hintText.bottom

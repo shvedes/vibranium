@@ -697,7 +697,6 @@ Item {
           // box that is not waiting reads as the frame's own fill and keyline
           // and nothing more - which is also what a motion-off run gets.
           Rectangle {
-            id: artWash
 
             anchors.fill: parent
             visible: artFlash.running
@@ -909,7 +908,6 @@ Item {
         // The metadata column's fixed cell: it takes its height from the
         // column it holds, which the artwork beside it follows top to bottom.
         Item {
-          id: sideSlot
 
           width: root.metaColumnWidth
           height: metaCol.height

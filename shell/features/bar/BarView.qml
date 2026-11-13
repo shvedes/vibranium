@@ -165,7 +165,6 @@ PanelWindow {
   // compositor put it, so the exclusive zone and the geometry the zones
   // publish never move, only what the bar draws inside it.
   Item {
-    id: barSlide
 
     anchors.fill: parent
     y: Bar.entranceSlide
@@ -226,7 +225,6 @@ PanelWindow {
     }
 
     Rectangle {
-      id: barBorder
 
       z: 1
       x: 0

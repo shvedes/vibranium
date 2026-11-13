@@ -848,7 +848,6 @@ PanelWindow {
   }
 
     MouseArea {
-      id: dragArea
 
       z: -1
       anchors.fill: parent

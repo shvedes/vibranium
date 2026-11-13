@@ -730,7 +730,6 @@ QtObject {
             opacity: opt.usable ? 1 : Ui.disabledOpacity
 
             Rectangle {
-              id: optBg
 
               width: pop.entryW
               height: parent.height
@@ -744,7 +743,6 @@ QtObject {
             }
 
             Row {
-              id: optRow
 
               anchors.left: parent.left
               anchors.leftMargin: Ui.s
@@ -1418,7 +1416,6 @@ QtObject {
     // Repeater still had a model would build every card, take every peak hold
     // and hold a selection for a tab nobody is looking at.
     GraphTab {
-      id: graphBody
 
       anchors.left: parent.left
       anchors.right: parent.right

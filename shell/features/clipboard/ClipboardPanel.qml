@@ -896,7 +896,6 @@ PanelCard {
 
   // --- split content: list left, preview right ---
   Item {
-    id: contentRow
     anchors.top: filterBar.bottom
     anchors.topMargin: panel.listTopGap
     anchors.left: parent.left
@@ -926,7 +925,6 @@ PanelCard {
 
       // Left list
       Item {
-        id: listBox
         width: metrics.leftW
         height: parent.height
         clip: true

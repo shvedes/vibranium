@@ -454,7 +454,6 @@ PanelWindow {
   }
 
   MouseArea {
-    id: pickArea
 
     anchors.fill: parent
     // Both buttons explicitly: the default is left-only, which silently

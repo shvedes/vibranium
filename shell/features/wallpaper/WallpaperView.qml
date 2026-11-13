@@ -585,7 +585,6 @@ PanelWindow {
     // stays here is the anchoring - clamped against the surface after layout,
     // so a click near an edge still opens the whole card on screen.
     ContextMenu {
-      id: menuCard
 
       entries: win.menuEntries
       x: Range.clamp(Math.round(win.menuX), Ui.m, menuWin.width - width - Ui.m)

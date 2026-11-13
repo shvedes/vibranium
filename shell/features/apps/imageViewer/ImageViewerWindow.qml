@@ -1308,7 +1308,6 @@ QtObject {
       }
 
       ContextMenu {
-        id: contextMenu
 
         visible: root.menuOpen
         z: 21

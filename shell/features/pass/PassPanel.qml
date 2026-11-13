@@ -1535,7 +1535,6 @@ PanelCard {
     // Overwrite guard floats over the list bottom: hint -> armed ->
     // confirm with stages 2, same ConfirmSlot as delete.
     ConfirmSlot {
-      id: overwriteSlot
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.bottom: parent.bottom
@@ -1571,7 +1570,6 @@ PanelCard {
     // only field on screen while it is up. Clicks land back on it so
     // typing can never leak into the filter behind the overlay.
     Rectangle {
-      id: secretOverlay
       anchors.fill: parent
       visible: panel.secretOpen
       color: Ui.solid("background_0")
@@ -1626,7 +1624,6 @@ PanelCard {
   // islands; the backdrop eats every click so the dead list underneath
   // never receives input.
   Item {
-    id: noPassOverlay
 
     // Fills the whole card so the dim reaches the dead filter box too;
     // the warning column itself centers in the body region below the

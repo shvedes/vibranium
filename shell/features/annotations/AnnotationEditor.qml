@@ -1366,7 +1366,6 @@ PanelWindow {
     // paint around; transformOrigin is one value per item, so the two
     // transforms need two items.
     Item {
-      id: boardImageBox
 
       x: editor._geom.x
       y: editor._geom.y
@@ -1420,7 +1419,6 @@ PanelWindow {
       }
 
       Item {
-        id: blurPlateBox
 
         anchors.fill: parent
         z: -1
@@ -1483,7 +1481,6 @@ PanelWindow {
     // tools is deliberately not modelled - blur is a picture treatment here, so
     // every annotation stays legible above it.
     Item {
-      id: blurLayer
 
       x: board.x
       y: board.y
@@ -3021,7 +3018,6 @@ PanelWindow {
   // Hover tooltip, declared last so it paints above the panel it
   // describes. Positioned above the hovered control.
   Rectangle {
-    id: tipBox
 
     property var anchorItem: editor._tipAnchor
 

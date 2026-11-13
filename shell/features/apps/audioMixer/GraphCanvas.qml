@@ -43,7 +43,6 @@ import qs.common
 import "GraphModel.js" as Graph
 
 Item {
-  id: canvasRoot
 
   // The tab that owns the state this canvas renders.
   required property var host

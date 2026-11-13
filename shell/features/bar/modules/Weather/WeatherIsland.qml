@@ -533,7 +533,6 @@ Item {
           spacing: Ui.s
 
           Repeater {
-            id: hourRepeater
             model: root.weather ? root.weather.hourlyForecast : []
 
             Item {

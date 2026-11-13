@@ -470,7 +470,6 @@ Item {
     // Empty state when no adapter or adapter off -> outside the per-section
     // lists so it does not share their scrollbars.
     Title {
-      id: emptyText
       level: 5
       visible: !root.adapter || !root.adapter.enabled
       width: parent.width
@@ -481,7 +480,6 @@ Item {
     // PAIRED DEVICES: per-section List + ScrollBar, always visible when the
     // adapter is enabled.
     Item {
-      id: pairedSection
       visible: root.adapter && root.adapter.enabled
       width: parent.width
       height: pairedColumn.implicitHeight
@@ -507,7 +505,6 @@ Item {
         }
 
         Title {
-          id: pairedHint
           level: 5
           visible: root.pairedRows.length === 0
           width: parent.width
@@ -544,7 +541,6 @@ Item {
           // Overlaid inside the viewport edge (ArchUpdates/Battery
           // pattern): rows already end at rowPad.
           ScrollBar {
-            id: pairedBar
             flickable: pairedList
             anchors.right: parent.right
             anchors.rightMargin: 1
@@ -561,7 +557,6 @@ Item {
 
     // AVAILABLE DEVICES: per-section List + ScrollBar + lib Button.
     Item {
-      id: availableSection
       visible: root.adapter && root.adapter.enabled
       width: parent.width
       height: availableColumn.implicitHeight
@@ -584,7 +579,6 @@ Item {
             text: "AVAILABLE DEVICES"
           }
           Button {
-            id: refreshBtn
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             variant: "outline"
@@ -619,7 +613,6 @@ Item {
           // Overlaid inside the viewport edge (ArchUpdates/Battery
           // pattern): rows already end at rowPad.
           ScrollBar {
-            id: availableBar
             flickable: availableList
             anchors.right: parent.right
             anchors.rightMargin: 1
@@ -817,7 +810,6 @@ Item {
           width: 16
           height: 16
           Icon {
-            id: devIcon
             anchors.fill: parent
             name: row.iconName !== "" ? row.iconName : "bluetooth"
             colorKey: row.connected ? "accent" : "foreground_1"

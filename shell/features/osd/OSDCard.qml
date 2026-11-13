@@ -132,7 +132,6 @@ Card {
       anchors.centerIn: parent
 
       Row {
-        id: rowNoText
         width: parent.width
         spacing: Ui.m
 
@@ -151,7 +150,6 @@ Card {
         }
 
         ProgressBar {
-          id: barPlain
           // Vertically bold: spans the Row's height. 10px reads bold vs
           // the thin 6px text variant while keeping the card low, and the
           // Row centers it vertically with the Icon. The width consumes

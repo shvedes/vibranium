@@ -1527,7 +1527,6 @@ Item {
   }
 
   Loader {
-    id: windowLoader
     // A PanelWindow with no screen to place itself on is a surface the
     // compositor decides about, so the load waits for a real one. Ui.primaryScreen
     // is already filtered to screens with a name and a non-zero size, and it is

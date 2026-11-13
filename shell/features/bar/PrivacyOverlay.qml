@@ -163,7 +163,6 @@ PanelWindow {
   }
 
   Item {
-    id: rampHost
 
     // A positioner does not honour anchors, so the corner inset is set
     // explicitly against the surface. The width is the row's own extent less

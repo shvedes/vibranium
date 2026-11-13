@@ -611,7 +611,6 @@ Item {
       }
 
       Row {
-        id: selRow
         anchors.left: parent.left
         anchors.leftMargin: Ui.s
         anchors.right: selCaret.left
@@ -890,7 +889,6 @@ Item {
         // 4px bar the Input section carries. Takes whatever the boost, the
         // title and the reserved readout leave over.
         LiveMeter {
-          id: outputMeter
 
           width: parent.width - outBoost.width - outputTitle.width - root.pctW - 3 * parent.spacing
           anchors.verticalCenter: parent.verticalCenter
@@ -901,7 +899,6 @@ Item {
           muted: root.outputMuted
         }
         Title {
-          id: outputPct
           level: 4
           width: root.pctW
           horizontalAlignment: Text.AlignRight
@@ -992,7 +989,6 @@ Item {
         // Inline live meter: the input level next to the title, the same
         // 4px bar and the same data the Output section carries.
         LiveMeter {
-          id: inputMeter
 
           width: parent.width - micBoost.width - inputTitle.width - root.pctW - 3 * parent.spacing
           anchors.verticalCenter: parent.verticalCenter
@@ -1000,7 +996,6 @@ Item {
           muted: root.inputMuted
         }
         Title {
-          id: inputPct
           level: 4
           width: root.pctW
           horizontalAlignment: Text.AlignRight
@@ -1259,7 +1254,6 @@ Item {
             height: 24
             anchors.verticalCenter: parent.verticalCenter
             Icon {
-              id: muteIcon
               anchors.centerIn: parent
               name: Core.Audio.volumeIconFor(row.vol, row.muted)
               colorKey: row.silent ? "red" : "foreground_1"
@@ -1278,7 +1272,6 @@ Item {
           }
 
           Title {
-            id: pctText
             level: 4
             text: row.muted ? "Muted" : Format.percent(row.vol)
             color: root.streamPctColor(row.vol, row.muted)

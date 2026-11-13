@@ -1037,7 +1037,6 @@ Singleton {
   // watcher. Named, repeat, 60s backstop.
   readonly property int reconcileBackstopMs: 60000
   Timer {
-    id: reconcileTimer
     interval: root.reconcileBackstopMs
     repeat: true
     // Fallback polls while the watcher is down; one-shot replay of a

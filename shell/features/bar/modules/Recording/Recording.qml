@@ -61,7 +61,6 @@ CollapsibleSlot {
   // the first paint so the pill never flashes 0:00. SystemClock fires on
   // second boundaries; activation and birth-while-active seed directly.
   SystemClock {
-    id: secClock
 
     precision: SystemClock.Seconds
     enabled: root.active

@@ -324,7 +324,6 @@ PanelWindow {
   // drawn here rather than on the bar window so a drag over a module zone,
   // which arrives at that window, lights the same slab.
   Rectangle {
-    id: wallpaperSlab
 
     x: 0
     y: root.barY

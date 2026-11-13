@@ -675,7 +675,6 @@ Singleton {
   // Subscription lease renewal, named: 12h against a 24h lease.
   readonly property int leaseRenewMs: 43200000
   Timer {
-    id: _renewTimer
 
     interval: root.leaseRenewMs
     running: root.state === "ready" && root.printers.length > 0

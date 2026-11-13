@@ -446,7 +446,6 @@ Rectangle {
         // what receives the pointer now. The handler knows where the
         // pointer is, and the text knows which anchor a position falls in.
         HoverHandler {
-          id: bodyHover
 
           // The pointer shape is the LINK's, not the body's: the shape
           // follows the link under the pointer, so the rest of the body
@@ -500,7 +499,6 @@ Rectangle {
     // spacing included, so a notification with no buttons spends nothing on
     // them.
     Flow {
-      id: actionsFlow
 
       // The buttons stop at the artwork's left edge when the artwork hangs
       // beside them (see artworkBesideButtons), so a long action never runs

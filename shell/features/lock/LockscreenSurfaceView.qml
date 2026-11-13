@@ -234,7 +234,6 @@ WlSessionLockSurface {
       // theme color instantly, whatever the source resolution, and fades
       // the wallpaper in when it lands; with animations off it snaps.
       Image {
-        id: backdropImg
         anchors.fill: parent
         visible: surface.backgroundMode === "background"
         source: Lockscreen.backdropPath !== "" ? Paths.toFileUrl(Lockscreen.backdropPath) : ""
@@ -282,7 +281,6 @@ WlSessionLockSurface {
   // the ScreencopyView above reads, so a suppressed backdrop and a captured
   // frame cannot disagree about what a valid screen is.
   Loader {
-    id: backdropLoader
     anchors.fill: parent
     active: surface.screenValid && surface.backgroundMode !== "none"
     sourceComponent: backdropComp
@@ -306,7 +304,6 @@ WlSessionLockSurface {
   // the one thing this overlay must not do. A Loader keeps its declared
   // slot in the paint order because its item is a child of the Loader.
   Loader {
-    id: vignetteLoader
     anchors.fill: parent
     active: surface.vignetteK > 0
     asynchronous: true
@@ -383,7 +380,6 @@ WlSessionLockSurface {
     }
 
     Text {
-      id: layoutHint
 
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: authBox.bottom

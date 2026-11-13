@@ -848,7 +848,6 @@ Item {
       }
 
       Icon {
-        id: devIcon
 
         Layout.preferredWidth: row.iconW
         Layout.preferredHeight: row.iconW
@@ -867,7 +866,6 @@ Item {
       }
 
       Column {
-        id: labelCol
 
         Layout.fillWidth: true
         Layout.minimumWidth: 60
@@ -893,7 +891,6 @@ Item {
       // The live half: the level with its meter stacked under the fader as one
       // control, the shell's level affordances, and the verb.
       Item {
-        id: levelStack
 
         // The same number twice, on purpose: a layout slot that may differ
         // between its minimum and its preferred is a slot the layout may resize.
@@ -944,7 +941,6 @@ Item {
       // control rather than a glyph plus a switch side by side, because a row
       // with two mute buttons has no mute button.
       Item {
-        id: levelToggle
 
         Layout.preferredWidth: row.levelW
         Layout.preferredHeight: row.levelW

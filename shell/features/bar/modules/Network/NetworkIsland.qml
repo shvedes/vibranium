@@ -1115,7 +1115,6 @@ Item {
         }
 
         GridLayout {
-          id: metricsGrid
           width: parent.width
           columns: 4
           columnSpacing: Ui.xl
@@ -1192,7 +1191,6 @@ Item {
           // their measure and the swap box holds the wider one
           // throughout; its own width eases when the action text flips.
           Item {
-            id: speedTitleSwap
 
             anchors.verticalCenter: parent.verticalCenter
             width: Math.max(capsTitle.implicitWidth, actionTitle.implicitWidth)

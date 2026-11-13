@@ -126,7 +126,6 @@ Singleton {
     printErrors: false
   }
   FileView {
-    id: siblingLoader
     path: ""
     printErrors: false
   }

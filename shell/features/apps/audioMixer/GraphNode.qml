@@ -729,7 +729,6 @@ Item {
     }
 
     Title {
-      id: nameText
 
       anchors.left: glyph.right
       anchors.leftMargin: Ui.s

@@ -127,7 +127,6 @@ Item {
     // other icon in the tree. Its hover tip names it; the click pins the legend
     // below it, which is a tooltip with more in it than a line of text.
     IconButton {
-      id: helpButton
 
       name: "info"
       tipText: "How the graph works"
@@ -142,7 +141,6 @@ Item {
   }
 
   Title {
-    id: statusLine
 
     anchors.left: parent.left
     anchors.right: actionRow.left

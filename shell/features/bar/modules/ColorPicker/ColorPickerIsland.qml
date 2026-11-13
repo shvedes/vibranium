@@ -488,7 +488,6 @@ Item {
     // Large saturation/value field: hue fixed, S left-to-right, V
     // bottom-to-top. Click or drag moves the circular thumb.
     Item {
-      id: svField
 
       width: parent.width
       height: 120
@@ -520,7 +519,6 @@ Item {
 
         // Click/drag surface over the field.
         MouseArea {
-          id: svArea
 
           anchors.fill: parent
           cursorShape: Qt.CrossCursor

@@ -1515,7 +1515,6 @@ Item {
   }
 
   Connections {
-    id: unitGateConnection
     target: UnitGate
     ignoreUnknownSignals: true
     function onUnitChanged(value) {
@@ -1553,7 +1552,6 @@ Item {
   }
 
   Connections {
-    id: annotationActionsConnection
     target: AnnotationActions
     ignoreUnknownSignals: true
     function onDrained() { boot._onAnnotationsDrained() }

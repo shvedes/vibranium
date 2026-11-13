@@ -104,7 +104,6 @@ Singleton {
   }
 
   FileView {
-    id: configView
     path: Paths.vibraniumHome + "/shell/features/powerMenu/config.json"
     watchChanges: true
     printErrors: false

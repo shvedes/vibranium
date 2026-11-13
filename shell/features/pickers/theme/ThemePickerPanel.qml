@@ -729,7 +729,6 @@ Item {
           // therefore scales a finished skeleton instead of reflowing every
           // bar inside it, which is the jump the resize used to cause.
           Item {
-            id: rowShot
 
             anchors.fill: parent
             anchors.margins: rowFrame.border.width

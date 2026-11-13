@@ -1030,7 +1030,6 @@ Item {
   // --- visuals ---
 
   Rectangle {
-    id: bg
 
     anchors.fill: parent
     visible: !row.isSep
@@ -1087,7 +1086,6 @@ Item {
   }
 
   MouseArea {
-    id: clickArea
 
     anchors.fill: parent
     enabled: !row.isSep
@@ -1159,7 +1157,6 @@ Item {
     // font pays on first use. Sized to the slot rather than the row, so a
     // tall keyword label beside it does not scale the emoji with it.
     Text {
-      id: glyphImg
 
       visible: row.glyphText !== ""
       anchors.left: parent.left
@@ -1325,7 +1322,6 @@ Item {
         // nothing else. The line is the strip alone, so its height is the
         // dot's own size.
         Row {
-          id: paletteRow
           width: parent.width
           visible: !!(itm && itm.palette && itm.palette.length > 0)
           spacing: 4
@@ -1733,7 +1729,6 @@ Item {
 
     // option rows (dropdown cells): bullet gutter
     Item {
-      id: optMark
 
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -2125,7 +2120,6 @@ Item {
       }
 
       Rectangle {
-        id: optCursor
 
         visible: row.dropdownOpen
         // One step ABOVE the surface this sits on, the way the list bar is one

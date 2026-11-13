@@ -206,7 +206,6 @@ Item {
   // Static card frame: fill, keyline, pause dim. The dim and its 200ms
   // fade cover the whole card for pause.
   Rectangle {
-    id: contentFrame
 
     anchors.fill: parent
     opacity: root.hasTrack ? (root.playing ? 1 : 0.55) : 1
@@ -226,7 +225,6 @@ Item {
     }
 
     Item {
-      id: cardBody
 
       // The track card keeps its compact footprint and stays centred while the
       // frame grows around it; only the transcript spends the extra room.

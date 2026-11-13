@@ -409,7 +409,6 @@ Item {
       // to nothing and the shell renders a miss as a purple checker - so a node
       // that named no icon gets the generic glyph instead.
       IconImage {
-        id: appIcon
 
         Layout.preferredWidth: row.iconW
         Layout.preferredHeight: row.iconW
@@ -419,7 +418,6 @@ Item {
       }
 
       Column {
-        id: labelCol
 
         // The name column is where a wider window now goes: the fader's length
         // is fixed, so the slack has to land somewhere, and a long application
@@ -458,7 +456,6 @@ Item {
       // subscription whatever draws it, and the stacked meter costs no second
       // one.
       Item {
-        id: levelStack
 
         // The same number twice, on purpose: a layout slot that may differ
         // between its minimum and its preferred is a slot the layout may resize,
@@ -509,7 +506,6 @@ Item {
       // control rather than a glyph plus a switch side by side, because a row
       // with two mute buttons has no mute button.
       Item {
-        id: levelToggle
 
         Layout.preferredWidth: row.levelW
         Layout.preferredHeight: row.levelW

@@ -242,7 +242,6 @@ Item {
             spacing: Ui.s
 
             IconButton {
-              id: settingsBtn
 
               anchors.verticalCenter: parent.verticalCenter
               name: "settings"
@@ -255,7 +254,6 @@ Item {
             }
 
             IconButton {
-              id: refreshBtn
 
               anchors.verticalCenter: parent.verticalCenter
               name: "rotate-cw"
@@ -364,7 +362,6 @@ Item {
           }
 
           List {
-            id: printersList
 
             visible: contentRoot.printers.length > 0
             selectionHighlight: false
@@ -414,7 +411,6 @@ Item {
           }
 
           List {
-            id: jobsList
 
             visible: contentRoot.jobs.length > 0
             selectionHighlight: false
@@ -623,7 +619,6 @@ Item {
             // that); anything unparseable hides instead of printing
             // "Unknown".
             Title {
-              id: stateLabel
 
               level: 4
               visible: jobRow.active && !jobRow.processing
@@ -864,7 +859,6 @@ Item {
             }
 
             Column {
-              id: identityCol
 
               width: parent.width - queueIcon.width - actionsCol.width - 2 * parent.spacing
               anchors.verticalCenter: parent.verticalCenter
@@ -925,7 +919,6 @@ Item {
                 }
 
                 MouseArea {
-                  id: nameHover
 
                   visible: !printerRow.renaming
                   anchors.fill: parent

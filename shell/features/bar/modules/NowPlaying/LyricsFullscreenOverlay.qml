@@ -326,7 +326,6 @@ PanelWindow {
     // the lane and the transcript do not reach swaps the backdrop. Declared
     // under the rest, so every other child keeps its own clicks.
     MouseArea {
-      id: backdropHit
 
       anchors.fill: parent
       acceptedButtons: Qt.LeftButton
@@ -480,7 +479,6 @@ PanelWindow {
     // Transport: previous, play/pause, next - centred under the cover at a
     // size that belongs on this surface rather than in the bar.
     Row {
-      id: controlsRow
 
       x: content.pad + Math.round((content.coverW - width) / 2)
       y: content.stackY + content.coverBoxH + content.stackGap
@@ -566,7 +564,6 @@ PanelWindow {
         }
 
         Item {
-          id: seekLane
 
           width: Math.max(0, progressBlock.width - 2 * progressBlock.timeW - 2 * laneRow.spacing)
           height: laneRow.height
@@ -804,7 +801,6 @@ PanelWindow {
     // The masks are the house MultiEffect idiom: hidden rectangles whose
     // alpha ramps, softened by the threshold spread.
     MultiEffect {
-      id: lyricsSharp
 
       anchors.fill: lyricsSide
       visible: root.opened && pane.ready
@@ -818,7 +814,6 @@ PanelWindow {
     }
 
     MultiEffect {
-      id: lyricsBlurLight
 
       anchors.fill: lyricsSide
       visible: root.opened && pane.ready
@@ -835,7 +830,6 @@ PanelWindow {
     }
 
     MultiEffect {
-      id: lyricsBlurMedium
 
       anchors.fill: lyricsSide
       visible: root.opened && pane.ready
@@ -852,7 +846,6 @@ PanelWindow {
     }
 
     MultiEffect {
-      id: lyricsBlurHeavy
 
       anchors.fill: lyricsSide
       visible: root.opened && pane.ready

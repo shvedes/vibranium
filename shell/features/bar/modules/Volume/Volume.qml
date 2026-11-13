@@ -252,7 +252,6 @@ BarModule {
       height: implicitHeight
 
       CrossfadeIcon {
-        id: volumeIcon
         anchors.centerIn: parent
         name: root.volumeIconName
         colorKey: root.volumeIconColor

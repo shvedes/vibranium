@@ -282,7 +282,6 @@ Singleton {
   // Refresh cadence, named: 30 minutes, single-flight guarded.
   readonly property int refreshMs: 30 * 60 * 1000
   Timer {
-    id: refreshTimer
 
     interval: root.refreshMs
     repeat: true

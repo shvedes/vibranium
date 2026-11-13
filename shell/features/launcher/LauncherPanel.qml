@@ -1021,7 +1021,6 @@ PanelCard {
     height: panel.listRegionH
     transform: Translate { id: modeEnterShift; x: 0 }
     Item {
-      id: listContent
       anchors.fill: parent
       // Never hidden. A pending fit is a REGION question, not a content one:
       // the rows are already correct and the bar already holds its geometry

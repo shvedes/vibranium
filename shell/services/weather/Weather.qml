@@ -667,7 +667,6 @@ Singleton {
   }
 
   Timer {
-    id: refreshTimer
     interval: root.refreshMinutes * 60 * 1000
     running: true
     repeat: true

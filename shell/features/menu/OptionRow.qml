@@ -84,7 +84,6 @@ Rectangle {
   }
 
   MouseArea {
-    id: optArea
 
     anchors.fill: parent
     onClicked: opt.picked(opt.modelData.value)

@@ -220,7 +220,6 @@ Singleton {
         }
     }
     Timer {
-        id: warmTimer
         interval: 1200
         running: true
         repeat: false

@@ -400,7 +400,6 @@ Item {
 
         // Table rows
         Item {
-          id: table
 
           x: Math.max(3, Math.round(5 * root.u))
           y: Math.max(16, Math.round(20 * root.u))

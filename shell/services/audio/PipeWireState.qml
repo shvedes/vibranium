@@ -217,7 +217,6 @@ Singleton {
   // their volume, mute and property reads being valid at all, so gating the
   // list on readiness would gate the binding on the binding.
   PwObjectTracker {
-    id: objectTracker
 
     objects: root._boundDevices
   }

@@ -79,7 +79,6 @@ Item {
   // models' own count signals miss it (a model aimed at a missing root
   // settles to Null and never emits again on its own).
   FileView {
-    id: officialDirWatch
 
     path: root.officialRoot
     watchChanges: true
@@ -88,7 +87,6 @@ Item {
   }
 
   FileView {
-    id: userDirWatch
 
     path: root.userRoot
     watchChanges: true

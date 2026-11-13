@@ -367,7 +367,6 @@ Item {
       }
 
       MouseArea {
-        id: rowArea
 
         anchors.fill: swatch
         hoverEnabled: true

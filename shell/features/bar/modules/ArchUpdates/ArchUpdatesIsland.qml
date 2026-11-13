@@ -537,7 +537,6 @@ Item {
         spacing: parent.spacing
 
         Button {
-          id: updateSelectedBtn
 
           width: (parent.width - parent.spacing) / 2
           label: root.selectedCount > 0 ? "Update Selected (" + root.selectedCount + ")" : "Update Selected"
@@ -559,7 +558,6 @@ Item {
         }
 
         Button {
-          id: updateSystemBtn
 
           width: (parent.width - parent.spacing) / 2
           label: "Update System"
@@ -576,7 +574,6 @@ Item {
       }
 
       DropdownSlot {
-        id: warnSlot
 
         width: parent.width
         // The island's inter-block rhythm (actionsCol.spacing) owns
@@ -730,7 +727,6 @@ Item {
             // Click-only: toggles all. No hover effects anywhere in the
             // table - rows, header and checkboxes alike.
             MouseArea {
-              id: headerArea
 
               anchors.fill: parent
               onClicked: root.toggleAll()
@@ -984,7 +980,6 @@ Item {
   }
 
   Component {
-    id: pkgDelegate
 
     Item {
       id: row
@@ -1070,7 +1065,6 @@ Item {
   // pulses opacity in a staggered loop while `root.skeleton` is true,
   // mimicking the shimmer/skeleton pattern used on web content loaders.
   Component {
-    id: skeletonDelegate
 
     Item {
       id: skeletonRow

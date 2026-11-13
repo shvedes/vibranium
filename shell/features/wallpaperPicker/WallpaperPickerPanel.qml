@@ -633,7 +633,6 @@ Item {
   }
 
   Column {
-    id: caption
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: stage.bottom

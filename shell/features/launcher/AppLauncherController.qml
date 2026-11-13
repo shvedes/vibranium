@@ -1817,7 +1817,6 @@ Item {
 
   // Watcher for hasUsageHistory - live without holding the cache resident.
   FileView {
-    id: historyWatcher
     path: Paths.drunCacheFile
     watchChanges: true
     printErrors: false

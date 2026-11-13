@@ -115,7 +115,6 @@ BarModule {
     spacing: 0
 
     Item {
-      id: daySeg
 
       property bool shown: root.fullDate
       clip: true
@@ -158,7 +157,6 @@ BarModule {
     }
 
     Item {
-      id: timeSeg
 
       clip: true
       implicitWidth: width
@@ -176,7 +174,6 @@ BarModule {
     }
 
     Item {
-      id: suffixSeg
 
       property bool shown: root.use12h
       clip: true
