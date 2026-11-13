@@ -52,6 +52,32 @@ function nodeKey(node) {
   return NodeKey.of(node)
 }
 
+// The audio controls a node carries, or null when it carries none. One
+// reader for the shape both mixer rows bind their volume half from: an
+// absent node, a node without an audio member and an audio member that is
+// null all mean "no controls", which is a different answer from a zero
+// level and must not be rendered as one.
+function nodeAudio(node) {
+  if (node === null || node === undefined) return null
+  return node.audio === undefined ? null : node.audio
+}
+
+// The node's level fraction. A node with no controls, or one whose audio
+// carries no numeric volume, reads 0 - the same answer a silent level
+// gives, because neither can be shown as a level.
+function nodeVolume(node) {
+  const audio = nodeAudio(node)
+  return audio === null ? 0 : Number(audio.volume) || 0
+}
+
+// Whether the node is EXPLICITLY muted. A truthy non-boolean is not a
+// mute: the flag is what the daemon reports, and a row that claimed one
+// from a string would draw a mute the user never performed.
+function nodeMuted(node) {
+  const audio = nodeAudio(node)
+  return audio !== null && audio.muted === true
+}
+
 function propText(node, key) {
   const p = props(node)
   if (!Object.prototype.hasOwnProperty.call(p, key)) return ""

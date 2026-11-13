@@ -78,10 +78,9 @@ Item {
   readonly property bool open: row.mixerWindow !== null
     && row.mixerWindow.isPopOpen(row.popKey)
 
-  readonly property var audio: row.node !== null && row.node !== undefined
-    && row.node.audio !== undefined ? row.node.audio : null
-  readonly property real volume: row.audio !== null ? Number(row.audio.volume) : 0
-  readonly property bool muted: row.audio !== null ? row.audio.muted === true : false
+  readonly property var audio: Model.nodeAudio(row.node)
+  readonly property real volume: Model.nodeVolume(row.node)
+  readonly property bool muted: Model.nodeMuted(row.node)
   // Nothing audible: the explicit mute or a level at zero. The level glyph
   // reads this; the toggle and the "Muted" readout keep `muted`.
   readonly property bool silent: row.audio !== null
@@ -365,9 +364,8 @@ Item {
     if (row._peakNode !== row.node) row._releasePeak()
     if (row.peak !== null) return
     const node = row.node
-    if (node === null || node === undefined || node.audio === null
-      || node.audio === undefined) return
-    if (!Model.channelsKnown(node.audio.channels)) return
+    const audio = Model.nodeAudio(node)
+    if (audio === null || !Model.channelsKnown(audio.channels)) return
     const handle = Core.PipeWireState.acquirePeaks("audioMixer/stream", node)
     if (handle === null) return
     row.peak = handle
