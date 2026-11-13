@@ -19,6 +19,19 @@ function foldHour12(hours) {
   return (Math.floor(h) % 12) || 12
 }
 
+// Zero-padded clock fields with the AM/PM suffix `use12h` asks for. The
+// one place the suffix decision and the field padding are applied, so the
+// card clock and the copy clock cannot disagree on either.
+function clockText(hours, minutes, use12h) {
+  let h = hours
+  let suffix = ""
+  if (use12h === true) {
+    suffix = h < 12 ? " AM" : " PM"
+    h = foldHour12(h)
+  }
+  return Format.pad2(h) + ":" + Format.pad2(minutes) + suffix
+}
+
 // The card's clock, in the same format the bar's clock module uses: local
 // time, zero-padded hours and minutes, and an AM/PM suffix when `use12h`
 // is set. Canonical home of NotificationsLib clockLabel. "" for a time
@@ -28,13 +41,7 @@ function clockLabel(atMs, use12h) {
   let ms = Number(atMs)
   if (!isFinite(ms)) return ""
   let at = new Date(ms)
-  let hours = at.getHours()
-  let suffix = ""
-  if (use12h === true) {
-    suffix = hours < 12 ? " AM" : " PM"
-    hours = foldHour12(hours)
-  }
-  return Format.pad2(hours) + ":" + Format.pad2(at.getMinutes()) + suffix
+  return clockText(at.getHours(), at.getMinutes(), use12h)
 }
 
 // A wall-clock hour as the weather strip prints it: "9 PM" on the 12-hour
@@ -94,13 +101,7 @@ function formatTime(ts, now, use12h) {
   let sameDay = d.getFullYear() === ref.getFullYear()
     && d.getMonth() === ref.getMonth()
     && d.getDate() === ref.getDate()
-  let hours = d.getHours()
-  let suffix = ""
-  if (use12h === true) {
-    suffix = hours < 12 ? " AM" : " PM"
-    hours = foldHour12(hours)
-  }
-  let time = Format.pad2(hours) + ":" + Format.pad2(d.getMinutes()) + suffix
+  let time = clockText(d.getHours(), d.getMinutes(), use12h)
   if (sameDay) return time
   return dayLabelOf(d) + " " + time
 }
