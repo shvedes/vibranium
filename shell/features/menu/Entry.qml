@@ -517,9 +517,7 @@ Item {
       // The held verdict belongs to the unfold that is over. Releasing here
       // rather than on the next open is what lets a dropdown that does NOT
       // resize the region animate normally on the next keystroke: the hold is
-      // a property of one unfold, not of the row, and `release()` clears the
-      // gate the Behaviors actually read rather than just the flag.
-      row._slotSettle = false
+      // a property of one unfold, not of the row.
       descSlot.release()
       expandSlot.release()
       return
@@ -527,15 +525,6 @@ Item {
     const now = Math.max(descSlot.slotMs, expandSlot.slotMs)
     if (now > row._slotMsLatch) row._slotMsLatch = now
   }
-
-  // This unfold resizes the region, and the region resize is not animated.
-  //
-  // MONOTONIC, for the same reason _slotMsLatch is: the verdict is published
-  // while the dropdown is opening and is gone by the time it closes, so the
-  // close needs the value the open was given. Taking the latest reading
-  // instead would animate the open and not the collapse - one motion, two
-  // clocks - which is the seam this exists to remove.
-  property bool _slotSettle: false
 
   // Panel-side slot claim (see MenuPanel.expansionNeedH).
   readonly property real expandSlotH: expandSlot.height
