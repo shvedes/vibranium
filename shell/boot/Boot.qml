@@ -1271,13 +1271,17 @@ Item {
     return false
   }
 
+  // Only the two halves that own a readiness edge are asked. The bar half has
+  // none - the bar unit settles on its dependencies - so asking it was a call
+  // whose every answer was false by construction.
   function _lateReady(id) {
     if (boot._lateFeatures && boot._lateFeatures.readyState(id)) return true
     if (boot._lateServices && boot._lateServices.readyState(id)) return true
-    if (boot._lateBar && boot._lateBar.readyState(id)) return true
     return false
   }
 
+  // The facade controllers all live in the feature half, which is the only
+  // half with a teardown to dispatch (see BootLate.teardown).
   function _lateTeardown(id) {
     if (boot._lateFeatures) boot._lateFeatures.teardown(id)
   }

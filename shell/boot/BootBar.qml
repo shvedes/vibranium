@@ -23,7 +23,9 @@ import qs.features.bar
 // Every case here is a type from qs.features.bar. A service belongs in
 // BootServices.qml and a feature module in BootLate.qml: resolve() answers
 // false for an id it does not own, and Boot stashes that demand for the half
-// that does.
+// that does. The bar is the whole half: it reports no readiness edge of its
+// own (it settles on its dependencies like any resident surface) and it
+// splits into no releasable controller, so the half has no other dispatcher.
 Item {
   id: late
 
@@ -42,21 +44,5 @@ Item {
       default:    return false
     }
     return true
-  }
-
-  // No unit in this half reports a readiness edge of its own; the bar unit
-  // settles on its dependencies like any other resident surface.
-  function readyState(id) {
-    switch (id) {
-      default: return false
-    }
-  }
-
-  // No unit in this half splits into a resident facade and a controller that
-  // has to be released, so there is no teardown to dispatch.
-  function teardown(id) {
-    switch (id) {
-      default: break
-    }
   }
 }

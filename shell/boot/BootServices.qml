@@ -83,14 +83,6 @@ Item {
     }
   }
 
-  // No unit in this half splits into a resident facade and a controller that
-  // has to be released, so there is no teardown to dispatch.
-  function teardown(id) {
-    switch (id) {
-      default: break
-    }
-  }
-
   // An observation edge, attached when the unit is first resolved rather than
   // when this half is constructed: a Connections element evaluates `target` at
   // creation, so naming Screenshots here would instantiate the singleton
