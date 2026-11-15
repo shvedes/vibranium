@@ -1,11 +1,11 @@
 #!/bin/bash
-# Suite: themes/ - the 30 shipped palettes, the files each one carries, and
+# Suite: themes/ - the 44 shipped palettes, the files each one carries, and
 # the colour keys the shell and the theme engine actually read.
 #
 # Nothing in the tree tests this surface. The settings suites cover
 # shell/common/settings/catalog.jsonc, the assets suite covers shell/assets/, and the
-# theme surfaces are only probed with a synthetic /tmp tree, so the 30 real
-# themes, their 14-colour palettes and their 183 wallpapers are untested data
+# theme surfaces are only probed with a synthetic /tmp tree, so the 44 real
+# themes, their 14-colour palettes and their 247 wallpapers are untested data
 # that a single dropped `colors.list` key silently degrades.
 #
 # The required colour set is DERIVED, not copied. Four independent sources in
@@ -36,7 +36,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
-t_init "themes" "the 30 shipped palettes: required files, the derived colour set, neovim.lua, backgrounds"
+t_init "themes" "the 44 shipped palettes: required files, the derived colour set, neovim.lua, backgrounds"
 
 require_tools awk sed grep sort paste tr wc find md5sum cut comm iconv
 
@@ -126,7 +126,7 @@ theme_dirs() {
 # "=", with the quotes and spaces vb-theme-set-templates:91 strips, and a
 # comment line (a leading #) and a blank line are dropped.
 #
-# Memoised per file: the sections below read the same 30 palettes a dozen times
+# Memoised per file: the sections below read the same 44 palettes a dozen times
 # each, and the parse is a while-read loop rather than a cheap builtin.
 declare -A PALETTE_KEYS_CACHE=()
 palette_keys() {
@@ -169,8 +169,8 @@ palette_value() {
 
 # info_field <file> <key> - one theme.info value, read the way vb-theme-set and
 # ThemePicker.qml do: split on the first "=" and take the right side.
-# The `|| [[ -n $key ]]` arm is not decoration: 20 of the 30 theme.info files
-# end without a newline, so a plain `while read` silently drops the last field
+# The `|| [[ -n $key ]]` arm is not decoration: many theme.info files end
+# without a newline, so a plain `while read` silently drops the last field
 # of each of them - which is LIGHT, the field both tools care most about.
 info_field() {
   local file="$1" want="$2" key="" val=""
@@ -237,8 +237,8 @@ lua_ends() {
 mapfile -t THEMES < <(theme_dirs)
 NT="${#THEMES[@]}"
 
-t_section "the inventory: 30 real directories, all discoverable"
-t_count "themes/ holds 30 theme directories" "30" "$NT"
+t_section "the inventory: 44 real directories, all discoverable"
+t_count "themes/ holds 44 theme directories" "44" "$NT"
 t_sorted "the directory listing is already in sorted order" "$(printf '%s\n' "${THEMES[@]}")"
 t_unique "no theme name is a case-insensitive duplicate of another" \
   "$(printf '%s\n' "${THEMES[@]}" | tr '[:upper:]' '[:lower:]')"
@@ -291,14 +291,14 @@ for theme in "${THEMES[@]}"; do
 done
 t_eq "every theme carries colors.list, theme.info and a non-empty backgrounds/" \
   "" "$MISSING_FILES"
-t_count "and 28 of the 30 also carry a hand-authored neovim.lua" "28" "$THEMED_THEMES"
+t_count "and 31 of the 44 also carry a hand-authored neovim.lua" "31" "$THEMED_THEMES"
 t_file "the template that renders the ones that do not" "$THEMED_DIR/neovim.lua.tpl"
 t_contains "and vb-theme-set-templates writes it only when absent" \
   'should_write=true' "$(<"$THEME_TEMPLATES")"
 t_contains "so a theme that ships its own wins over the generated one" \
   'if [[ ! -f $output_path ]]; then' "$(<"$THEME_TEMPLATES")"
-t_note "osaka-jade and vibranium carry no neovim.lua, so both get the prism.nvim palette rendered from default/themed/neovim.lua.tpl. neovim.lua is therefore NOT part of the required set: apply_theme copies the directory and the renderer fills the gaps, and the four components docs/understanding/making-your-own-theme.md:14-18 names are colors.list, theme.info and one background image"
-t_note "the 3 themes that ship a hand-authored hyprland.lua (nightfox-carbonfox, tokyonight-moon, tokyonight-night) override the generated one the same way; 2 ship no other override, so every theme's applied tree is its own files plus the rendered templates"
+t_note "13 themes carry no neovim.lua (osaka-jade, vibranium and 11 community palettes), so they get the prism.nvim palette rendered from default/themed/neovim.lua.tpl. neovim.lua is therefore NOT part of the required set: apply_theme copies the directory and the renderer fills the gaps, and the four components docs/understanding/making-your-own-theme.md:14-18 names are colors.list, theme.info and one background image"
+t_note "the 4 themes that ship a hand-authored hyprland.lua (lumon, nightfox-carbonfox, tokyonight-moon, tokyonight-night) override the generated one the same way; 2 ship no other override, so every theme's applied tree is its own files plus the rendered templates"
 
 # --------------------------------------------------------------------------
 # theme.info
@@ -354,14 +354,14 @@ for theme in "${THEMES[@]}"; do
       grep -vxE 'FAMILY|VARIANT|LIGHT' | paste -sd' ' -)"
 done
 t_eq "every theme declares a non-empty VARIANT" "" "$VARIANT_MISSING"
-t_eq "exactly one theme is standalone, with an empty FAMILY" "1" "$FAMILY_EMPTY"
-t_eq "and it is the one named after the project" "vibranium" \
+t_eq "15 of the 44 themes are standalone, with an empty FAMILY" "15" "$FAMILY_EMPTY"
+t_eq "and the project's own theme is one of them" "vibranium" \
   "$(for theme in "${THEMES[@]}"; do
     family="$(info_field "$THEMES_DIR/$theme/theme.info" FAMILY || printf 'absent')"
-    [[ -z "${family//[[:space:]]/}" ]] && printf '%s' "$theme"
-  done)"
-t_eq "4 of the 30 themes declare LIGHT=true" "4" "$INFO_LIGHT"
-t_note "the picker falls back to a folder-name heuristic when theme.info has no LIGHT (ThemePicker.qml, /(light|latte|dawn)\$/i) and vb-theme-set-templates resolves it to dark instead (bin/vb-theme-set-templates:39); all 30 declare the field, so the two fallbacks are never reached and a future theme that omits it would get the heuristic from one tool and dark from the other"
+    [[ -z "${family//[[:space:]]/}" ]] && printf '%s\n' "$theme"
+  done | grep -x vibranium)"
+t_eq "5 of the 44 themes declare LIGHT=true" "5" "$INFO_LIGHT"
+t_note "the picker falls back to a folder-name heuristic when theme.info has no LIGHT (ThemePicker.qml, /(light|latte|dawn)\$/i) and vb-theme-set-templates resolves it to dark instead (bin/vb-theme-set-templates:39); all 44 declare the field, so the two fallbacks are never reached and a future theme that omits it would get the heuristic from one tool and dark from the other"
 
 # --------------------------------------------------------------------------
 # colors.list
@@ -525,8 +525,8 @@ t_note "with the shades computed there is no unreachable palette entry left: the
 
 t_section "the palette every theme declares, checked key by key"
 # "Every theme declares the same colour names" is one fact about the tree, so
-# the digest of all 30 name sets is computed once. Inside the loop it was 30
-# identical 30-theme digests, which is the quadratic part of this suite.
+# the digest of all 44 name sets is computed once. Inside the loop it was 44
+# identical 44-theme digests, which is the quadratic part of this suite.
 NAME_SET_VARIANTS="$(for theme in "${THEMES[@]}"; do
   palette_keys "$THEMES_DIR/$theme/colors.list" | LC_ALL=C sort -u |
     md5sum | cut -d' ' -f1
@@ -535,7 +535,7 @@ MISSING_COLOUR=""
 for theme in "${THEMES[@]}"; do
   keys="$(palette_keys "$THEMES_DIR/$theme/colors.list")"
   # One associative lookup per name in each direction, instead of a grep per
-  # name: 30 themes x 14 names x 2 is most of the process spawns this suite
+  # name: 44 themes x 14 names x 2 is most of the process spawns this suite
   # makes, and the membership test is the same one.
   declare -A HAVE=() WANT=()
   while read -r key; do
@@ -655,12 +655,14 @@ for theme in "${THEMES[@]}"; do
     [[ -n $ref ]] || continue
     LUA_COLORREF=$((LUA_COLORREF + 1))
     if [[ "$ref" == \#* ]]; then
-      hex="$(palette_keys "$THEMES_DIR/$theme/colors.list" >/dev/null;
-        while read -r k; do
-          [[ "$(palette_value "$THEMES_DIR/$theme/colors.list" "$k")" == "$ref" ]] && break
-        done < <(palette_keys "$THEMES_DIR/$theme/colors.list") |
-        sed 's/$/ found/')"
-      [[ "$hex" == " found" ]] || LUA_MISSING_COLOUR="$LUA_MISSING_COLOUR$theme:$ref "
+      hex=""
+      while read -r k; do
+        if [[ "$(palette_value "$THEMES_DIR/$theme/colors.list" "$k")" == "$ref" ]]; then
+          hex="$k"
+          break
+        fi
+      done < <(palette_keys "$THEMES_DIR/$theme/colors.list")
+      [[ -n "$hex" ]] || LUA_MISSING_COLOUR="$LUA_MISSING_COLOUR$theme:$ref "
     else
       base="$(resolve_key "$ref")" || { LUA_MISSING_COLOUR="$LUA_MISSING_COLOUR$theme:$ref "
         continue; }
@@ -675,13 +677,13 @@ for theme in "${THEMES[@]}"; do
     fi
   fi
 done
-t_count "every shipped neovim.lua is non-empty" "28" "$LUA_CHECKED"
+t_count "every shipped neovim.lua is non-empty" "31" "$LUA_CHECKED"
 t_eq "no neovim.lua is empty" "" "$LUA_EMPTY"
 t_eq "no neovim.lua is structurally unbalanced" "" "$LUA_BAD"
 t_eq "no neovim.lua references a colour its theme does not define" "" "$LUA_MISSING_COLOUR"
-t_eq "the colour-reference check is not vacuous: no shipped neovim.lua inlines a colour" \
-  "0" "$LUA_COLORREF"
-t_note "all 28 hand-authored neovim.lua files select an upstream colourscheme plugin (catppuccin/nvim, neanias/everforest-nvim, ellisonleao/gruvbox.nvim, rose-pine/neovim, ...) and name no palette colour at all, so the reference check has nothing to find. That is correct: the template renderer, not the theme, supplies the inline palette, and the 4 gruvbox themes legitimately share one neovim.lua because the upstream plugin picks its own variant"
+t_eq "the colour-reference check is not vacuous: 7 inline colours are checked against the palettes" \
+  "7" "$LUA_COLORREF"
+t_note "30 of the 31 hand-authored neovim.lua files select an upstream colourscheme plugin (catppuccin/nvim, neanias/everforest-nvim, ellisonleao/gruvbox.nvim, rose-pine/neovim, ...) and name no palette colour at all. ristretto is the exception: it hardcodes seven hexes in its monokai-pro override, and every one of them is a value its colors.list defines, so the reference check now runs on real input rather than on nothing. The template renderer, not the theme, supplies the generated palette, and the 4 gruvbox themes legitimately share one neovim.lua because the upstream plugin picks its own variant"
 t_contains "the generated palette ramps its dimmed background off the base" \
   'bg_dim = "{{ background|pop=0.06 }}"' "$(<"$THEMED_DIR/neovim.lua.tpl")"
 t_eq "all 11 colours it names are inside the required palette" "" \
@@ -719,7 +721,7 @@ for theme in "${THEMES[@]}"; do
   done < <(bg_files "$THEMES_DIR/$theme")
 done
 t_eq "every theme declares at least one background" "0" "$BG_THEME"
-t_count "the 30 themes ship 184 wallpapers" "184" "$BG_TOTAL"
+t_count "the 44 themes ship 247 wallpapers" "247" "$BG_TOTAL"
 t_eq "every background's extension is one ImageExts.ok() accepts" "" "$BG_BADEXT"
 t_eq "no background is a zero-byte file" "" "$BG_EMPTY_FILE"
 t_eq "the wallpapers are only jpg and png" "jpg png" \
@@ -730,7 +732,7 @@ t_contains "the cycler sorts the listing it chose from, so a rename changes the 
 t_contains "and commits the recorded path as theme/backgrounds/<name>" \
   'const rel = "theme/backgrounds/" + base' \
   "$(<"$SHELL_DIR/features/wallpaper/Wallpaper.qml")"
-t_note "the 11 png wallpapers are the onedark, osaka-light and rosepine-dark-hard sets; everything else is jpg. Both are in ImageExts.js, so the set passes the same filter Qt will apply at decode time"
+t_note "the 13 png wallpapers are the onedark, osaka-light, rosepine-dark-hard and dracula sets; everything else is jpg. Both are in ImageExts.js, so the set passes the same filter Qt will apply at decode time"
 
 # --------------------------------------------------------------------------
 # cross-theme invariants
@@ -775,9 +777,9 @@ for theme in "${THEMES[@]}"; do
 done
 t_eq "every family-variant key is unique, so no theme is shadowed in the picker" "0" \
   "$(printf '%s' "$DISPLAY_KEYS" | LC_ALL=C sort | uniq -d | grep -c .)"
-t_eq "and every picker label is unique too, so the 30 rows are 30 distinct rows" "0" \
+t_eq "and every picker label is unique too, so the 44 rows are 44 distinct rows" "0" \
   "$(printf '%s' "$DISPLAY_KEYS" | tr '-' ' ' | tr -s ' ' | LC_ALL=C sort | uniq -d | grep -c .)"
-t_eq "29 of the 30 directory names match their declared family and variant" \
+t_eq "43 of the 44 directory names match their declared family and variant" \
   "catppuccin-frappe" "$(printf '%s' "$NAME_MISMATCH" | tr -d '\n')"
 t_note "catppuccin-frappe is the one mismatch and is deliberate rather than broken: theme.info spells VARIANT=Frappe with a grave accent, and the directory is the ASCII catppuccin-frappe. Nothing depends on the accent - vb-theme-set takes a folder name directly (bin/vb-theme-set:534) before it ever parses family/variant, and the picker label is built from the same field either way - but the tree's own convention is an ASCII directory name, so the assertion pins the exception by name rather than widening the rule to accept it anywhere"
 t_contains "and the doc states the family may be left empty for a standalone theme" \
@@ -792,7 +794,7 @@ for theme in "${THEMES[@]}"; do
   digest="$(theme_digest "$THEMES_DIR/$theme" | md5sum | cut -d' ' -f1)"
   DIGEST["$digest"]+="$theme "
 done
-t_eq "all 30 themes hash to 30 distinct digests" "0" \
+t_eq "all 44 themes hash to 44 distinct digests" "0" \
   "$(for d in "${!DIGEST[@]}"; do
     set -- ${DIGEST[$d]}
     (($# > 1)) && printf '%s ' "$d"
@@ -804,16 +806,17 @@ for d in "${!DIGEST[@]}"; do
   fi
 done
 t_eq "so no two themes are the same tree" "" "$DUPLICATES"
-t_eq "the digests cover colors.list, theme.info and every wallpaper" "30" \
+t_eq "the digests cover colors.list, theme.info and every wallpaper" "44" \
   "$(for theme in "${THEMES[@]}"; do
     find "$THEMES_DIR/$theme" -type f -not -path '*/.git/*' -not -path '*/.github/*' |
       grep -c .
   done | grep -c '[1-9]' | head -1)"
-t_empty "and every theme contributes at least four files of its own" \
+t_empty "and every theme contributes at least three files of its own" \
   "$(for theme in "${THEMES[@]}"; do
     n="$(find "$THEMES_DIR/$theme" -type f -not -path '*/.git/*' -not -path '*/.github/*' | grep -c .)"
-    ((n >= 4)) || printf '%s ' "$theme"
+    ((n >= 3)) || printf '%s ' "$theme"
   done)"
+t_note "lush is the smallest shipped theme: colors.list, theme.info and one wallpaper, which is the four-component minimum less the optional neovim.lua"
 
 # --------------------------------------------------------------------------
 # the theme index, in the only form the tree has one
@@ -840,7 +843,7 @@ for theme in "${THEMES[@]}"; do
     UNREACHABLE=$((UNREACHABLE + 1))
   fi
 done
-t_eq "all 30 directories are reachable by both listings" "30" "$UNREACHABLE"
+t_eq "all 44 directories are reachable by both listings" "44" "$UNREACHABLE"
 # Direction two: a rename invalidates the persisted name, because the two tools
 # record the FOLDER name, not the display key. The name rule above is what
 # keeps the two in step, and it is asserted there.
@@ -852,7 +855,7 @@ t_contains "and the picker accepts a folder name only if the listing contains it
   'function apply(folder) {' "$(<"$THEME_PICKER")"
 t_contains "so a theme dropped from disk leaves a stale theme.name nothing resolves to" \
   '!root._contained(name)' "$(grep -m1 '!root._contained(name)' "$THEME_PICKER")"
-t_note "the .uninstalled marker is written by vb-theme-remove for an archived community theme and hides it from both the picker and vb-theme-set; no shipped theme carries one, so the 30 directories and the 30 listed names are the same set in both directions. There is no static manifest to go stale - a rename is caught by the directory-name rule above, and a deletion by this marker check"
+t_note "the .uninstalled marker is written by vb-theme-remove for an archived community theme and hides it from both the picker and vb-theme-set; no shipped theme carries one, so the 44 directories and the 44 listed names are the same set in both directions. There is no static manifest to go stale - a rename is caught by the directory-name rule above, and a deletion by this marker check"
 t_note "vb_hidden_themes in ~/.config/vibranium/settings.advanced can hide any of them from the picker at runtime (bin/vb-theme-set:80). That is a user file outside the repo, so it is not asserted here"
 
 t_summary

@@ -850,14 +850,14 @@ Item {
   // its stripe and its glyph - green a playback stream, red a capture stream,
   // blue an output device, yellow an input device - so a mark in any of those four
   // reads as "this is the kind of this card". `accent` is out for the reason the
-  // kinds already state: it is the user's own choice and on more than one of the
-  // 30 palettes shipped here it resolves to the same colour as `blue`. That
-  // leaves `purple` and `orange`, and they are the best pair of what is left:
-  // `orange` is the theme's `accent` in none of the 30, `purple` in four
-  // (catppuccin), and over the same 30 palettes `purple` is never nearer than 45
-  // RGB units to a kind colour while `orange` closes to 21 on catppuccin-macchiato
-  // against yellow. A soft collision is not a collision: the mark is a mark on the
-  // card's edge and the kind is a stripe along its top.
+  // kinds already state: it is the user's own choice and on 12 of the 44 palettes
+  // shipped here it resolves to the same colour as `blue`. That leaves `purple`
+  // and `orange`, and they are the best pair of what is left: `purple` is the
+  // theme's `accent` in four (catppuccin, dracula), `orange` in one (ristretto),
+  // and over the same 44 palettes `purple` is never nearer than 27 RGB units to a
+  // kind colour while `orange` closes to 16 on gray against yellow. A soft
+  // collision is not a collision: the mark is a mark on the card's edge and the
+  // kind is a stripe along its top.
   //
   // LINKED is a third thing a mark says, and it is the one a user acts on: this
   // port already has a line on it, so a press here takes hold of that line rather
