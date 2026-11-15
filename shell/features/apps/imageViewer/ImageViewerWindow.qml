@@ -1044,17 +1044,17 @@ QtObject {
               spacing: 7
               KeyCap { key: "+"; anchors.verticalCenter: parent.verticalCenter }
               KeyCap { key: "-"; anchors.verticalCenter: parent.verticalCenter }
-              Text { anchors.verticalCenter: parent.verticalCenter; text: "zoom"; color: Ui.tint("foreground_0", 0.56); font.pixelSize: 11; font.family: Ui.fontFamily }
+              Text { anchors.verticalCenter: parent.verticalCenter; text: "zoom"; color: Ui.tint("foreground_0", 0.56); font.pixelSize: Ui.fontS; font.family: Ui.fontFamily }
             }
             Row {
               spacing: 7
               KeyCap { key: "Tab"; anchors.verticalCenter: parent.verticalCenter }
-              Text { anchors.verticalCenter: parent.verticalCenter; text: "hide ui"; color: Ui.tint("foreground_0", 0.56); font.pixelSize: 11; font.family: Ui.fontFamily }
+              Text { anchors.verticalCenter: parent.verticalCenter; text: "hide ui"; color: Ui.tint("foreground_0", 0.56); font.pixelSize: Ui.fontS; font.family: Ui.fontFamily }
             }
             Row {
               spacing: 7
               KeyCap { key: "F"; anchors.verticalCenter: parent.verticalCenter }
-              Text { anchors.verticalCenter: parent.verticalCenter; text: "fullscreen"; color: Ui.tint("foreground_0", 0.56); font.pixelSize: 11; font.family: Ui.fontFamily }
+              Text { anchors.verticalCenter: parent.verticalCenter; text: "fullscreen"; color: Ui.tint("foreground_0", 0.56); font.pixelSize: Ui.fontS; font.family: Ui.fontFamily }
             }
           }
         }
