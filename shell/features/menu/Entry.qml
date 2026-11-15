@@ -517,7 +517,9 @@ Item {
       // The held verdict belongs to the unfold that is over. Releasing here
       // rather than on the next open is what lets a dropdown that does NOT
       // resize the region animate normally on the next keystroke: the hold is
-      // a property of one unfold, not of the row.
+      // a property of one unfold, not of the row, and `release()` clears the
+      // gate the Behaviors actually read rather than just the flag.
+      row._slotSettle = false
       descSlot.release()
       expandSlot.release()
       return
@@ -526,6 +528,26 @@ Item {
     if (now > row._slotMsLatch) row._slotMsLatch = now
   }
 
+  // This unfold resizes the region, and the region resize is not animated.
+  //
+  // MONOTONIC, for the same reason _slotMsLatch is: the verdict is published
+  // while the dropdown is opening and is gone by the time it closes, so the
+  // close needs the value the open was given. Taking the latest reading
+  // instead would animate the open and not the collapse - one motion, two
+  // clocks - which is the seam this exists to remove.
+  property bool _slotSettle: false
+
+  // Land both slots at their destination and hold them there. Called from the
+  // panel's verdict, never from a slot's own transition: a slot cannot know
+  // whether the region is about to grow for it, and asking the row first and
+  // the panel second would be a turn too late - the slot's height has already
+  // been written by then, and its Behavior has already armed.
+  function _settleSlots() {
+    if (row._slotSettle) return
+    row._slotSettle = true
+    if (descSlot.open || descSlot.closing) descSlot.land()
+    if (expandSlot.open || expandSlot.closing) expandSlot.land()
+  }
   // Panel-side slot claim (see MenuPanel.expansionNeedH).
   readonly property real expandSlotH: expandSlot.height
   // Where this row lands once its slots finish unfolding, known from the
@@ -731,6 +753,29 @@ Item {
     }
   }
 
+  // Panel-driven dropdown navigation; returns true when consumed.
+  function moveOption(direction) {
+    const opts = row.optionList
+    if (!dropdownOpen || opts.length === 0) return false
+    // A dropdown that has just been opened (or whose cursor was cleared)
+    // starts with no option selected (-1). Stepping from -1 must land on
+    // the first option going forward and on the last going back, mirroring
+    // List.move's unseated-cursor handling - otherwise Tab from -1 lands
+    // on the first option but Shift-Tab lands on the pre-last one.
+    let base = optionIndex
+    if (base < 0) base = direction > 0 ? -1 : opts.length
+    optionIndex = ((base + direction) % opts.length + opts.length) % opts.length
+    return true
+  }
+
+  function pickCurrent() {
+    if (!dropdownOpen || !itm) return false
+    const opts = row.optionList
+    if (optionIndex < 0 || optionIndex >= opts.length) return false
+    pick(opts[optionIndex].value)
+    return true
+  }
+
   // Swap this select row's dropdown for a free-text field (prompt mode).
   // Nothing is persisted here - the option that leads here only asks for
   // text; the editor's Enter commits through editCall.
@@ -844,6 +889,26 @@ Item {
     } finally {
       if (_wasFiltered && Menu.scopedActive) Menu.clearScoped()
     }
+  }
+
+  function toggleInfo() {
+    if (!itm || searchResult || (descText === "" && warnText === "")) return
+    // An expanded row already renders its description in-shell; there
+    // is nothing for ctrl+i to toggle without stacking a second copy.
+    if (row.descInShell) return
+    Menu.setInfo(itm, !Menu.infoOpen(itm))
+  }
+
+  function stepBy(direction) {
+    if (!hasStepper || !enabled_) return
+    if (Menu.isNumberActive(itm)) return
+    let next = MenuLib.clamp(numericValue + direction * stepSize,
+      minimum, maximum)
+    next = MenuLib.quantize(next)
+    if (next === numericValue) return
+    Menu.setValue(itm, next)
+    if (Menu.handleNumberChange(itm, next)) return
+    Menu.runCommand(itm.onChange, Format.fixed(next, decimals) + unitSuffix)
   }
 
   function openEditor() {
