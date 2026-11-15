@@ -296,7 +296,7 @@ Rectangle {
     // ---- secret ----
     Item {
       anchors.fill: parent
-      visible: isSecret
+      visible: root.isSecret
       Column {
         anchors.centerIn: parent
         spacing: Ui.s
@@ -334,7 +334,7 @@ Rectangle {
     Item {
       id: stage
       anchors.fill: parent
-      visible: isMedia
+      visible: root.isMedia
 
       readonly property real imgAspect: (root._paint && root._paint.imageW > 0 && root._paint.imageH > 0) ? root._paint.imageW / root._paint.imageH : 16/9
       readonly property real stageW: Math.min(gutter.width, gutter.height * imgAspect)
@@ -406,7 +406,7 @@ Rectangle {
     Flickable {
       id: infoFlick
       anchors.fill: parent
-      visible: isMediaInfo || isFolderInfo
+      visible: root.isMediaInfo || root.isFolderInfo
       clip: true
       contentWidth: width
       contentHeight: infoCol.implicitHeight + 2 * Ui.s
@@ -422,8 +422,8 @@ Rectangle {
         // container tag (format), then metadata rows
         Text {
           width: parent.width
-          visible: mi !== null && mi.format !== undefined
-          text: mi !== null && mi.format !== undefined ? String(mi.format) : ""
+          visible: root.mi !== null && root.mi.format !== undefined
+          text: root.mi !== null && root.mi.format !== undefined ? String(root.mi.format) : ""
           color: Ui.tint("foreground_1", 0.45)
           font.pixelSize: Ui.fontS
           font.family: Ui.fontFamily
@@ -432,7 +432,7 @@ Rectangle {
 
         // metadata rows: icon + label + value, donated proportions
         Repeater {
-          model: isFolderInfo ? folderRows.concat(gitRows) : miRows
+          model: root.isFolderInfo ? root.folderRows.concat(root.gitRows) : root.miRows
           // Delegate root is a plain Item (explicit geometry) so its
           // children may use anchors; Column-positioner children must not.
           delegate: Item {
@@ -477,7 +477,7 @@ Rectangle {
     Flickable {
       id: fileFlick
       anchors.fill: parent
-      visible: isTextfile
+      visible: root.isTextfile
       clip: true
       contentHeight: fileText.height
       contentWidth: width
@@ -486,7 +486,7 @@ Rectangle {
       Text {
         id: fileText
         width: fileFlick.width
-        text: isTextfile ? root._dumpText(d.content) : ""
+        text: root.isTextfile ? root._dumpText(root.d.content) : ""
         color: Ui.tint("foreground_0", 1)
         font.pixelSize: Ui.fontM
         font.family: "monospace"
@@ -499,7 +499,7 @@ Rectangle {
     Flickable {
       id: inlineFlick
       anchors.fill: parent
-      visible: isInline && !isTextfile
+      visible: root.isInline && !root.isTextfile
       clip: true
       contentHeight: inlineText.height
       contentWidth: width
@@ -508,7 +508,7 @@ Rectangle {
       Text {
         id: inlineText
         width: inlineFlick.width
-        text: isInline ? root._dumpText(root._paint.preview || root._paint.raw) : ""
+        text: root.isInline ? root._dumpText(root._paint.preview || root._paint.raw) : ""
         color: Ui.tint("foreground_0", 1)
         font.pixelSize: Ui.fontM
         font.family: Ui.fontFamily
@@ -526,7 +526,7 @@ Rectangle {
     // gaps - the plot box (not a fixed pixel height) is what stretches.
     Item {
       anchors.fill: parent
-      visible: isFunc
+      visible: root.isFunc
 
       FunctionGraph {
         anchors.fill: parent
@@ -543,7 +543,7 @@ Rectangle {
     // empty state.
     Item {
       anchors.fill: parent
-      visible: isUnpreviewable
+      visible: root.isUnpreviewable
 
       Column {
         x: Ui.s
@@ -551,7 +551,7 @@ Rectangle {
         width: parent.width - 2 * Ui.s
         spacing: Ui.s
         opacity: 0.8
-        visible: !hasSelection && !root.isBinary
+        visible: !root.hasSelection && !root.isBinary
 
         Rectangle {
           width: parent.width * 0.4
@@ -568,18 +568,18 @@ Rectangle {
 
       Rectangle {
         anchors.fill: parent
-        visible: hasSelection && !root.isBinary
+        visible: root.hasSelection && !root.isBinary
         color: Ui.tint("background_0", 0.45)
       }
 
       Column {
         anchors.centerIn: parent
-        visible: hasSelection
+        visible: root.hasSelection
         width: gutter.width - Ui.l
         spacing: Ui.s
         Icon {
           anchors.horizontalCenter: parent.horizontalCenter
-          name: hasSelection ? "bug" : "file"
+          name: root.hasSelection ? "bug" : "file"
           colorKey: "foreground_1"
           size: 54
           opacity: 0.35
@@ -589,7 +589,7 @@ Rectangle {
           width: 220
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.Wrap
-          text: phTitle
+          text: root.phTitle
           color: Ui.tint("foreground_1", 0.6)
           font.pixelSize: Ui.fontM
           font.family: Ui.fontFamily
@@ -601,8 +601,8 @@ Rectangle {
           width: 240
           horizontalAlignment: Text.AlignHCenter
           wrapMode: Text.Wrap
-          visible: phNote !== ""
-          text: phNote
+          visible: root.phNote !== ""
+          text: root.phNote
           color: Ui.tint("foreground_1", 0.4)
           font.pixelSize: Ui.fontXs
           font.family: Ui.fontFamily

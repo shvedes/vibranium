@@ -113,8 +113,11 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #
 #   The parent-element note counts a name that resolves through scopes the
 #   delegate scopes up. That naming is deliberate across the bar and menu
-#   surfaces, so 54 is a shape of the tree rather than 54 defects, and it moves
-#   with those files.
+#   surfaces, so the figure is a shape of the tree rather than a defect count,
+#   and it moves with those files. It fell from 51 to 23 with the clipboard
+#   preview's 28 reads: each of those was one warning and one note, because a
+#   name that resolves through the component's own scope is exactly the shape
+#   both diagnostics describe.
 #   common/LyricsPane.qml is one of them: the delegate's click handler reads
 #   `modelData` through its parent Text, and qmllint reports the same read as
 #   an unqualified warning.
@@ -130,8 +133,8 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
 RECORDED_FILE_COUNT=252
-RECORDED_WARNING_COUNT=133
-RECORDED_INFO_COUNT=51
+RECORDED_WARNING_COUNT=105
+RECORDED_INFO_COUNT=23
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -150,11 +153,15 @@ PanelWindow"
 # must land in exactly one of these buckets, and each bucket's count is
 # pinned: a moved number then names the kind that moved, which a bare total
 # would not.
+# The unqualified figure fell by 28 when the clipboard preview's own
+# properties were read through `root.` (isSecret, isMedia, mi, phTitle and the
+# rest); what is left there is the delegate's injected `modelData`/`index`,
+# which must stay unqualified, plus the same shape in the bar islands.
 RECORDED_WARNING_KINDS="confusing-expression-statement 4
 eval 1
 missing-property 52
 uncreatable-type 3
-unqualified 68
+unqualified 40
 unresolved-type 5"
 
 t_section "the tool under test"
