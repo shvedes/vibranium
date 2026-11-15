@@ -954,13 +954,6 @@ Singleton {
     return hooked !== null ? hooked : false
   }
 
-  function isNumberActive(item) {
-    if (!item) return false
-    const p = root._providerFor(item.id)
-    const hooked = MenuLib.hookBool(p, "numberActive", item, root._hookCtx(item), null)
-    return hooked !== null ? hooked : false
-  }
-
   // Palette key a provider wants its row glyph accented with (caffeine's
   // red slash while active). "" keeps the row monochrome.
   function iconAccentFor(item) {

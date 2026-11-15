@@ -582,7 +582,6 @@ Singleton {
       display: () => (root.active || root.expired) ? root.formatted : null,
       widestDisplay: () => "Time's up!",
       valueActive: () => root.active,
-      numberActive: () => root.active || root.expired,
       confirm: () => {
         if (!(root.active || root.expired)) return null
         return {
