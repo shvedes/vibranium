@@ -43,7 +43,7 @@ The lock releases by itself when the countdown expires.
 Three things, and only these:
 
 - **Caffeine** (the toggle above) and any other `systemd-inhibit --what=idle` lock, through the system inhibitor registry.
-- **A Wayland idle inhibit** held by any client, which the compositor reports directly.
+- **A Wayland idle inhibit** held by any client. This one never reaches D-Bus: a browser playing a video asks the compositor to stay awake over the Wayland idle-inhibit protocol, so before a lock or suspend timer runs, Vibranium asks the compositor which windows are inhibiting idle. A Chromium video therefore holds the timer back even though neither the logind registry nor the screensaver stream can see it.
 - **A screensaver inhibit** (`org.freedesktop.ScreenSaver`) - what a browser or video player asks for while it plays video, so a YouTube video keeps the session untouched until it ends. Vibranium watches that interface's Inhibit/UnInhibit method calls; a player that asks and dies without releasing is dropped after a day rather than leaving your session unlocked for good.
 
 Anything else - the screen blanker, a player that requests nothing, a timer that is not declared - leaves the timers running.

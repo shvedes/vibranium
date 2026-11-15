@@ -72,6 +72,10 @@ Singleton {
   // as a timeout and the row is reported, never left running.
   readonly property int _commandTimeoutMs: 120000
 
+  // One compositor readback is a single short-lived child, so it needs only a
+  // ceiling that bounds a wedged hyprctl; it never retries.
+  readonly property int _inhibitorProbeMs: 2000
+
   // Config signature: string equality means monitors are rearmed only
   // when the idle config actually changed, never on unrelated store
   // churn (every settings mutation bumps the shared rev).
@@ -182,10 +186,34 @@ Singleton {
       // re-arms it and it fires then.
       return
     }
-    // Asked and refused to run: the row was not marked, so it retries on the
-    // next epoch exactly as if it had never been reached.
+    // A session action has a second source to ask. The D-Bus registries above
+    // only see applications that inhibited over D-Bus, while a browser playing
+    // a video asks for the same thing through the Wayland idle-inhibit
+    // protocol: no bus name, no queryable object, and whether it suppresses an
+    // idle notification is the compositor's decision. The compositor's own
+    // client list carries the answer, so a lock or suspend asks it before it
+    // runs instead of trusting the monitor's policy alone.
+    if (root._needsCompositorGuard(meta)) {
+      root._probeCompositor(meta, row, index, capturedEpoch)
+      return
+    }
+    root._dispatch(meta, row, index, capturedEpoch)
+  }
+
+  // Whether the action is one an idle inhibitor is asking the session not to
+  // take. A declared command class counts the same as the two project actions:
+  // the store only records a class for a command that says what it does to the
+  // session.
+  function _needsCompositorGuard(meta) {
+    return meta.kind === "lock" || meta.kind === "suspend"
+      || meta.commandClass === "lock" || meta.commandClass === "suspend"
+  }
+
+  // Asked and refused to run: the row was not marked, so it retries on the
+  // next epoch exactly as if it had never been reached.
+  function _dispatch(meta, row, index, capturedEpoch) {
     if (!root._accept(meta, row)) return
-    root.fired[key] = capturedEpoch
+    root.fired[String(index)] = capturedEpoch
   }
 
   // Action metadata for one stored row: an explicit kind plus the class a
@@ -207,15 +235,79 @@ Singleton {
     }
   }
 
-  // Both project actions honor logind's inhibitor registry: the Wayland
-  // idle monitor knows nothing about login1 inhibitor locks, so without
-  // this guard caffeine (an "idle" block lock) could not stop an idle timer
-  // from locking or suspending the session. A command is guarded by the
-  // class its row declares and by nothing else.
+  // Both project actions honor the inhibitor registries: the Wayland idle
+  // monitor knows nothing about login1 inhibitor locks, so without this guard
+  // caffeine (an "idle" block lock) could not stop an idle timer from locking
+  // or suspending the session. The screensaver counter is the other D-Bus
+  // source. A command is guarded by the class its row declares and by nothing
+  // else - and a Wayland idle inhibitor, which neither registry can see, is
+  // asked of the compositor in fire() before the action runs.
   function _blocked(meta) {
     if (meta.kind === "suspend" || meta.commandClass === "suspend") return Inhibitor.sleepBlocked()
     if (meta.kind === "lock" || meta.commandClass === "lock") return Inhibitor.idleBlocked()
     return false
+  }
+
+  // What the compositor says about idle inhibitors, from its client list. A
+  // Wayland idle inhibitor belongs to a surface, and Hyprland reports one per
+  // window as `inhibitingIdle`; nothing else the shell can reach exposes it.
+  // The answer is tri-state on purpose: `true` is an inhibitor, `false` is a
+  // list that provably holds none, and `null` is an unreadable reply. Only
+  // `true` holds the action back, because an unreadable probe must never keep
+  // the session unlocked past its own timeout.
+  function _compositorInhibitsIdle(text) {
+    let rows
+    try {
+      rows = JSON.parse(String(text))
+    } catch (ignored) {
+      return null
+    }
+    if (!Array.isArray(rows)) return null
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      if (row && row.inhibitingIdle === true) return true
+    }
+    return false
+  }
+
+  // One bounded, one-shot probe per arm. The run is kept in a property rather
+  // than closed over, so the callbacks below are the same shape as the command
+  // action's: they read root and nothing else. At most one probe is in flight;
+  // the timer list carries one row per action class, so two arms landing at
+  // once are not a case the store can produce. An arm a later one replaces
+  // simply tries again on the next activity edge.
+  property var _probePending: null
+
+  function _probeCompositor(meta, row, index, capturedEpoch) {
+    root._probePending = { meta: meta, row: row, index: index, epoch: capturedEpoch }
+    let job = null
+    try {
+      job = ProcessRegistry.start(["hyprctl", "-j", "clients"], root.tag + ":inhibitor", {
+        maxAttempts: 1,
+        timeoutMs: root._inhibitorProbeMs,
+        onFinished: result => root._probeFinished(result, false),
+        onFailed: reason => root._probeFinished(null, true)
+      })
+    } catch (ignored) {
+      job = null
+    }
+    if (job === null) root._probeFinished(null, true)
+  }
+
+  // Only `true` holds the action back: a refused, failed or unreadable probe
+  // proceeds exactly as the guard did before this source existed, so a missing
+  // hyprctl can never keep the session unlocked past its own timeout.
+  function _probeFinished(result, failed) {
+    const run = root._probePending
+    root._probePending = null
+    if (run === null) return
+    let blocked = null
+    if (failed !== true && result !== null && result !== undefined && result.code === "ok")
+      blocked = root._compositorInhibitsIdle(result.stdout)
+    if (blocked === true) return
+    if (!root.enabled || run.epoch !== root.epoch) return
+    if (root.fired[String(run.index)] === run.epoch) return
+    root._dispatch(run.meta, run.row, run.index, run.epoch)
   }
 
   // Lock owns music pause/auth through Lockscreen; suspend goes through
