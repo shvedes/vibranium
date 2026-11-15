@@ -704,7 +704,7 @@ Item {
           width: ListView.view ? ListView.view.width : 0
           height: 44
 
-          Rectangle {
+          SkeletonBar {
             id: leadMock
 
             anchors.left: parent.left
@@ -712,15 +712,10 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             width: 16
             height: 16
-            radius: RoundingPolicy.radius
-            color: Ui.tint("foreground_1", 0.13)
-            opacity: 0.55
-
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: contentRoot.queueLoading && MotionPolicy.enabled
-              SkeletonPulse { index: skeletonRow.index }
-            }
+            tint: 0.13
+            restingOpacity: 0.55
+            pulse: contentRoot.queueLoading && MotionPolicy.enabled
+            pulseIndex: skeletonRow.index
           }
 
           Row {
@@ -731,34 +726,25 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Ui.s
 
-            Rectangle {
+            SkeletonBar {
               anchors.verticalCenter: parent.verticalCenter
               width: 36
-              height: 8
-              radius: RoundingPolicy.radius
-              color: Ui.tint("foreground_1", 0.10)
-              opacity: 0.55
-
-              SequentialAnimation on opacity {
-                loops: Animation.Infinite
-                running: contentRoot.queueLoading && MotionPolicy.enabled
-                SkeletonPulse { index: skeletonRow.index; offset: 75 }
-              }
+              tint: 0.10
+              restingOpacity: 0.55
+              pulse: contentRoot.queueLoading && MotionPolicy.enabled
+              pulseIndex: skeletonRow.index
+              pulseOffset: 75
             }
 
-            Rectangle {
+            SkeletonBar {
               anchors.verticalCenter: parent.verticalCenter
               width: 14
               height: 14
-              radius: RoundingPolicy.radius
-              color: Ui.tint("foreground_1", 0.13)
-              opacity: 0.55
-
-              SequentialAnimation on opacity {
-                loops: Animation.Infinite
-                running: contentRoot.queueLoading && MotionPolicy.enabled
-                SkeletonPulse { index: skeletonRow.index; offset: 75 }
-              }
+              tint: 0.13
+              restingOpacity: 0.55
+              pulse: contentRoot.queueLoading && MotionPolicy.enabled
+              pulseIndex: skeletonRow.index
+              pulseOffset: 75
             }
           }
 
@@ -770,32 +756,21 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 4
 
-            Rectangle {
+            SkeletonBar {
               width: parent.width * (0.52 + ((Number(skeletonRow.index) || 0) % 2) * 0.2)
-              height: 8
-              radius: RoundingPolicy.radius
-              color: Ui.tint("foreground_1", 0.14)
-              opacity: 0.55
-
-              SequentialAnimation on opacity {
-                loops: Animation.Infinite
-                running: contentRoot.queueLoading && MotionPolicy.enabled
-                SkeletonPulse { index: skeletonRow.index }
-              }
+              restingOpacity: 0.55
+              pulse: contentRoot.queueLoading && MotionPolicy.enabled
+              pulseIndex: skeletonRow.index
             }
 
-            Rectangle {
+            SkeletonBar {
               width: parent.width * 0.72
               height: 6
-              radius: RoundingPolicy.radius
-              color: Ui.tint("foreground_1", 0.10)
-              opacity: 0.55
-
-              SequentialAnimation on opacity {
-                loops: Animation.Infinite
-                running: contentRoot.queueLoading && MotionPolicy.enabled
-                SkeletonPulse { index: skeletonRow.index; offset: 150 }
-              }
+              tint: 0.10
+              restingOpacity: 0.55
+              pulse: contentRoot.queueLoading && MotionPolicy.enabled
+              pulseIndex: skeletonRow.index
+              pulseOffset: 150
             }
           }
         }

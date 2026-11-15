@@ -24,10 +24,18 @@ Rectangle {
   // Extra offset inside the pulse cycle, for a variant that must not sit on
   // top of the row it follows.
   property int pulseOffset: 0
+  // Tint strength of the block against foreground_1: the row's main line is
+  // the default, a secondary line (or a glyph) passes its own.
+  property real tint: 0.14
+  // The block's opacity before and between pulses. Islands that sit the
+  // placeholder under a dimmer surface pass their own rather than fading the
+  // whole row.
+  property real restingOpacity: 1
 
   implicitHeight: 8
   radius: RoundingPolicy.radius
-  color: Ui.tint("foreground_1", 0.14)
+  color: Ui.tint("foreground_1", bar.tint)
+  opacity: bar.restingOpacity
 
   SequentialAnimation on opacity {
     loops: Animation.Infinite

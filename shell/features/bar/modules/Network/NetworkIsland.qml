@@ -2088,19 +2088,14 @@ Item {
         anchors.rightMargin: root.rowPad + 6
         spacing: Ui.s
 
-        Rectangle {
+        SkeletonBar {
           width: 28
           height: 28
-          radius: RoundingPolicy.radius
           anchors.verticalCenter: parent.verticalCenter
-          color: Ui.tint("foreground_1", 0.13)
-          opacity: 0.55
-
-          SequentialAnimation on opacity {
-            loops: Animation.Infinite
-            running: root._otherSkeleton
-            SkeletonPulse { index: skeletonRow.index }
-          }
+          tint: 0.13
+          restingOpacity: 0.55
+          pulse: root._otherSkeleton
+          pulseIndex: skeletonRow.index
         }
 
         Column {
@@ -2108,49 +2103,34 @@ Item {
           width: parent.width - 28 - 14 - 2 * Ui.s
           spacing: 4
 
-          Rectangle {
+          SkeletonBar {
             width: parent.width * (0.48 + ((Number(skeletonRow.index) || 0) % 3) * 0.16)
-            height: 8
-            radius: RoundingPolicy.radius
-            color: Ui.tint("foreground_1", 0.14)
-            opacity: 0.55
-
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: root._otherSkeleton
-              SkeletonPulse { index: skeletonRow.index }
-            }
+            restingOpacity: 0.55
+            pulse: root._otherSkeleton
+            pulseIndex: skeletonRow.index
           }
 
-          Rectangle {
+          SkeletonBar {
             width: parent.width * 0.72
             height: 6
-            radius: RoundingPolicy.radius
-            color: Ui.tint("foreground_1", 0.10)
-            opacity: 0.55
-
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: root._otherSkeleton
-              SkeletonPulse { index: skeletonRow.index; offset: 150 }
-            }
+            tint: 0.10
+            restingOpacity: 0.55
+            pulse: root._otherSkeleton
+            pulseIndex: skeletonRow.index
+            pulseOffset: 150
           }
         }
 
-        Rectangle {
+        SkeletonBar {
           width: 14
           height: 14
-          radius: RoundingPolicy.radius
           anchors.verticalCenter: parent.verticalCenter
-          color: Ui.tint("foreground_1", 0.13)
-          opacity: 0.55
+          tint: 0.13
+          restingOpacity: 0.55
           visible: ((Number(skeletonRow.index) || 0) % 2) === 0
-
-          SequentialAnimation on opacity {
-            loops: Animation.Infinite
-            running: root._otherSkeleton && ((Number(skeletonRow.index) || 0) % 2) === 0
-            SkeletonPulse { index: skeletonRow.index; offset: 75 }
-          }
+          pulse: root._otherSkeleton && ((Number(skeletonRow.index) || 0) % 2) === 0
+          pulseIndex: skeletonRow.index
+          pulseOffset: 75
         }
       }
     }
