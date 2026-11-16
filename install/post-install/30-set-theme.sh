@@ -47,5 +47,3 @@ done
 
 mkdir -p "$HOME/.local/state/vibranium"
 printf '{"theme": "Adwaita", "size": 24}\n' > "$HOME/.local/state/vibranium/cursor-theme.json"
-
-helpers::symlink ~/.local/state/vibranium/theme/neovim.lua ~/.config/nvim/lua/plugins/theme.lua

@@ -1,0 +1,12 @@
+[Unit]
+Description=
+Before=local-fs.target
+
+[Mount]
+What=
+Where=
+Type=
+Options=
+
+[Install]
+WantedBy=local-fs.target

@@ -1,0 +1,9 @@
+FROM
+
+WORKDIR
+
+COPY
+
+RUN
+
+CMD

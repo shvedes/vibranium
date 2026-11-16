@@ -2,6 +2,13 @@
 
 helpers::log::info "Copying configs"
 
+# Earlier installs symlinked the generated theme spec here. The nvim config now
+# ships a real theme.lua that reads the generated file, so drop the stale link
+# before copying or cp -aT writes through it into the theme state directory.
+if [[ -L "$HOME/.config/nvim/lua/plugins/theme.lua" ]]; then
+  rm -f "$HOME/.config/nvim/lua/plugins/theme.lua"
+fi
+
 mkdir -p "$HOME/.local/bin"
 mkdir -p "$HOME/.local/state/vibranium"
 mkdir -p "$HOME/.local/share/applications"

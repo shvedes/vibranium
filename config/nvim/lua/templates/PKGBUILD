@@ -1,0 +1,22 @@
+# Maintainer: Your Name <you@example.com>
+# shellcheck disable=all
+
+pkgname=example
+pkgver=1.0.0
+pkgrel=1
+pkgdesc=""
+arch=('x86_64')
+url=""
+license=()
+depends=()
+makedepends=()
+source=()
+sha256sums=()
+
+build() {
+  :
+}
+
+package() {
+  :
+}

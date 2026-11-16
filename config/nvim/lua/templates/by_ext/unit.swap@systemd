@@ -1,0 +1,9 @@
+[Unit]
+Description=
+Before=swap.target
+
+[Swap]
+What=
+
+[Install]
+WantedBy=swap.target

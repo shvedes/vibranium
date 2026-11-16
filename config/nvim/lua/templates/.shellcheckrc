@@ -1,0 +1,10 @@
+# shellcheck shell=bash
+
+disable=
+enable=
+
+exclude=
+
+source-path=
+
+external-sources=false

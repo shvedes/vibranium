@@ -1,56 +1,93 @@
+--==============================================================================
+-- config/lazy.lua  -  lazy.nvim bootstrap and plugin setup
+--
+-- Responsibilities:
+--   1. Clone lazy.nvim (if not already installed) into stdpath("data")/lazy/.
+--   2. Add lazy.nvim to the runtimepath.
+--   3. Call lazy.setup() with the plugin spec entry point (lua/plugins/).
+--   4. Register a UIEnter autocmd that triggers the live theme watcher.
+--
+-- The plugin spec loader processes ALL files under lua/plugins/*.lua.
+-- Each file returns either a single spec table or a list of spec tables.
+-- lazy.nvim merges them and handles installation, loading, and dependencies.
+--
+-- The theme.lua plugin spec (loaded by lazy via lua/plugins/theme.lua)
+-- is special: it reads the Vibranium host-theme neovim.lua at runtime and
+-- returns the appropriate colourscheme spec for lazy to install.
+-- The UIEnter autocmd then starts the fs watcher that detects host theme
+-- switches and applies them live.
+--==============================================================================
+
+-- Path to the lazy.nvim plugin manager directory.
+-- stdpath("data") resolves to ~/.local/share/nvim/ (or platform equivalent).
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+
+-- Bootstrap: clone lazy.nvim if it is not already present on disk.
+-- Uses a shallow clone (blob:none filter, stable branch) for speed.
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
-  local lazyrepo = "https://github.com/folke/lazy.nvim.git"
-  local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
-  if vim.v.shell_error ~= 0 then
-    vim.api.nvim_echo({
-      { "Failed to clone lazy.nvim:\n", "ErrorMsg" },
-      { out, "WarningMsg" },
-      { "\nPress any key to exit..." },
-    }, true, {})
-    vim.fn.getchar()
-    os.exit(1)
-  end
+	local lazyrepo = "https://github.com/folke/lazy.nvim.git"
+	local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
+	if vim.v.shell_error ~= 0 then
+		-- Clone failed: display error and exit so the user can fix connectivity.
+		vim.api.nvim_echo({
+			{ "Failed to clone lazy.nvim:\n", "ErrorMsg" },
+			{ out, "WarningMsg" },
+			{ "\nPress any key to exit..." },
+		}, true, {})
+		vim.fn.getchar()
+		os.exit(1)
+	end
 end
+
+-- Add lazy.nvim to the runtimepath so its modules (lazy, lazy.view, etc.)
+-- are available for immediate require().
 vim.opt.rtp:prepend(lazypath)
 
+-- Configure and start lazy.nvim.
+-- The `spec` entry point tells lazy to import all specs from lua/plugins/.
 require("lazy").setup({
-  spec = {
-    -- add LazyVim and import its plugins
-    { "LazyVim/LazyVim", import = "lazyvim.plugins" },
-    -- import/override with your plugins
-    { import = "plugins" },
-  },
-  defaults = {
-    -- By default, only LazyVim plugins will be lazy-loaded. Your custom plugins will load during startup.
-    -- If you know what you're doing, you can set this to `true` to have all your custom plugins lazy-loaded by default.
-    lazy = false,
-    -- It's recommended to leave version=false for now, since a lot the plugin that support versioning,
-    -- have outdated releases, which may break your Neovim install.
-    version = false, -- always use the latest git commit
-    -- version = "*", -- try installing the latest stable version for plugins that support semver
-  },
-  install = { colorscheme = { "tokyonight", "habamax" } },
+	-- Import all plugin specs from lua/plugins/*.lua as a single collection.
+	spec = { { import = "plugins" } },
 
-  -- You can toggle config change notification below
-  -- change_detection = { enabled = false },
-  checker = {
-    enabled = true, -- check for plugin updates periodically
-    notify = false, -- notify on update
-  }, -- automatically check for plugin updates
-  performance = {
-    rtp = {
-      -- disable some rtp plugins
-      disabled_plugins = {
-        "gzip",
-        -- "matchit",
-        -- "matchparen",
-        -- "netrwPlugin",
-        "tarPlugin",
-        "tohtml",
-        "tutor",
-        "zipPlugin",
-      },
-    },
-  },
+	-- Custom lockfile path: stored next to init.lua so it can be versioned.
+	lockfile = vim.fn.stdpath("config") .. "/.lazy-lock.json",
+
+	-- Auto-install missing plugins (true) and use habamax as the temporary
+	-- colourscheme during the initial installation process (before the actual
+	-- theme plugin is downloaded).
+	install = { missing = true, colorscheme = { "habamax" } },
+
+	-- UI border style and window title for the lazy.nvim dashboard.
+	ui = { border = "single", title = "Manage Plugins" },
+
+	-- Periodically check for plugin updates (notify = false means no pop-up;
+	-- the check runs silently and the user can see pending updates via :Lazy).
+	checker = { enabled = true, notify = false },
+
+	-- Detect when the spec changes and show a notification (silent here).
+	change_detection = { enabled = true, notify = false },
+
+	-- Disable lazy.nvim's own require profiling (no overhead).
+	profiling = { loader = false, require = false },
+
+	-- Disable the README viewer (not needed).
+	readme = { enabled = false },
+
+	-- Development mode (commented out): clones repos into a local_plugins
+	-- directory for local editing.
+	-- dev = {
+	--   path = function()
+	--     return vim.fn.stdpath("config") .. "/lua/local_plugins"
+	--   end,
+	-- },
+})
+
+-- After the first UI paint (UIEnter), start the live theme watcher.
+-- This polls and fs-watches the Vibranium host-theme symlink at
+-- ~/.local/state/vibranium/theme/neovim.lua so that when the host
+-- theme changes, the Neovim colourscheme updates without a restart.
+vim.api.nvim_create_autocmd("UIEnter", {
+	callback = function()
+		require("utils.theme").watch()
+	end,
 })
