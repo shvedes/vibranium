@@ -29,6 +29,16 @@ Card {
   // width between two presses.
   readonly property real minWidth: Math.min(320, root.availableWidth)
   property real maxWidth: 9999
+  // Hosts that rotate the card (a side placement) pass the inverse angle so
+  // the glyph stays upright: the card reads along the edge, but a speaker or
+  // sun icon must never lie on its side.
+  property real iconRotation: 0
+  // A clockwise-rotated card (the right edge) maps the row's leading edge and
+  // the meter's 0 mark to the top of the screen. Mirroring the content there
+  // puts the glyph on the trailing edge and the fill's origin on the leading
+  // one, so a vertical meter keeps both its icon and its 0% at the bottom on
+  // both sides, where the reading starts.
+  property bool mirrored: false
   width: root.minWidth
   height: body.implicitHeight + 2 * root.padV
   opacity: OSD.visible ? 1 : 0
@@ -58,6 +68,7 @@ Card {
       Row {
         width: parent.width
         spacing: Ui.m
+        layoutDirection: root.mirrored ? Qt.RightToLeft : Qt.LeftToRight
 
         // Icon box: the Icon always tries to fit the whole box it's in.
         // The box is a square; Icon.size is bound to the box size so the
@@ -72,6 +83,7 @@ Card {
             // Fit the whole box: use the smaller side so the glyph never
             // overflows, but the box here is square so it's just box size.
             size: Math.min(iconBoxText.width, iconBoxText.height)
+            rotation: root.iconRotation
             name: OSD.iconName
             colorKey: "foreground_0"
             // Muted: only the off-mark goes red (class="indicator" in
@@ -103,7 +115,15 @@ Card {
       }
 
       ProgressBar {
+        id: barText
         width: parent.width
+        // A clockwise card turns local right into screen bottom, so the bar
+        // mirrors its fill there: 0% stays at the bottom, beside the icon,
+        // instead of filling down from the top.
+        transform: Scale {
+          origin.x: barText.width / 2
+          xScale: root.mirrored ? -1 : 1
+        }
         // When brightness is negative (gamma dimming) the background is dim red but the
         // filled part must still show progress. Map -90..0 to 10..100 so bar never looks empty;
         // use 100 + value (e.g. -30 -> 70% fill) so deeper dim = less fill.
@@ -134,6 +154,7 @@ Card {
       Row {
         width: parent.width
         spacing: Ui.m
+        layoutDirection: root.mirrored ? Qt.RightToLeft : Qt.LeftToRight
 
         Item {
           id: iconBoxPlain
@@ -142,6 +163,7 @@ Card {
           Icon {
             anchors.centerIn: parent
             size: Math.min(iconBoxPlain.width, iconBoxPlain.height)
+            rotation: root.iconRotation
             name: OSD.iconName
             colorKey: "foreground_0"
             accentKey: OSD.muted ? "red" : ""
@@ -150,6 +172,7 @@ Card {
         }
 
         ProgressBar {
+          id: barPlain
           // Vertically bold: spans the Row's height. 10px reads bold vs
           // the thin 6px text variant while keeping the card low, and the
           // Row centers it vertically with the Icon. The width consumes
@@ -159,6 +182,12 @@ Card {
           width: parent.width - iconBoxPlain.width - parent.spacing
           height: 20
           anchors.verticalCenter: parent.verticalCenter
+          // Same mirror as the text variant: the fill grows up from the
+          // bottom rather than down from the top.
+          transform: Scale {
+            origin.x: barPlain.width / 2
+            xScale: root.mirrored ? -1 : 1
+          }
           value: OSD.kind === "brightness" && OSD.value < 0 ? Math.max(0, 100 + OSD.value) : (OSD.muted ? 0 : OSD.value)
           dimWhenEmpty: false
           // Placed at the level, not swept to it: see the thin bar above and

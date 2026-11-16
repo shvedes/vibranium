@@ -1060,11 +1060,32 @@
         "showItemCount": true,
         "options": [
             {
+                "key": "shell.osd.position",
+                "type": "string",
+                "default": "bottom",
+                "label": "Position",
+                "sub": "Which screen edge the OSD sits on",
+                "desc": "Which screen edge the OSD sits on. Left and right rotate the card so it reads along the edge.",
+                "values": [
+                    "bottom",
+                    "top",
+                    "left",
+                    "right"
+                ],
+                "valueLabels": {
+                    "bottom": "Bottom",
+                    "top": "Top",
+                    "left": "Left",
+                    "right": "Right"
+                }
+            },
+            {
                 "key": "shell.osd.offset",
                 "type": "int",
                 "default": 80,
                 "label": "Offset",
-                "sub": "OSD offset level",
+                "sub": "Distance from the chosen edge",
+                "desc": "Space between the OSD and the screen edge it sits on.",
                 "range": {
                     "min": 0,
                     "max": 400

@@ -70,15 +70,21 @@ Singleton {
   // this same turn, so this marks the one assignment that must not tween.
   property bool fillSnap: false
 
-  // Placement is fixed: always at the bottom side of the screen,
-  // `offset` px above the bottom edge (mirrors OSDs that hover above a
-  // bottom bar without overlapping it). Validated against the same check
-  // the view uses so malformed persisted values never crash the shell -
-  // they fall back to the default and the store keeps the bad value until
-  // the user fixes it via Settings/IPC.
-  // The OSD offers no top/bottom switch: `position` is a constant, kept for
-  // IPC compatibility with a caller that still asks for one.
-  readonly property string position: "bottom"
+  // Placement: `position` names the screen edge the card hugs, and `offset`
+  // is the distance from that same edge - so switching edge keeps the meter
+  // the same distance from the screen. Top and bottom center the card
+  // horizontally; left and right center it vertically and rotate it so the
+  // meter reads along the edge (OSDView owns that rotation). Validated here
+  // so malformed persisted values never crash the shell - they fall back to
+  // the default and the store keeps the bad value until the user fixes it
+  // via Settings/IPC.
+  readonly property var positions: ["bottom", "top", "left", "right"]
+  readonly property string position: {
+    root.revDep
+    const v = Settings.value("shell.osd.position")
+    return root.positions.indexOf(v) >= 0 ? v : "bottom"
+  }
+  readonly property bool vertical: root.position === "left" || root.position === "right"
   readonly property int offset: {
     root.revDep
     const v = Settings.value("shell.osd.offset")
@@ -94,10 +100,11 @@ Singleton {
   // the two are independent: the window holds off the first real
   // write once the store IS ready, the flag holds off a slow one.
   property double _bootAt: -1
-  // Placement preview: editing offset re-maps the live card (or a dummy
-  // meter when nothing showed yet) so the new spot reads at once. Change
-  // signals fire only on real edits, never on boot or on unrelated
-  // settings flushes.
+  // Placement preview: editing the edge or the offset re-maps the live card
+  // (or a dummy meter when nothing showed yet) so the new spot reads at
+  // once. Change signals fire only on real edits, never on boot or on
+  // unrelated settings flushes.
+  onPositionChanged: root.previewMeterPlacement()
   onOffsetChanged: root.previewMeterPlacement()
   function previewMeterPlacement() {
     if (root._bootAt <= 0 || Date.now() - root._bootAt < 3000) return
