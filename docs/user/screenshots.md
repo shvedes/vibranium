@@ -5,11 +5,12 @@ Screenshots are basic by default, but somewhat powerful when needed. Don't sue m
 | Shortcut | Scope |
 |---|---|
 | ++super+shift+s++ | Screenshot: pick region or screen |
-| ++super+ctrl+s++ | Screenshot: the screen exactly as it stands |
 
 Pressing the shortcut opens a dimmed overlay with two icon-only buttons: region and entire screen. Buttons are clickable, or Tab / arrows + Enter. Region selection also supports a keyboard cursor with Space, arrows, Shift+arrows, and Enter.
 
-++super+ctrl+s++ skips that overlay and takes the frame immediately, with whatever is on screen left standing. The normal screenshot is an exclusive surface: it dismisses the open menu, launcher, power menu, pass panel, and clipboard panel first, so the shot is the desktop alone. This one takes no such claim, so an open menu is in the picture - which is the point when you are documenting a menu or an error. It captures the whole screen only; there is no region variant, because the region selector needs exclusive keyboard focus and would take it from the very menu you are photographing.
+`vb-shell screenshots screen` and `vb-shell screenshots region` skip that overlay and capture immediately, with whatever is on screen left standing. Neither takes an exclusive surface claim, so an open menu is in the picture - which is the point when you are documenting a menu or an error. The region selector holds its dimming until the frame lands, so it cannot paint itself into the shot, and its exclusive keyboard focus cannot disturb the menu you are photographing.
+
+The picker overlay (`super+shift+s`) still takes an exclusive claim and dismisses open overlays before it appears. Use `screen` or `region` when you need them in the shot.
 
 Because nothing is dismissed, anything open is recorded. Leave the pass and clipboard panels closed when you use it.
 

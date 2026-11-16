@@ -1233,10 +1233,13 @@ Singleton {
     return true
   }
 
-  function openRegionSelect(screen, existingFlow, immediate) {
+  // `keepSurfaces` photographs the screen as it stands: no claim, so an open
+  // menu stays in the frame. The live selector gates its dimming until the
+  // frame lands, so it never paints itself into the frame it is selecting.
+  function openRegionSelect(screen, existingFlow, immediate, keepSurfaces) {
     if (!root._runtimeReady) {
       if (root._runtimeFailed || Number(existingFlow) > 0) return false
-      return root._queueStart(() => root.openRegionSelect(screen, existingFlow, immediate))
+      return root._queueStart(() => root.openRegionSelect(screen, existingFlow, immediate, keepSurfaces))
     }
     if (Number(existingFlow) > 0 && root._activeFlow !== Number(existingFlow)) return false
     if (!(Number(existingFlow) > 0)
@@ -1246,7 +1249,7 @@ Singleton {
       return true
     }
     if (Number(existingFlow) === 0 && immediate !== true && root._debounced("region")) return false
-    const flowId = Number(existingFlow) > 0 ? Number(existingFlow) : root._claimFlow("region")
+    const flowId = Number(existingFlow) > 0 ? Number(existingFlow) : root._claimFlow("region", keepSurfaces)
     if (flowId === 0) return false
     const target = screen !== undefined && screen !== null ? screen : root._targetScreen()
     if (!root._screenValid(target)) {
@@ -2153,10 +2156,9 @@ Singleton {
 
     function help(command: string): string {
       return UnitIpc.help("screenshots", "Screenshots", "native capture + annotation", [
-        { name: "screen", help: "capture the active screen" },
-        { name: "region", help: "pick a region, then capture it" },
+        { name: "screen", help: "capture the active screen as it stands, open menus included" },
+        { name: "region", help: "pick a region, then capture it, open menus included" },
         { name: "picker", help: "choose region or screen" },
-        { name: "asIs", help: "capture the active screen as it stands, open menus included" },
         { name: "annotate", help: "(path) open the annotation editor" },
       ], command)
     }
@@ -2170,21 +2172,17 @@ Singleton {
       })
     }
     // The verbs report the verdict of the call, not the request: `ok` here
-    // means a flow was claimed and the pipeline is running.
+    // means a flow was opened and the pipeline is running.
+    // No picker: these grab the frame that is on screen right now. An overlay
+    // asking "region or screen?" between the keypress and the frame is the
+    // delay they are meant to skip. Both pass keepSurfaces so an open menu is
+    // in the picture, which is the point when documenting a menu or an error.
     function screen(): string {
-      const ok = root.capture("screen", undefined, 0, true)
-      return ok ? "ok" : "error: capture refused"
-    }
-    function asIs(): string {
-      // No picker: this verb exists to grab the frame that is on screen
-      // right now, and an overlay asking "region or screen?" between the
-      // keypress and the frame is exactly the delay it is meant to skip.
-      // Immediate like `screen`, so the frame is requested on the next tick.
       const ok = root.capture("screen", undefined, 0, true, true)
       return ok ? "ok" : "error: capture refused"
     }
     function region(): string {
-      const ok = root.openRegionSelect(undefined, 0, true)
+      const ok = root.openRegionSelect(undefined, 0, true, true)
       return ok ? "ok" : "error: region select unavailable"
     }
     function picker(): string {
