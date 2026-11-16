@@ -147,8 +147,15 @@ BarModule {
           // from instead of following the cell under the pointer.
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
-          acceptedButtons: Qt.LeftButton
-          onClicked: {
+          acceptedButtons: Qt.LeftButton | Qt.RightButton
+          onClicked: mouse => {
+            // Right-click is the module's declarative hook
+            // (shell.statusbar.workspacesRightClick). Unset, it does nothing -
+            // the catalog offered the command before anything consumed it.
+            if (mouse.button === Qt.RightButton) {
+              root.clickCommand("rightClick")
+              return
+            }
             // A slot the model no longer backs is not a workspace to switch
             // to; re-deriving the strip drops it instead of keeping a number
             // that can never be clicked.

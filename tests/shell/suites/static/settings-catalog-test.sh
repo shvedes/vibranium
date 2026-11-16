@@ -227,7 +227,7 @@ KEYS="$(awk -F'\t' '$1=="ok" {print $4}' "$PROBE_OUT_DIR/meta.tsv")"
 PAGEIDS="$(awk -F'\t' '$1=="ok" {print $5}' "$PROBE_OUT_DIR/meta.tsv")"
 MENUS="$(awk -F'\t' '$1=="ok" {print $6}' "$PROBE_OUT_DIR/meta.tsv")"
 t_eq "the catalog holds 53 settings pages" "53" "$PAGES"
-t_eq "the catalog holds 238 options" "238" "$OPTS"
+t_eq "the catalog holds 247 options" "247" "$OPTS"
 t_eq "every option has a distinct key" "$OPTS" "$KEYS"
 t_eq "every page has a distinct id" "$PAGES" "$PAGEIDS"
 t_eq "the catalog holds 7 menu pages" "7" "$MENUS"
@@ -238,6 +238,82 @@ t_eq "the documented cross-namespace riders still parse" "4" \
   "$(awk -F'\t' '$3=="APP_LAUNCHER_ALWAYS_FOCUS" || $3=="PLAYER_FADE_DURATION" || $3=="misc.cursorTheme" || $3=="misc.cursorSize"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
 
 # --------------------------------------------------------------------------
+# duplicate keys: JSON.parse keeps the LAST one, so a second "options" in a
+# page silently discards the first list - the options parse without an error
+# and simply never appear. Scan the raw text, not the parsed object.
+# --------------------------------------------------------------------------
+
+cat >"$PROBE_DIR/dupkeys.mjs" <<'DUP_EOF'
+import fs from 'node:fs'
+const text = fs.readFileSync(process.argv[2], 'utf8').replace(/^[ \t]*\/\/.*$/gm, '')
+const stack = []
+const dups = []
+let i = 0
+while (i < text.length) {
+  const c = text[i]
+  if (c === '"') {
+    let j = i + 1
+    let s = ''
+    while (j < text.length && text[j] !== '"') {
+      if (text[j] === '\\') { s += text.slice(j, j + 2); j += 2; continue }
+      s += text[j]
+      j++
+    }
+    let k = j + 1
+    while (k < text.length && /[ \t\n\r]/.test(text[k])) k++
+    if (text[k] === ':' && stack.length > 0) {
+      const top = stack[stack.length - 1]
+      if (Object.prototype.hasOwnProperty.call(top, s)) {
+        dups.push((text.slice(0, i).split('\n').length + ':') + s)
+      }
+      top[s] = true
+    }
+    i = j + 1
+    continue
+  }
+  if (c === '{') stack.push(Object.create(null))
+  else if (c === '}') stack.pop()
+  i++
+}
+if (dups.length) console.error(dups.join('\n'))
+console.log(dups.length)
+DUP_EOF
+
+t_section "no object repeats a key"
+t_eq "the catalog declares each object key once" "0" \
+  "$(node "$PROBE_DIR/dupkeys.mjs" "$CATALOG_JSONC")"
+t_eq "the duplicate-key scan itself works" "1" \
+  "$(printf '{"a":1,"a":2}' >"$PROBE_DIR/dup-sample.jsonc" && node "$PROBE_DIR/dupkeys.mjs" "$PROBE_DIR/dup-sample.jsonc")"
+
+# --------------------------------------------------------------------------
+# click contract: BarModule.clickSetting builds shell.statusbar.<id><Action>
+# (the action stem capitalised), so every clickCommand("<stem>") a module
+# makes has to name an option the catalog actually declares. A stem without
+# one is an override the user can never set and the module can never read.
+# --------------------------------------------------------------------------
+
+t_section "click contract: module hooks are catalog options"
+t_eq "every module click hook resolves to an option" "0" "$(
+  dead=0
+  while IFS= read -r key; do
+    grep -qxF -- "$key" <(awk -F'\t' '$3 ~ /^shell\.statusbar\./ {print $3}' "$PROBE_OUT_DIR/opt.tsv") \
+      || dead=$((dead + 1))
+  done < <(
+    for d in "$SHELL_DIR"/features/bar/modules/*/; do
+      name="$(basename "$d")"
+      qml="$d$name.qml"
+      [[ -f $qml ]] || continue
+      id="$(printf '%s' "${name:0:1}" | tr 'A-Z' 'a-z')${name:1}"
+      while IFS= read -r action; do
+        [[ -n $action ]] || continue
+        printf 'shell.statusbar.%s%s\n' "$id" "${action^}"
+      done < <(grep -o 'clickCommand("[A-Za-z]*"' "$qml" | sed 's/.*("//; s/"$//')
+    done
+  )
+  printf '%s' "$dead"
+)"
+
+# --------------------------------------------------------------------------
 # ownership split across the three stores
 # --------------------------------------------------------------------------
 
@@ -246,7 +322,7 @@ t_eq "Settings keeps 25 shell/env pages" "25" "$(cut -f1 "$PROBE_OUT_DIR/split.t
 t_eq "HyprlandSettings keeps 28 hypr pages" "28" "$(cut -f2 "$PROBE_OUT_DIR/split.tsv")"
 t_eq "every page declares a group" "0" "$(cut -f3 "$PROBE_OUT_DIR/split.tsv")"
 t_eq "no page mixes hypr and non-hypr options" "0" "$(cut -f4 "$PROBE_OUT_DIR/split.tsv")"
-t_eq "shell options" "72" "$(awk -F'\t' '$5=="shell"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
+t_eq "shell options" "81" "$(awk -F'\t' '$5=="shell"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
 t_eq "env options" "11" "$(awk -F'\t' '$5=="env"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
 t_eq "hypr options" "153" "$(awk -F'\t' '$5=="hypr"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
 t_eq "misc options" "2" "$(awk -F'\t' '$5=="misc"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"

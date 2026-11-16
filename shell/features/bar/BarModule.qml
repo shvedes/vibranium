@@ -133,7 +133,12 @@ Item {
   // Resolve one click-command setting (shell.statusbar.<moduleId><action>,
   // e.g. "rightClick") as a trimmed string; "" when unset.
   function clickSetting(action): string {
-    const raw = Settings.value("shell.statusbar." + root.moduleId + action)
+    // Callers pass camelCase verb stems ("rightClick"); the catalog names the
+    // key with a capitalised suffix (shell.statusbar.volumeRightClick). Joining
+    // verbatim built "volumerightClick", which matched no option, so every
+    // click override read "" and silently fell back to the builtin action.
+    const suffix = action.charAt(0).toUpperCase() + action.slice(1)
+    const raw = Settings.value("shell.statusbar." + root.moduleId + suffix)
     return String(raw !== undefined ? raw : "").trim()
   }
 

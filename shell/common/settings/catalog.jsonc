@@ -460,10 +460,26 @@
                 "visibility": "hidden"
             },
             {
+                "key": "shell.statusbar.networkMiddleClick",
+                "type": "string",
+                "default": "",
+                "label": "Middle-click action",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
                 "key": "shell.statusbar.bluetoothRightClick",
                 "type": "string",
                 "default": "",
                 "label": "Right-click action",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.bluetoothMiddleClick",
+                "type": "string",
+                "default": "",
+                "label": "Middle-click action",
                 "allowEmpty": true,
                 "visibility": "hidden"
             },
@@ -615,6 +631,48 @@
         "desc": "Options of each bar module.",
         "icon": "settings",
         "showItemCount": true,
+        "options": [
+            // Modules with no page of their own still honour the click
+            // contract (clickCommand reads shell.statusbar.<moduleId><action>).
+            // Hidden, so they validate and persist like every other option
+            // without adding a page whose only row is a command field.
+            {
+                "key": "shell.statusbar.keyboardLayoutLeftClick",
+                "type": "string",
+                "default": "",
+                "label": "Keyboard layout left-click action",
+                "sub": "Command on left-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.keyboardLayoutRightClick",
+                "type": "string",
+                "default": "",
+                "label": "Keyboard layout right-click action",
+                "sub": "Command on right-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.readingModeLeftClick",
+                "type": "string",
+                "default": "",
+                "label": "Reading mode left-click action",
+                "sub": "Command on left-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.updateLeftClick",
+                "type": "string",
+                "default": "",
+                "label": "Update left-click action",
+                "sub": "Command on left-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            }
+        ],
         "items": [
             {
                 "type": "submenu",
@@ -656,8 +714,7 @@
                 "label": "Power",
                 "page": "bar-module-power"
             }
-        ],
-        "options": []
+        ]
     },
     // --- settings page 7/53 (shell) ---
     {
@@ -751,6 +808,24 @@
                 "default": "",
                 "label": "Middle-click action",
                 "sub": "Command on middle-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.volumeMicRightClick",
+                "type": "string",
+                "default": "vb-shell app audioMixer",
+                "label": "Microphone right-click action",
+                "sub": "Command on mic right-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.volumeMicMiddleClick",
+                "type": "string",
+                "default": "",
+                "label": "Microphone middle-click action",
+                "sub": "Command on mic middle-click",
                 "allowEmpty": true,
                 "visibility": "hidden"
             }
@@ -889,6 +964,15 @@
                 "label": "Verbose forecast",
                 "sub": "Per-day details",
                 "desc": "Show per-day details for each forecast day."
+            },
+            {
+                "key": "shell.statusbar.weatherMiddleClick",
+                "type": "string",
+                "default": "",
+                "label": "Middle-click action",
+                "sub": "Command on middle-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
             }
         ]
     },
