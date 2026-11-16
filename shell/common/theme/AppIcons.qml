@@ -24,23 +24,29 @@ import "../collections/BoundedCache.js" as BoundedCache
 // caller that passes no fallback and one that passes an explicit generic
 // cannot read each other's answer.
 //
-// Keyed on the raw name, the fallback and the tone, NOT on the resolved URL,
-// and deliberately not on any theme state: every lookup is a function of
-// those three inputs, so a theme change does not invalidate an entry (the tone
-// is a palette KEY, and Icons.url re-resolves it against the live palette), and
-// an install that adds an icon mid-session is picked up when the entry is
-// evicted rather than by watching the icon theme (which would cost a watcher
-// per distinct app for a lookup that is correct the overwhelming majority of
-// times).
+// Keyed on the raw name, the fallback and the tone, NOT on any theme state:
+// the memo keeps the RESOLUTION (a shipped asset name or a platform URL), not
+// the themed data URL. Icons.url re-runs on every call against the live palette,
+// so a theme switch recolours a shipped glyph without invalidating the entry -
+// and reading Theme.color there is what makes caller bindings depend on the
+// palette and re-evaluate on a switch. Caching the data URL instead would pin
+// the first palette's colour into every entry (a dark-theme icon stays white
+// after switching to a light theme). An install that adds an icon mid-session
+// is picked up when the entry is evicted rather than by watching the icon
+// theme (which would cost a watcher per distinct app for a lookup that is
+// correct the overwhelming majority of times).
 Singleton {
   id: root
 
   readonly property string tag: "appIcons"
 
-  // name + fallback + tone -> resolved URL. Mutated in place for the reason
-  // BoundedCache documents: a caller binding calls url() while it
-  // evaluates, so replacing this map would notify the very bindings that
-  // are mid-evaluation and loop. Size and diagnostics are functions for
+  // name + fallback + tone -> resolution descriptor: `{ asset: "<name>" }` for
+  // a shipped glyph, `{ url: "<url>" }` for a platform icon, a file path or a
+  // miss. The themed data URL is deliberately NOT stored here - it is rebuilt
+  // through Icons.url on every call so it tracks the live palette. Mutated in
+  // place for the reason BoundedCache documents: a caller binding calls url()
+  // while it evaluates, so replacing this map would notify the very bindings
+  // that are mid-evaluation and loop. Size and diagnostics are functions for
   // that same reason, not properties.
   //
   // Bounded at 128: a session's distinct window identities are counted in
@@ -65,6 +71,7 @@ Singleton {
     if (n === "") return ""
     const fb = String(fallback ?? "")
     const tone = String(colorKey ?? "").trim()
+    const key = tone === "" ? undefined : tone
     // NUL-separated, and NUL is the one character neither an app name, a theme
     // icon name nor a palette key can contain, so two inputs that differ in any
     // field always produce different keys. A plain separator would let
@@ -74,11 +81,17 @@ Singleton {
     // "red" and " red " are one entry rather than two, and so the "" and
     // undefined spellings of "no tone" share the entry they both resolve to.
     const ck = n + "\u0000" + fb + "\u0000" + tone
-    const hit = BoundedCache.get(root._cache, ck)
-    if (hit !== undefined) return hit
-    const resolved = root._resolve(n, fb, tone)
-    BoundedCache.put(root._cache, ck, resolved)
-    return resolved
+    let resolved = BoundedCache.get(root._cache, ck)
+    if (resolved === undefined) {
+      resolved = root._resolve(n, fb, tone)
+      BoundedCache.put(root._cache, ck, resolved)
+    }
+    // Regenerate the themed URL on every call. Icons.url keys its data URL on
+    // the resolved palette hex, so a theme switch rebuilds a shipped glyph's
+    // URL while the identity above stays cached; the Theme.color read inside
+    // Icons.url is what binds every caller to Theme.colors so it re-evaluates
+    // on that switch. Platform icons keep their own artwork and bypass this.
+    return resolved.asset ? Icons.url(resolved.asset, key) : resolved.url
   }
 
   function _resolve(name, fallback, colorKey) {
@@ -88,8 +101,8 @@ Singleton {
     // theme - so the path is its own answer. Both legs ignore `colorKey`: the
     // file is drawn exactly as it shipped, because a sender's own artwork is
     // not a glyph this shell recolors.
-    if (name.startsWith("file:")) return name
-    if (name.startsWith("/")) return "file://" + name
+    if (name.startsWith("file:")) return { url: name }
+    if (name.startsWith("/")) return { url: "file://" + name }
     // Icon themes and the shipped asset set both key on lower-case names,
     // but a window class is whatever the app's binary called itself
     // ("Firefox", "Code"), so each lookup is tried in lower case first and
@@ -124,9 +137,11 @@ Singleton {
     // Theme.color("") is #000000, so an empty tone would paint the glyph
     // black instead of leaving it on the default foreground_0.
     const key = colorKey === "" ? undefined : colorKey
+    // Probe the recolor once to pick the shipped asset; url() re-runs it on
+    // the live palette for every served call, so the cached value holds only
+    // the name that resolved and never a palette-specific data URL.
     for (const candidate of cands) {
-      const themed = Icons.url(candidate, key)
-      if (themed !== "") return themed
+      if (Icons.url(candidate, key) !== "") return { asset: candidate }
     }
     // The checked overload is the one that returns "" on a miss instead of
     // a missing-texture URL, so a caller can tell "no icon" from "icon".
@@ -135,10 +150,10 @@ Singleton {
     // ever reaching the fallback leg (and its load-time warning).
     for (const candidate of cands) {
       const hit = String(Quickshell.iconPath(candidate, true))
-      if (hit !== "") return hit
+      if (hit !== "") return { url: hit }
     }
-    if (fallback !== "") return String(Quickshell.iconPath(lower, fallback))
-    return ""
+    if (fallback !== "") return { url: String(Quickshell.iconPath(lower, fallback)) }
+    return { url: "" }
   }
 
   // Live entry count of the URL cache. A function and not a property: the
