@@ -3201,9 +3201,21 @@ Rectangle {
   // Single route for the search field's text edits. While the "/" scoped
   // filter is armed, edits narrow the CURRENT page; otherwise they drive
   // the global bundle search.
+  // The query is published on the next event-loop turn, never from inside the
+  // field's own text-change signal. Qt finishes a TextInput change
+  // (QQuickTextInputPrivate::finishChange) and then evaluates the QML handlers
+  // synchronously; a query published there reinstalls the row model and
+  // remeasures the card inside that frame. That nested rebuild matches the
+  // shape Qt 6.12's V4 has crashed on: sameValueZero on a freed string, via
+  // the Map lookups the search and width passes do, while the query text is
+  // still held by the change being finished. Deferring keeps the search out
+  // of that frame; the field still echoes the key immediately and the results
+  // land one turn later.
   function onFieldEdited(text) {
-    if (panel.scopedSearching) Menu.setScopedQuery(text)
-    else Menu.setQuery(text)
+    Qt.callLater(() => {
+      if (panel.scopedSearching) Menu.setScopedQuery(text)
+      else Menu.setQuery(text)
+    })
   }
 
   function currentRow() {
