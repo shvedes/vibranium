@@ -7,7 +7,9 @@ import Quickshell
 import Quickshell.Wayland
 import qs.common
 import "../../../../common/capture/ShotLib.js" as ShotLib
+import "../../../../common/math/Color.js" as Color
 import "../../../../common/math/Range.js" as Range
+import "PreviewPlacement.js" as PreviewPlacement
 
 // Full-screen still frame of one screen for the native color pick: the
 // captured frame renders through ScreencopyView (same backend as the
@@ -49,6 +51,13 @@ PanelWindow {
   // arrow keys step it off the pointer by whole frame pixels.
   property real aimX: -1
   property real aimY: -1
+
+  // Optional floating readout of the aimed pixel in the island's active
+  // format. The module captures that format when the pick starts; the overlay
+  // formats each live sample with it.
+  property string format: "hex"
+  property bool previewEnabled: false
+  property string previewCode: ""
 
   // Magnifier scale in integer steps (source px -> lens px). Every step
   // draws a hard-edged block per source pixel on the Canvas.
@@ -304,6 +313,9 @@ PanelWindow {
       Math.min(width - 7, lensViewX + overlay.aimX * magStep))
     readonly property real crossY: Math.max(7,
       Math.min(height - 7, lensViewY + overlay.aimY * magStep))
+    // Read off the frame pixel the cross marks, so the mark keeps its contrast
+    // as the lens moves over light and dark content. White until the first read.
+    property string crossColor: "#ffffff"
 
     // Drop shadow under the lens, painted before lensClip so the lens
     // covers it. Its source is a dedicated hidden rounded rectangle -
@@ -393,9 +405,9 @@ PanelWindow {
       layer.samples: 4
     }
 
-    // Cross over the sampled pixel (at crossX/crossY in lens coords): a
-    // black shadow cross under a white one stays visible on any
-    // background. Zero-size anchor item so the bars center on the
+    // Cross over the sampled pixel (at crossX/crossY in lens coords). Its
+    // colour comes from the pixel underneath, so the mark stays visible on
+    // any background. Zero-size anchor item so the bars center on the
     // point, wherever rim clamping pushed it.
     Item {
       x: magnifier.crossX
@@ -405,28 +417,116 @@ PanelWindow {
         anchors.centerIn: parent
         width: 1
         height: 13
-        color: "#000000"
-        opacity: 0.9
+        color: magnifier.crossColor
       }
       Rectangle {
         anchors.centerIn: parent
         width: 13
         height: 1
-        color: "#000000"
-        opacity: 0.9
+        color: magnifier.crossColor
       }
-      Rectangle {
-        anchors.centerIn: parent
-        width: 1
-        height: 13
-        color: "#ffffff"
-      }
-      Rectangle {
-        anchors.centerIn: parent
-        width: 13
-        height: 1
-        color: "#ffffff"
-      }
+    }
+  }
+
+  // Live contrast for the cross. The mark covers one magnified source pixel -
+  // the one a click samples - so its colour is decided from that pixel in the
+  // frame the lens shows. The hidden Image decodes the grabbed frame once per
+  // pick; only the 1x1 Canvas repaints as the aim moves.
+  Image {
+    id: crossProbe
+
+    visible: false
+    cache: false
+    source: overlay.frameUrl
+
+    onStatusChanged: {
+      if (status === Image.Ready && source !== "") crossSampler.loadImage(source)
+    }
+  }
+
+  Canvas {
+    id: crossSampler
+
+    width: 1
+    height: 1
+    visible: false
+    contextType: "2d"
+
+    Connections {
+      target: overlay
+
+      function onAimXChanged() { crossSampler.requestPaint() }
+      function onAimYChanged() { crossSampler.requestPaint() }
+    }
+
+    onImageLoaded: crossSampler.requestPaint()
+
+    onPaint: {
+      const url = crossProbe.source
+      if (url === "" || crossProbe.status !== Image.Ready) return
+      // The Canvas keeps its own copy of the frame; drawing before that copy
+      // lands reads the bare backing - zeros - and colours the cross for black
+      // over a pixel that was never black.
+      if (!crossSampler.isImageLoaded(url)) return
+      if (overlay.aimX < 0 || overlay.aimY < 0 || !(overlay.frameRatio > 0)) return
+      const fw = crossProbe.implicitWidth
+      const fh = crossProbe.implicitHeight
+      if (fw <= 0 || fh <= 0) return
+      const ctx = crossSampler.getContext("2d")
+      if (ctx === null) return
+      // The same floor-to-frame-pixel mapping the module's pick uses, so the
+      // colour read here belongs to the block the cross actually covers.
+      const gx = Range.clamp(Math.floor(overlay.aimX * overlay.frameRatio), 0, fw - 1)
+      const gy = Range.clamp(Math.floor(overlay.aimY * overlay.frameRatio), 0, fh - 1)
+      ctx.clearRect(0, 0, 1, 1)
+      ctx.drawImage(crossProbe, gx, gy, 1, 1, 0, 0, 1, 1)
+      const px = ctx.getImageData(0, 0, 1, 1)
+      if (!px || !px.data || px.data.length < 3) return
+      const c = { r: px.data[0] / 255, g: px.data[1] / 255, b: px.data[2] / 255 }
+      magnifier.crossColor = Color.contrastText(c)
+      const code = Color.format(c, overlay.format, 1)
+      overlay.previewCode = code === null ? "" : code
+    }
+  }
+
+  // Floating code readout. It rides the magnifier box and jumps to whichever
+  // side still has room when the lens flattens against a screen edge.
+  Item {
+    id: codeCard
+
+    readonly property int pad: 8
+    readonly property int cardHeight: 26
+    readonly property int cardWidth: Math.ceil(codeText.implicitWidth) + 2 * pad
+    readonly property var spot: PreviewPlacement.place(
+      { x: magnifier.x, y: magnifier.y, width: magnifier.width, height: magnifier.height },
+      { width: cardWidth, height: cardHeight },
+      { width: overlay.width, height: overlay.height },
+      10)
+
+    z: 2
+    visible: overlay.previewEnabled && magnifier.shown && overlay.previewCode !== ""
+    x: spot.x
+    y: spot.y
+    width: cardWidth
+    height: cardHeight
+
+    Rectangle {
+      anchors.fill: parent
+      radius: RoundingPolicy.radius
+      color: Ui.solid("background_1")
+      border.width: 1
+      border.color: Ui.solid("accent")
+    }
+
+    Text {
+      id: codeText
+
+      anchors.centerIn: parent
+      text: overlay.previewCode
+      color: Ui.solid("foreground_0")
+      font.pixelSize: Ui.fontS
+      font.family: Ui.fontFamily
+      textFormat: Text.PlainText
     }
   }
 

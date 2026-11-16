@@ -1121,6 +1121,13 @@
                 "sub": "Notify after each pick"
             },
             {
+                "key": "shell.colorPicker.showLivePreview",
+                "type": "bool",
+                "default": true,
+                "label": "Floating color code",
+                "sub": "Show the live code beside the magnifier"
+            },
+            {
                 "key": "shell.colorPicker.historySize",
                 "type": "int",
                 "default": 10,

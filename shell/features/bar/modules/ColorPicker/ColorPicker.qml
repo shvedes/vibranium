@@ -67,6 +67,11 @@ BarModule {
   // default on).
   readonly property bool notifyOnPick: Settings.value("shell.colorPicker.notifyOnPick") !== false
 
+  // Optional floating code readout on the pick overlay
+  // (shell.colorPicker.showLivePreview, default on). The overlay reads the
+  // live pixel and formats it with this instance's captured pickFmt.
+  readonly property bool showLivePreview: Settings.value("shell.colorPicker.showLivePreview") !== false
+
   // Icon tint (shell.colorPicker.showLastColor, default on): when on
   // and the history holds at least one record, the small droplet inside
   // the droplet glyph is filled with the newest record's opaque color
@@ -872,6 +877,10 @@ BarModule {
 
     visible: root.picking
     screen: root.picking ? root.pickScreen : null
+    // The island's active format, captured with beginPick(), is the spelling
+    // the floating readout shows for the pixel under the cross.
+    format: root.pickFmt
+    previewEnabled: root.showLivePreview
     onPickedAt: (x, y) => root.sampleAt(x, y)
     // The overlay names the gesture that abandoned the pick (escape,
     // right-click); the module's own cancels below pass their own reasons.

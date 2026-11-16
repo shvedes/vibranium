@@ -26,6 +26,11 @@ An open menu is closed when the pick starts, so the frozen frame is the
 desktop and not the menu that was in the way. The pick is drawn over every
 other overlay on the screen, the privacy dots included.
 
+With **Floating color code** enabled, a small readout follows the magnifier
+and shows the aimed pixel in the format selected in the island. It sits above
+the lens by default and jumps below, right or left when the lens nears a
+screen edge.
+
 ## Bar module
 
 The bar module represents the color history.
@@ -65,5 +70,6 @@ The xmark in the field's right edge empties it.
 | Setting | What it does |
 |---|---|
 | **Live HEX preview** | Shows the hex value live while you hover (readable text on the picker) |
+| **Floating color code** | Shows the live code beside the magnifier while picking |
 | **Show selected color** | The notification after picking |
 | **History size** | How many recent colors the bar tooltip keeps |
