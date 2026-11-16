@@ -162,6 +162,11 @@ Rectangle {
   // the surface's to choose. The pass card turns it on, because there the sub
   // IS the identifying line.
   property bool fitSub: false
+  // A surface that flips this policy as its row set changes kind - the
+  // launcher, whose card holds app names and then an engine answer - has to
+  // re-measure on the flip, or the answer elides in a card the previous row
+  // set sized. Coalesced inside recalcWidth, so a flip costs one pass.
+  onFitSubChanged: root.recalcWidth()
   // The row's icon column: the glyph plus the gap before its text column,
   // charged once for a row that carries an icon. A surface whose rows draw a
   // 20px glyph 8px from the text declares 28, not the glyph's own size.

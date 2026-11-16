@@ -14,9 +14,11 @@
 //   source      parseSource scans number/unit pairs left to right, so
 //               "6 ft 2 in" is one quantity and "5m" is the same shape as
 //               "5 m". Each further term is converted into the first term's
-//               unit and added. A named constant marked bare ("speed of
-//               sound") may stand alone: the phrase is the quantity, and it
-//               carries an implicit 1.
+//               unit and added. A row marked bare ("speed of sound") may stand
+//               alone: the phrase is the quantity, and it carries an implicit
+//               1 - the shape is the parser's, but no shipped row here is bare
+//               any more: the named constants and their snapshots are the
+//               constants plugin's rows now.
 //   target      The text after the keyword. A bare query has none, so it
 //               answers with a LIST of targets: pickDefault(value, from)
 //               first, then the dimension's shortlist as far as each reading
@@ -913,32 +915,6 @@ addUnit("lunar distance", "length", 3.84399e8, "km",
   ["lunardistance", "lunardistances", "moondistance", "moondistances"],
   ["lunar distance", "lunar distances"]);
 
-// The two Voyagers are the only distances anybody checks up on, and they are a
-// SNAPSHOT rather than a conversion: this table reads no clock, so a figure
-// pinned to an epoch is the honest shape. Both are measured from EARTH, which
-// is what the missions publish, and both recede by about three astronomical
-// units a year - the Earth's own orbit moves the reading by up to one AU either
-// way, so the last digit is a date more than a measurement.
-//
-// Voyager 1 crossed one light-day from Earth on 2026-11-18 at 25.902 billion
-// kilometres, NASA's own figure for that milestone, and Voyager 2 was 21.66
-// billion kilometres (144.8 AU) from Earth the same week - what its 15.3 km/s
-// adds to the 119 AU it had reached when it entered interstellar space in
-// November 2018.
-//
-// Both are bare, so the name is the whole query, and both carry `spread`: the
-// six readings the distance is actually said in. That list is not the length
-// shortlist because readable() drops the kilometre and the light-year as five
-// decades out of a person's range, and those two are the whole point.
-var VOYAGER_SPREAD = ["km", "au", "lmin", "lh", "ld", "ly"];
-addUnit("Voyager 1", "length", 2.5902e13, "au",
-  ["voyager1", "voyager1distance", "voyager1distances"],
-  ["distance from Earth to Voyager 1", "distances from Earth to Voyager 1"],
-  { bare: true, spread: VOYAGER_SPREAD });
-addUnit("Voyager 2", "length", 2.1658e13, "au",
-  ["voyager2", "voyager2distance", "voyager2distances"],
-  ["distance from Earth to Voyager 2", "distances from Earth to Voyager 2"],
-  { bare: true, spread: VOYAGER_SPREAD });
 
 addUnit("ozt", "mass", 0.0311034768, "g", ["ozt", "troyounce", "troyounces"],
   ["troy ounce", "troy ounces"]);
@@ -1141,148 +1117,6 @@ SUGGEST.acceleration = ["m/s2", "gforce", "ft/s2"];
 SUGGEST.datarate = ["Mbps", "MB/s", "Gbps", "GB/s", "kbps", "KB/s", "MiB/s"];
 SUGGEST.count = ["item", "dozen", "gross", "score", "pair", "thousand", "million"];
 
-// --- the silly ones ---------------------------------------------------------
-// Nothing below is a standard. Each row is one round, defensible number for a
-// thing people really do compare to ("the size of three football fields"), the
-// source of the number is in the comment, and none of them is reachable from a
-// bare query: they are what you get by naming them.
-//
-// A word means one dimension. A football field is an area here, not a length,
-// so "3 football fields in acres" works and "100 football fields in km" is
-// refused as incompatible, which is the honest answer.
-// Names are written the way a query is: no spaces, the multiword ones are
-// tokens the parser joins ("blue whale" -> bluewhale).
-
-// length
-addUnit("banana", "length", 0.178, "cm", ["banana", "bananas"], ["banana", "bananas"]);       // 7 in, for scale
-addUnit("smoot", "length", 1.7018, "ft", ["smoot", "smoots"], ["smoot", "smoots"]);           // 5 ft 7 in, Harvard Bridge
-addUnit("beard-second", "length", 5e-9, "nm", ["beardsecond", "beardseconds"],
-  ["beard-second", "beard-seconds"]);                                                         // 5 nm, what a beard grows in a second
-addUnit("barleycorn", "length", 0.0254 / 3, "mm", ["barleycorn", "barleycorns"], ["barleycorn", "barleycorns"]);
-addUnit("furlong", "length", 201.168, "mi", ["furlong", "furlongs"], ["furlong", "furlongs"]);
-addUnit("chain", "length", 20.1168, "ft", ["chain", "chains"], ["chain", "chains"]);
-addUnit("rod", "length", 5.0292, "ft", ["rod", "rods", "perch", "perches", "pole", "poles"], ["rod", "rods"]);
-addUnit("league", "length", 4828.032, "km", ["league", "leagues"], ["league", "leagues"]);  // 3 statute miles
-addUnit("cubit", "length", 0.4572, "cm", ["cubit", "cubits"], ["cubit", "cubits"]);         // 18 in
-addUnit("marathon", "length", 42195, "km", ["marathon", "marathons"], ["marathon", "marathons"]);
-addUnit("eiffel tower", "length", 330, "ft", ["eiffeltower", "eiffeltowers"],
-  ["Eiffel Tower", "Eiffel Towers"]);                                                         // with antennas
-addUnit("empire state building", "length", 443.2, "ft", ["empirestatebuilding", "empirestatebuildings"],
-  ["Empire State Building", "Empire State Buildings"]);                                       // with antenna
-addUnit("statue of liberty", "length", 93, "ft", ["statueofliberty", "statuesofliberty"],
-  ["Statue of Liberty", "Statues of Liberty"]);                                               // ground to torch
-addUnit("burj khalifa", "length", 828, "ft", ["burjkhalifa", "burjkhalifas"],
-  ["Burj Khalifa", "Burj Khalifas"]);
-addUnit("everest", "length", 8848.86, "ft", ["everest", "everests", "mounteverest", "mounteverests"],
-  ["Mount Everest", "Mount Everests"]);
-addUnit("credit card", "length", 0.0856, "mm", ["creditcard", "creditcards"],
-  ["credit card", "credit cards"]);                                                           // ISO/IEC 7810 ID-1 length
-addUnit("hair", "length", 7e-5, "um", ["hair", "hairs", "humanhair", "humanhairs"],
-  ["human hair", "human hairs"]);                                                             // about 70 um wide
-addUnit("equator", "length", 40075017, "mi", ["equator", "equators", "earthcircumference", "earthcircumferences"],
-  ["Earth circumference", "Earth circumferences"]);
-
-// mass
-addUnit("elephant", "mass", 6000, "lb", ["elephant", "elephants"], ["elephant", "elephants"]);        // adult African bull
-addUnit("blue whale", "mass", 150000, "elephant", ["bluewhale", "bluewhales"], ["blue whale", "blue whales"]);
-addUnit("human", "mass", 62, "lb", ["human", "humans"], ["human", "humans"]);                         // world adult average
-addUnit("cat", "mass", 4.5, "lb", ["cat", "cats"], ["cat", "cats"]);
-addUnit("penny", "mass", 0.0025, "g", ["penny", "pennies"], ["penny", "pennies"]);                    // US cent
-addUnit("nickel", "mass", 0.005, "g", ["nickel", "nickels"], ["nickel", "nickels"]);
-addUnit("dime", "mass", 0.002268, "g", ["dime", "dimes"], ["dime", "dimes"]);
-addUnit("grain of rice", "mass", 2e-5, "mg", ["grainofrice", "grainsofrice"], ["grain of rice", "grains of rice"]);
-addUnit("paperclip", "mass", 0.001, "g", ["paperclip", "paperclips"], ["paperclip", "paperclips"]);
-addUnit("stick of butter", "mass", 4 * 0.028349523125, "g", ["stickofbutter", "sticksofbutter"],
-  ["stick of butter", "sticks of butter"]);                                                           // 4 oz
-
-// time
-addUnit("microfortnight", "time", 1.2096, "s", ["microfortnight", "microfortnights"],
-  ["microfortnight", "microfortnights"]);
-addUnit("nanocentury", "time", 3.1536, "s", ["nanocentury", "nanocenturies"],
-  ["nanocentury", "nanocenturies"]);                                                                  // about pi seconds
-addUnit("shake", "time", 1e-8, "ns", ["shake", "shakes"], ["shake", "shakes"]);                       // 10 ns, nuclear physics
-addUnit("moment", "time", 90, "s", ["moment", "moments"], ["moment", "moments"]);                     // medieval: 1/40 hour
-addUnit("heartbeat", "time", 0.8, "ms", ["heartbeat", "heartbeats"], ["heartbeat", "heartbeats"]);
-addUnit("age of the universe", "time", 13.787e9 * 31536000, "Gyr", ["ageoftheuniverse", "universeage"],
-  ["age of the universe", "ages of the universe"]);                                                   // Planck 2018, in this table's years
-
-// energy
-addUnit("hiroshima", "energy", 15 * 4.184e12, "kt TNT", ["hiroshima", "hiroshimas", "littleboy"],
-  ["Hiroshima bomb", "Hiroshima bombs"]);                                                             // about 15 kt
-addUnit("tsar bomba", "energy", 50 * 4.184e15, "Mt TNT", ["tsarbomba", "tsarbombas"],
-  ["Tsar Bomba", "Tsar Bombas"]);                                                                     // 50 Mt
-addUnit("lightning bolt", "energy", 1e9, "kWh", ["lightningbolt", "lightningbolts"],
-  ["lightning bolt", "lightning bolts"]);                                                             // about 1 GJ
-addUnit("big mac", "energy", 563 * 4184, "kcal", ["bigmac", "bigmacs"], ["Big Mac", "Big Macs"]);      // 563 kcal, US
-
-// power
-addUnit("jigawatt", "power", 1.21e9, "GW", ["jigawatt", "jigawatts"], ["jigawatt", "jigawatts"]);
-
-// speed
-addUnit("snail pace", "speed", 0.013, "mph", ["snail", "snails", "snailpace", "snailpaces"],
-  ["snail pace", "snail paces"]);                                                                     // garden snail
-addUnit("usain bolt", "speed", 12.42, "mph", ["usainbolt", "usainbolts"], ["Usain Bolt", "Usain Bolts"]);
-addUnit("cheetah", "speed", 29, "mph", ["cheetah", "cheetahs"], ["cheetah", "cheetahs"]);
-addUnit("escape velocity", "speed", 11186, "km/h",
-  ["escapevelocity", "escapevelocities", "earthescapevelocity", "earthescapevelocities"],
-  ["Earth escape velocity", "Earth escape velocities"]);
-addUnit("iss", "speed", 7660, "km/h", ["iss", "issspeed"], ["ISS orbital speed", "ISS orbital speeds"]);
-// 343 m/s in dry air at 20 \u00b0C - the round figure the phrase means. It is
-// marked bare because there is exactly one speed of sound: the name is the
-// query, so "speed of sound" answers in kilometres per hour with no numeral.
-addUnit("speed of sound", "speed", 343, "km/h",
-  ["speedofsound", "speedsofsound", "soundspeed", "soundspeeds"],
-  ["speed of sound", "speeds of sound"], { bare: true });
-
-// volume
-addUnit("olympic pool", "volume", 2.5e6, "m3",
-  ["olympicpool", "olympicpools", "olympicswimmingpool", "olympicswimmingpools"],
-  ["Olympic swimming pool", "Olympic swimming pools"]);                                               // 50 x 25 x 2 m
-addUnit("soda can", "volume", 12 * 0.0295735295625, "ml", ["sodacan", "sodacans"], ["soda can", "soda cans"]);
-addUnit("wine bottle", "volume", 0.75, "ml", ["winebottle", "winebottles"], ["wine bottle", "wine bottles"]);
-addUnit("magnum", "volume", 1.5, "l", ["magnum", "magnums"], ["magnum", "magnums"]);
-addUnit("jeroboam", "volume", 3, "l", ["jeroboam", "jeroboams"], ["jeroboam", "jeroboams"]);
-addUnit("methuselah", "volume", 6, "l", ["methuselah", "methuselahs"], ["methuselah", "methuselahs"]);
-addUnit("nebuchadnezzar", "volume", 15, "l", ["nebuchadnezzar", "nebuchadnezzars"],
-  ["nebuchadnezzar", "nebuchadnezzars"]);
-addUnit("keg", "volume", 15.5 * 3.785411784, "gal", ["keg", "kegs"], ["keg", "kegs"]);                // US half barrel
-addUnit("hogshead", "volume", 63 * 3.785411784, "gal", ["hogshead", "hogsheads"], ["hogshead", "hogsheads"]);
-addUnit("firkin", "volume", 9 * 4.54609, "ukgal", ["firkin", "firkins"], ["firkin", "firkins"]);      // 9 imperial gallons
-addUnit("shot", "volume", 1.5 * 0.0295735295625, "ml", ["shot", "shots"], ["shot", "shots"]);         // 1.5 US fl oz
-addUnit("dash", "volume", 0.00492892159375 / 8, "ml", ["dash", "dashes"], ["dash", "dashes"]);        // 1/8 tsp
-addUnit("pinch", "volume", 0.00492892159375 / 16, "ml", ["pinch", "pinches"], ["pinch", "pinches"]);  // 1/16 tsp
-addUnit("smidgen", "volume", 0.00492892159375 / 32, "ml", ["smidgen", "smidgens"], ["smidgen", "smidgens"]);
-addUnit("drop", "volume", 5e-5, "ml", ["drop", "drops"], ["drop", "drops"]);                          // 20 drops per ml
-addUnit("lake superior", "volume", 1.21e16, "km3", ["lakesuperior", "lakesuperiors"],
-  ["Lake Superior", "Lake Superiors"]);                                                               // 12,100 km3
-
-// area
-addUnit("football field", "area", 57600 * 0.09290304, "ac",
-  ["footballfield", "footballfields", "americanfootballfield", "americanfootballfields"],
-  ["football field", "football fields"]);                                                             // 360 x 160 ft with end zones
-addUnit("tennis court", "area", 2808 * 0.09290304, "ft2", ["tenniscourt", "tenniscourts"],
-  ["tennis court", "tennis courts"]);                                                                 // doubles, 78 x 36 ft
-addUnit("soccer pitch", "area", 7140, "ac", ["soccerpitch", "soccerpitches", "footballpitch", "footballpitches"],
-  ["soccer pitch", "soccer pitches"]);                                                                // 105 x 68 m
-addUnit("wales", "area", 2.0779e10, "km2", ["wales"], ["Wales", "Wales"]);
-addUnit("texas", "area", 6.95662e11, "km2", ["texas"], ["Texas", "Texas"]);
-addUnit("belgium", "area", 3.0689e10, "km2", ["belgium"], ["Belgium", "Belgium"]);
-addUnit("rhode island", "area", 4.001e9, "km2", ["rhodeisland"], ["Rhode Island", "Rhode Island"]);
-addUnit("central park", "area", 843 * 4046.8564224, "ha", ["centralpark", "centralparks"],
-  ["Central Park", "Central Parks"]);                                                                 // 843 acres
-
-// data
-addUnit("nibble", "data", 0.5, "bit", ["nibble", "nibbles"], ["nibble", "nibbles"]);
-addUnit("floppy", "data", 1474560, "KB", ["floppy", "floppies", "floppydisk", "floppydisks"],
-  ["floppy disk", "floppy disks"]);                                                                   // 2880 x 512 B
-addUnit("cdrom", "data", 737280000, "MB", ["cdrom", "cdroms"], ["CD-ROM", "CD-ROMs"]);               // 80 min, mode 1
-addUnit("dvd", "data", 4707319808, "GB", ["dvd", "dvds"], ["DVD", "DVDs"]);                           // single layer
-addUnit("bluray", "data", 25025314816, "GB", ["bluray", "blurays"], ["Blu-ray disc", "Blu-ray discs"]);
-
-// acceleration
-addUnit("moon gravity", "acceleration", 1.62, "m/s2", ["moongravity", "lunargravity"],
-  ["lunar gravity", "lunar gravities"]);
-addUnit("mars gravity", "acceleration", 3.71, "m/s2", ["marsgravity"], ["Martian gravity", "Martian gravities"]);
 
 // The symbol -> noun lookup, flattened out of UNIT_NOUN's dimension grouping.
 // The grouping is for the reader; the answer only ever needs the symbol.

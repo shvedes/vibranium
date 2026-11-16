@@ -41,7 +41,24 @@ PanelCard {
   baseWidth: 380
   rowIconW: 26
   rowBadgeW: 22
-  _maxLabelW: 420
+  // Wide enough for a whole reading ("low Earth orbit speed = 27608.4 km/h")
+  // beside the AC that names it; the card still clamps to its screen.
+  _maxLabelW: 520
+  // The sub line is the ANSWER for every engine row - "low Earth orbit speed
+  // is 27608.4 kilometres per hour" - so the card measures it and grows to fit
+  // rather than eliding the end of the result. An app row's sub is a
+  // description, and following it would size the card to a paragraph, so the
+  // policy follows the row set: engine answers fit, the application list does
+  // not.
+  fitSub: panel._fitsSub
+  readonly property bool _fitsSub: {
+    const rows = panel.rows || []
+    const first = rows[0]
+    if (!first) return false
+    const k = String(first.kind ?? "")
+    return k === "calc" || k === "unit" || k === "constants" || k === "fx"
+      || k === "color" || k === "time" || k === "web"
+  }
 
   count: list.count
   contentHeight: list.contentHeight

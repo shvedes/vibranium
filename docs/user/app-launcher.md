@@ -129,6 +129,92 @@ a specific unit.
     and `yr` is exactly 365 days. `torr` currently converts as mmHg
     (relative difference 1.4e-7).
 
+## Named constants
+
+Rockets, engines, buildings, explosions and orbital speeds have their own
+plugin, so the converter above stays a converter of definitions. Type the name
+of a thing:
+
+```text
+starship          ->  Starship upper stage = 52.1 m
+                      Starship upper stage = 170.932 ft
+                      Starship V3 = 124.4 m          (the whole stack)
+                      Super Heavy V3 = 72.3 m
+                      Mechazilla = 146 m
+starship stack    ->  Starship V3 = 124.4 m
+raptor 3 in kN    ->  Raptor 3 = 2451.66 kN
+burj khalifa      ->  Burj Khalifa = 2716.54 ft
+                      Burj Khalifa = 828 m
+3 bananas in cm   ->  3 bananas = 53.4 cm
+```
+
+A name is matched whole and case does not matter (`starship v2`, `Super Heavy`,
+`F-1`), a trailing `height`, `thrust`, `mass`, `speed`, `length` or `distance`
+is ignored, and `in`/`to`/`as`/`->`/`=` name the one reading you want. A bare
+name answers with the readings that thing is actually said in - metres and
+feet for a vehicle, tonne-force and kilonewtons for an engine - up to ten,
+with the row's own default first. Two rows can quote each other: `football
+field in tennis courts` is a ratio of the two.
+
+A bare name then carries the rows it belongs with, one line each in that row's
+own unit, so the question's own readings stay first:
+
+```text
+starship    ->  ... Starship V3 (the stack), Super Heavy V3, Mechazilla,
+                Starship V2 upper stage, Starship V1 upper stage
+starship v2 ->  ... Starship V2 (the stack), Super Heavy V2, Starship ship V3
+raptor 3    ->  ... Raptor 3 vacuum (RVAC), Raptor 2, Raptor 1
+mechazilla  ->  ... Starship V3, Super Heavy V3
+saturn v    ->  ... Saturn V thrust, F-1
+```
+
+A relation is always one of the thing, whatever quantity was typed (`3
+starships` still shows one Super Heavy), and naming a target (`starship in
+ft`) turns the answer back into that single reading.
+
+A bare version names the ship, and `stack` behind it names the whole vehicle:
+`starship` is the upper stage flying now, `starship v1` the first one, and
+`starship stack` (or `starship v1 stack`) the full vehicle. An engine takes
+`thrust` behind its name (`raptor 3 thrust`). An orbital speed answers without
+its noun, and every body has its own: `leo`, `orbital velocity`, `orbit speed`
+or `low earth orbit` is the 27,600 km/h a low orbit needs, `geostationary` the
+11,052 km/h at 35,786 km, and `moon orbital velocity`, `mars orbit`, `io orbit`
+or `titan orbit` the circular speed at that body's surface (1.68, 3.55, 1.81
+and 1.87 km/s). Circular speed is the escape velocity above divided by sqrt(2),
+so the two rows answer each other, and every body takes the kind word in front
+of its speed (`moon escape speed`, `titan orbital speed`).
+
+Launch towers are rows of their own and of their rocket's relations, so
+`falcon tower`, `saturn v launch tower`, `ariane 6 tower` or `vif` answer a
+height, and `falcon 9` shows its transporter-erector beside it. Only towers with
+a published height are in the table - Electron, Neutron, New Glenn, Soyuz and
+the N1 have no tower row.
+
+A question in front of the name is understood too - `how tall is the eiffel
+tower`, `height of the burj khalifa`, `what is the speed of sound` - and a
+misspelling is rescued the way the application search rescues one: one edit
+under eight characters and two above, accepted only when exactly one row is
+that close. `starshp` still answers Starship V3; `starshipv9`, one edit from
+both V1 and V2, answers nothing rather than guessing.
+
+The answer also outlives the keystroke that stops naming it. `raptor 3` answers
+with its thrust, and `raptor 3 th` is not a name yet - so the web search takes
+the top row and Raptor 3 stays below it, under a divider, until the query
+finishes (`raptor 3 thrust`) or turns into a different name. The carried rows
+follow one rule: the text is the answer's own query with at most one word added
+or taken away, so deleting back through `raptor 3 thr` keeps the answer just as
+typing it did, while a second word or a different name carries nothing.
+
+!!! note "Figures are snapshots"
+    Every row is a published number with the date it was read, not a live
+    reading. The table reads no clock, so a vehicle that changes between
+    versions is a version of its own (`starship v1`, `v2`, `v3`), and a
+    re-engined booster is a new row rather than an edited one. Starship's
+    figures follow SpaceX's May 2026 V3 specification (124.4 m stack, Raptor 3
+    at 250 tf in flight and 280 tf demonstrated, its vacuum variant at 275 tf
+    and Raptor 2's at 258 tf); building heights are CTBUH architectural
+    heights; escape velocities are NASA/JPL surface values.
+
 ## Currency
 
 Type an amount and a currency pair to convert it against **today's** rate -
@@ -270,6 +356,7 @@ Launcher capabilities are plugins:
 | `fx` | engine | Live currency conversion (`100 usd in eur`) |
 | `time` | engine | `time in <city>`, on the city's own 12- or 24-hour dial; `<time> <tz>` in your local zone |
 | `unit` | engine | Unit conversion (`5m in cm`) |
+| `constants` | engine | Named real-world values (`starship`, `raptor 3 in kN`) |
 | `websearch` | websearch | Automatic no-match web-search fallback |
 
 A city's clock reads the way that place reads it, whatever this machine is

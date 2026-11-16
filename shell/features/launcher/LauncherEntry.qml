@@ -344,7 +344,7 @@ Item {
         // Middle-elide for the engines whose label is a whole equation
         // wrapped around a value ("100 USD = 87.84 EUR"): the ends carry
         // the operands, and either end alone is unreadable.
-        elide: (row.modelData && (row.modelData.kind === "calc" || row.modelData.kind === "unit" || row.modelData.kind === "fx")) ? Text.ElideMiddle : Text.ElideRight
+        elide: (row.modelData && (row.modelData.kind === "calc" || row.modelData.kind === "unit" || row.modelData.kind === "constants" || row.modelData.kind === "fx")) ? Text.ElideMiddle : Text.ElideRight
         textFormat: Text.PlainText
       }
 
@@ -375,7 +375,7 @@ Item {
         // Text, so ElideNone becomes ElideRight and text reads subText direct.
         // Truncation stays right-anchored on one line and ends in the font
         // ellipsis.
-        elide: ((row.modelData && (row.modelData.kind === "calc" || row.modelData.kind === "unit" || row.modelData.kind === "fx") && !row.modelData.incomplete) ? Text.ElideMiddle : Text.ElideRight)
+        elide: ((row.modelData && (row.modelData.kind === "calc" || row.modelData.kind === "unit" || row.modelData.kind === "constants" || row.modelData.kind === "fx") && !row.modelData.incomplete) ? Text.ElideMiddle : Text.ElideRight)
         wrapMode: Text.NoWrap
         textFormat: Text.PlainText
       }

@@ -628,7 +628,11 @@ function pluginToggles(plugins) {
 // calculator takes any arithmetic - "100*2" is its - and the unit converter
 // takes a bare "<value><unit>", so anything that reads as a currency pair
 // reaches fx before either can claim it.
-const ENGINE_ORDER = ["color", "fx", "time", "unit", "calc"]
+// `constants` sits behind `unit` because a quantity with a unit is the more
+// specific reading: "5 m" is a conversion, while the rows there answer a NAME
+// ("starship", "burj khalifa") and decline every number that a unit already
+// explains. Both are above calc, which takes anything with an operator in it.
+const ENGINE_ORDER = ["color", "fx", "time", "unit", "constants", "calc"]
 
 // `itemsFor(plugin)` is the plugin's own items() call, injected so a throwing
 // implementation can be caught by the controller rather than here.
@@ -950,6 +954,84 @@ function allSynthKinds(rows) {
     if (!r || !isSynthKind(r.kind)) return false
   }
   return true
+}
+
+// --- sticky answers -------------------------------------------------------
+//
+// The launcher recomputes on every keystroke, and a query that names an engine
+// answer stops naming it the moment the next letter lands: "raptor 3" answers
+// with Raptor 3's thrust, "raptor 3 th" answers nothing at all. Without memory
+// the card flips to the web search there and flips back two keystrokes later,
+// which reads as the answer being taken away and handed over again. So the last
+// engine answer is remembered and put back UNDER the fallback slot while the
+// query is still being typed from it - the web search keeps the top seat, the
+// answer stays where it was.
+//
+// An extension is the same intention continued: the query starts with the
+// remembered one and adds at most one word. "raptor 3 th" and "raptor 3 thrust"
+// extend "raptor 3"; "raptor 3 th x" is a second word, and "falcon 9 th" is a
+// different name, so neither carries anything.
+function stickyExtends(prevQuery, query) {
+  const p = SU.textOf(prevQuery).trim()
+  const q = SU.textOf(query)
+  if (p === "" || q.length <= p.length) return false
+  if (q.substring(0, p.length).toLowerCase() !== p.toLowerCase()) return false
+  const extra = q.substring(p.length).trim()
+  return extra !== "" && extra.indexOf(" ") < 0
+}
+
+// The memory after one recompute: { query, rows } while an answer is worth
+// carrying, null once the query has moved somewhere else. Only a real engine
+// answer is ever remembered - an app list is a pool the filter narrows by
+// itself, and a fallback row is not an answer.
+// The same intention from either side, which is what a keystroke that DELETES
+// needs: "raptor 3 thr" trimmed back to "raptor 3 th" is still the answer's own
+// query being typed, and the card must not drop the answer just because the
+// text got shorter. One word is the bound in both directions, and the same
+// query relates to itself - an engine that stops claiming its own query (a
+// guess that became ambiguous) still has its rows to show.
+function stickyRelated(prevQuery, query) {
+  const p = SU.textOf(prevQuery).trim()
+  if (p === "") return false
+  if (SU.textOf(query).trim() === p) return true
+  return stickyExtends(p, query) || stickyExtends(query, p)
+}
+
+function stickyKeep(prev, query, rows) {
+  if (Array.isArray(rows) && rows.length > 0) return { query: SU.textOf(query), rows: rows }
+  if (prev && prev.rows && stickyExtends(prev.query, query)) return prev
+  return null
+}
+
+// The rows for a query that claimed nothing locally: the fallback slot exactly
+// as it was built, then the remembered answer under a divider, every carried
+// row marked `sticky` so a consumer can tell it belongs to the previous
+// keystroke rather than to this query. The rows are copied, never mutated - the
+// remembered set is read again on the next keystroke.
+function stickyAttach(prev, query, rows) {
+  const out = Array.isArray(rows) ? rows.slice() : []
+  if (!prev || !prev.rows || !stickyRelated(prev.query, query)) return out
+  if (out.length > 0) out.push({ kind: "separator" })
+  for (let i = 0; i < prev.rows.length; i++) {
+    const row = prev.rows[i]
+    if (!row) continue
+    const copy = {}
+    for (const k in row) copy[k] = row[k]
+    copy.sticky = true
+    out.push(copy)
+  }
+  return out
+}
+
+// Whether a set carries any carried-over row. The filter counter reads this:
+// "0/214 apps" printed over a constants answer that is not about apps is a
+// lie, so the counter steps aside while a sticky answer sits on the card.
+function anySticky(rows) {
+  if (!Array.isArray(rows)) return false
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].sticky === true) return true
+  }
+  return false
 }
 
 // What the granted `cachedNet` operation hands a plugin: the fetched BODY, or

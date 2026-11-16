@@ -127,6 +127,7 @@ const CALC_TWINS = {
   color: path.join(SHELL_DIR, 'common/math/Color.js'),
   fx: path.join(LAUNCHER, 'FxLib.js'),
   unit: path.join(LAUNCHER, 'UnitLib.js'),
+  constants: path.join(LAUNCHER, 'ConstantsLib.js'),
   time: path.join(LAUNCHER, 'TimeLib.js'),
   binary: path.join(LAUNCHER, 'BinaryLib.js'),
 }
@@ -1885,12 +1886,12 @@ group('ENGINE_ORDER and FALLBACK_ORDER agree with the shipped plugin directories
     const m = pluginManifest(dir)
     ;(byType[m.type] = byType[m.type] || []).push(path.basename(dir))
   }
-  eq('the engine plugins on disk are exactly the five priorities',
-    (byType.engine || []).sort(), ['calc', 'color', 'fx', 'time', 'unit'])
+  eq('the engine plugins on disk are exactly the six priorities',
+    (byType.engine || []).sort(), ['calc', 'color', 'constants', 'fx', 'time', 'unit'])
   eq('the websearch plugins on disk', byType.websearch || [], ['websearch'])
   eq('the binary plugins on disk', byType.binary || [], ['binary'])
-  // And every one of the five is a name firstEngineClaiming will consult.
-  for (const id of ['color', 'fx', 'time', 'unit', 'calc']) {
+  // And every one of the six is a name firstEngineClaiming will consult.
+  for (const id of ['color', 'fx', 'time', 'unit', 'constants', 'calc']) {
     eq(`${id} is an engine kind`, LL.isEngineKind(id), true)
   }
   // Every type on disk is a name the fallback chain knows, so a new plugin
@@ -4151,8 +4152,8 @@ section('The seven shipped plugins - manifests and shape')
 // =========================================================================
 
 group('every plugin directory is discoverable and carries a usable manifest', () => {
-  eq('listPlugins finds the shipped tree', PLUGIN_DIRS.length, 7)
-  eq('and names them', PLUGIN_NAMES, ['binary', 'calc', 'color', 'fx', 'time', 'unit', 'websearch'])
+  eq('listPlugins finds the shipped tree', PLUGIN_DIRS.length, 8)
+  eq('and names them', PLUGIN_NAMES, ['binary', 'calc', 'color', 'constants', 'fx', 'time', 'unit', 'websearch'])
   for (const dir of PLUGIN_DIRS) {
     const m = pluginManifest(dir)
     is(`${path.basename(dir)} has a name`, m.name, (v) => typeof v === 'string' && v !== '', 'a non-empty string')
@@ -4187,8 +4188,8 @@ group('every plugin is keywordless, and only the claimed types may be', () => {
   for (const dir of PLUGIN_DIRS) {
     eq(`${path.basename(dir)} keyword is empty`, pluginManifest(dir).keyword, '')
   }
-  eq('the five engines', PLUGIN_DIRS.filter((d) => pluginManifest(d).type === 'engine').map((d) => path.basename(d)),
-    ['calc', 'color', 'fx', 'time', 'unit'])
+  eq('the six engines', PLUGIN_DIRS.filter((d) => pluginManifest(d).type === 'engine').map((d) => path.basename(d)),
+    ['calc', 'color', 'constants', 'fx', 'time', 'unit'])
   eq('and the one websearch', PLUGIN_DIRS.filter((d) => pluginManifest(d).type === 'websearch').map((d) => path.basename(d)),
     ['websearch'])
   eq('and the one binary', PLUGIN_DIRS.filter((d) => pluginManifest(d).type === 'binary').map((d) => path.basename(d)),
@@ -4506,13 +4507,11 @@ group('unit: a bare quantity answers with a row per reading, capped and same-dim
   // An explicit target is an intention, so it stays one row.
   eq('an explicit target is still one row', impl.items('5 mb in gb').length, 1)
   eq('and it is the one that was asked for', impl.items('5 mb in gb')[0].label, '5 MB = 0.005 GB')
-  // A snapshot row drifts, and the adapter is what hands it the clock: the
-  // card therefore shows the distance at the moment it was built, in the same
-  // six rows either way.
-  eq('a bare Voyager is six rows', impl.items('voyager 1').map((r) => r.uid),
-    ['unit:km', 'unit:au', 'unit:lmin', 'unit:lh', 'unit:ld', 'unit:ly'])
-  eq('each one carries a number to copy',
-    impl.items('voyager 1').every((r) => r.unitValue !== '' && r.incomplete === false), true)
+  // A name the converter no longer knows is not its row: the snapshots and the
+  // named real-world values live in the constants plugin now, so the claim is
+  // a miss and the query falls through.
+  eq('a named constant is no longer a unit query', impl.items('voyager 1'), [])
+  eq('and nor is a real-world row', impl.items('banana'), [])
   eq('a compound bare source fans out from the sum, not from one term',
     impl.items('6 ft 2 in')[0].label, '6 ft + 2 in = 1.8796 m')
   eq('and every row of it names the whole sum',
@@ -4530,6 +4529,259 @@ group('unit: a bare quantity answers with a row per reading, capped and same-dim
     const numbers = impl.items(q).map((r) => r.unitValue.replace(/ [^ ]+$/, ''))
     return new Set(numbers).size === numbers.length
   }), true)
+})
+
+group('constants: a name answers with the readings it is said in', () => {
+  const { api } = shippedApi()
+  const impl = loadPlugin(path.join(PLUGIN_ROOT, 'constants', 'main.js'), api)
+  const lib = pristineLib(CALC_TWINS.constants)
+  // A vehicle is a length, and the readings it is said in are the two a
+  // comparison uses. The subject is the row, not a quantity the user typed.
+  // A bare version names the SHIP, not the stack: the stack is the same name
+  // with "stack" behind it.
+  eq('a rocket reads in metres and feet', impl.items('starship').slice(0, 2).map((r) => r.label),
+    ['Starship upper stage = 52.1 m', 'Starship upper stage = 170.932 ft'])
+  eq('a stack is the whole vehicle, per version',
+    [impl.items('starship stack')[0].label, impl.items('starship v1 stack')[0].label,
+      impl.items('starship v2 stack')[0].label, impl.items('starship v3 stack')[0].label],
+    ['Starship V3 = 124.4 m', 'Starship V1 = 121.3 m', 'Starship V2 = 123.1 m', 'Starship V3 = 124.4 m'])
+  eq('and a bare version names its own ship',
+    [impl.items('starship v1')[0].label, impl.items('starship v2')[0].label],
+    ['Starship V1 upper stage = 50.3 m', 'Starship V2 upper stage = 52.1 m'])
+  eq('a block number is a version too',
+    [impl.items('starship block 2')[0].uid, impl.items('starship block 1 stack')[0].uid],
+    ['constants:starshipshipv2:m', 'constants:starshipv1:m'])
+  // Launch towers are rows too, and each rocket names its own - the pairing
+  // Mechazilla already has with the Starship stack.
+  eq('a rocket names its tower', impl.items('falcon 9').slice(2).map((r) => r.label),
+    ['Falcon transporter-erector = 64.6 m', 'Falcon Heavy = 70 m', 'Merlin 1D = 845 kN'])
+  eq('and a tower names its rocket', impl.items('saturn v launch tower').slice(2).map((r) => r.label),
+    ['Saturn V = 110.6 m', 'SLS launch tower = 108.2 m'])
+  // One structure can serve two rockets: SLC-41's VIF stacks both, so it is a
+  // single row that either name reaches.
+  eq('the pad is one structure for two rockets',
+    [impl.items('atlas tower')[0].uid, impl.items('vulcan tower')[0].uid],
+    ['constants:slc41tower:m', 'constants:slc41tower:m'])
+  eq('the tower heights are the published ones',
+    ['saturn v launch tower', 'shuttle launch tower', 'sls launch tower', 'ariane 6 tower',
+      'delta iv tower'].map((q) => impl.items(q)[0].label),
+    ['Saturn V launch tower = 115.8 m', 'Shuttle launch tower = 105.8 m',
+      'SLS launch tower = 108.2 m', 'Ariane 6 mobile gantry = 90 m',
+      'Delta IV mobile service tower = 100.6 m'])
+  // Whatever the row is, the thing it is part of comes after it, one row each
+  // in that row's own default unit: the stack and its tower for a ship, the
+  // vacuum variant and the older ratings for an engine.
+  // The relations put the other end of the vehicle beside the ship: the stack,
+  // the booster, the tower, and both earlier ships.
+  eq('then the stack, the booster, the tower and both earlier ships',
+    impl.items('starship').slice(2).map((r) => r.label),
+    ['Starship V3 = 124.4 m', 'Super Heavy V3 = 72.3 m', 'Mechazilla = 146 m',
+      'Starship V2 upper stage = 52.1 m', 'Starship V1 upper stage = 50.3 m'])
+  eq('an engine answers with RVAC, then the older ratings',
+    impl.items('raptor 3').slice(4).map((r) => r.label),
+    ['Raptor 3 vacuum = 275 tf', 'Raptor 3 at full thrust = 280 tf',
+      'Raptor 2 = 230 tf', 'Raptor 1 = 185 tf'])
+  eq('a relation is one row even when a quantity was asked',
+    impl.items('3 starships').slice(2).map((r) => r.label),
+    ['Starship V3 = 124.4 m', 'Super Heavy V3 = 72.3 m', 'Mechazilla = 146 m',
+      'Starship V2 upper stage = 52.1 m', 'Starship V1 upper stage = 50.3 m'])
+  eq('rvac is the vacuum Raptor', impl.items('rvac')[0].label, 'Raptor 3 vacuum = 275 tf')
+  // A uid is conKey(sym), and conKey drops a trailing kind word there too.
+  // The name a stack goes by in a sentence, the two orbital speeds without
+  // their noun, and the kind word an engine is asked with: each lands on the
+  // row itself rather than on a near-miss.
+  eq('a stack names itself', impl.items('starship stack')[0].uid, 'constants:starshipv3:m')
+  eq('and so does a stacked one', impl.items('Starship stacked')[0].uid, 'constants:starshipv3:m')
+  eq('leo is the low orbit', impl.items('leo')[0].uid, 'constants:lowearthorbit:km/h')
+  eq('orbital velocity is that same speed',
+    impl.items('orbital velocity')[0].uid, 'constants:lowearthorbit:km/h')
+  eq('geostationary answers without the word speed',
+    impl.items('geostationary')[0].uid, 'constants:geostationary:km/h')
+  // The alias set a reader actually types: with the acronym, with the noun
+  // spelled out, and with the trailing "speed" the kind-word stripper would
+  // otherwise take off and leave a name the table does not have.
+  for (const q of ['leo orbit', 'LEO orbit', 'low earth orbit', 'low earth orbit speed',
+    'orbit speed', 'leo injection']) {
+    eq(`constants reads ${JSON.stringify(q)} as the low orbit`,
+      impl.items(q)[0].uid, 'constants:lowearthorbit:km/h')
+  }
+  // An orbit is per body, not just for Earth, and the moons are the ones a
+  // mission is planned around: circular speed at the surface is escape/sqrt(2).
+  eq('the Moon orbit is a row of its own', impl.items('moon orbital velocity')[0].label,
+    'Moon orbital velocity = 6048 km/h')
+  eq('and so are Io and Titan', [impl.items('io orbit')[0].label, impl.items('titan orbit')[0].label],
+    ['Io orbital velocity = 6512.4 km/h', 'Titan orbital velocity = 6717.6 km/h'])
+  // One ceiling for a whole answer, the card's own ten rows: a reading and its
+  // neighbours share it, and there is no second number trimming relations.
+  eq('the answer ceiling is the card ceiling', lib.CON_MAX, 10)
+  eq('and relations carry no ceiling of their own', typeof lib.CON_REL_MAX, 'undefined')
+  // A question in front of a name is not a different name: the ask is stripped
+  // and the head looked up again, one phrase at a time, so the forms stack.
+  eq('a question in front of the name still names it',
+    [impl.items('how tall is the eiffel tower')[0].uid,
+      impl.items('height of the burj khalifa')[0].uid,
+      impl.items('what is the height of the burj khalifa')[0].uid,
+      impl.items('what is the speed of sound')[0].uid],
+    ['constants:eiffeltower:ft', 'constants:burjkhalifa:ft',
+      'constants:burjkhalifa:ft', 'constants:speedofsound:km/h'])
+  // A body takes the kind word in front of its speed, like the Earth rows do -
+  // the alias is `<body> action`, so the stripped form names the row.
+  eq('every body takes escape speed and orbital speed',
+    [impl.items('moon escape speed')[0].uid, impl.items('titan orbital speed')[0].uid],
+    ['constants:moonescapevelocity:km/h', 'constants:titanorbitalvelocity:km/h'])
+  // The same tolerance the application search gives a typo, at a length-gated
+  // budget: one edit off still names the row, and the rows say they are a guess.
+  eq('a misspelled name is rescued', impl.items('starshp')[0].uid, 'constants:starshipshipv3:m')
+  // Every READING is the guess and says so; a relation is a row the table really
+  // has, reached through the guessed one, so it stays clean.
+  eq('every reading of a rescued answer admits it', impl.items('starshp').slice(0, 2).map((r) => r.typo),
+    [true, true])
+  eq('and the relations under it stay clean', impl.items('starshp').slice(2).map((r) => r.typo),
+    [false, false, false, false, false])
+  eq('a rescue is never a tie between two rows', impl.items('starshipv9'), [])
+  eq('an exact name is not a guess', impl.items('starship')[0].typo, false)
+  eq('a two-letter remainder is never guessed', impl.items('5 km'), [])
+  // ...and the budget stays off a word that merely shares letters with a short
+  // key: "chrome" sits two edits from "cdrom", and answering CD-ROM there would
+  // be worse than missing.
+  eq('a browser name is not a disc', impl.items('chrome'), [])
+  eq('an engine takes thrust behind it', impl.items('raptor 3 thrust')[0].uid, 'constants:raptor3:tf')
+  // ...while a row that IS a thrust keeps its name: the whole key is tried
+  // before the trailing kind word is dropped.
+  eq('the liftoff-thrust row keeps its own name',
+    impl.items('super heavy thrust')[0].uid, 'constants:superheavy:MN')
+  // The table is the rows worth a card, not every quirky unit someone once
+  // measured. The ones cut in November 2026 are not answers at all.
+  for (const q of ['smoot', 'barleycorn', 'blue whale', 'elephant', 'big mac',
+    'jigawatt', 'snail pace', 'olympic pool', 'lake superior', 'soccer pitch',
+    'wales', 'nibble', 'moon gravity', 'age of the universe', 'hair',
+    'credit card', 'furlong']) {
+    eq(`constants has no row for ${JSON.stringify(q)}`, impl.items(q), [])
+  }
+  // The graph is data and can name a row that does not exist; this is the only
+  // reader that treats it as a contract.
+  eq('every relation names a row', (() => {
+    const bySym = new Set(lib.CON_ROWS.map((r) => r.sym))
+    const bad = []
+    for (const k of Object.keys(lib.CON_RELATIONS)) {
+      if (!bySym.has(k)) bad.push(k)
+      for (const v of lib.CON_RELATIONS[k]) if (!bySym.has(v)) bad.push(k + ' -> ' + v)
+    }
+    return bad
+  })(), [])
+  eq('and no row relates to itself', Object.keys(lib.CON_RELATIONS)
+    .filter((k) => lib.CON_RELATIONS[k].indexOf(k) >= 0), [])
+  eq('and the sub is the same reading as a sentence', impl.items('starship')[0].sub,
+    'Starship upper stage is 52.1 metres')
+  // The uid names the target, so a bare name's rows do not collapse into one.
+  eq('every row carries its own target in the uid', impl.items('starship').map((r) => r.uid),
+    ['constants:starshipshipv3:m', 'constants:starshipshipv3:ft', 'constants:starshipv3:m',
+      'constants:superheavyv3:m', 'constants:mechazilla:m', 'constants:starshipshipv2:m',
+      'constants:starshipshipv1:m'])
+  eq('a named target is one row', impl.items('raptor 3 in kN').map((r) => r.label),
+    ['Raptor 3 = 2451.66 kN'])
+  eq('a quantity multiplies the row', impl.items('3 bananas in cm').map((r) => r.label),
+    ['3 bananas = 53.4 cm'])
+  // Two rows can quote each other: the tennis court is what the field is
+  // measured in, and it is a row of this table rather than a unit symbol.
+  eq('a row is a unit for another row', impl.items('football field in tennis courts').map((r) => r.label),
+    ['football field = 20.5128 tennis courts'])
+  eq('a trailing kind word is not part of the name', impl.items('starship height')[0].label,
+    'Starship upper stage = 52.1 m')
+  // The card replaces the whole list with these rows, so everything that is
+  // not a row must be a miss rather than a hint.
+  for (const q of ['5 km', '2+2', 'firefox', '', '#ff8800', 'time in madrid', 'starship in kg']) {
+    eq(`constants claims nothing for ${JSON.stringify(q)}`, impl.items(q), [])
+  }
+  eq('the icon follows showIcons', (() => {
+    const off = shippedApi({ settings: { 'shell.launcher.showIcons': false } })
+    return loadPlugin(path.join(PLUGIN_ROOT, 'constants', 'main.js'), off.api).items('starship')[0].icon
+  })(), '')
+  // Both the row and the input-field chip paint through the shipped SVG set,
+  // so the name has to name a file in it: an XDG spelling here is a glyph that
+  // silently does not render.
+  // The row and the chip are one glyph: a constants answer is a number to
+  // read, so the card's rows wear the calculator the field shows.
+  eq('the row icon is a shipped asset', impl.items('starship')[0].icon, 'calculator')
+  is('that asset exists', fs.existsSync(path.join(SHELL_DIR, 'assets/icons/calculator.svg')),
+    (v) => v === true, 'an existing asset')
+  // The input field's chip is the engine family's glyph, shared with the unit
+  // converter: a constants answer is a number to read, like a conversion.
+  is('the chip reads as a calculation, not a gauge',
+    /kind === "constants"\) return "calculator"/.test(
+      fs.readFileSync(path.join(SHELL_DIR, 'features/launcher/AppLauncher.qml'), 'utf8')),
+    (v) => v === true, 'a shipped asset name')
+  is('and that glyph is a shipped asset',
+    fs.existsSync(path.join(SHELL_DIR, 'assets/icons/calculator.svg')),
+    (v) => v === true, 'an existing asset')
+})
+
+
+group('sticky answers: the last engine answer survives the keystroke that leaves it', () => {
+  const eng = [
+    { kind: 'constants', uid: 'constants:raptor3:tf', label: 'Raptor 3 = 250 tf', sub: '' },
+    { kind: 'constants', uid: 'constants:raptor3:kN', label: 'Raptor 3 = 2451.66 kN', sub: '' },
+  ]
+  // The same intention continued: the remembered query plus one word, whether
+  // that word completes the name or is the first letter of completing it.
+  eq('a word appended to the remembered query extends it', LL.stickyExtends('raptor 3', 'raptor 3 th'), true)
+  eq('and so does the word that completes it', LL.stickyExtends('raptor 3', 'raptor 3 thrust'), true)
+  eq('case does not break the continuity', LL.stickyExtends('Raptor 3', 'raptor 3 th'), true)
+  eq('a different name does not extend it', LL.stickyExtends('raptor 3', 'falcon 9 th'), false)
+  eq('a second word is a different question', LL.stickyExtends('raptor 3', 'raptor 3 th x'), false)
+  eq('backspacing does not extend it', LL.stickyExtends('raptor 3', 'raptor'), false)
+  eq('an empty memory extends nothing', LL.stickyExtends('', 'anything'), false)
+  // The memory itself: an answer replaces it, an extension keeps it, and any
+  // other query clears it.
+  const state = LL.stickyKeep(null, 'raptor 3', eng)
+  eq('an engine answer is remembered with its query', [state.query, state.rows.length], ['raptor 3', 2])
+  eq('an extension with no rows keeps the answer', LL.stickyKeep(state, 'raptor 3 th', []).rows.length, 2)
+  eq('a query that moved on clears it', LL.stickyKeep(state, 'falcon 9', []), null)
+  eq('a new answer replaces the old one',
+    LL.stickyKeep(state, 'falcon 9', [eng[0]]).query, 'falcon 9')
+  // The card: the fallback slot keeps the top seat, the remembered answer
+  // follows it under a divider, every carried row marked.
+  const rows = LL.stickyAttach(state, 'raptor 3 th', [{ kind: 'web', uid: 'web:0' }])
+  eq('the fallback row keeps the top seat', rows[0].uid, 'web:0')
+  eq('a divider separates it from the answer', rows[1].kind, 'separator')
+  eq('and the whole answer follows, marked sticky',
+    rows.slice(2).map((r) => [r.uid, r.sticky]),
+    [['constants:raptor3:tf', true], ['constants:raptor3:kN', true]])
+  eq('the remembered rows are copied, not marked in place', eng[0].sticky, undefined)
+  eq('a query that moved on carries nothing',
+    LL.stickyAttach(state, 'falcon 9', [{ kind: 'web', uid: 'web:0' }]).length, 1)
+  // Deleting is the same typing seen backwards: the answer's own query being
+  // trimmed must not drop the answer on the first backspace.
+  eq('a deletion toward the answer relates to it', LL.stickyRelated('raptor 3 th', 'raptor 3'), true)
+  eq('trimming one letter off the typed word relates',
+    LL.stickyRelated('raptor 3 thr', 'raptor 3 th'), true)
+  eq('the same query relates, so a guess that stopped claiming still shows',
+    LL.stickyRelated('raptor 3', 'raptor 3'), true)
+  eq('a different name relates to nothing', LL.stickyRelated('raptor 3', 'falcon 9'), false)
+  eq('two words beyond the answer do not relate', LL.stickyRelated('raptor 3', 'raptor 3 th x'), false)
+  eq('an empty memory relates to nothing', LL.stickyRelated('', 'raptor 3'), false)
+  const long = LL.stickyKeep(null, 'raptor 3 thr', eng)
+  eq('deleting back toward the answer still carries it',
+    LL.stickyAttach(long, 'raptor 3 th', [{ kind: 'web', uid: 'web:0' }]).length, 4)
+  eq('a query with no fallback row still gets its answer',
+    LL.stickyAttach(state, 'raptor 3 th', []).map((r) => r.uid),
+    ['constants:raptor3:tf', 'constants:raptor3:kN'])
+  // The counter reads both gates: a sticky row is a real engine kind, so
+  // allSynthKinds alone would print "0/214 apps" over a constants answer.
+  eq('a sticky set is detected', LL.anySticky(rows), true)
+  eq('a plain engine set is not', LL.anySticky(eng), false)
+  eq('and neither is a plain app row', LL.anySticky([{ kind: 'app', uid: 'app:1' }]), false)
+  eq('a non-array carries nothing', LL.anySticky(null), false)
+  eq('a sticky set is not all-synthetic', LL.allSynthKinds(rows), false)
+  is('so the counter gate asks the sticky question too',
+    /anySticky\(root\.results\)/.test(fs.readFileSync(path.join(LAUNCHER, 'AppLauncher.qml'), 'utf8')),
+    (v) => v === true, 'a sticky-aware counter gate')
+  // The controller is what keeps the memory between keystrokes, and it keeps it
+  // on the engine path only - an app list is a pool, not an answer.
+  is('and the controller remembers the engine answer',
+    /_sticky = LauncherLib\.stickyKeep\(root\._sticky, AppLauncher\.entry, eng\)/.test(
+      fs.readFileSync(path.join(LAUNCHER, 'AppLauncherController.qml'), 'utf8')),
+    (v) => v === true, 'a remembered answer')
 })
 
 group('time: the plugin decides the zone, the service supplies the clock', () => {
@@ -6155,8 +6407,36 @@ const PARITY = PLUGIN_NAMES.map((name) => {
 const TWINNED = PARITY.filter((p) => p.hasTwin)
 const UNTWINNED = PARITY.filter((p) => !p.hasTwin)
 
+group('constants: the factors it quotes are the converter own, and the drift is named', () => {
+  // The table carries its own small factor map so the plugin stays one file.
+  // That is a second copy of a number, so this is where the copy is held to
+  // the original: every symbol the converter knows must agree with it on both
+  // the dimension and the factor, and the four it does not know - plus the one
+  // whose capitalised spelling is a different unit - are named rather than
+  // tolerated.
+  const constants = TWINNED.find((p) => p.name === 'constants')
+  const unit = TWINNED.find((p) => p.name === 'unit')
+  const bad = []
+  const unknown = []
+  for (const dim of Object.keys(constants.libFns.CON_FACTORS)) {
+    const table = constants.libFns.CON_FACTORS[dim]
+    for (const sym of Object.keys(table)) {
+      const u = unit.libFns.symLookup(sym)
+      if (u === null || u.dim !== dim) unknown.push(dim + ':' + sym)
+      else if (u.factor !== table[sym][0]) bad.push(dim + ':' + sym)
+    }
+  }
+  eq('the converter has no row for these six, and they are shorthand it does not carry',
+    unknown, ["energy:TJ","energy:PJ","speed:km/s","speed:c","force:MN","force:tf"])
+  eq('every factor the converter knows agrees with it exactly', bad, [])
+  eq('every row has a noun and a default target of its own dimension',
+    constants.libFns.CON_ROWS.filter((r) => !r.one || !r.many
+      || constants.libFns.conFactor(r.dim, r.def) === null).map((r) => r.sym), [])
+  eq('no two rows claim the same name', constants.libFns.duplicateKeys(), [])
+})
+
 group('every twin this section compares against actually exists', () => {
-  eq('the six documented pairs are discovered', TWINNED.map((p) => p.name), ['binary', 'calc', 'color', 'fx', 'time', 'unit'])
+  eq('the seven documented pairs are discovered', TWINNED.map((p) => p.name), ['binary', 'calc', 'color', 'constants', 'fx', 'time', 'unit'])
   for (const p of PARITY) {
     if (CALC_TWINS[p.name] === undefined) {
       eq(`${p.name} is not declared as a twin of any library`, p.hasTwin, false)
@@ -6217,7 +6497,7 @@ group('every shared data table is byte-identical', () => {
     eq(`${p.name}: no data value differs`, p.valueDiffs, [])
   }
   const unit = TWINNED.find((p) => p.name === 'unit')
-  eq('unit: the UNITS table has 363 entries on both sides', unit.libFns.UNITS.length, 363)
+  eq('unit: the UNITS table has 285 entries on both sides', unit.libFns.UNITS.length, 285)
   eq('unit: the same table', unit.plugFns.UNITS.length, unit.libFns.UNITS.length)
   eq('unit: the SPEED_LEN shorthand has five entries', Object.keys(unit.libFns.SPEED_LEN).length, 5)
   eq('unit: the default-target ladders are the two documented shapes', unit.libFns.DEF_LADDER, {

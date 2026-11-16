@@ -486,10 +486,21 @@ Item {
   //
   // Single place deciding what the list shows; the panel only renders.
 
+  // The last engine answer, kept across the keystrokes that stop naming it
+  // (see LauncherLib.stickyKeep/stickyAttach): "raptor 3" answers, and
+  // "raptor 3 th" keeps that answer below the web search instead of dropping
+  // to the fallback alone and back again on the next key. Memory-only, and
+  // cleared the moment the query is no longer being typed from it - it is the
+  // previous keystroke's card, not a cache.
+  property var _sticky: null
+
   function recompute() {
     let next = []
     const mode = AppLauncher.mode
     const modeId = AppLauncher.modePluginId
+    // A fresh summon or a mode switch starts no answer: the sticky memory is
+    // the previous keystroke of THIS typing session and nothing else.
+    if (mode !== "normal" || AppLauncher.entry.trim() === "") root._sticky = null
     switch (mode) {
       case "websearch": {
         next = root._webRows(AppLauncher.entry, LauncherLib.pluginById(root.plugins, modeId))
@@ -501,8 +512,22 @@ Item {
         if (eng.length > 0) {
           next = eng
           root.matchedCount = eng.length
+          root._sticky = LauncherLib.stickyKeep(root._sticky, AppLauncher.entry, eng)
         } else {
           next = root._appRows(AppLauncher.entry)
+          // Nothing local claimed the query, so the card is the fallback slot
+          // alone - which is the moment a half-typed word would take the
+          // answer away. Put the remembered answer back under it.
+          //
+          // The memory is deliberately NOT cleared when this branch finds app
+          // rows instead: deleting a letter can match an app for one
+          // keystroke, and dropping the answer there is what made the card
+          // collapse to a web search on the first backspace. stickyAttach is
+          // guarded by relatedness, so a memory that survives a detour can
+          // only come back for a query that is still typing the same name.
+          if (LauncherLib.allSynthKinds(next)) {
+            next = LauncherLib.stickyAttach(root._sticky, AppLauncher.entry, next)
+          }
         }
         break
       }
@@ -566,7 +591,7 @@ Item {
     // to one. An engine that answers with a LIST of readings (a bare amount, a
     // bare quantity, a color code) is already outside the guard above, which is
     // the other half of why nothing here fires on a keystroke.
-    if (r.kind === "calc" || r.kind === "fx" || r.kind === "time" || r.kind === "unit" || r.kind === "color" || r.kind === "web" || r.kind === "file") return
+    if (r.kind === "calc" || r.kind === "fx" || r.kind === "time" || r.kind === "unit" || r.kind === "constants" || r.kind === "color" || r.kind === "web" || r.kind === "file") return
     // A typo-rescued single is a guess, not a selection: firing it would
     // launch an app the user never named.
     if (r.typo === true) return
@@ -1766,6 +1791,7 @@ Item {
       case "fx":
       case "time":
       case "unit":
+      case "constants":
       case "color": {
         if (row.incomplete === true || row.timeInvalid === true) break
         const ok = root._safeActivate(row.plugin, row.item, AppLauncher.entry)

@@ -2490,8 +2490,8 @@ group('the blend is over the channels, and the result is opaque', () => {
 // ---------------------------------------------------------------------------
 section('UnitLib - the UNITS table')
 
-group('the table is 363 entries across 24 dimensions with no duplicate symbol', () => {
-  eq('363 entries', UL.UNITS.length, 363)
+group('the table is 285 entries across 24 dimensions with no duplicate symbol', () => {
+  eq('285 entries', UL.UNITS.length, 285)
   eq('the dimensions', [...new Set(UL.UNITS.map((u) => u.dim))],
     ['length', 'mass', 'volume', 'speed', 'temperature', 'area', 'time', 'energy', 'power', 'pressure', 'data', 'angle',
       'frequency', 'force', 'torque', 'fuel', 'concentration', 'molarity', 'fraction', 'flow',
@@ -2813,7 +2813,7 @@ group('an unknown or empty key is null, never a wrong unit', () => {
 
 group('aliasMap is built once and covers every name exactly once', () => {
   const m = UL.aliasMap()
-  eq('1200 aliases', Object.keys(m).length, 1200)
+  eq('1022 aliases', Object.keys(m).length, 1022)
   eq('and it is the cached instance on the second call', UL.aliasMap() === m, true)
   eq('the alias count matches the name count', Object.keys(m).length,
     UL.UNITS.reduce((n, u) => n + u.names.length, 0))
@@ -3057,8 +3057,12 @@ group('isPotentialUnit wants a leading number, or a named constant standing alon
   eq('a speed unit', UL.isPotentialUnit('5m/s'), true)
   eq('an explicit target', UL.isPotentialUnit('5.m in cm'), true)
   eq('thousands grouping', UL.isPotentialUnit('1,000 km'), true)
-  eq('a named constant without a number', UL.isPotentialUnit('speed of sound'), true)
-  eq('and with its article', UL.isPotentialUnit('the speed of sound'), true)
+  // The named real-world values moved to the constants plugin, so this engine
+  // no longer admits a phrase with no number in it: an app name and a
+  // constants row are both a miss here, and the constants plugin claims the
+  // row before the app search gets it.
+  eq('a named constant is not a unit query any more', UL.isPotentialUnit('speed of sound'), false)
+  eq('and neither is its article form', UL.isPotentialUnit('the speed of sound'), false)
 })
 
 group('the gate runs on the preprocessed text, so a filler word is not a reason to say no', () => {
@@ -3562,7 +3566,6 @@ group('the twelve newer dimensions: frequency, force, torque, fuel, concentratio
   approx('1 gforce in m/s2', cvOut('1 gforce in m/s2'), 9.80665, 1e-12)
   approx('9.80665 m/s2 in gforce', cvOut('9.80665 m/s2 in gforce'), 1, 1e-12)
   approx('1 ft/s2 in m/s2', cvOut('1 ft/s2 in m/s2'), 0.3048, 1e-12)
-  approx('moon gravity', cvOut('1 moon gravity in m/s2'), 1.62, 1e-12)
   eq('and a speed is still not an acceleration', cvHint('1 m/s in m/s2').error, 'incompatible')
 
   // Datarate: bits and bytes per second, which is why the bit rows are a factor
@@ -3588,7 +3591,7 @@ group('the twelve newer dimensions: frequency, force, torque, fuel, concentratio
   approx('and a crore is ten million', cvOut('1 crore in item'), 1e7, 1e-3)
 })
 
-group('every one of the 363 rows is structurally sound', () => {
+group('every one of the 285 rows is structurally sound', () => {
   // Three invariants over the WHOLE table, because the interesting failures in a
   // table this size are not wrong answers - they are a row that resolves to
   // nothing, a noun that was never written, or a pair that does not survive the
@@ -3629,7 +3632,7 @@ group('every one of the 363 rows is structurally sound', () => {
   // how much of this table is a plain word rather than a prefixed or compound
   // noun, and it moves whenever the table does.
   eq('and the nouns that are their own symbol, counted not listed',
-    Object.keys(nouns).filter((sym) => nouns[sym][0] === sym).length, 90)
+    Object.keys(nouns).filter((sym) => nouns[sym][0] === sym).length, 40)
   // Twelve of those take no plural at all, and they are the ones where "dozens"
   // or "bars" would be wrong rather than merely clumsy - a gross is a gross and a
   // crore is a crore. Named, because this is the short list that has to stay true.
@@ -3958,58 +3961,6 @@ group('the speed ratios are the published ones', () => {
   eq('100km/h in kmh target reads as km/h', cvOk('100km/h in km/h').to, 'km/h')
 })
 
-group('a named constant is its own phrase, with the article and no 1', () => {
-  // "There's only one, the speed of sound." The name is the quantity, so the
-  // bare phrase resolves with an implicit 1 and reads as a subject rather than
-  // as "1 speed of sound".
-  const r = cvOk('speed of sound')
-  eq('the bare phrase resolves', r !== null, true)
-  eq('to the default speed target', r && r.to, 'km/h')
-  eq('with the value of the constant', cvOut('speed of sound in m/s'), 343)
-  eq('the label reads as the subject', r && r.label, 'the speed of sound = 1234.8 km/h')
-  eq('the sub spells the sentence', r && r.phrase,
-    'the speed of sound is 1234.8 kilometres per hour')
-  eq('the article is optional', cvOk('the speed of sound').label, r.label)
-  eq('every compatible unit is a row', UL.tryAll('speed of sound').map((x) => x.to),
-    ['km/h', 'mph', 'm/s', 'kn', 'ft/s', 'm/min'])
-  eq('and an ordinary unit still needs a value', UL.tryConvert('km'), null)
-})
-
-group('the Voyagers are pinned snapshot distances, answered in six readings', () => {
-  // A spacecraft is a length, and the two Voyagers are the only lengths a
-  // person checks up on. The table reads no clock, so each is a SNAPSHOT at the
-  // epoch in its comment rather than a live reading, and each is measured from
-  // Earth - which is why the row is bare (the name is the query) and why it
-  // carries its own row list: readable() would drop the kilometre and the
-  // light-year for being five decades out of a person's range, and those two
-  // are the whole point of the query.
-  eq('voyager 1 is a query on its own', UL.isPotentialUnit('voyager 1'), true)
-  eq('with its article', UL.isPotentialUnit('the voyager 1'), true)
-  eq('voyager 2 likewise', UL.isPotentialUnit('voyager 2'), true)
-  eq('a bare voyager names nothing', UL.tryConvert('voyager'), null)
-  eq('the row is a length', UL.lookup('voyager 1').dim, 'length')
-  eq('voyager 1 is the light-day figure from Earth', cvOut('voyager 1 in km'), 25902000000)
-  approx('which is 173.1 AU', cvOut('voyager 1 in au'), 2.5902e13 / 1.495978707e11, 1e-9)
-  approx('and just under one light-day', cvOut('voyager 1 in ld'), 2.5902e13 / 2.59020683712e13, 1e-9)
-  eq('voyager 2 is 21.66 billion km', cvOut('voyager 2 in km'), 21658000000)
-  approx('which is 144.8 AU', cvOut('voyager 2 in au'), 2.1658e13 / 1.495978707e11, 1e-9)
-  eq('the bare list is the spread, not the length shortlist',
-    UL.tryAll('voyager 1').map((r) => r.to), ['km', 'au', 'lmin', 'lh', 'ld', 'ly'])
-  eq('with those readings', UL.tryAll('voyager 1').map((r) => r.formatted),
-    ['25902000000', '173.144', '1440', '23.9999', '0.999997', '0.00273784'])
-  eq('voyager 2 answers the same six', UL.tryAll('voyager 2').map((r) => r.to),
-    ['km', 'au', 'lmin', 'lh', 'ld', 'ly'])
-  eq('the label reads as the subject', cvOk('voyager 1').label, 'the Voyager 1 = 173.144 au')
-  eq('the sub names the distance and where it is measured from', cvOk('voyager 1').phrase,
-    'the distance from Earth to Voyager 1 is 173.144 astronomical units')
-  eq('an explicit target still answers with one row', UL.tryAll('voyager 1 in ly').length, 1)
-  eq('and converts there', cvOk('voyager 1 in ly').to, 'ly')
-  // It is a length like any other, so the neighbour conversion and the
-  // dimension check apply to it unchanged.
-  eq('a length target reaches the row', cvOk('1 au in voyager 1').to, 'Voyager 1')
-  eq('and a mass target is refused', cvHint('voyager 1 in kg').error, 'incompatible')
-})
-
 // ---------------------------------------------------------------------------
 section('UnitLib - the bare-query default target')
 
@@ -4312,9 +4263,9 @@ group('dimUnits, dimHint and dimNote are the three hint strings, on their own', 
   const g = (s) => UL.lookup(s)
   // dimUnits is the hint's vocabulary: one dimension, in table order, so a
   // suggestion list is the engine's own ordering rather than a sorted guess.
-  eq('the length dimension has 58 units', UL.dimUnits('length').length, 58)
+  eq('the length dimension has 38 units', UL.dimUnits('length').length, 38)
   eq('and they come out smallest first', UL.dimUnits('length').slice(0, 4), ['A', 'nm', 'um', 'thou'])
-  eq('the mass dimension', UL.dimUnits('mass').slice(-3), ['grain of rice', 'paperclip', 'stick of butter'])
+  eq('the mass dimension ends on the astronomical rows', UL.dimUnits('mass').slice(-4), ['Mearth', 'Mjup', 'Msun', 'Mmoon'])
   eq('the five temperature scales', UL.dimUnits('temperature'), ['C', 'F', 'K', 'Re', 'R'])
   // The dimension is in TABLE order and the table is grouped by system, not
   // globally sorted by factor - kilometres come before inches here. So what the

@@ -316,6 +316,11 @@
                 "label": "Currency converter"
             },
             {
+                "id": "launcher-constants",
+                "type": "toggle",
+                "label": "Named constants"
+            },
+            {
                 "id": "launcher-unit",
                 "type": "toggle",
                 "label": "Unit converter"

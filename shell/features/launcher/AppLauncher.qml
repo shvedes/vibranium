@@ -278,9 +278,9 @@ Singleton {
     root._publishedToggles = toggles
   }
 
-  // The seven rows the settings menu owns, read from the persisted plugin
-  // section. Not a scan: the settings store is resident and the answer is a
-  // seven-entry map.
+  // The eight rows the settings menu owns, read from the persisted plugin
+  // section. Not a scan: the settings store is resident and the answer is an
+  // eight-entry map.
   function _persistedPluginToggles() {
     const section = Settings.rawSection("appLauncher")
     const list = section && Array.isArray(section.plugins) ? section.plugins : []
@@ -323,6 +323,7 @@ Singleton {
     if (root.mode === "websearch") return "webapp"
     const row = root.results.length > 0 ? root.results[0] : null
     if (row && row.kind === "unit") return "calculator"
+    if (row && row.kind === "constants") return "calculator"
     if (row && row.kind === "fx") return "landmark"
     if (row && row.kind === "color") return "pipette"
     if (row && row.kind === "web") return "webapp"
@@ -349,8 +350,12 @@ Singleton {
   // counting a pool the engine never searched. The synthetic web fallback row
   // never counts as a match either: "0/214 apps" is the honest reading of a
   // fruitless query.
+  // A sticky answer counts as neither: the rows are a previous keystroke's, so
+  // "0/214 apps" over a constants answer would be reporting a pool nobody
+  // searched.
   readonly property bool showCounter: root.mode === "normal"
     && !LauncherLib.allSynthKinds(root.results)
+    && !LauncherLib.anySticky(root.results)
 
   // Focus truth: the visible panel reports its field's live keyboard
   // state; scanned on demand (status/probe), never stale.
@@ -379,7 +384,7 @@ Singleton {
   // Ids of the plugin toggle rows the launcher overlays. One source for
   // registration and teardown, so the two sets cannot drift apart.
   function _pluginToggleIds() {
-    return ["launcher-calc", "launcher-unit", "launcher-fx", "launcher-time", "launcher-color", "launcher-binary", "launcher-websearch"]
+    return ["launcher-calc", "launcher-unit", "launcher-constants", "launcher-fx", "launcher-time", "launcher-color", "launcher-binary", "launcher-websearch"]
   }
 
   function _releaseMenuProviders() {
