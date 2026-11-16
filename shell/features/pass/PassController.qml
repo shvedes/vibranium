@@ -1182,7 +1182,7 @@ Item {
       primary: modelData === Ui.primaryScreen
       dim: 0.45
 
-      wlrNamespace: "vibranium:pass"
+      wlrNamespace: "vibranium:modal"
 
       onCloseRequested: Pass.close()
 

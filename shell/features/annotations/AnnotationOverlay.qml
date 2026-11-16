@@ -97,7 +97,7 @@ LayerSurface {
     : ShotLib.qtDpr(Screen.devicePixelRatio)
 
   color: "transparent"
-  surface: "vibranium:screenshot-region"
+  surface: "vibranium:capture-region"
   WlrLayershell.keyboardFocus: overlay.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
   // One still frame of the source screen. Seeded selectors use the frozen

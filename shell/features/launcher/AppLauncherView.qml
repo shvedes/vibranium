@@ -31,7 +31,7 @@ Variants {
     primary: modelData === Ui.primaryScreen
     dim: 0.45
 
-    wlrNamespace: "vibranium:launcher"
+    wlrNamespace: "vibranium:modal"
 
     onCloseRequested: AppLauncher.close()
 

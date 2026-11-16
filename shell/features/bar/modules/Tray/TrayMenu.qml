@@ -31,6 +31,14 @@ LayerSurface {
   property bool open: false
   signal menuClosed()
 
+  // See the header: one screen, one visit.
+  property var _claimToken: null
+
+  // Whether the card has been parked for the current open. The surface maps at
+  // its placeholder size, so the open-time park has to run against the screen;
+  // until it has, the card stays transparent rather than drawn at 0,0.
+  property bool _parked: false
+
   // Submenu stack: each level is the DBusMenuItem whose children are
   // showing; empty means the root menu.
   property var stack: []
@@ -52,7 +60,7 @@ LayerSurface {
 
   screen: root.anchorScreen()
   visible: root.open || card.opacity > 0
-  surface: "vibranium:tray"
+  surface: "vibranium:popup"
   // OnDemand while open so Escape can reach the key scope; released the
   // moment the logical close fires.
   WlrLayershell.keyboardFocus: root.open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
@@ -93,12 +101,26 @@ LayerSurface {
     root.stack = []
     card.contentY = 0
     root.open = true
+    // Park before the surface maps. Its first present is built from the card's
+    // coordinates, and the deferred pass used to leave it at 0,0 for a frame.
+    // The anchor's bar window and its screen are known while this surface is
+    // still unmapped.
+    root._parked = false
+    root.positionCard()
+    if (root._claimToken === null) {
+      root._claimToken = SurfaceClaim.claim("trayMenu", root.close, root)
+    }
     root.refreshCurrent()
   }
 
   function close() {
     if (!root.open) return
     root.open = false
+    root._parked = false
+    if (root._claimToken !== null) {
+      SurfaceClaim.release(root._claimToken)
+      root._claimToken = null
+    }
     root.stack = []
     root.menuClosed()
   }
@@ -156,7 +178,12 @@ LayerSurface {
     // A remote menu can be longer than the screen; the shared card scrolls
     // past `maxHeight`.
     maxHeight: root.maxHeight
-    opacity: root.open ? 1 : 0
+    opacity: root.open && root._parked ? 1 : 0
+    // A remote menu arrives asynchronously: the open-time park runs before the
+    // entries exist, so the width they give the card re-parks it. Height has
+    // its own handler below - a second one here is a duplicate handler and a
+    // load-time error for the whole type.
+    onWidthChanged: if (root.open) Qt.callLater(root.positionCard)
 
     // Menu content can land after open (DBus aboutToShow, late layout
     // updates): for a bottom bar the card must grow UP from its bottom edge
@@ -210,14 +237,24 @@ LayerSurface {
     if (!root.anchorItem || !root.anchorWindow) return
     const w = card.width
     const h = card.height
+    if (!(w > 0) || !(h > 0)) return
     const barH = root.anchorWindow.height
     const anchorX = root.anchorItem.mapToItem(root.anchorWindow.contentItem, 0, 0).x
     let x = anchorX + root.anchorItem.width / 2 - w / 2
-    let y = root.barPosition === "bottom" ? root.height - barH - h - root.margin : barH + root.margin
-    x = Range.clamp(x, root.margin, root.width - w - root.margin)
-    y = Range.clamp(y, root.margin, root.height - h - root.margin)
+    // The settle is the SCREEN's, not this surface's. The popup is still at its
+    // 100x100 placeholder when it opens, so clamping against root.width put the
+    // card at the clamp's lower bound - the top-left corner. The bar window is
+    // mapped and configured, and its screen is the one being placed on.
+    // qmllint disable missing-property
+    const screenW = root.anchorWindow.screen ? root.anchorWindow.screen.width : root.width
+    const screenH = root.anchorWindow.screen ? root.anchorWindow.screen.height : root.height
+    // qmllint enable missing-property
+    let y = root.barPosition === "bottom" ? screenH - barH - h - root.margin : barH + root.margin
+    x = Range.clamp(x, root.margin, screenW - w - root.margin)
+    y = Range.clamp(y, root.margin, screenH - h - root.margin)
     card.x = Math.round(x)
     card.y = Math.round(y)
+    root._parked = true
   }
 
   onOpenChanged: {

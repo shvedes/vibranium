@@ -2,21 +2,43 @@ pragma Singleton
 pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
+import Quickshell.Hyprland
 import "../runtime/ErrorText.js" as ErrorText
 import "../text/StringUtils.js" as SU
 
 // Exclusive surface claim: which of the participating services owns the
 // screen, and how the previous owner is put away when a new one arrives.
 //
-// Not every overlay in the shell takes part. Nine services claim - the menu,
+// Not every overlay in the shell takes part. Twelve services claim - the menu,
 // the app launcher, the power menu, the pass panel, the clipboard panel, the
-// theme picker, the wallpaper picker, the screenshot flow and the color pick -
+// theme picker, the wallpaper picker, the Wi-Fi QR card, the screenshot flow,
+// the color pick, and the two context menus (the tray's and the desktop's) -
 // and they dismiss each other whichever id the newcomer claims: `claim` fires
 // the current holder's closer regardless of the id it held, so one visit at a
 // time is a property of the registry rather than a list each surface keeps.
-// The other windows (MenuPanel, TrayMenu, NetworkQrOverlay) are independent
-// surfaces with no mutual dismissal: Tray.qml opens TrayMenu without telling
-// this registry.
+//
+// The two context menus are the newest members and the reason the set is not
+// just "the fullscreen ones": a popup left mapped under a visit's dim is
+// invisible but still there, and it reappears the moment the visit closes. The
+// claim is what makes "open a menu over an open tray menu" a replacement rather
+// than a stack.
+//
+// A visit is also the context of the WORKSPACE it was summoned on. A layer
+// surface is bound to the output, not the workspace, so the compositor keeps
+// it mapped across a switch: a menu opened on one desktop stayed on screen over
+// the next one, still holding its Escape scope. The registry dismisses its
+// holder when the focused workspace changes. The screenshot flow opts out with
+// `keepOnWorkspace` - an annotation in progress is a document rather than a
+// menu - and every other claimant is a visit that belongs to its desktop.
+//
+// The polkit prompt shares the modal class but does not claim, in either
+// direction: it is summoned by the system rather than by the user, so standing
+// it down for a menu would deny an authentication nobody asked the shell to
+// cancel. The cost is the inverse case - a visit opened during a prompt covers
+// the card and takes the keyboard from it - which is why the prompt is the one
+// surface whose precedence a claim cannot express. The remaining independent
+// windows (MenuPanel and the island) are sub-surfaces with no mutual dismissal
+// needs.
 //
 // The color pick claims for the same reason the screenshot flow does: both
 // photograph the screen, and a photograph taken with a menu still open is a
@@ -40,6 +62,18 @@ Singleton {
   // only writer, and a caller that could assign this could also invent a
   // holder the map knows nothing about.
   readonly property string activeClaim: root._entry === null ? "" : root._entry.id
+
+  // The focused workspace, watched rather than listened for: it is read off the
+  // same monitor property the bar's Workspaces module and the island use, and a
+  // binding cannot miss a switch that happened before a listener connected.
+  readonly property int focusedWorkspaceId: Hyprland.focusedMonitor
+    && Hyprland.focusedMonitor.activeWorkspace
+    ? Hyprland.focusedMonitor.activeWorkspace.id : -1
+  onFocusedWorkspaceIdChanged: {
+    const entry = root._entry
+    if (entry === null || entry.keepOnWorkspace) return
+    root._fire(entry)
+  }
 
   // Closers held for a claim that is still displaceable, and the entry the
   // activeClaim binding reads. Bounded at one by construction: a claim
@@ -76,7 +110,9 @@ Singleton {
   // `owner` is an opaque object the claim is released against.
   // Returns the token for this claim, or null when the arguments do not
   // answer the contract.
-  function claim(id, closer, owner) {
+  // `options.keepOnWorkspace` marks a claim that a workspace switch must not
+  // dismiss: the capture flow's, whose editor is a document in progress.
+  function claim(id, closer, owner, options) {
     if (!root._validId(id)) {
       return null
     }
@@ -87,6 +123,8 @@ Singleton {
       return null
     }
     const ownerKey = owner
+    const keep = options !== undefined && options !== null
+      && options.keepOnWorkspace === true
 
     const prev = root._entry
     if (prev !== null && prev.id === id && prev.owner === ownerKey) {
@@ -95,6 +133,7 @@ Singleton {
       // re-entrant claim from leaving the old closer stored and never
       // called, and the token the owner already holds stays valid.
       prev.closer = closer
+      prev.keepOnWorkspace = keep
       return prev.token
     }
 
@@ -103,7 +142,8 @@ Singleton {
       id: id,
       owner: ownerKey,
       closer: closer,
-      fired: false
+      fired: false,
+      keepOnWorkspace: keep
     }
     root._entries.push(entry)
     root._entry = entry

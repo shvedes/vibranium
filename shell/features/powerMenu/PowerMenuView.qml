@@ -32,7 +32,7 @@ Variants {
     primary: modelData === Ui.primaryScreen
     dim: 0.45
 
-    wlrNamespace: "vibranium:power"
+    wlrNamespace: "vibranium:modal"
 
     onCloseRequested: PowerMenu.close()
 

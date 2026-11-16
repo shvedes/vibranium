@@ -478,13 +478,26 @@ LayerSurface {
   // Open at the click point, in the surfaced window's coordinates (the menu
   // surface covers the same screen, so the two agree).
   property bool menuOpen: false
+  // The claim the context menu holds while open, null while closed.
+  property var _menuClaim: null
   property real menuX: 0
   property real menuY: 0
+
+  // The workspace rule lives in SurfaceClaim, with the claim this menu takes:
+  // every visit belongs to the desktop it was summoned on, and one place
+  // dismisses them all.
 
   function openMenu(x, y) {
     win.menuX = x
     win.menuY = y
     win.menuOpen = true
+    // A context menu is a visit of its own: it claims the screen so a menu or
+    // a picker opened afterwards puts it away, and so summoning it closes
+    // whatever held the screen. Without the claim the card stayed mapped under
+    // a visit's dim and came back when the visit closed.
+    if (win._menuClaim === null) {
+      win._menuClaim = SurfaceClaim.claim("wallpaperMenu", win.closeMenu, win)
+    }
     // On the next tick, when the surface is mapped: the key scope is what
     // makes Escape reach the menu.
     Qt.callLater(menuKeyScope.forceActiveFocus)
@@ -493,6 +506,10 @@ LayerSurface {
   function closeMenu() {
     if (!win.menuOpen) return
     win.menuOpen = false
+    if (win._menuClaim !== null) {
+      SurfaceClaim.release(win._menuClaim)
+      win._menuClaim = null
+    }
   }
 
   function runMenuAction(action) {
@@ -543,7 +560,7 @@ LayerSurface {
 
     screen: win.screen
     visible: win.menuOpen
-    surface: "vibranium:wallpaper-menu"
+    surface: "vibranium:popup"
     // OnDemand only while open, so Escape can reach the key scope; the
     // wallpaper surface itself never takes the keyboard.
     WlrLayershell.keyboardFocus: win.menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
@@ -569,8 +586,12 @@ LayerSurface {
     ContextMenu {
 
       entries: win.menuEntries
-      x: Range.clamp(Math.round(win.menuX), Ui.m, menuWin.width - width - Ui.m)
-      y: Range.clamp(Math.round(win.menuY), Ui.m, menuWin.height - height - Ui.m)
+      // The wallpaper surface IS the screen: it is mapped from boot, so its
+      // geometry is real before this menu's own surface has been configured.
+      // Clamping against menuWin.width put the card at the top-left corner for
+      // the first frame, because a mapping surface is 100x100.
+      x: Range.clamp(Math.round(win.menuX), Ui.m, win.width - width - Ui.m)
+      y: Range.clamp(Math.round(win.menuY), Ui.m, win.height - height - Ui.m)
 
       onActivated: entry => win.runMenuAction(entry.action)
     }

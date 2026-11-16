@@ -330,7 +330,7 @@ LayerSurface {
   }
 
   color: Ui.solid("background_0")
-  surface: "vibranium:screenshot-annotate"
+  surface: "vibranium:annotate"
   // Modal: hotkeys must land regardless of prior focus, and the grab is
   // released when the editor is not mapped - a grab with no release branch
   // outlives the surface it was granted to.

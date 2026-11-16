@@ -35,6 +35,14 @@ LayerSurface {
   // Hover delay: a newly served request shows only after the cursor has
   // rested this long. Shared by all requests; no consumer overrides it.
   property int delay: 300
+
+  // Whether the bubble has been placed since the surface appeared. The surface
+  // maps at its default size, so `place()` can only run after the compositor
+  // configures it and the anchor maps across windows - one or two frames after
+  // the window is on screen. Those frames painted the bubble at 0,0, which the
+  // fade-in used to hide and which animations-off made visible as a flick in
+  // the top-left corner. The bubble is opaque only once it has been placed.
+  property bool _placed: false
   property bool _show: false
 
   // The served snapshot {bind, rev, anchor, barWindow, text, lines,
@@ -261,7 +269,7 @@ LayerSurface {
   // makes every click pass through to the window beneath.
   mask: Region { width: 0; height: 0 }
 
-  surface: "vibranium:tooltip"
+  surface: "vibranium:hud"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
   Rectangle {
@@ -273,6 +281,7 @@ LayerSurface {
     border.width: Ui.cardBorder
     border.color: Ui.solid("background_3")
     radius: RoundingPolicy.radius
+    opacity: root._placed ? 1 : 0
     width: {
       const natural = (bubble.hasLines ? root._linesW : label.implicitWidth) + 2 * Ui.m
       const cap = root._req ? root._req.maxWidth : 260
@@ -479,16 +488,28 @@ LayerSurface {
   // coordinates).
   function place() {
     if (!root._req || !root._req.anchor || !root._req.barWindow) return
+    // The settle is the SCREEN's, not the surface's. A mapping surface is still
+    // at its 100x100 placeholder, and clamping against root.width put the
+    // bubble at the clamp's lower bound - the top-left corner. The screen is
+    // known from the bar's window, mapped before this one.
+    // `screen` is a Quickshell screen info: the runtime object carries the
+    // QtQuick Screen members, qmllint's stub does not.
+    // qmllint disable missing-property
+    const screenW = root.screen ? root.screen.width : root.width
+    const screenH = root.screen ? root.screen.height : root.height
+    // qmllint enable missing-property
+    if (!(screenW > 100) || !(screenH > 100)) return
     const w = bubble.width
     const h = bubble.height
     const barH = root._req.barWindow.height
     const anchorX = root._req.anchor.mapToItem(root._req.barWindow.contentItem, 0, 0).x
     let x = anchorX + root._req.anchor.width / 2 - w / 2
-    let y = root.barPosition === "bottom" ? root.height - barH - h - root.gap : barH + root.gap
-    const right = root.width - w - root.gap
+    let y = root.barPosition === "bottom" ? screenH - barH - h - root.gap : barH + root.gap
+    const right = screenW - w - root.gap
     x = right >= root.gap ? Range.clamp(x, root.gap, right) : root.gap
     bubble.x = Math.round(x)
     bubble.y = Math.round(y)
+    root._placed = true
   }
 
   // A slot-reorder drag cancels a pending or shown bubble instantly; when
@@ -502,7 +523,18 @@ LayerSurface {
     }
   }
   on_ReqChanged: if (root.visible) Qt.callLater(root.place)
-  onVisibleChanged: if (root.visible) Qt.callLater(root.place)
+  onVisibleChanged: {
+    // Place on the spot as well as after the configure: the first present is
+    // built from the bubble's coordinates now, and the deferred-only pass left
+    // it at 0,0 for that frame.
+    if (root.visible) {
+      root.place()
+      Qt.callLater(root.place)
+    }
+    // The next bubble has to be placed on its own screen before it paints:
+    // keeping the latch through the hide would show it at the old position.
+    else root._placed = false
+  }
   onBackingWindowVisibleChanged: if (root.backingWindowVisible) Qt.callLater(root.place)
   // `100` is the surface's placeholder size, not a threshold about the bubble:
   // an anchored PanelWindow carries no real geometry until the compositor

@@ -11,7 +11,8 @@ import "LayerSpec.js" as LayerSpec
 // the same six lines on every full-screen surface in this shell; the namespace,
 // the layer and the keyboard policy are the parts that have to agree with the
 // Hyprland rules. All of it lives here, and a declaration says one thing:
-// `surface: "vibranium:osd"`.
+// `surface: "vibranium:<class>"` - the class it belongs to, not a name of its
+// own.
 //
 // A consumer owns what is genuinely its own: `screen`, `visible`, `mask`, and a
 // keyboard mode gated on its own open state. Overriding `anchors` or
@@ -20,7 +21,8 @@ import "LayerSpec.js" as LayerSpec
 PanelWindow {
   id: root
 
-  // The layer-shell namespace, and the registry key. Empty only on
+  // The layer-shell namespace, and the registry key: the surface class, shared
+  // with every other window that keeps the same contract. Empty only on
   // ScrimWindow, the base the menu family inherits before it sets one.
   property string surface: ""
 

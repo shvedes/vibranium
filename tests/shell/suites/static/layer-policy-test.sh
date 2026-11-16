@@ -14,10 +14,12 @@
 #   - the layer is the one the feature was designed for;
 #   - the bar is the only surface that reserves space, which is what keeps a
 #     modal overlay from reflowing the desktop under it;
-#   - namespaces are unique, and a namespace that needs a Hyprland rule has
-#     one, in both directions: no rule outlives its surface, and no surface
-#     loses the rule that carries its order, its lock behaviour or its
-#     animation;
+#   - a namespace is a surface class, shared by every window that keeps the
+#     same contract, and each row names its clients, so what maps a class is
+#     answerable from the table;
+#   - a class that needs a Hyprland rule has one, in both directions: no rule
+#     outlives its class, and no class loses the rule that carries its order,
+#     its lock behaviour or its animation;
 #   - the modal scrims take input and the passive surfaces are click-through,
 #     which is a property of the mask each one declares;
 #   - an exclusive keyboard grab has a release branch, so it cannot outlive
@@ -27,9 +29,9 @@
 #
 # qmltestrunner cannot construct a PanelWindow (there is no backend under
 # QT_QPA_PLATFORM=offscreen), so a missing namespace, a surface that reserves
-# an exclusive zone it never asked for, or two features quietly sharing a
-# namespace could only be found by reading every declaring file. This suite
-# reads them.
+# an exclusive zone it never asked for, or two classes that were meant to stay
+# apart quietly sharing a name could only be found by reading every declaring
+# file. This suite reads them.
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
@@ -56,6 +58,10 @@ reg_rule_namespaces() {
 }
 reg_mask_count() {
   grep -cE "^  \"vibranium:.*mask: \"$1\"" "$REGISTRY" || true
+}
+reg_client_count() {
+  grep -o 'clients: \[[^]]*\]' "$REGISTRY" \
+    | sed -E 's/clients: \[//; s/\]//' | tr ',' '\n' | grep -c '"'
 }
 rule_namespaces() {
   grep -oE 'namespace = "\^vibranium:[a-z-]+[$]"' "$RULES" \
@@ -94,8 +100,11 @@ t_section "the registry is the single table of surfaces"
 
 REG_KEYS="$(reg_namespaces)"
 t_unique "no namespace is declared twice in the registry" "$REG_KEYS"
-t_eq "the registry holds every surface the shell maps" "24" \
+t_eq "the registry keeps fourteen surface classes" "14" \
   "$(printf '%s\n' "$REG_KEYS" | grep -c .)"
+t_eq "the classes account for every window the shell maps" "24" "$(reg_client_count)"
+t_eq "and every class names at least one client" "14" \
+  "$(grep -E '^  "vibranium:' "$REGISTRY" | grep -c 'clients: \[')"
 
 # The declared side of the same set: literal keys, the menu family's bound
 # namespaces, and the capture picker's constant. A surface that maps without a
@@ -110,33 +119,43 @@ t_empty "every declared surface has a registry row" "$MISSING_FROM_REGISTRY"
 UNUSED_ROWS="$(LC_ALL=C comm -23 <(printf '%s\n' "$REG_KEYS" | LC_ALL=C sort -u) <(printf '%s\n' "$DECLARED"))"
 t_empty "and no row outlives its declaration" "$UNUSED_ROWS"
 
+t_section "the table is a closed schema"
+
+# The row shape is normative: the same fields, in the same order, each inside
+# the domain the spec names. A row that adds a field is rejected by the JS
+# suite as an unknown key, and here by the shape, so neither file can grow an
+# extension the other does not know about.
+ROW_SCHEMA='^  "vibranium:[a-z-]+": . layer: (BACKGROUND|BOTTOM|TOP|OVERLAY), focus: "(none|ondemand|exclusive)", exclusion: "(normal|ignore)", mask: "(none|empty|content)", mapped: "(always|open)", order: -?[0-9]+, rule: (true|false), clients: \[("[a-z-]+"(, "[a-z-]+")*)\] .[,]?$'
+t_count "every row declares the full schema, in field order" "14" \
+  "$(grep -E '^  "vibranium:' "$REGISTRY" | grep -cE "$ROW_SCHEMA" || true)"
+t_eq "and no row escapes the schema" "0" \
+  "$(grep -E '^  "vibranium:' "$REGISTRY" | grep -vcE "$ROW_SCHEMA" || true)"
+# Clause 4: an order with no rule is an intent the compositor never hears.
+t_empty "no class carries an order without a rule" \
+  "$(grep -E '^  "vibranium:' "$REGISTRY" | grep -v 'order: 0,' | grep -v 'rule: true' || true)"
+
+# Clause 3: one client, one class. The counts above prove the total; this
+# proves no name was reused to reach it.
+t_unique "every client belongs to one class" \
+  "$(grep -o 'clients: \[[^]]*\]' "$REGISTRY" | sed -E 's/clients: \[//; s/\]//' | tr ',' '\n' | tr -d ' "' | grep .)"
+
 t_section "the layer of each surface is the one it was designed for"
 
 # Pinned here rather than read from the table: the registry is the thing under
 # test, so the expectation has to live outside it.
 EXPECTED_LAYERS="bar:BOTTOM
-island:OVERLAY
-menu:OVERLAY
-launcher:OVERLAY
-clipboard:OVERLAY
-power:OVERLAY
-pass:OVERLAY
-theme-picker:OVERLAY
-wallpaper-picker:OVERLAY
-wallpaper-menu:OVERLAY
-tray:OVERLAY
-tooltip:OVERLAY
-notifications:OVERLAY
-osd:OVERLAY
-polkit:OVERLAY
-privacy:OVERLAY
-bar-move:OVERLAY
+bar-drag:OVERLAY
+capture:TOP
+capture-region:OVERLAY
+capture-picker:OVERLAY
+annotate:OVERLAY
 color-pick:OVERLAY
-network-qr:OVERLAY
-screenshot:TOP
-screenshot-region:OVERLAY
-screenshot-picker:OVERLAY
-screenshot-annotate:OVERLAY
+hud:OVERLAY
+island:OVERLAY
+modal:OVERLAY
+notifications:OVERLAY
+popup:OVERLAY
+privacy:OVERLAY
 wallpaper:BACKGROUND"
 t_eq "every row's layer is the designed one" \
   "$(printf '%s\n' "$EXPECTED_LAYERS" | LC_ALL=C sort)" "$(reg_layers | LC_ALL=C sort)"
@@ -161,7 +180,7 @@ t_empty "no other surface sets an exclusive zone" "$ZONE_OVERRIDES"
 
 t_section "modal scrims take input and passive surfaces do not"
 
-t_eq "four surfaces are click-through" "4" "$(reg_mask_count empty)"
+t_eq "three classes are click-through" "3" "$(reg_mask_count empty)"
 t_eq "two surfaces follow their content" "2" "$(reg_mask_count content)"
 for rel in \
   features/bar/PrivacyOverlay.qml \
@@ -190,6 +209,32 @@ while read -r f; do
 done < <(grep -rl "WlrKeyboardFocus.Exclusive" "$SHELL_DIR" --include=*.qml | sort)
 t_empty "every exclusive grab is gated on the surface's own state" "$UNGATED"
 
+t_section "a visit that can stand down does"
+
+# The QR card was the one fullscreen visit outside the claim set, so it could sit
+# on top of a menu with a credential on screen. It claims on open and releases
+# on close now, which is what makes it dismissable in both directions.
+QR_OVERLAY="$SHELL_DIR/features/bar/modules/Network/NetworkQrOverlay.qml"
+t_contains "the QR overlay claims the screen when it opens" \
+  'SurfaceClaim.claim("networkQr", root.close, root)' "$(<"$QR_OVERLAY")"
+t_contains "and releases it when it closes" \
+  "SurfaceClaim.release(root._claimToken)" "$(<"$QR_OVERLAY")"
+t_contains "and drops the claim if it is destroyed while open" \
+  "SurfaceClaim.releaseOwner(root)" "$(<"$QR_OVERLAY")"
+
+# The two context menus are visits too. A popup left mapped under a visit's dim
+# is invisible but still there, and it reappears when the visit closes.
+TRAY_MENU="$SHELL_DIR/features/bar/modules/Tray/TrayMenu.qml"
+t_contains "the tray menu claims the screen while open" \
+  'SurfaceClaim.claim("trayMenu", root.close, root)' "$(<"$TRAY_MENU")"
+t_contains "and gives it back when it closes" \
+  "SurfaceClaim.release(root._claimToken)" "$(<"$TRAY_MENU")"
+WALLPAPER_VIEW="$SHELL_DIR/features/wallpaper/WallpaperView.qml"
+t_contains "the desktop menu claims the screen while open" \
+  'SurfaceClaim.claim("wallpaperMenu", win.closeMenu, win)' "$(<"$WALLPAPER_VIEW")"
+t_contains "and gives it back when it closes" \
+  "SurfaceClaim.release(win._menuClaim)" "$(<"$WALLPAPER_VIEW")"
+
 t_section "the island is an overlay that unmaps on close"
 
 ISLAND="$(<"$SHELL_DIR/common/ui/IslandHost.qml")"
@@ -200,6 +245,22 @@ t_contains "the close is the compositor's fade, so it takes OnDemand" \
 t_not_contains "and needs no exclusive focus prime" "focusPrimed" "$ISLAND"
 t_eq "no exclusive grab of its own" "0" \
   "$(grep -cE 'WlrLayershell\.keyboardFocus:.*Exclusive' "$SHELL_DIR/common/ui/IslandHost.qml" || true)"
+
+t_section "a visit belongs to the workspace it was summoned on"
+
+# A layer surface is bound to the output, not the workspace: the compositor
+# keeps it mapped across a switch, so a menu opened on one desktop used to stay
+# on the next one, Escape scope and all. The registry dismisses its holder; the
+# capture flow opts out because an annotation is a document.
+CLAIM_IMPL="$SHELL_DIR/common/bus/SurfaceClaim.qml"
+t_contains "the registry dismisses the holder when the workspace changes" \
+  "onFocusedWorkspaceIdChanged" "$(<"$CLAIM_IMPL")"
+t_contains "and the capture flow survives a switch" \
+  "keepOnWorkspace: true" "$(<"$SHELL_DIR/services/screenshots/Screenshots.qml")"
+t_contains "the island closes too, since it holds no claim" \
+  "onWorkspaceIdChanged" "$(<"$SHELL_DIR/common/ui/IslandHost.qml")"
+t_empty "no surface keeps its own copy of the workspace rule" \
+  "$(grep -l 'focusedWorkspaceId' "$TRAY_MENU" "$WALLPAPER_VIEW" 2>/dev/null || true)"
 
 t_section "the layer rules cover the surfaces that need them"
 
@@ -216,8 +277,8 @@ t_contains "the island is ordered under the menus and over the pile" \
   "Vibranium Island" "$RULES_SRC"
 t_contains "the privacy dots sit above the lock" "above_lock = 1," "$RULES_SRC"
 t_contains "the color pick is the topmost overlay" "order = -2" "$RULES_SRC"
-t_contains "the picker leaves at the unmap" "vibranium:screenshot-picker" "$RULES_SRC"
-t_contains "and so does the region selector" "vibranium:screenshot-region" "$RULES_SRC"
+t_contains "the picker leaves at the unmap" "vibranium:capture-picker" "$RULES_SRC"
+t_contains "and so does the region selector" "vibranium:capture-region" "$RULES_SRC"
 t_contains "the annotator may share the screen with a visit" \
   "Vibranium Annotation Editor" "$RULES_SRC"
 t_contains "one order step above the visit band" "order = -1," \

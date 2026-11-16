@@ -34,7 +34,7 @@ Variants {
     primary: modelData === Ui.primaryScreen
     dim: 0.45
 
-    wlrNamespace: "vibranium:menu"
+    wlrNamespace: "vibranium:modal"
 
     onCloseRequested: Menu.close()
 

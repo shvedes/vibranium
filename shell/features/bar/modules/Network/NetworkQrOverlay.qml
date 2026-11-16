@@ -11,6 +11,11 @@ import "Model.js" as Model
 // Fullscreen Wi-Fi share overlay: a saved network as a scannable QR code
 // on a heavy scrim. Esc or the scrim dismisses it.
 //
+// It is a visit like a menu or a picker, so it joins the claim set: opening it
+// closes whichever overlay held the screen, and opening any of them closes it.
+// The QR code is the one surface that shows a credential on screen, which is
+// the worst thing to leave up behind something else.
+//
 // Owned by the network bar module (sibling to the island, like the color
 // picker's overlay): a row's QR button calls open(ssid), which regenerates
 // the code via vb-network-qr --ssid. The generator emits the security type
@@ -40,6 +45,11 @@ Item {
   property string password: ""
   property bool passwordVisible: false
   property string passwordError: ""
+
+  // Null while closed. A second open() on an already-open card keeps the token:
+  // claiming again would fire this object's own closer and close the card the
+  // caller just asked for.
+  property var _claimToken: null
 
   readonly property string _gateInstance: String(root)
   readonly property string _qrScope: "network-qr/" + root._gateInstance
@@ -89,6 +99,9 @@ Item {
     root.ssid = ""
     generate()
     root.opened = true
+    if (root._claimToken === null) {
+      root._claimToken = SurfaceClaim.claim("networkQr", root.close, root)
+    }
     Qt.callLater(function() {
       if (root.opened) keyCatcher.forceActiveFocus()
     })
@@ -101,6 +114,10 @@ Item {
     root._retire(root._pwRequest)
     root._pwRequest = null
     root.opened = false
+    if (root._claimToken !== null) {
+      SurfaceClaim.release(root._claimToken)
+      root._claimToken = null
+    }
     root.pendingShow = false
     // Both generations are dead before either child is stopped: cancelling a
     // job reports its terminal transition synchronously, and that callback
@@ -321,6 +338,9 @@ Item {
   // follows reports its terminal transition synchronously, and that callback
   // must find a handle this teardown already retired.
   Component.onDestruction: {
+    // A claim outlives the object unless the registry is told: the next visit's
+    // claim would otherwise fire a closer on a destroyed window.
+    SurfaceClaim.releaseOwner(root)
     root._retire(root._qrRequest)
     root._retire(root._pwRequest)
     root._cancel(root._qrScope)
@@ -330,7 +350,7 @@ Item {
   LayerSurface {
     visible: root.opened
     screen: root.targetScreen
-    surface: "vibranium:network-qr"
+    surface: "vibranium:modal"
     WlrLayershell.keyboardFocus: root.opened
       ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 

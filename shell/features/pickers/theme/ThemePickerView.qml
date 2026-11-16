@@ -34,7 +34,7 @@ Variants {
     overlayOpen: ThemePicker.isOpen
     primary: modelData === Ui.primaryScreen
     dim: 0.55
-    wlrNamespace: "vibranium:theme-picker"
+    wlrNamespace: "vibranium:modal"
     onCloseRequested: ThemePicker.close()
 
     Loader {

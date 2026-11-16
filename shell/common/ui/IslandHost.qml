@@ -102,6 +102,22 @@ LayerSurface {
   // and a reopen starts over at false.
   property bool _sizedForOpen: false
 
+  // Whether the card has been parked for the open in flight. A mapping surface
+  // spends its first frames at the default size (100x100), where the anchor
+  // cannot be mapped across windows yet, so positionCard() has nothing real to
+  // park against. The card used to paint at 0,0 for those frames - hidden by
+  // the fade-in and visible as a flick in the corner with animations off.
+  property bool _parked: false
+
+  // The island holds no claim (a visit's dim is meant to cover it rather than
+  // close it), so the registry's workspace dismissal does not reach it. Its
+  // surface is bound to the output like every other layer window, and without
+  // this the card stayed open over the next workspace's windows.
+  readonly property int workspaceId: Hyprland.focusedMonitor
+    && Hyprland.focusedMonitor.activeWorkspace
+    ? Hyprland.focusedMonitor.activeWorkspace.id : -1
+  onWorkspaceIdChanged: if (root.open) root.close()
+
   // Read-only: the instantiated content (null while closed).
   readonly property alias content: cardLoader.item
 
@@ -221,6 +237,12 @@ LayerSurface {
     // while already open keeps the latch: that content is already measured.
     if (reopening) root._sizedForOpen = false
     root.open = true
+    // Park before the surface maps. The first present is built from whatever
+    // the card's coordinates are at that moment, and the open-time park used to
+    // be deferred to the next turn: one frame of the card at the old spot. The
+    // anchor's bar window and the screen are both known while this surface is
+    // still unmapped, so the park needs no configure to be correct.
+    root.positionCard()
     root.requestPark()
   }
   function toggle(anchor, comp) {
@@ -313,6 +335,9 @@ LayerSurface {
   // across two handlers is not a style question - a second assignment to the
   // same signal handler is a load-time error for the whole type.
   onOpenChanged: {
+    // Opaque only once parked for THIS open: the park that ran while the host
+    // was closed belongs to the old anchor position.
+    root._parked = false
     if (root.open) {
       root.grabNavFocus()
       // The bar or its modules may have moved while the host was closed, so
@@ -399,7 +424,7 @@ LayerSurface {
       // body stays opaque). Card's default neutral stroke stays for
       // non-island consumers (OSD, TrayMenu).
       border.color: Ui.tint("accent", 1)
-      opacity: root.open ? 1 : 0
+      opacity: root.open && root._parked ? 1 : 0
       // No opacity tween on the close: the surface unmaps with the logical
       // close, so the compositor's layersOut fade is the whole close motion.
 
@@ -486,8 +511,18 @@ LayerSurface {
     const h = cardLoader.active && root.content
       ? root.content.islandContentHeight : root._frozenH(root._key)
     if (!(w > 0) || !(h > 0)) return
-    const screenW = root.width
-    const screenH = root.height
+    // The settle is the SCREEN's, not the surface's. A mapping surface is still
+    // at its 100x100 placeholder when the open-time park runs, so clamping
+    // against root.width put the card at the clamp's lower bound - the top-left
+    // corner - and the first present showed it there. The screen is known from
+    // the bar's window, which is mapped and stayed mapped.
+    // `screen` is a Quickshell screen info: the runtime object carries the
+    // QtQuick Screen members, qmllint's stub does not.
+    // qmllint disable missing-property
+    const screenW = root.screen ? root.screen.width : root.width
+    const screenH = root.screen ? root.screen.height : root.height
+    // qmllint enable missing-property
+    if (!(screenW > 100) || !(screenH > 100)) return
     const barH = barWin.height
     // Parallel axis (along the bar): center the card under the module. The
     // bar spans the screen width, so its content x maps straight to screen x.
@@ -501,6 +536,7 @@ LayerSurface {
     y = Range.clamp(y, root.margin, screenH - h - root.margin)
     cardItem.x = Math.round(x)
     cardItem.y = Math.round(y)
+    root._parked = true
     // Clearance for the notification pile: this park's target geometry (the
     // clamped x/y/w/h above, the footprint the card is actually parked at)
     // plus the showing flag. Plain data keyed by this window's screen, no-op when

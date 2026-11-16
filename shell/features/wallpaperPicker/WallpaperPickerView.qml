@@ -34,7 +34,7 @@ Variants {
     overlayOpen: WallpaperPicker.isOpen
     primary: modelData === Ui.primaryScreen
     dim: 0.55
-    wlrNamespace: "vibranium:wallpaper-picker"
+    wlrNamespace: "vibranium:modal"
     onCloseRequested: WallpaperPicker.close()
 
     Loader {

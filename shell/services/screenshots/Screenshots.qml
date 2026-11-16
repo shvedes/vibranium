@@ -269,7 +269,7 @@ Singleton {
     // region the surface is still the topmost pointer target in the
     // compositor for that interval and a click during it is swallowed.
     mask: Region { width: 0; height: 0 }
-    surface: "vibranium:screenshot"
+    surface: "vibranium:capture"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     screen: root._shotScreen
 
@@ -510,7 +510,11 @@ Singleton {
     root._flow = kind
     root._flowKeep = keepSurfaces === true
     if (!root._flowKeep) {
-      root._claimToken = SurfaceClaim.claim("screenshots", root._cancelActiveFlow, root)
+      // `keepOnWorkspace`: an annotation in progress is a document, not a
+      // menu, so a workspace switch must not throw the capture away. Every
+      // other claimant is dismissed by the switch.
+      root._claimToken = SurfaceClaim.claim("screenshots", root._cancelActiveFlow, root,
+        { keepOnWorkspace: true })
     }
     root._armClock()
     return root._activeFlow

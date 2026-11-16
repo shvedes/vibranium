@@ -200,7 +200,7 @@ hl.layer_rule({
 -- that samples pixels must not sample the editor's board.
 hl.layer_rule({
   name = "Vibranium Annotation Editor",
-  match = { namespace = "^vibranium:screenshot-annotate$" },
+  match = { namespace = "^vibranium:annotate$" },
   order = -1,
 })
 
@@ -212,8 +212,8 @@ hl.layer_rule({
 -- screenshot the selector itself asked for. It is dismissed rather than
 -- animated, so the surface has to leave the scene at the unmap.
 hl.layer_rule({
-  name = "Vibranium Screenshot Picker",
-  match = { namespace = "^vibranium:screenshot-picker$" },
+  name = "Vibranium Capture Target Picker",
+  match = { namespace = "^vibranium:capture-picker$" },
   no_anim = true,
 })
 
@@ -224,8 +224,8 @@ hl.layer_rule({
 -- is made of: the selector would end up inside the screenshot it asked for.
 -- Same rule and same reason as the picker above.
 hl.layer_rule({
-  name = "Vibranium Screenshot Region",
-  match = { namespace = "^vibranium:screenshot-region$" },
+  name = "Vibranium Capture Region",
+  match = { namespace = "^vibranium:capture-region$" },
   no_anim = true,
 })
 

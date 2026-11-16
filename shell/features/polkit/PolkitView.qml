@@ -78,7 +78,7 @@ Variants {
     // panels underneath must not move because a password dialog appeared. The
     // four anchors that fill the output, and the ignoring exclusion mode, come
     // from LayerSurface like they do for every other per-screen overlay.
-    surface: "vibranium:polkit"
+    surface: "vibranium:modal"
     // Exclusive on the primary alone. A second monitor gets OnDemand, so the
     // keyboard cannot be stolen from the card by a surface the user is not
     // looking at - which is also why `refocus()` below guards on `win.primary`.

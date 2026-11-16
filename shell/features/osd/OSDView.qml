@@ -30,7 +30,7 @@ LayerSurface {
 
   mask: Region { width: 0; height: 0 }
 
-  surface: "vibranium:osd"
+  surface: "vibranium:hud"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
   // Placement: one slot owns the box the card occupies. A side placement
@@ -42,12 +42,21 @@ LayerSurface {
   readonly property int margin: 12
   readonly property bool vertical: OSD.vertical
 
+  // Placement is in SCREEN coordinates. A mapping layer surface is still at its
+  // 100x100 placeholder, so an OSD centred on the surface lands in the
+  // top-left corner for the first frame - hidden by the fade, visible with
+  // animations off. The screen is known from the binding that chose it.
+  // qmllint disable missing-property
+  readonly property real screenW: win.screen ? win.screen.width : win.width
+  readonly property real screenH: win.screen ? win.screen.height : win.height
+  // qmllint enable missing-property
+
   Item {
     id: slot
     width: win.vertical ? card.height : card.width
     height: win.vertical ? card.width : card.height
-    readonly property real freeX: Math.max(0, win.width - slot.width)
-    readonly property real freeY: Math.max(0, win.height - slot.height)
+    readonly property real freeX: Math.max(0, win.screenW - slot.width)
+    readonly property real freeY: Math.max(0, win.screenH - slot.height)
     // Top/bottom: offset from that edge, horizontally centered. Left/right:
     // offset from that edge, vertically centered.
     readonly property real preferredX: OSD.position === "right"
@@ -65,7 +74,7 @@ LayerSurface {
       id: card
       // The card's width runs along the screen edge, so a side placement
       // caps it against the screen height instead of the width.
-      maxWidth: Math.max(0, (win.vertical ? win.height : win.width) - 2 * win.margin)
+      maxWidth: Math.max(0, (win.vertical ? win.screenH : win.screenW) - 2 * win.margin)
       // Right reads top-to-bottom, left bottom-to-top: the glyphs face the
       // edge they sit on. Rotation of the reading, not of the geometry.
       rotation: !win.vertical ? 0 : (OSD.position === "right" ? 90 : -90)

@@ -30,7 +30,7 @@ Variants {
     primary: modelData === Ui.primaryScreen
     dim: 0.45
 
-    wlrNamespace: "vibranium:clipboard"
+    wlrNamespace: "vibranium:modal"
 
     onCloseRequested: Clipboard.close()
 

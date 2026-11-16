@@ -128,7 +128,7 @@ LayerSurface {
   // random menu toggle did). Staying unmapped until the holes exist makes
   // the first map carry the correct region.
   visible: Bar.enabled && !Bar.hideToggle && (root.ownsGesture || root.idleRegion)
-  surface: "vibranium:bar-move"
+  surface: "vibranium:bar-drag"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
   mask: Region {
     x: 0
