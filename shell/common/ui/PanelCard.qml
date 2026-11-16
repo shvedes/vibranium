@@ -377,7 +377,18 @@ Rectangle {
   // the resting-buffer latches below, and they clear it there - QML allows one
   // handler per signal, so all four edges live together.
   onFitPendingChanged: {
-    if (root.fitPending) root._fitRecovering = false
+    if (root.fitPending) {
+      root._fitRecovering = false
+      return
+    }
+    // A committed fit is a measurement, and a measurement latches even when
+    // it repeats the value already held: a consumer writes exactListH and
+    // then clears this flag, so a fit that lands on the current number fires
+    // no change handler at all. Without this the latch show() cleared stays
+    // at -1 for the whole session, and the card sizes itself from the row
+    // model and the resting buffer instead of from the measurement - one
+    // frame of an over-estimated region on every row-set change.
+    root._latchRestingFit()
   }
 
   // The resting region: what the row set is worth with nothing open. An
