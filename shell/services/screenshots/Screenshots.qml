@@ -51,7 +51,10 @@ Singleton {
     const v = Settings.value("shell.screenshots.fileType")
     return v === "jpeg" ? "jpeg" : "png"
   }
-  readonly property bool saveToDisk: Settings.value("shell.screenshots.saveToDisk") !== false
+  // Auto-annotate owns the only write: its Save must produce a file, so the
+  // stored choice is ignored while it is on (the settings row is disabled).
+  readonly property bool saveToDisk: root.autoAnnotate
+    || Settings.value("shell.screenshots.saveToDisk") !== false
   readonly property bool showNotification: Settings.value("shell.screenshots.showNotification") !== false
   readonly property bool autoAnnotate: Settings.value("shell.screenshots.autoAnnotate") === true
   readonly property bool captureCursor: Settings.value("shell.screenshots.captureCursor") === true

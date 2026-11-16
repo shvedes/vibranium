@@ -16,7 +16,7 @@ Because nothing is dismissed, anything open is recorded. Leave the pass and clip
 
 Capture uses Quickshell screencopy for the frozen frame and Qt for PNG/JPEG encoding. ImageMagick performs the exact physical-pixel crop for selected regions, and `wl-copy` offers the finished image as a `text/uri-list` file URI. Region selection crops the same pre-overlay frame the user selected, including at fractional display scales.
 
-With **Save to disk** on, a screenshot without auto-annotate is saved to `~/Pictures/Screenshots` (respects `XDG_PICTURES_DIR`) and copied to the clipboard. With **Save to disk** off, it is kept only for the clipboard offer. With auto-annotate, no final file is created up front: Save writes to the screenshots folder only when disk saving is on. Cancelling drops it silently. **Save to disk** is listed under **Auto-annotate** in the settings, so it is only reachable there while auto-annotate is off; the value you set persists and keeps deciding the annotator's Save behavior when it is on.
+With **Save to disk** on, a screenshot without auto-annotate is saved to `~/Pictures/Screenshots` (respects `XDG_PICTURES_DIR`) and copied to the clipboard. With **Save to disk** off, it is kept only for the clipboard offer. With auto-annotate, no final file is created up front: Save always writes to the screenshots folder while auto-annotate is on, and the clipboard offer still applies. Cancelling drops it silently. **Save to disk** is listed under **Auto-annotate** in the settings and is disabled while auto-annotate is on; the stored choice applies again once auto-annotate is turned off.
 
 ## Settings
 
@@ -27,7 +27,7 @@ With **Save to disk** on, a screenshot without auto-annotate is saved to `~/Pict
 | File type | `jpeg` (default), `png` |
 | Notification | Notify when taking screenshots |
 | Auto-annotate | Open the annotation overlay after every capture (see below) |
-| Save to disk | On by default. Off = clipboard only. Listed under Auto-annotate, so it appears only while that is off |
+| Save to disk | On by default. Off = clipboard only. Listed under Auto-annotate and disabled while it is on, where Save always writes to the screenshots folder |
 | Capture cursor | Include the cursor in the image |
 
 JPEG quality and PPM are retired: the native encoder writes JPEG at its default quality, and no QML encoder writes PPM.

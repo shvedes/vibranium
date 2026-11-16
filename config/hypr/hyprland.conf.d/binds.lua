@@ -54,7 +54,7 @@ end
 -- SUPER + SHIFT + D: Cycle window layouts.
 hl.bind(mainMod .. " + SHIFT + D", cycle_layout, { description = "Cycle window layout" })
 
--- Or of you want to launch the terminal in a floating window.
+-- Or if you want to launch the terminal in a floating window.
 -- hl.bind(mainMod .. " + SHIFT + Return", hl.dsp.exec_raw("vb-launch-terminal --app-id=org.vb.term.float"), { description = "Open terminal (floating)" })
 
 -- Bind file manager to extra keys on the keyboard.

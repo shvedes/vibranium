@@ -220,14 +220,16 @@
                 "type": "bool",
                 "default": true,
                 "label": "Show icons",
-                "sub": "Show/hide app icons"
+                "sub": "Show/hide app icons",
+                "desc": "Show app icons in launcher results."
             },
             {
                 "key": "shell.launcher.showBadges",
                 "type": "bool",
                 "default": true,
                 "label": "Show PWA/TUI badges",
-                "sub": "Show/hide PWA & TUI badges"
+                "sub": "Show/hide PWA/TUI badges",
+                "desc": "Mark PWA and TUI entries with a badge."
             },
             {
                 "key": "shell.launcher.showDescriptions",
@@ -257,7 +259,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Auto-select",
-                "sub": "Auto-select remaining entry"
+                "sub": "Auto-select remaining entry",
+                "desc": "Select the remaining entry automatically."
             },
             {
                 "key": "shell.launcher.showClipboardSuggestion",
@@ -273,7 +276,7 @@
                 "default": false,
                 "label": "Focus first",
                 "sub": "Focus existing windows instead",
-                "desc": "Focus existing windows instad of opening new instances.",
+                "desc": "Focus existing windows instead of opening new instances.",
                 "warning": "Sometimes it can misbehave!"
             }
         ],
@@ -314,6 +317,11 @@
                 "id": "launcher-fx",
                 "type": "toggle",
                 "label": "Currency converter"
+            },
+            {
+                "id": "launcher-binary",
+                "type": "toggle",
+                "label": "Binary Launcher"
             },
             {
                 "id": "launcher-constants",
@@ -879,7 +887,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Verbose forecast",
-                "sub": "Per-day details"
+                "sub": "Per-day details",
+                "desc": "Show per-day details for each forecast day."
             }
         ]
     },
@@ -896,8 +905,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Heavy backlog warning",
-                "sub": "See description below",
-                "desc": "Show the warning message when accumulating many package updates."
+                "sub": "Warn on large update backlogs",
+                "desc": "Show a warning when many package updates have accumulated."
             }
         ]
     },
@@ -968,14 +977,14 @@
                 "key": "shell.volume.allowAboveHundred",
                 "type": "bool",
                 "default": false,
-                "label": "Vol above 100%",
+                "label": "Volume above 100%",
                 "sub": "Boost vol cap to 200%"
             },
             {
                 "key": "shell.volume.micAllowAboveHundred",
                 "type": "bool",
                 "default": false,
-                "label": "Mic above 100%",
+                "label": "Microphone above 100%",
                 "sub": "Boost mic cap to 200%"
             }
         ]
@@ -1025,7 +1034,7 @@
                 "default": true,
                 "label": "Save to disk",
                 "sub": "Save screenshots on disk",
-                "desc": "Whether to save screenshots on disk. Off = clipboard only.",
+                "desc": "Whether to save screenshots on disk. Off = clipboard only. Always on while auto-annotate is enabled.",
                 "showIf": [
                     {
                         "key": "shell.screenshots.autoAnnotate",
@@ -1206,7 +1215,7 @@
                 "type": "string",
                 "default": "medium",
                 "label": "Blur strength",
-                "sub": "Adjust blur strenght",
+                "sub": "Adjust blur strength",
                 "desc": "Background blur level.",
                 "values": [
                     "low",
@@ -4945,7 +4954,7 @@
             {
                 "type": "action",
                 "label": "Docker",
-                "sub": "Install & confiure Docker",
+                "sub": "Install & configure Docker",
                 "icon": "docker",
                 "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-docker"
             },
