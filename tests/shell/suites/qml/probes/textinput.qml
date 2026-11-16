@@ -180,6 +180,7 @@ Window {
     reportChips()
     reportPrefixes()
     reportEmacs()
+    reportPaste()
     reportAffordances()
     reportPasswordBox()
   }
@@ -646,6 +647,69 @@ Window {
     kv("emacs.unicode.text2", unicodeField.text)
     unicodeField.text = ""
     unicodeField.input.cursorPosition = 0
+  }
+
+  // ---- InputField: clipboard paste ------------------------------------
+
+  // A paste a panel routes while the caret is NOT live - the list-mode Ctrl-V
+  // every menu takes: the text lands at the end, commits through type() so the
+  // panel filters on the same edited() path as a keystroke, and the caret
+  // follows it so the next key extends the paste instead of replacing it.
+  function reportPaste() {
+    kv("paste.handler.pastableText", typeof plain.pastableText)
+    kv("paste.handler.pasteText", typeof plain.pasteText)
+
+    plain.text = ""
+    ifEditedCount = 0
+    kv("paste.ret", plain.pasteText([{ type: "text", raw: "pasted" }]))
+    kv("paste.text", plain.text)
+    kv("paste.caret", plain.input.cursorPosition)
+    kv("paste.edited.count", ifEditedCount)
+    kv("paste.edited.payload", ifEditedLast)
+
+    // A query that already holds characters is appended to, not replaced.
+    plain.text = "abc"
+    ifEditedCount = 0
+    kv("paste.append.ret", plain.pasteText([{ type: "text", raw: "def" }]))
+    kv("paste.append.text", plain.text)
+    kv("paste.append.caret", plain.input.cursorPosition)
+    kv("paste.append.edited.count", ifEditedCount)
+
+    // The query is one line, so a multi-line copy folds and its ends trim.
+    kv("paste.fold.text", plain.pastableText([{ type: "text", raw: "  one\ntwo\r\nthree  " }]))
+
+    // The two other flavors that carry text.
+    plain.text = ""
+    plain.pasteText([{ type: "url", raw: "https://example.com/a" }])
+    kv("paste.url.text", plain.text)
+    plain.text = ""
+    plain.pasteText([{ type: "network", raw: "smb://nas/media" }])
+    kv("paste.network.text", plain.text)
+
+    // Everything else is refused and the query is left untouched.
+    plain.text = "keep"
+    ifEditedCount = 0
+    kv("paste.image.ret", plain.pasteText([{ type: "image", raw: "binary" }]))
+    kv("paste.image.text", plain.text)
+    kv("paste.image.edited.count", ifEditedCount)
+    kv("paste.secret.ret", plain.pasteText([{ type: "secret", raw: "" }]))
+    kv("paste.emptyHistory.ret", plain.pasteText([]))
+    kv("paste.missingHistory.ret", plain.pasteText(undefined))
+    kv("paste.bareString.ret", plain.pasteText("text"))
+    kv("paste.blank.ret", plain.pasteText([{ type: "text", raw: "   " }]))
+    kv("paste.blank.text", plain.text)
+
+    // A pasted batch reaches the prefix pipeline the same way typing does, so
+    // a launcher mode switch survives a wholesale paste.
+    prefixed.text = ""
+    ifPrefixCount = 0
+    prefixed.pasteText([{ type: "text", raw: "> web query" }])
+    kv("paste.prefix.text", prefixed.text)
+    kv("paste.prefix.signalCount", ifPrefixCount)
+    kv("paste.prefix.last", ifPrefixLast)
+
+    plain.text = ""
+    prefixed.text = ""
   }
 
   // ---- InputField: right chrome and layout ----------------------------

@@ -340,10 +340,11 @@ Menu -> Settings -> App launcher.
 
 !!! tip
     Typing filters from the first key and ++ctrl+v++ pastes the clipboard
-    straight into the query. Only real text flavors are pasted; image
-    and binary payloads are ignored. Typing or pasting a path as the
-    query also offers it as a single **Open \<name\>** entry when
-    nothing else matches.
+    into the query and leaves the caret there, so typing continues the
+    pasted text instead of starting over. Only real text flavors are
+    pasted; image and binary payloads are ignored. Typing or pasting a
+    path as the query also offers it as a single **Open \<name\>** entry
+    when nothing else matches.
 
 ## Plugins
 

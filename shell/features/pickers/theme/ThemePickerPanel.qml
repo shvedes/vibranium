@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import qs.common
+import qs.features.clipboard
 import qs.features.pickers.theme
 
 // Theme picker overlay. A horizontal deck of theme cards, each card an
@@ -535,6 +536,15 @@ Item {
     const ctrl = event.modifiers & Qt.ControlModifier
     const alt = event.modifiers & Qt.AltModifier
     const open = panel._expanded && panel.family
+    // Ctrl-V pastes the clipboard into the query from the deck: the field's
+    // caret is not live until a keystroke starts the query, so the native
+    // paste never sees the key. The paste takes the caret afterwards, so the
+    // next keystroke extends it instead of replacing it.
+    if (k === Qt.Key_V && ctrl && (event.modifiers & Qt.MetaModifier) === 0) {
+      if (themeSearch.pasteText(Clipboard.history)) focusCtrl.grabFilter()
+      event.accepted = true
+      return
+    }
     if (k === Qt.Key_F && ctrl) {
       focusCtrl.grabFilter()
       event.accepted = true

@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
+import qs.features.clipboard
 import qs.features.pass
 import "Model.js" as Model
 import "../../common/text/StringUtils.js" as SU
@@ -1281,6 +1282,15 @@ PanelCard {
     // Every other key belongs to the field and is left to reach it.
     if (panel.editing) {
       if (k === Qt.Key_Tab || k === Qt.Key_Backtab) event.accepted = true
+      return
+    }
+
+    // Ctrl-V pastes the clipboard into the page filter from the list and takes
+    // the caret, so the next keystroke extends the pasted query. An open
+    // editor is the field's above, so its own paste is untouched.
+    if (k === Qt.Key_V && ctrl && !meta && !searchField.focused) {
+      if (searchField.pasteText(Clipboard.history)) focusCtrl.grabFilter()
+      event.accepted = true
       return
     }
 

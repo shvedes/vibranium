@@ -16,6 +16,16 @@ Press ++ctrl+alt+v++ (or the `Tools` key if your keyboard has one) and the Vibra
 !!! note
     In a VM, the **Setup** entry is hidden — none of those wizards make sense on virtual hardware.
 
+## Filtering and paste
+
+Type and the menu filters from the first key; ++ctrl+v++ pastes the
+clipboard into the filter from the list as well as from the field. The
+caret lands after the paste, so typing continues the pasted query
+instead of starting it over. Every Vibranium menu takes ++ctrl+v++ the
+same way - the menu, launcher, clipboard manager, password manager,
+power menu and theme picker - and only text flavors are pasted, so an
+image or a secret copy is ignored.
+
 ## Settings, submenu by submenu
 
 | Submenu | What you'll find |

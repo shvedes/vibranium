@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
+import qs.features.clipboard
 import qs.features.powerMenu
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
 
@@ -391,6 +392,13 @@ PanelCard {
     const k = event.key
     const ctrl = event.modifiers & Qt.ControlModifier
     const meta = event.modifiers & Qt.MetaModifier
+    // Ctrl-V pastes the clipboard into the filter from the list and takes the
+    // caret, so the next keystroke extends the pasted query.
+    if (k === Qt.Key_V && ctrl && !meta) {
+      if (searchField.pasteText(Clipboard.history)) focusCtrl.grabFilter()
+      event.accepted = true
+      return
+    }
     if (k === Qt.Key_F && ctrl) { focusCtrl.grabFilter(); event.accepted = true; return }
     switch (k) {
       case Qt.Key_Down:

@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
+import qs.features.clipboard
 import qs.features.menu
 import "MenuFit.js" as MenuFit
 import "MenuLib.js" as MenuLib
@@ -3752,6 +3753,22 @@ Rectangle {
   // write and focus grab is below - the table above it takes state, never
   // an item, so focus ownership stays entirely in this file.
   function handleKey(event) {
+    // Ctrl-V pastes the clipboard into the query from the list. The field has
+    // no caret there, so the native paste never sees the key; pasting lands
+    // through the field's own pipeline and then takes the caret, so the next
+    // keystroke extends the pasted query instead of replacing it.
+    if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)
+        && !(event.modifiers & Qt.MetaModifier)) {
+      // An open editor owns the key even when its own paste declined it (a
+      // validator refused the paste): routing it into the query would pull
+      // the filter's focus off the editor mid-edit - the same rule that makes
+      // a letter the editor refused a swallow rather than a query key.
+      const row = panel.currentRow()
+      if (row && row.editorOpen === true) { event.accepted = true; return }
+      if (panel.searchField.pasteText(Clipboard.history)) focusCtrl.grabFilter()
+      event.accepted = true
+      return
+    }
     const r = MenuLib.keyRoute(panel.keyRouteCtx(event))
     if (r === null) return
     const arg = r.arg

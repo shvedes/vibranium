@@ -167,6 +167,37 @@ Rectangle {
     input.focus = false
   }
 
+  // Text the newest clipboard entry offers this field. Only the real text
+  // flavors are pasted - an image, a file list or a secret holds no query
+  // text - and newlines fold to spaces because the query is one line.
+  function pastableText(history) {
+    if (!Array.isArray(history) || history.length === 0) return ""
+    const entry = history[0]
+    if (!entry) return ""
+    const kind = String(entry.type ?? "")
+    if (kind !== "text" && kind !== "url" && kind !== "network") return ""
+    return String(entry.raw ?? "").replace(/[\r\n]+/g, " ").trim()
+  }
+
+  // Paste into the query from a clipboard history (newest first). A panel
+  // routes the key here while the caret is NOT live - in list mode the deck
+  // holds the keyboard - so the text lands at the end, and the caller grabs
+  // the filter afterwards, which is what makes the next keystroke extend the
+  // query instead of replacing it. The text commits through type(), so the
+  // panel filters it on the same edited() path every keystroke uses. Returns
+  // false when the clipboard holds nothing pastable, leaving the text alone.
+  function pasteText(history) {
+    const clip = root.pastableText(history)
+    if (clip === "") return false
+    const focused = input.activeFocus
+    const caret = focused ? input.cursorPosition : input.text.length
+    const text = input.text
+    root.type(text.slice(0, caret) + clip + text.slice(caret))
+    input.cursorPosition = focused
+      ? Math.min(caret + clip.length, input.text.length) : input.text.length
+    return true
+  }
+
   // Unified text pipeline. When chip prefixes are configured, leading
   // prefix characters never become text - they flip into chip mode via
   // prefixEntered(); pasted batches like "> query" are stripped the same

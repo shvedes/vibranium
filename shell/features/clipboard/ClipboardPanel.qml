@@ -676,6 +676,18 @@ PanelCard {
       if (k === Qt.Key_K) { preview.scrollText(-40); event.accepted = true; return }
     }
 
+    // Ctrl-V pastes the clipboard into the query from the list, launcher
+    // parity: the paste lands through the field's pipeline and then takes the
+    // caret, so the next keystroke extends it instead of starting over.
+    if (k === Qt.Key_V && ctrl && !meta && focusCtrl.mode === "list"
+        && !searchField.focused) {
+      if (!panel.filterDead && searchField.pasteText(Clipboard.history)) {
+        focusCtrl.grabFilter()
+      }
+      event.accepted = true
+      return
+    }
+
     if (k === Qt.Key_P && ctrl && focusCtrl.mode === "list" && !searchField.focused) { panel.togglePinCurrent(); event.accepted = true; return }
 
     if ((k === Qt.Key_D && ctrl && focusCtrl.mode === "list" && !searchField.focused) || k === Qt.Key_Delete) {

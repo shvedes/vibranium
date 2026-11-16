@@ -808,24 +808,15 @@ PanelCard {
   function jumpEnd(last) { list.jumpEnd(last) }
 
   // Ctrl-V with an inactive search box: append the clipboard text to the
-  // query. No focus is stolen - the field stays unfocused, the query
-  // updates through AppLauncher.submit() and the list re-filters where it
-  // stands. Text comes from the resident Clipboard singleton (the same
-  // history the controller subscribes to) instead of a wl-paste child ->
-  // no spawn per paste; newlines collapse to spaces because the query is
-  // a single line.
+  // query and hand the caret to the field. Pasted text is a query the user
+  // means to keep editing, so leaving the list in charge would drop it on the
+  // next keystroke - that press types into a field the query never reached.
+  // Text comes from the resident Clipboard singleton (the same history the
+  // controller subscribes to) instead of a wl-paste child -> no spawn per
+  // paste; InputField owns the flavor rule and the single-line folding.
   function pasteIntoSearch() {
-    const hist = Clipboard.history
-    if (!hist || hist.length === 0) return
-    const entry = hist[0]
-    if (!entry) return
-    // Text-only paste -> image/file/secret rows never leak bytes into the
-    // query: only the text, url and network flavours are pasted.
-    const kind = String(entry.type ?? "")
-    if (kind !== "text" && kind !== "url" && kind !== "network") return
-    const clip = String(entry.raw ?? "").replace(/[\r\n]+/g, " ").trim()
-    if (clip === "") return
-    AppLauncher.submit(AppLauncher.entry + clip)
+    if (!searchField.pasteText(Clipboard.history)) return
+    focusCtrl.grabFilter()
   }
 
   function handleKey(event) {
@@ -834,8 +825,8 @@ PanelCard {
     const meta = event.modifiers & Qt.MetaModifier
 
     // Ctrl-V with an inactive search box: paste the clipboard into the
-    // query without stealing focus. With the field focused, TextInput's
-    // native paste consumes the key before it ever reaches here.
+    // query and take the caret. With the field focused, TextInput's native
+    // paste consumes the key before it ever reaches here.
     if (k === Qt.Key_V && ctrl && !meta && focusCtrl.mode === "list") {
       panel.pasteIntoSearch()
       event.accepted = true
