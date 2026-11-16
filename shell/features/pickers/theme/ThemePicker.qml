@@ -50,6 +50,16 @@ Singleton {
   property string _activeTheme: ""
   readonly property string activeFolder: root._activeTheme
 
+  // The folder this service last handed to the backend, held until the switch
+  // lands. activeFolder only moves once the backend has written theme.name,
+  // so a repeat of the same action inside that window - a click that lands
+  // before the closing overlay's input region is gone, a key repeat, or both
+  // accept routes of the search field - is not caught by the same-theme guard
+  // below and would queue a second vb-theme-set run that answers "already on"
+  // for a theme the user did pick. Cleared when theme.name moves, or when the
+  // child exits if the run produced no name write.
+  property string _applying: ""
+
   // --- active theme tracking via Watch governor (trio) ---
   property var _watchUnsub: null
 
@@ -92,6 +102,7 @@ Singleton {
       return
     }
     root._activeTheme = activeReader.text().trim().toLowerCase()
+    if (root._activeTheme === root._applying) root._applying = ""
   }
 
   // The theme name is accepted only as a single path segment below one of
@@ -130,7 +141,20 @@ Singleton {
       root.close()
       return "ok"
     }
-    Exec.run([Paths.vibraniumHome + "/bin/vb-theme-set", name])
+    // A repeat of the switch already in flight is one action arriving twice.
+    // The backend serialises applies, so the second run would wait for the
+    // first and then report "already on" the theme the user selected.
+    if (name.toLowerCase() === root._applying) {
+      root.close()
+      return "ok"
+    }
+    root._applying = name.toLowerCase()
+    const proc = Exec.run([Paths.vibraniumHome + "/bin/vb-theme-set", name])
+    if (proc) {
+      proc.exited.connect(() => {
+        if (root._applying === name.toLowerCase()) root._applying = ""
+      })
+    }
     // The state file is written by the backend, so the marker follows its
     // watcher rather than an optimistic stamp here.
     root.close()

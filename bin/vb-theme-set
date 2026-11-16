@@ -280,6 +280,26 @@ apply_theme() {
   local chosen="$1"
   local folder_name="$2"
 
+  # One writer at a time. Every apply stages into the same cache tree and
+  # commits the same state directory, so two overlapping picks - a second
+  # theme selected while the first is still copying wallpapers, or the
+  # fallback from vb-theme-remove - would delete each other's staging tree:
+  # the slower run's mv then fails after it has already moved the live theme
+  # aside, leaving no $VIBRANIUM_STATE/theme for Hyprland to source. The wait
+  # is deliberate rather than -n: a queued apply is the user's latest choice,
+  # so it must run once the current one finishes. The lock is released when
+  # this process exits.
+  mkdir -p "$VIBRANIUM_RUNTIME"
+  exec 9> "$VIBRANIUM_RUNTIME/$SELF.lock" || {
+    log Error "cannot open lock file $VIBRANIUM_RUNTIME/$SELF.lock"
+    exit 1
+  }
+  if ! flock -w 60 9; then
+    log Error "another theme change is still running"
+    notify-send -r 4 -a "Vibranium" "Theme Selector" "Another theme change is still running"
+    exit 1
+  fi
+
   # Resolve the base source path: user-only themes copy from USER_THEMES_PATH;
   # official themes (with or without a user overlay) copy from VIBRANIUM/themes.
   local source_label="${THEME_SOURCE[$folder_name]:-official}"
@@ -304,8 +324,9 @@ apply_theme() {
     exit 1
   fi
 
-  # Build the replacement under NEXT_THEME_PATH. The rm+mv commit removes the
-  # current directory first and therefore has a visibility gap.
+  # Build the replacement under NEXT_THEME_PATH. The commit below renames the
+  # live tree aside rather than deleting it, so a failed install can be
+  # rolled back.
   rm -rf "$NEXT_THEME_PATH"
   mkdir -p "$NEXT_THEME_PATH" "$NEXT_THEME_PATH/backgrounds" "$CURRENT_THEME_PATH"
 
@@ -356,10 +377,23 @@ apply_theme() {
   # Create missing config files from templates
   vb-theme-set-templates
 
-  # Commit the fully built staging directory. Removing the current directory
-  # first creates a short visibility gap; the subsequent rename installs it.
-  rm -rf "$CURRENT_THEME_PATH"
-  mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
+  # Commit the fully built staging directory. The live theme is renamed aside
+  # first, so a failed install puts it back instead of leaving the compositor
+  # to source a directory that is not there.
+  local previous_path="$VIBRANIUM_CACHE/previous-theme"
+  rm -rf "$previous_path"
+  if [[ -d $CURRENT_THEME_PATH ]]; then
+    mv "$CURRENT_THEME_PATH" "$previous_path"
+  fi
+  if ! mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"; then
+    log Error "could not commit $NEXT_THEME_PATH to $CURRENT_THEME_PATH"
+    if [[ -d $previous_path ]]; then
+      mv "$previous_path" "$CURRENT_THEME_PATH"
+    fi
+    notify-send -r 4 -a "Vibranium" "Theme Selector" "Theme change failed: could not commit files"
+    exit 1
+  fi
+  rm -rf "$previous_path"
 
   # The wallpaper watcher receives theme.name through Watch.subscribe. Writing
   # the name once the new backgrounds tree is in place orders the event after
