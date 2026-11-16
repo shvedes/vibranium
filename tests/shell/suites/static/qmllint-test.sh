@@ -28,7 +28,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 253 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 254 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
@@ -132,8 +132,8 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   word of it is then read as a category name. The sentence that documents this
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
-RECORDED_FILE_COUNT=253
-RECORDED_WARNING_COUNT=104
+RECORDED_FILE_COUNT=254
+RECORDED_WARNING_COUNT=103
 RECORDED_INFO_COUNT=23
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
@@ -157,15 +157,16 @@ PanelWindow"
 # properties were read through `root.` (isSecret, isMedia, mi, phTitle and the
 # rest); what is left there is the delegate's injected `modelData`/`index`,
 # which must stay unqualified, plus the same shape in the bar islands.
-# The `uncreatable-type` figure fell by one when the fullscreen lyrics surface
-# became a plain `Window`: that file's `PanelWindow` was one of the
-# `Type PanelWindow is not creatable` diagnostics, and the file no longer
-# declares one. The unresolved-type set is unchanged, because the type still
-# appears in the files that do.
+# The `uncreatable-type` figure is one: the single `PanelWindow {` in the tree
+# is the shared `common/ui/LayerSurface.qml` veneer every surface is built on,
+# and it is the only declaration without a `qmllint disable uncreatable-type`
+# line. The per-surface files no longer open a PanelWindow of their own, so the
+# diagnostic moved out of them and into the one file that must reopen it. The
+# unresolved-type set is unchanged, because the type still appears there.
 RECORDED_WARNING_KINDS="confusing-expression-statement 4
 eval 1
 missing-property 52
-uncreatable-type 2
+uncreatable-type 1
 unqualified 40
 unresolved-type 5"
 
@@ -328,7 +329,7 @@ t_note "the recorded warning total is $RECORDED_WARNING_COUNT and the per-kind b
 t_section "the unresolved types are only Quickshell C++ types"
 UNRESOLVED_LINES="$(grep -E '\[(unresolved-type|uncreatable-type)\]$' "$LINT_OUT" || true)"
 UNRESOLVED_COUNT="$(printf '%s\n' "$UNRESOLVED_LINES" | grep -c . || true)"
-t_count "the unresolved/uncreatable count" "7" "$UNRESOLVED_COUNT"
+t_count "the unresolved/uncreatable count" "6" "$UNRESOLVED_COUNT"
 
 # The names, from two different shapes of diagnostic:
 #   Property "adapter" has incomplete type "FileViewAdapter" ...

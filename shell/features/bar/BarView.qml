@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable uncreatable-type missing-property
 import QtQuick
-import Quickshell
 import Quickshell.Wayland
 import qs.common
 import qs.features.bar
@@ -28,7 +27,7 @@ import "../../common/text/DropPayload.js" as DropPayload
 // The window never closes while the shell runs: disabled state only
 // unmaps it (and releases the exclusive zone) so a toggle over IPC can
 // bring it back instantly.
-PanelWindow {
+LayerSurface {
   id: win
 
   property string moveRegistrationKey: ""
@@ -138,7 +137,7 @@ PanelWindow {
   // travel with the boot entrance slide. A surface color is painted by the
   // window itself and cannot move, and it would leave the strip on screen
   // while the contents slid in.
-  color: "transparent"
+  surface: "vibranium:bar"
   // exclusiveZone implies ExclusionMode.Normal (reserves space for tiled
   // windows); an explicit Ignore would let windows slide under the bar.
   // A transient IPC-only hide (hideToggle) releases the zone like a
@@ -152,8 +151,6 @@ PanelWindow {
   }
   implicitHeight: Bar.height
 
-  WlrLayershell.layer: WlrLayer.Bottom
-  WlrLayershell.namespace: "vibranium:bar"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
   // Uniform inset between the zones and every window edge. Zones anchor to

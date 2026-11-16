@@ -1199,9 +1199,10 @@ t_eq "the runtime instantiation produced no object" "null" "$(qp_get scrim.objec
 t_eq "the engine reports the type as unavailable" "true" "$(qp_get scrim.err.typeUnavailable)"
 t_eq "and names the reason" "true" "$(qp_get scrim.err.panelWindowBackend)"
 t_eq "it got as far as the component's own file" "true" "$(qp_get scrim.err.reachedSourceFile)"
-t_eq "at the line its PanelWindow base is declared" "true" "$(qp_get scrim.err.hasLineNumber)"
+t_eq "at the line its layer-surface base is declared" "true" "$(qp_get scrim.err.hasLineNumber)"
+t_eq "with the shared veneer as the cause that reaches the backend" "true" "$(qp_get scrim.err.layerSurfaceCause)"
 t_eq "so this is not a missing module or a bad qmldir" "false" "$(qp_get scrim.err.moduleMissing)"
-t_note "ScrimWindow.qml:10 declares a PanelWindow as its base type. Under QT_QPA_PLATFORM=offscreen there is no PanelWindow backend, so the whole type is unresolvable - and because that happens at component-compile time, a probe that merely MENTIONS ScrimWindow never loads at all. The probe therefore instantiates it through Qt.createQmlObject at runtime, which is the only way to turn the failure into data. The error text is: 'Type ScrimWindow unavailable / caused by qs:@/qs/common/ui/ScrimWindow.qml:10:1: No PanelWindow backend loaded.'"
+t_note "ScrimWindow is built on LayerSurface, and LayerSurface is the one declaration in the tree that opens a PanelWindow. Under QT_QPA_PLATFORM=offscreen no PanelWindow backend exists, so the chain fails at component-compile time: 'Type ScrimWindow unavailable' names ScrimWindow's own file and the line its base is declared on, with common/ui/LayerSurface.qml as the nested cause ('No PanelWindow backend loaded'). The probe instantiates through Qt.createQmlObject because a probe that merely MENTIONS the type never loads at all."
 t_skip "ScrimWindow's derived state: dim, overlayOpen fade, isPrimary click gate" "PanelWindow has no backend under offscreen; the type cannot be constructed at all, so none of its bindings can be evaluated here"
 t_skip "ScrimWindow's exclusionMode, exclusiveZone and four-way anchoring" "same reason - the anchored PanelWindow properties only exist on a live layer surface"
 

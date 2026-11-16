@@ -565,10 +565,11 @@ ShellRoot {
     let grab = 0
     let inGrab = false
     let inVisibilityHandler = false
+    let droppingKeyboard = false
     let depth = 0
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i]
-      if (/^PanelWindow \{$/.test(l)) {
+      if (/^(PanelWindow|LayerSurface) \{$/.test(l)) {
         kept.push("Item {")
         continue
       }
@@ -598,12 +599,21 @@ ShellRoot {
         if (depth <= 0) inVisibilityHandler = false
         continue
       }
-      if (/^  (screen|color|exclusionMode|exclusiveZone):/.test(l)
+      if (/^  (screen|color|exclusionMode|exclusiveZone|surface):/.test(l)
         || /^  anchors\.(top|bottom|left|right):/.test(l)
         || /^  WlrLayershell\./.test(l)) {
         dropped.push(l.trim())
+        droppingKeyboard = /^  WlrLayershell\.keyboardFocus:/.test(l)
         continue
       }
+      // A property whose value continues on the next line leaves those lines
+      // behind when its first line is dropped: `keyboardFocus` is a ternary
+      // written over two lines.
+      if (droppingKeyboard && /^\s+[?:]\s/.test(l)) {
+        dropped.push(l.trim())
+        continue
+      }
+      droppingKeyboard = false
       kept.push(l)
     }
     // A QML object created with Qt.createQmlObject resolves its imports
@@ -654,6 +664,7 @@ ShellRoot {
     kv("hl.sourceStatus", root.hostSourceStatus)
     kv("hl.sourceLen", root.hostSource.length)
     kv("hl.sourceIsPanelWindow", /^PanelWindow \{/m.test(root.hostSource))
+    kv("hl.sourceIsLayerSurface", /^LayerSurface \{/m.test(root.hostSource))
     kv("hl.rootTypeIsItem", /^Item \{/m.test(root.hostText))
     kv("hl.droppedCount", root.dropCount)
     kv("hl.droppedLines", root.droppedLines)
@@ -663,7 +674,7 @@ ShellRoot {
     kv("hl.keepsCard", root.hostText.indexOf('objectName: "islandCard"') >= 0)
     kv("hl.keepsSaveCall", root.hostText.indexOf("FP.save(root._footprint, root._key, w, h)") >= 0)
     kv("hl.keepsCapacityBind", root.hostText.indexOf("FP.create(root.frozenCapacity)") >= 0)
-    kv("hl.keepsVisible", root.hostText.indexOf("visible: root.open || cardItem.opacity > 0") >= 0)
+    kv("hl.keepsVisible", root.hostText.indexOf("visible: root.open") >= 0)
     kv("hl.keepsPositionCard", root.hostText.indexOf("function positionCard()") >= 0)
     kv("hl.keepsKeyFor", root.hostText.indexOf("function _keyFor(anchor)") >= 0)
     kv("hl.relativeImportsRerooted", root.relativeImportsRerooted)

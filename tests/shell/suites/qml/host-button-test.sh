@@ -66,9 +66,9 @@ t_section "the headless rewrite is the component, minus its window surface"
 # rewrite: if the file grows a new window-only line, the count changes and the
 # suite says so instead of testing a stale rewrite.
 t_eq "the source was read whole" "200" "$(qp_get hl.sourceStatus)"
-t_eq "the real component's root type is what the rewrite keys on" "true" "$(qp_get hl.sourceIsPanelWindow)"
+t_eq "the real component's root type is what the rewrite keys on" "true" "$(qp_get hl.sourceIsLayerSurface)"
 t_eq "and the rewritten root is a constructible Item" "true" "$(qp_get hl.rootTypeIsItem)"
-t_eq "window-only properties and the full visibility handler were removed" "16" "$(qp_get hl.droppedCount)"
+t_eq "window-only properties and the full visibility handler were removed" "8" "$(qp_get hl.droppedCount)"
 t_eq "the whole HyprlandFocusGrab block was removed" "5" "$(qp_get hl.grabLines)"
 t_eq "both relative script imports were re-rooted" "2" "$(qp_get hl.relativeImportsRerooted)"
 t_contains "FrozenFootprint at the config root" \
@@ -78,12 +78,12 @@ t_contains "and Range at the config root" \
 t_eq "the focus grab is gone from the evaluated text" "true" "$(qp_get hl.dropsGrab)"
 t_eq "so is every layershell line" "true" "$(qp_get hl.dropsLayershell)"
 t_contains "including the screen binding" "screen: root.anchorScreen()" "$(qp_get hl.droppedLines)"
-t_contains "including the layershell layer" "WlrLayershell.layer: WlrLayer.Top" "$(qp_get hl.droppedLines)"
-t_contains "including the exclusive zone" "exclusiveZone: -1" "$(qp_get hl.droppedLines)"
+t_contains "including the registry key" 'surface: "vibranium:island"' "$(qp_get hl.droppedLines)"
+t_contains "including the keyboard mode" "WlrLayershell.keyboardFocus: root.open" "$(qp_get hl.droppedLines)"
 t_contains "including the PanelWindow signal handler" "onBackingWindowVisibleChanged:" "$(qp_get hl.droppedLines)"
 # The other half of the contract: everything the assertions are about survived.
 PUBLIC_SURFACE+="_frozenH,_frozenW,_keyFor,_navBlocked,_navTarget,_saveFrozen,"
-PUBLIC_SURFACE+="anchorScreen,beginFocusPrime,close,diagnostics,grabNavFocus,grabWindows,"
+PUBLIC_SURFACE+="anchorScreen,close,diagnostics,grabNavFocus,grabWindows,"
 PUBLIC_SURFACE+="isOpenFor,onIslandContentHeightChanged,onIslandContentWidthChanged,"
 PUBLIC_SURFACE+="positionCard,requestPark,show,toggle"
 t_eq "the public surface is intact" "$PUBLIC_SURFACE" "$(qp_get hl.functions)"
@@ -216,9 +216,9 @@ qp_assert "positionCard is a no-op without an anchor" "ih.nullAnchor.cardXUnchan
 
 # ---------------------------------------------------------------------------
 t_section "the frozen footprint: a closed host keeps the size its content had"
-qp_assert "the content is destroyed once the fade lands" "ih.settle.t32.content" "null"
-qp_assert "it is still there one turn before that" "ih.settle.t31.content" "live"
-qp_assert "which is what the close fade is for" "ih.close.contentStillLive" "live"
+qp_assert "the content is destroyed with the close" "ih.settle.t32.content" "null"
+qp_assert "not one turn after it" "ih.settle.t31.content" "null"
+qp_assert "because the close leaves nothing staged" "ih.close.contentStillLive" "null"
 qp_assert "the opacity reaches zero" "ih.closed.opacity" "0"
 qp_assert "content is null while closed" "ih.closed.content" "null"
 qp_assert "and diagnostics agrees" "ih.closed.contentLive" "false"
@@ -378,10 +378,11 @@ qp_assert "the width never moved" "ih.resize.t17.widthUnchanged" "300"
 qp_assert "the card reaches the declared size" "ih.resize.settledExact" "true"
 t_eq "which is the live height" "400" "$(qp_get ih.resize.settledValue)"
 qp_assert "and the frozen width never changed" "ih.resize.landedFrozenW" "300"
-# The fade: opacity and height both run, and the no-motion control on the same
-# turns is already at its final size.
+# The open: the card is opaque on its first sampled turn, because the surface
+# unmaps on close and the open has nothing to fade against; only the height
+# tween runs.
 if [[ $MOTION_ENABLED == "true" ]]; then
-  qp_assert "the card is fading in" "ih.fade.t5.opacityStrict" "true"
+  qp_assert "the card is opaque on its first sampled turn" "ih.fade.t5.opacity" "1"
   qp_assert "while the height is already the content's" "ih.fade.t5.height" "140"
   qp_assert "with no intermediate height on that turn" "ih.fade.t5.heightStrict" "false"
   qp_assert "one turn later it is still final" "ih.fade.t6.heightStrict" "false"
@@ -408,13 +409,11 @@ qp_assert "the footprint agrees while open" "ih.settled.frozenH" "140"
 qp_assert "in width" "ih.settled.frozenW" "300"
 qp_assert "one entry, live content" "ih.settled.contentLive" "true"
 qp_assert "and one footprint" "ih.settled.count" "1"
-# The close fade, sampled: content outlives the close through it when motion is enabled.
-if [[ $MOTION_ENABLED == "true" ]]; then
-  qp_assert "the fade is still running five turns after the close" "ih.settle.t29.opacityStrict" "true"
-  gt "the opacity is descending" "$(qp_get ih.settle.t27.opacity)" "$(qp_get ih.settle.t31.opacity)"
-else
-  t_skip "IslandHost close fade samples" "MotionPolicy.enabled is false, so close snaps opacity to zero"
-fi
+# The close, sampled: the host unmap is the whole close motion, so the card is
+# already at its closed opacity and never holds a value a compositor would not
+# paint.
+qp_assert "the close snaps the card instead of fading it" "ih.settle.t29.opacity" "0"
+qp_assert "and never leaves an opacity between the two" "ih.settle.t29.opacityStrict" "false"
 qp_assert "the card is still the content's size" "ih.settle.t31.cardWidth" "300"
 t_eq "landing on zero" "0" "$(qp_get ih.settle.t32.opacity)"
 t_eq "and the content is gone on that same turn" "null" "$(qp_get ih.settle.t32.content)"

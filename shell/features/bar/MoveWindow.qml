@@ -33,7 +33,7 @@ import "../../common/text/DropPayload.js" as DropPayload
 // The same hit-test precedence makes this surface the drop target for the
 // strip's gaps: a drag landing there arrives here and never reaches the bar
 // window, whose own DropArea only serves the zone rects the region subtracts.
-PanelWindow {
+LayerSurface {
   id: root
 
   required property ShellScreen winScreen
@@ -128,18 +128,7 @@ PanelWindow {
   // random menu toggle did). Staying unmapped until the holes exist makes
   // the first map carry the correct region.
   visible: Bar.enabled && !Bar.hideToggle && (root.ownsGesture || root.idleRegion)
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors {
-    top: true
-    bottom: true
-    left: true
-    right: true
-  }
-
-  WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.namespace: "vibranium:bar-move"
+  surface: "vibranium:bar-move"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
   mask: Region {
     x: 0

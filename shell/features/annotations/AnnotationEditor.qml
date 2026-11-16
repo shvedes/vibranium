@@ -32,7 +32,7 @@ import "../../common/math/Range.js" as Range
 // stroke replay, view rect, probes, board I/O), Toolbar (tool row,
 // palette, handles, tool buttons), Crop (crop frame/rect, staged crop,
 // apply). Strokes paint above the board image line, chrome below it.
-PanelWindow {
+LayerSurface {
   id: editor
 
   required property string shotPath
@@ -330,17 +330,12 @@ PanelWindow {
   }
 
   color: Ui.solid("background_0")
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
-
-  WlrLayershell.namespace: "vibranium:screenshot-annotate"
-  WlrLayershell.layer: WlrLayer.Overlay
-  // Modal: hotkeys must land regardless of prior focus.
-  WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+  surface: "vibranium:screenshot-annotate"
+  // Modal: hotkeys must land regardless of prior focus, and the grab is
+  // released when the editor is not mapped - a grab with no release branch
+  // outlives the surface it was granted to.
+  WlrLayershell.keyboardFocus: editor.visible
+    ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
   // Cumulative document rotation in degrees. Never wrapped modulo 360 -
   // trig is periodic regardless, and wrapping would make _rotAnim's

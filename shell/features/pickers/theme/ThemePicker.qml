@@ -46,6 +46,8 @@ Singleton {
   property var rows: []
   property bool visible: false
   readonly property bool isOpen: root.visible
+  // The surface claim this visit holds while it is up, null when closed.
+  property var _claimToken: null
 
   property string _activeTheme: ""
   readonly property string activeFolder: root._activeTheme
@@ -497,10 +499,13 @@ Singleton {
 
   function open() {
     if (root.visible) return "ok"
-    // The overlay is a visit of its own; a menu that summoned it goes away
-    // rather than sitting dimmed behind the deck.
-    Registry.call("menu", "close")
+    // A visit of its own. The surface claim is the primitive every full-screen
+    // visit in this shell shares: taking it runs the current holder's closer,
+    // so a menu, the launcher or the other picker goes away instead of sitting
+    // under the deck. Taken after the surface is visible, because the closer a
+    // claim stores for a later displacement must have something to put away.
     root.visible = true
+    root._claimToken = SurfaceClaim.claim("themePicker", root.close, root)
     if (root._cached !== null) {
       root.rows = root._buildRows(root._cached)
       // The themes roots are external state: a folder added/removed while
@@ -532,7 +537,10 @@ Singleton {
 
   function close() {
     if (root.visible) root.visible = false
-    Registry.call("menu", "close")
+    if (root._claimToken !== null) {
+      SurfaceClaim.release(root._claimToken)
+      root._claimToken = null
+    }
     return "ok"
   }
   function toggle() {

@@ -174,11 +174,34 @@ hl.layer_rule({
   name = "Vibranium Notifications",
   match = { namespace = "^vibranium:notifications$" },
   no_anim = true,
-  -- One step below the modal overlays, which sit at the default order. The
-  -- pile shares their layer now, and `order` counts DOWN (the lowest value is
-  -- on top), so 1 puts an open menu over the cards without depending on which
-  -- surface mapped last.
+  -- Two steps below the modal overlays, which sit at the default order. The
+  -- pile shares their layer, and `order` counts DOWN (the lowest value is on
+  -- top), so 2 puts an open menu and an open island over the cards without
+  -- depending on which surface mapped last.
+  order = 2,
+})
+
+-- The island shares the Overlay layer with the modal menus and the pile. Its
+-- explicit order puts it under a menu (0) and over the pile (2): a menu's dim
+-- covers an open island instead of the island floating over the dim, and a
+-- notification card cannot land on top of the island's card. It sits on
+-- Overlay rather than Top because the compositor fades the whole Top layer
+-- when a window goes fullscreen, which would take an open island with it.
+hl.layer_rule({
+  name = "Vibranium Island",
+  match = { namespace = "^vibranium:island$" },
   order = 1,
+})
+
+-- The annotation editor is the one visit overlay allowed to share the screen
+-- with another: it is the last step of a capture the user asked for, so it
+-- draws above the menus, the pickers and the ambient surfaces rather than
+-- closing them. The color pick keeps -2, one step above it, because a pick
+-- that samples pixels must not sample the editor's board.
+hl.layer_rule({
+  name = "Vibranium Annotation Editor",
+  match = { namespace = "^vibranium:screenshot-annotate$" },
+  order = -1,
 })
 
 -- The screenshot target picker is a fullscreen dim layer, and the frame the

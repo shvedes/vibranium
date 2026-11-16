@@ -1,13 +1,16 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import Quickshell
 import qs.common
 
-// Shared scrim window - common PanelWindow chrome for menu, launcher,
-// power, clipboard, wallpaper picker and pass. Keeps anchors, transparent color
-// and close-fade in one place so every overlay shares the same dim timing.
-PanelWindow {
+// Shared scrim window - the common layer surface for menu, launcher, power,
+// clipboard, wallpaper picker and pass. The anchors, the ignoring exclusion
+// mode and the transparent color come from LayerSurface; the close-fade and the
+// dim live here, so every overlay shares one timing.
+//
+// It declares no namespace and no layer of its own: OverlayWindow sets both for
+// the whole family through `surface`, which is the registry key.
+LayerSurface {
   id: root
 
   property real dim: 0.45
@@ -18,14 +21,6 @@ PanelWindow {
   property bool animationsEnabled: true
 
   signal closeRequested()
-
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
 
   default property alias content: container.data
 

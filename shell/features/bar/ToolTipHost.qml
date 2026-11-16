@@ -25,7 +25,7 @@ import "../../common/math/Range.js" as Range
 // change; the tray pushes imperatively through show/hide/cancel. Highest
 // activation serial wins. Hidden always pays the hover delay; a winner
 // change while shown swaps instantly with no re-delay.
-PanelWindow {
+LayerSurface {
   id: root
 
   // Where the bar sits: "top" parks the bubble below it, "bottom" above.
@@ -253,13 +253,6 @@ PanelWindow {
   visible: root._show && root._req !== null
     && (root._req.text !== "" || (root._req.lines && root._req.lines.length > 0))
     && !root.dragModeActive
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
 
   // A passive bubble must never eat input: the window is full-screen
   // transparent, so without a mask its default clickable region would be
@@ -268,8 +261,7 @@ PanelWindow {
   // makes every click pass through to the window beneath.
   mask: Region { width: 0; height: 0 }
 
-  WlrLayershell.namespace: "vibranium:tooltip"
-  WlrLayershell.layer: WlrLayer.Overlay
+  surface: "vibranium:tooltip"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
   Rectangle {

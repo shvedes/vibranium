@@ -190,42 +190,33 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 112 of the 252 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 126 of the 253 declared types, and every one of them
 # through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
 # constructed - cannot be built at all. That is one environmental
 # fact with a long reach, not 125 separate problems, and the reason string each
 # type carries says so.
-EXPECTED_UNCREATABLE="qs.common.IslandHost
-qs.common.ScrimWindow
-qs.features.annotations.AnnotationEditor
-qs.features.annotations.AnnotationOverlay
-qs.features.annotations.CapturePicker
-qs.features.bar.BarView
-qs.features.bar.MoveWindow
-qs.features.bar.PrivacyOverlay
-qs.features.bar.ToolTipHost
-qs.features.bar.modules.ColorPicker.ColorPickerOverlay
-qs.features.bar.modules.NowPlaying.LyricsFullscreenOverlay
-qs.features.bar.modules.Tray.TrayMenu
+EXPECTED_UNCREATABLE="qs.common.LayerSurface
 qs.features.clipboard.ClipboardView
 qs.features.launcher.AppLauncherView
 qs.features.lock.LockscreenSurfaceView
 qs.features.menu.MenuView
-qs.features.notifications.NotificationsView
-qs.features.osd.OSDView
 qs.features.pickers.theme.ThemePickerView
 qs.features.polkit.PolkitView
 qs.features.powerMenu.PowerMenuView
-qs.features.wallpaper.WallpaperView
 qs.features.wallpaperPicker.WallpaperPickerView"
 
 EXPECTED_NEEDS_ENVIRONMENT="qs.boot.BootBar
 qs.boot.BootLate
 qs.boot.BootServices
+qs.common.IslandHost
 qs.common.OverlayWindow
+qs.common.ScrimWindow
 qs.features.annotations.AnnotationController
+qs.features.annotations.AnnotationEditor
+qs.features.annotations.AnnotationOverlay
+qs.features.annotations.CapturePicker
 qs.features.apps.audioMixer.AudioMixer
 qs.features.apps.audioMixer.AudioMixerController
 qs.features.apps.audioMixer.AudioMixerWindow
@@ -244,14 +235,19 @@ qs.features.apps.imageViewer.ImageViewerWindow
 qs.features.bar.Bar
 qs.features.bar.BarModule
 qs.features.bar.BarPill
+qs.features.bar.BarView
 qs.features.bar.CollapsibleSlot
 qs.features.bar.Group
+qs.features.bar.MoveWindow
+qs.features.bar.PrivacyOverlay
 qs.features.bar.RevealFlash
 qs.features.bar.SectionLabel
 qs.features.bar.ToolTipBind
+qs.features.bar.ToolTipHost
 qs.features.bar.Zone
 qs.features.bar.modules.ArchUpdates.ArchUpdates
 qs.features.bar.modules.ColorPicker.ColorPicker
+qs.features.bar.modules.ColorPicker.ColorPickerOverlay
 qs.features.bar.modules.KeyboardLayout.KeyboardLayout
 qs.features.bar.modules.Logout.Logout
 qs.features.bar.modules.Network.Network
@@ -264,6 +260,7 @@ qs.features.bar.modules.Printers.Printers
 qs.features.bar.modules.Printers.PrintersIsland
 qs.features.bar.modules.Privacy.Privacy
 qs.features.bar.modules.Tray.Tray
+qs.features.bar.modules.Tray.TrayMenu
 qs.features.bar.modules.Volume.Volume
 qs.features.bar.modules.Volume.VolumeIsland
 qs.features.bar.modules.Weather.Weather
@@ -292,8 +289,10 @@ qs.features.menu.RowGeometry
 qs.features.notifications.NotificationCard
 qs.features.notifications.NotificationEntry
 qs.features.notifications.Notifications
+qs.features.notifications.NotificationsView
 qs.features.osd.OSD
 qs.features.osd.OSDCard
+qs.features.osd.OSDView
 qs.features.pass.Pass
 qs.features.pass.PassController
 qs.features.pass.PassEntry
@@ -310,6 +309,7 @@ qs.features.polkit.Polkit
 qs.features.powerMenu.PowerMenu
 qs.features.powerMenu.PowerMenuPanel
 qs.features.wallpaper.Wallpaper
+qs.features.wallpaper.WallpaperView
 qs.features.wallpaperPicker.WallpaperEntry
 qs.features.wallpaperPicker.WallpaperPicker
 qs.features.wallpaperPicker.WallpaperPickerPanel
@@ -357,7 +357,7 @@ supplied.qs.common.LyricsPane=player: null"
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=252
+EXPECTED_DECLARED_COUNT=253
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -378,9 +378,9 @@ EXPECTED_DECLARED_COUNT=252
 # radial gradient, with no singleton and no window behind it.
 # qs.common.HiddenWallpapers is clean for the same reason: a FileView and a
 # JsonAdapter over one state file, with no window and no environment.
-EXPECTED_CLEAN_COUNT=116
-EXPECTED_NEEDS_COUNT=112
-EXPECTED_UNCREATABLE_COUNT=23
+EXPECTED_CLEAN_COUNT=117
+EXPECTED_NEEDS_COUNT=126
+EXPECTED_UNCREATABLE_COUNT=9
 
 # --------------------------------------------------------------------------
 # the generated case list

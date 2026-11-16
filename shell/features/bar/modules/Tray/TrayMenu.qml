@@ -18,7 +18,7 @@ import "../../../../common/math/Range.js" as Range
 // Dismissal mirrors the island: a focus grab routes input to the menu and
 // its bar window, and a full-screen net catches any click outside the
 // card; Escape pops submenus first, then closes.
-PanelWindow {
+LayerSurface {
   id: root
 
   property var menuHandle: null
@@ -52,16 +52,7 @@ PanelWindow {
 
   screen: root.anchorScreen()
   visible: root.open || card.opacity > 0
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.top: true
-  anchors.bottom: true
-  anchors.left: true
-  anchors.right: true
-
-  WlrLayershell.namespace: "vibranium:tray"
-  WlrLayershell.layer: WlrLayer.Overlay
+  surface: "vibranium:tray"
   // OnDemand while open so Escape can reach the key scope; released the
   // moment the logical close fires.
   WlrLayershell.keyboardFocus: root.open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None

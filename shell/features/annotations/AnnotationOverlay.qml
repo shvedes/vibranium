@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable uncreatable-type signal-handler-parameters
 import QtQuick
-import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.common
@@ -15,7 +14,7 @@ import "../../common/capture/ShotLib.js" as ShotLib
 // rectangle, size badge and magnifier lens. Multi-monitor crossing is out
 // of scope - one overlay per focused screen. Coordinates emitted in
 // window-logical pixels; the service scales them to frame pixels.
-PanelWindow {
+LayerSurface {
   id: overlay
 
   property int _uid: -1
@@ -98,15 +97,7 @@ PanelWindow {
     : ShotLib.qtDpr(Screen.devicePixelRatio)
 
   color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
-
-  WlrLayershell.namespace: "vibranium:screenshot-region"
-  WlrLayershell.layer: WlrLayer.Overlay
+  surface: "vibranium:screenshot-region"
   WlrLayershell.keyboardFocus: overlay.visible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
   // One still frame of the source screen. Seeded selectors use the frozen

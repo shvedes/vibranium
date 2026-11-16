@@ -46,6 +46,8 @@ Singleton {
 
     property bool visible: false
     readonly property bool isOpen: root.visible
+    // The surface claim this visit holds while it is up, null when closed.
+    property var _claimToken: null
     // Browse mode: shipped wallpapers the user disabled are listed with a
     // badge so they can be restored. A visit starts with them hidden.
     property bool showHidden: false
@@ -913,7 +915,13 @@ Singleton {
             Exec.notify("No wallpapers found for current theme", null, { replaceId: 1 })
             return "ok"
         }
+        // A visit of its own. The surface claim runs the closer of whatever
+        // visit is up (a menu, the launcher, the theme picker), which is the
+        // same primitive the rest of the full-screen family uses. Taken after
+        // the surface is visible and after the empty-theme return above, so a
+        // summon that cannot open never dismisses what is already up.
         root.visible = true
+        root._claimToken = SurfaceClaim.claim("wallpaperPicker", root.close, root)
         return "ok"
     }
     // The close is the end of the visit, so the menu chain that summoned the
@@ -928,7 +936,10 @@ Singleton {
         // next open starts from the set the theme actually offers.
         root.showHidden = false
         root._recomputeFiltered()
-        Registry.call("menu", "close")
+        if (root._claimToken !== null) {
+            SurfaceClaim.release(root._claimToken)
+            root._claimToken = null
+        }
         return "ok"
     }
     function toggle() {

@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 // qmllint disable uncreatable-type signal-handler-parameters
 import QtQuick
 import QtQuick.Effects
-import Quickshell
 import Quickshell.Wayland
 import qs.common
 import "../../../../common/capture/ShotLib.js" as ShotLib
@@ -38,7 +37,7 @@ import "PreviewPlacement.js" as PreviewPlacement
 // again. An Image with smooth: false sidesteps both: it samples the texture
 // nearest, and it loads the URL the ordinary way.
 //
-PanelWindow {
+LayerSurface {
   id: overlay
 
   signal pickedAt(real x, real y)
@@ -127,16 +126,7 @@ PanelWindow {
   // overlay is closed. The frame's arrival is the one piece of timing a
   // user feels as lag in this component (the overlay is up and blank until
   // it lands), so the capture line carries it.
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
-
-  WlrLayershell.namespace: "vibranium:color-pick"
-  WlrLayershell.layer: WlrLayer.Overlay
+  surface: "vibranium:color-pick"
   // Exclusive, never OnDemand: the pick is a modal surface that owns the
   // screen for as long as it is up, and an OnDemand surface only takes the
   // keyboard when the compositor hands it over. Another overlay that already

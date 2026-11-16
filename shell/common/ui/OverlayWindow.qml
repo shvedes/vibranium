@@ -32,8 +32,12 @@ ScrimWindow {
   animationsEnabled: MotionPolicy.enabled
 
   isPrimary: root.primary
-  WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.namespace: root.wlrNamespace
+  // The registry key for this view's surface: the layer, the namespace and the
+  // exclusion mode all resolve from it in LayerSurface.qml.
+  surface: root.wlrNamespace
+  // Exclusive while the overlay is up on the primary screen, and released the
+  // moment it closes: a grab with no release branch is a keyboard taken from
+  // the session rather than lent to a modal.
   WlrLayershell.keyboardFocus: root.primary && root.overlayOpen
     ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 }

@@ -27,25 +27,22 @@ import "NotificationsLib.js" as NotificationsLib
 //     that gating a window's loading on its visibility unmaps and re-maps it,
 //     and the pile is the last surface that wants that: it is up in bursts and
 //     down between them.
-PanelWindow {
+LayerSurface {
   id: win
 
+  // Primary output only, and that is a decision rather than an oversight: a
+  // card carries a dismiss deadline and a hover freeze, so a stack that
+  // migrated to another output mid-timer would arrive still counting down with
+  // no pointer able to pause it. Secondary outputs get the bar, the islands
+  // and the OSD; the pile stays home.
   screen: Ui.primaryScreen ?? Quickshell.screens[0] ?? null
   // The mapping rule lives with the rest of the pile's policy (Notifications):
   // a card is up, including the exit fade of the last one.
   visible: Notifications.surfaceVisible
-  color: "transparent"
   // No `clip` here, and there cannot be one: this root is a Window, and `clip`
   // is an Item property. Anything that needs clipping goes on `pile`, which is
   // the Item the cards actually live in.
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.top: true
-  anchors.bottom: true
-  anchors.left: true
-  anchors.right: true
-
-  WlrLayershell.namespace: "vibranium:notifications"
+  surface: "vibranium:notifications"
   // The same level as the modal overlays (the menu family in
   // common/ui/OverlayWindow.qml) but below them in the layer's order: the
   // `vibranium:notifications` layer rule pins `order = 1`, so an open menu
@@ -60,7 +57,6 @@ PanelWindow {
   // window goes fullscreen, which took the pile with it. Overlay is not faded
   // that way, so a notification arriving over a fullscreen app stays at full
   // strength.
-  WlrLayershell.layer: WlrLayer.Overlay
   // Never takes the keyboard. `OnDemand` reads as the polite choice - "this
   // surface may have the keyboard" - but a compositor is free to grant it the
   // moment the surface maps, and this surface maps every time a notification

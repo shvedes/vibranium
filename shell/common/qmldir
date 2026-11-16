@@ -51,6 +51,7 @@ singleton RequestGate 1.0 request/RequestGate.qml
 singleton PathPolicy 1.0 path/PathPolicy.qml
 PasswordBox 1.0 ui/PasswordBox.qml
 CapsChip 1.0 ui/CapsChip.qml
+LayerSurface 1.0 ui/LayerSurface.qml
 ScrimWindow 1.0 ui/ScrimWindow.qml
 ScrollBar 1.0 ui/ScrollBar.qml
 BodyText 1.0 ui/BodyText.qml

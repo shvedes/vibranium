@@ -182,9 +182,16 @@ Singleton {
   // unified catalog (catalog.jsonc#utilities). Bare catalog path means
   // the settings index; menu keybinds pass #main / #utilities.
   function openFile(path) {
+    // ONE surface serves every page, so the requested path decides what an
+    // already-open menu does: the same path again is the keybind's toggle, a
+    // different one replaces what is showing. Closing on any open menu made
+    // #utilities then #main a close with nothing opening. The close runs
+    // before the build so the runtime is unwound and the build's own `wasOpen`
+    // snapshot is false.
     if (root.open) {
+      const same = root._lastPath === path
       root.close()
-      return true
+      if (same) return true
     }
     if (!root._buildFromFile(path)) return false
     root._primeRuntime(root.bundle)
@@ -2084,8 +2091,11 @@ Singleton {
     }
 
     function toggleFile(path: string): string {
-      if (root.open) { root.close(); return "ok" }
-      return root.openFile(path) ? "ok" : "error"
+      // Delegated rather than re-implemented: the root's own toggle knows the
+      // page it was opened with, so the same path closes and a different one
+      // switches. A local `if (open) close` here turned every cross-page
+      // keybind into a close.
+      return root.toggleFile(path) ? "ok" : "error"
     }
 
     function back(): string {

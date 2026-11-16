@@ -33,7 +33,7 @@ import "PolkitTrace.js" as PolkitTrace
 Variants {
   model: Ui.validScreens
 
-  PanelWindow {
+  LayerSurface {
     id: win
 
     required property ShellScreen modelData
@@ -74,21 +74,11 @@ Variants {
     // 460x280 card: the window would BE the card, the scrim `anchors.fill:
     // parent` would fill 460x280 rather than the output, and there would be no
     // overlay left - just a dialog with a dark edge.
-    color: "transparent"
     // An overlay reserves no space and takes no exclusive zone: the bar and the
-    // panels underneath must not move because a password dialog appeared.
-    exclusionMode: ExclusionMode.Ignore
-    exclusiveZone: -1
-    // The four anchors are what make the surface fill its output. This is the
-    // idiom the rest of the tree uses for a per-screen overlay - see
-    // common/ui/ScrimWindow.qml, which is the same six lines.
-    anchors.left: true
-    anchors.right: true
-    anchors.top: true
-    anchors.bottom: true
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "vibranium:polkit"
+    // panels underneath must not move because a password dialog appeared. The
+    // four anchors that fill the output, and the ignoring exclusion mode, come
+    // from LayerSurface like they do for every other per-screen overlay.
+    surface: "vibranium:polkit"
     // Exclusive on the primary alone. A second monitor gets OnDemand, so the
     // keyboard cannot be stolen from the card by a surface the user is not
     // looking at - which is also why `refocus()` below guards on `win.primary`.

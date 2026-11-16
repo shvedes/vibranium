@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable uncreatable-type signal-handler-parameters
 import QtQuick
-import Quickshell
 import Quickshell.Wayland
 import qs.common
 
@@ -11,7 +10,7 @@ import qs.common
 // chrome - the buttons float centered over the dim veil, with the same
 // hover language as the annotation toolbar. Keyboard: arrows/TAB move,
 // Enter/Space picks, Esc/right-click backs out.
-PanelWindow {
+LayerSurface {
   id: picker
 
   signal chosen(string mode)
@@ -41,16 +40,12 @@ PanelWindow {
   }
 
    color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
-
-  WlrLayershell.namespace: AnnotationActions.pickerLayerNamespace
-  WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+  surface: AnnotationActions.pickerLayerNamespace
+  // Exclusive while the picker is mapped. The surface is created for one pick
+  // and destroyed with it; the release branch keeps the grab from outliving a
+  // close that arrives before the destroy.
+  WlrLayershell.keyboardFocus: picker.visible
+    ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
   Rectangle {
     id: veil

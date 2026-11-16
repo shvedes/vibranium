@@ -26,22 +26,23 @@ import qs.services
 // than by anything here. The effect is the whole mechanism: to change whether
 // the indicator survives a lock, edit the Hyprland layer rule for
 // vibranium:privacy, not this file.
-PanelWindow {
+LayerSurface {
   id: root
 
   property ShellScreen winScreen
   screen: root.winScreen
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  // Full-screen surface, like every other Overlay in this shell. Covering
-  // the monitor costs one transparent surface, and the empty mask region
-  // below keeps all of it click-through, so the dots are positioned
-  // explicitly instead of the window being shrunk around them.
-  anchors.top: true
-  anchors.bottom: true
-  anchors.left: true
-  anchors.right: true
+  surface: "vibranium:privacy"
+  // A corner-shaped surface rather than a full-screen one: the dots are the
+  // whole content, so an output-sized buffer mapped for the session buys
+  // nothing. One horizontal and one vertical edge are anchored, which leaves
+  // the compositor placing the window at the configured corner, and the size
+  // below is the cluster plus one inset on each side.
+  anchors.left: root.dotOnLeftEdge
+  anchors.right: !root.dotOnLeftEdge
+  anchors.top: root.dotOnTopEdge
+  anchors.bottom: !root.dotOnTopEdge
+  width: root.clusterW + 2 * Ui.s
+  height: root.clusterH + 2 * Ui.s
 
   // The window's own `visible` is never bound to the privacy state. The
   // surface stays mapped for the whole session and only the content
@@ -85,6 +86,10 @@ PanelWindow {
   // the one gap that is always there.
   readonly property int dotSize: 6
   readonly property int dotGap: 5
+  // The dot cluster's own extent, before the inset each edge carries: the
+  // window is sized to this rather than to the output.
+  readonly property real clusterW: Math.max(0, dotsRow.implicitWidth - root.dotGap)
+  readonly property real clusterH: dotsRow.implicitHeight
 
   // Corner pick, split once per position change rather than per binding
   // evaluation: the vertical edge only varies with the row's top/bottom
@@ -96,8 +101,6 @@ PanelWindow {
   // never take input from a fullscreen app sitting under it.
   mask: Region { width: 0; height: 0 }
 
-  WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.namespace: "vibranium:privacy"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
   // Dot geometry and colour order: microphone, camera, screenshare. Each dot
@@ -170,10 +173,10 @@ PanelWindow {
     // is the wrapper's right edge and the cluster sits flush to the corner
     // whichever dots happen to be on. The row's width tracks the lit dots, so
     // this does too, and the cluster grows inward from the edge.
-    y: root.dotOnTopEdge ? Ui.s : root.winScreen.height - height - Ui.s
-    x: root.dotOnLeftEdge ? Ui.s : root.winScreen.width - width - Ui.s
-    width: Math.max(0, dotsRow.implicitWidth - root.dotGap)
-    height: dotsRow.implicitHeight
+    x: Ui.s
+    y: Ui.s
+    width: root.clusterW
+    height: root.clusterH
     opacity: root.levelAlpha
     // InOutQuad, symmetric so the onset and the settle are the same shape and
     // neither end reads as a stall or a lurch. Curves with a later head

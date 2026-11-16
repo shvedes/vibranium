@@ -327,19 +327,12 @@ Item {
     root._cancel(root._pwScope)
   }
 
-  PanelWindow {
+  LayerSurface {
     visible: root.opened
     screen: root.targetScreen
-    anchors.top: true
-    anchors.bottom: true
-    anchors.left: true
-    anchors.right: true
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    exclusiveZone: -1
-    WlrLayershell.namespace: "vibranium:network-qr"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    surface: "vibranium:network-qr"
+    WlrLayershell.keyboardFocus: root.opened
+      ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // Deep scrim: the floating code needs the backdrop to carry the contrast
     // on any wallpaper. Either mouse button dismisses.

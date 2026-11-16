@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable uncreatable-type
 import QtQuick
-import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.common
@@ -15,7 +14,7 @@ import "../math/Range.js" as Range
 // focus grab, ESC, outside-click dismissal and the close fade. Only one
 // island is ever open per screen (exclusive by construction).
 //
-// Built on a full-screen PanelWindow (layer-shell) rather than a
+// Built on a full-screen LayerSurface (layer-shell) rather than a
 // PopupWindow: xdg_popup cannot attach to a layer surface, so a popup
 // anchored to the bar dies with a fatal Wayland protocol error. Instead
 // the host is a transparent overlay on the bar's screen with the card
@@ -64,9 +63,10 @@ import "../math/Range.js" as Range
 // layer-shell surfaces on WlrLayer.Overlay and stay independent of this
 // host; each is incompatible for a specific, verifiable reason.
 //   - TrayMenu: a structural clone of this host (full-screen transparent
-//     window, card parked under the clicked item, focus-grab dismissal),
-//     but on WlrLayer.Overlay where this host sits on WlrLayer.Top, so
-//     migrating it would put the tray popup underneath every island.
+//     window, card parked under the clicked item, focus-grab dismissal). It
+//     is on the same Overlay layer, ordered above the island by its own layer
+//     rule, so migrating it would only move one surface's geometry into
+//     another's file.
 //   - ColorPickerOverlay: a full-screen opaque ScreencopyView still
 //     frame whose magnifier lens reads real pixels, and whose
 //     captureItem the module grabs. This host's card is themed, clipped
@@ -80,7 +80,7 @@ import "../math/Range.js" as Range
 // does not reach them. The color picker takes a surface claim while its pick
 // runs, but that claim belongs to the pick, not to this host: it is taken
 // and released with the pick's own lifetime.
-PanelWindow {
+LayerSurface {
   id: root
 
   // The currently served module; used for centering.
@@ -277,58 +277,22 @@ PanelWindow {
     } catch (e) { return [root] }
   }
 
-  // Full-screen transparent overlay on the bar's screen. Only mapped while
-  // open (or fading out) so it never intercepts input when closed.
+  // Full-screen transparent overlay on the bar's screen, mapped only while
+  // open. The close is the compositor's own `layersOut` fade, so the surface
+  // leaves the scene at the close tick instead of staying mapped to animate an
+  // opacity nothing would paint.
+  //
+  // Mapping only while open is also what makes the keyboard work without a
+  // grab: a compositor focuses an `OnDemand` surface when it first maps, so
+  // every open is a first map. A surface kept mapped through a fade would come
+  // back as an already-mapped OnDemand surface, which Hyprland does not focus -
+  // the reason this host used to spend 75ms in `Exclusive` on every open.
   screen: root.anchorScreen()
-  visible: root.open || cardItem.opacity > 0
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.top: true
-  anchors.bottom: true
-  anchors.left: true
-  anchors.right: true
+  visible: root.open
 
-  WlrLayershell.namespace: "vibranium:island"
-  WlrLayershell.layer: WlrLayer.Top
-  // Keyboard focus follows `open`, NOT `visible`: the window stays mapped
-  // through the close fade so the opacity has something to animate, but
-  // keyboard ownership must release the moment the logical close fires or the
-  // user is locked out of their own desktop for the length of the fade.
-  //
-  // THE PRIME IS LOAD-BEARING, and this is the whole reason the keyboard
-  // works at all. Hyprland focuses an OnDemand surface when it FIRST MAPS -
-  // and not when an already-mapped surface goes from None back to OnDemand.
-  // This window is exactly that second case on every reopen: it stayed mapped
-  // through the fade, so a reopen that asked for OnDemand got no focus, no
-  // active focus item, and therefore no key events reaching any Keys handler.
-  // Without the prime, ESC and the arrows reach no Keys handler at all.
-  //
-  // Exclusive is granted for one timer tick on every open to cover both the
-  // first-map and the reopen case, then released back to OnDemand. Exclusive
-  // has to stay brief: while it is set, Hyprland routes EVERY pointer event
-  // to this surface regardless of which output the cursor is on, so holding
-  // it would break clicks on every other monitor. 75ms is several Qt/Wayland
-  // commit cycles and imperceptible.
+  surface: "vibranium:island"
   WlrLayershell.keyboardFocus: root.open
-    ? (root.focusPrimed ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive)
-    : WlrKeyboardFocus.None
-
-  // True once the Exclusive phase has run for this open.
-  property bool focusPrimed: false
-
-  function beginFocusPrime() {
-    if (root.open && root.backingWindowVisible) focusPrimeTimer.restart()
-  }
-
-  Timer {
-    id: focusPrimeTimer
-
-    // Several Qt/Wayland commit cycles after the surface becomes visible,
-    // short enough that the Exclusive phase is never perceptible.
-    interval: 75
-    onTriggered: if (root.open) root.focusPrimed = true
-  }
+    ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
   // A layer surface holding compositor keyboard focus still needs an
   // ACTIVE-FOCUS ITEM inside it before any Keys handler fires: the grant is
@@ -350,15 +314,10 @@ PanelWindow {
   // same signal handler is a load-time error for the whole type.
   onOpenChanged: {
     if (root.open) {
-      root.focusPrimed = false
-      root.beginFocusPrime()
       root.grabNavFocus()
       // The bar or its modules may have moved while the host was closed, so
       // the card re-parks on open like it does when the anchor is rewired.
       root.requestPark()
-    } else {
-      focusPrimeTimer.stop()
-      root.focusPrimed = false
     }
   }
 
@@ -441,6 +400,8 @@ PanelWindow {
       // non-island consumers (OSD, TrayMenu).
       border.color: Ui.tint("accent", 1)
       opacity: root.open ? 1 : 0
+      // No opacity tween on the close: the surface unmaps with the logical
+      // close, so the compositor's layersOut fade is the whole close motion.
 
       // Window grow/shrink follows the house resize tween (PanelCard,
       // MenuPanel) for discrete content changes. Self-animating content
@@ -464,22 +425,16 @@ PanelWindow {
       // deterministically.
       onHeightChanged: if (root.open) root._sizedForOpen = true
 
-      Behavior on opacity {
-        enabled: root.animationsEnabled
-        NumberAnimation { duration: Ui.fastMs }
-      }
 
       Loader {
         id: cardLoader
 
         anchors.fill: parent.contentArea
-        // Live while the host is open and through the close fade (items
-        // must not vanish mid-animation); destroyed once the card is back
-        // at opacity 0. Synchronous incubation: a frame of blank card on
-        // first open is worse than the one-off build cost, and consumers'
-        // open-time wiring (focus grabs et al) can assume the item exists
-        // by the next event-loop turn.
-        active: root.open || cardItem.opacity > 0
+        // Live while the host is open. Synchronous incubation: a frame of
+        // blank card on first open is worse than the one-off build cost, and
+        // consumers' open-time wiring (focus grabs et al) can assume the item
+        // exists by the next event-loop turn.
+        active: root.open
         sourceComponent: root.contentComponent
         onLoaded: {
           if (cardLoader.item && cardLoader.item.islandHost !== undefined)
@@ -590,7 +545,6 @@ PanelWindow {
   // arms the focus prime, so both jobs hang off the one handler.
   onBackingWindowVisibleChanged: {
     if (!root.backingWindowVisible) return
-    root.beginFocusPrime()
     root.requestPark()
   }
   onWidthChanged: {

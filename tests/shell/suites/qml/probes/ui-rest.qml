@@ -1459,7 +1459,8 @@ Item {
     kv("scrim.err.panelWindowBackend", root.scrimError.indexOf("No PanelWindow backend loaded") >= 0)
     kv("scrim.err.reachedSourceFile", root.scrimError.indexOf("ui/ScrimWindow.qml") >= 0)
     kv("scrim.err.moduleMissing", root.scrimError.indexOf("is not installed") >= 0)
-    kv("scrim.err.hasLineNumber", root.scrimError.indexOf("ScrimWindow.qml:10:1") >= 0)
+    kv("scrim.err.hasLineNumber", /ScrimWindow\.qml:\d+:\d+/.test(root.scrimError))
+    kv("scrim.err.layerSurfaceCause", root.scrimError.indexOf("ui/LayerSurface.qml") >= 0)
   }
 
   // ---- turn 1: the icon scan has landed; every tween starts here ------

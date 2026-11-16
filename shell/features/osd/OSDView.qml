@@ -16,26 +16,21 @@ import "../../common/math/Range.js" as Range
 // The card body lives in OSDCard.qml. Session-lock surfaces render above
 // all layer-shell windows, so this window stays unmapped while the session
 // is locked (OSD.desktopSuppressed) and no OSD is shown over the lockscreen.
-PanelWindow {
+LayerSurface {
   id: win
 
+  // Primary output only: the OSD answers a keypress the user just made, and
+  // the user is looking at the keyboard's own screen's OSD position setting.
+  // A second output showing the same meter would be the same number twice.
   screen: Ui.primaryScreen ?? Quickshell.screens[0] ?? null
   // The mapping rule lives with the rest of the OSD's policy (OSD.qml):
   // a payload is up, including its exit fade, and the lock is not
   // suppressing the desktop surface.
   visible: OSD.surfaceVisible
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.top: true
-  anchors.bottom: true
-  anchors.left: true
-  anchors.right: true
 
   mask: Region { width: 0; height: 0 }
 
-  WlrLayershell.namespace: "vibranium:osd"
-  WlrLayershell.layer: WlrLayer.Overlay
+  surface: "vibranium:osd"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
   // Placement: one slot owns the box the card occupies. A side placement

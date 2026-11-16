@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 // qmllint disable uncreatable-type
 import QtQuick
 import QtQuick.Effects
-import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.common
@@ -23,7 +22,7 @@ import "WallpaperTrans.js" as Trans
 //
 // The window never closes: disabled state only hides the images, keeping
 // the surface alive so the right-click menu can bring the wallpaper back.
-PanelWindow {
+LayerSurface {
   id: win
 
   readonly property int fadeMs: Wallpaper.fadeMs
@@ -113,15 +112,7 @@ PanelWindow {
   // Theme background shows through while disabled and before the first
   // image decodes, so the surface never flashes plain black.
   color: Theme.color("background_0")
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
-
-  WlrLayershell.layer: WlrLayer.Background
-  WlrLayershell.namespace: "vibranium:wallpaper"
+  surface: "vibranium:wallpaper"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
   // Empty path keeps the previous frame; only non-empty changes transition.
@@ -547,21 +538,12 @@ PanelWindow {
   // behind every window on screen. Overlay is the layer above them, and the
   // full-screen transparent net beneath the card is the outside-click
   // dismissal.
-  PanelWindow {
+  LayerSurface {
     id: menuWin
 
     screen: win.screen
     visible: win.menuOpen
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    exclusiveZone: -1
-    anchors.left: true
-    anchors.right: true
-    anchors.top: true
-    anchors.bottom: true
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "vibranium:wallpaper-menu"
+    surface: "vibranium:wallpaper-menu"
     // OnDemand only while open, so Escape can reach the key scope; the
     // wallpaper surface itself never takes the keyboard.
     WlrLayershell.keyboardFocus: win.menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None

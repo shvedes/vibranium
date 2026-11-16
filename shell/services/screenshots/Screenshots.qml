@@ -237,7 +237,7 @@ Singleton {
   // capture target so no compositor buffers remain between shots.
   property ShellScreen _shotScreen: null
 
-  PanelWindow {
+  LayerSurface {
     id: shotWin
 
     property ShellScreen targetScreen: null
@@ -262,22 +262,14 @@ Singleton {
       return ShotLib.compositorScale(scale, Screen.devicePixelRatio)
     }
 
-    color: "transparent"
-    exclusionMode: ExclusionMode.Ignore
-    exclusiveZone: -1
     visible: root._shotScreen !== null
-    anchors.left: true
-    anchors.right: true
-    anchors.top: true
-    anchors.bottom: true
     // Full-screen at WlrLayer.Top for the whole frame -> grab -> decode ->
     // save hop, and nothing in it wants input: the ScreencopyView is
     // opacity: 0 and the decode probe is visible: false. Without an empty
     // region the surface is still the topmost pointer target in the
     // compositor for that interval and a click during it is swallowed.
     mask: Region { width: 0; height: 0 }
-    WlrLayershell.namespace: "vibranium:screenshot"
-    WlrLayershell.layer: WlrLayer.Top
+    surface: "vibranium:screenshot"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     screen: root._shotScreen
 

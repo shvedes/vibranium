@@ -8,12 +8,15 @@ import "../text/StringUtils.js" as SU
 // Exclusive surface claim: which of the participating services owns the
 // screen, and how the previous owner is put away when a new one arrives.
 //
-// Not every overlay in the shell takes part. Seven services claim - the
-// menu, the app launcher, the power menu, the pass panel, the clipboard
-// panel, the screenshot flow and the color pick - and they dismiss each
-// other. The other windows (MenuPanel, TrayMenu, NetworkQrOverlay) are
-// independent surfaces with no mutual dismissal: Tray.qml opens TrayMenu
-// without telling this registry.
+// Not every overlay in the shell takes part. Nine services claim - the menu,
+// the app launcher, the power menu, the pass panel, the clipboard panel, the
+// theme picker, the wallpaper picker, the screenshot flow and the color pick -
+// and they dismiss each other whichever id the newcomer claims: `claim` fires
+// the current holder's closer regardless of the id it held, so one visit at a
+// time is a property of the registry rather than a list each surface keeps.
+// The other windows (MenuPanel, TrayMenu, NetworkQrOverlay) are independent
+// surfaces with no mutual dismissal: Tray.qml opens TrayMenu without telling
+// this registry.
 //
 // The color pick claims for the same reason the screenshot flow does: both
 // photograph the screen, and a photograph taken with a menu still open is a
