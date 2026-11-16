@@ -133,7 +133,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
 RECORDED_FILE_COUNT=253
-RECORDED_WARNING_COUNT=105
+RECORDED_WARNING_COUNT=104
 RECORDED_INFO_COUNT=23
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
@@ -157,10 +157,15 @@ PanelWindow"
 # properties were read through `root.` (isSecret, isMedia, mi, phTitle and the
 # rest); what is left there is the delegate's injected `modelData`/`index`,
 # which must stay unqualified, plus the same shape in the bar islands.
+# The `uncreatable-type` figure fell by one when the fullscreen lyrics surface
+# became a plain `Window`: that file's `PanelWindow` was one of the
+# `Type PanelWindow is not creatable` diagnostics, and the file no longer
+# declares one. The unresolved-type set is unchanged, because the type still
+# appears in the files that do.
 RECORDED_WARNING_KINDS="confusing-expression-statement 4
 eval 1
 missing-property 52
-uncreatable-type 3
+uncreatable-type 2
 unqualified 40
 unresolved-type 5"
 
@@ -323,7 +328,7 @@ t_note "the recorded warning total is $RECORDED_WARNING_COUNT and the per-kind b
 t_section "the unresolved types are only Quickshell C++ types"
 UNRESOLVED_LINES="$(grep -E '\[(unresolved-type|uncreatable-type)\]$' "$LINT_OUT" || true)"
 UNRESOLVED_COUNT="$(printf '%s\n' "$UNRESOLVED_LINES" | grep -c . || true)"
-t_count "the unresolved/uncreatable count" "8" "$UNRESOLVED_COUNT"
+t_count "the unresolved/uncreatable count" "7" "$UNRESOLVED_COUNT"
 
 # The names, from two different shapes of diagnostic:
 #   Property "adapter" has incomplete type "FileViewAdapter" ...

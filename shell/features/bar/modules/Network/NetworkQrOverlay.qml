@@ -336,6 +336,7 @@ Item {
     anchors.right: true
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
+    exclusiveZone: -1
     WlrLayershell.namespace: "vibranium:network-qr"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive

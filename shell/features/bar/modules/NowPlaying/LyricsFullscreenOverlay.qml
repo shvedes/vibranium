@@ -11,22 +11,31 @@ import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/process/CommandSpec.js" as CommandSpec
 import "../../../../common/math/Range.js" as Range
 
-// Fullscreen lyrics surface for the Now Playing island: a left click on the
-// island's cover while its transcript is up asks the module to open this
-// window, which outlives the island and is handed the client rather than a
-// binding to it.
+// Lyrics window for the Now Playing island: a left click on the island's
+// cover while its transcript is up asks the module to open this window, which
+// outlives the island and is handed the client rather than a binding to it.
 //
 // The composition is ratio-driven rather than pixel-driven, so 16:9, 16:10
 // and 3:2 outputs all read the same: a cover column on the left with the three
 // transport pads and the seek lane centred under it, and the synced transcript
-// running the full height of the screen on the right, its top and bottom edges
+// running the full height of the window on the right, its top and bottom edges
 // blurred. The cover box is derived from the cover's own aspect ratio, drawn
 // at 97.75% of the fit its column allows, and centred in the column, so a
 // portrait or wide cover is neither cropped nor left in a letterbox.
 //
-// Esc or the corner minimizer closes it. Right-clicking the island's artwork
-// goes back to the island's controls instead of opening this.
-PanelWindow {
+// Esc closes it. Right-clicking the island's artwork goes back to the
+// island's controls instead of opening this.
+//
+// A regular toplevel, not a layer surface, like the audio mixer and the image
+// viewer. The transcript is an app-like view: it seeks, it takes
+// keys and it holds an idle inhibitor, so a window the compositor lists is one
+// the user can reach from a switcher and leave with the same verbs as any other
+// window. Quickshell 0.3.2 has no toplevel of its own - `PanelWindow` always
+// maps `wlr_layer_shell_v1` and `PopupWindow` needs a parent - so the window
+// below is a plain QtQuick `Window`. The root is a holder because a `Window`
+// created inside a QQuickItem renders into that item instead of reaching the
+// compositor (see AudioMixerWindow.qml for the measured case).
+QtObject {
   id: root
 
   // Filled by the island at open time. The MPRIS object outlives both the
@@ -34,31 +43,6 @@ PanelWindow {
   property var player: null
   property bool opened: false
   property ShellScreen targetScreen: null
-
-  // While the transcript is up the session must not idle out from under it:
-  // the inhibitor stops the compositor marking the session idle, which is what
-  // the idle daemon's lock and suspend rows wait on. Releasing the surface
-  // releases the hold; the window association is what makes a compositor
-  // respect it.
-  IdleInhibitor {
-    enabled: root.opened
-    window: root
-  }
-
-  color: "transparent"
-  exclusionMode: ExclusionMode.Ignore
-  exclusiveZone: -1
-  anchors.left: true
-  anchors.right: true
-  anchors.top: true
-  anchors.bottom: true
-  visible: root.opened
-  screen: root.targetScreen
-
-  WlrLayershell.namespace: "vibranium:lyrics"
-  WlrLayershell.layer: WlrLayer.Overlay
-  WlrLayershell.keyboardFocus: root.opened
-    ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
   readonly property bool animOn: MotionPolicy.enabled
   readonly property string artUrl: root.player !== null ? root.player.trackArtUrl ?? "" : ""
@@ -93,8 +77,7 @@ PanelWindow {
   // to it only shows up the next time the surface is mapped - the backdrop
   // stayed opaque until the overlay was reopened. A Rectangle is ordinary
   // scene graph and repaints on the tick the cache write lands, which is also
-  // what lets the compositor's blur follow the alpha (see the vibranium:lyrics
-  // layer rule in default/hypr/window-rules.lua).
+  // what lets the compositor's window blur follow the alpha.
   readonly property real dimBackdropAlpha: 0.8
 
   // Read from the cache when the surface is built and again when it opens, so
@@ -219,7 +202,7 @@ PanelWindow {
     if (root._holdJob !== null) return
     const spec = CommandSpec.argv([
       "systemd-inhibit", "--what=idle", "--who=Vibranium",
-      "--why=Lyrics fullscreen is open", "--mode=block",
+      "--why=Lyrics window is open", "--mode=block",
       "sleep", "infinity"
     ])
     if (spec.ok !== true) return
@@ -258,14 +241,6 @@ PanelWindow {
     } catch (ignored) {}
   }
 
-  Timer {
-    id: holdRetry
-
-    interval: 5000
-    repeat: false
-    onTriggered: if (root.opened) root._holdStart()
-  }
-
   onArtUrlChanged: {
     artFade.stop()
     artNext.opacity = 0
@@ -281,6 +256,60 @@ PanelWindow {
     // time this handler runs it may already be loading the new url.
     artNext.source = root.artUrl
   }
+
+  // The window, held rather than declared as the component root: this file is
+  // instantiated as a child of the Now Playing module, which is an Item, and a
+  // `Window` created inside a QQuickItem renders into it instead of reaching
+  // the compositor. Everything above this line is the holder's state; every
+  // child below it belongs to the window.
+  property Window win: Window {
+    visible: root.opened
+    title: "Lyrics"
+    // `WindowScreen` is the name-matching bridge between Quickshell's screen
+    // objects and the QtQuick Screen a `Window` takes; a name that does not
+    // meet leaves the window on the compositor's choice rather than on none.
+    screen: WindowScreen.forScreen(root.targetScreen)
+    // A regular window: no `visibility` is assigned here. Setting a
+    // non-windowed state makes a `Window` visible by itself, which is what
+    // spawned this surface at shell startup before anything had opened it.
+    // The size is a request the compositor may answer with a tile of its own;
+    // the composition reads `content.width/height`, so any size lays out.
+    width: Math.max(720, Math.round((screen ? screen.width : 1280) * 0.8))
+    height: Math.max(480, Math.round((screen ? screen.height : 800) * 0.8))
+    // Alpha belongs to the backdrop Rectangle inside, so the compositor sees a
+    // translucent surface and the double-click density can change without a
+    // remap.
+    color: "transparent"
+
+    // The hold retry is the window's child, not the holder's: `QtObject` has no
+    // default property to put it in.
+    Timer {
+      id: holdRetry
+
+      interval: 5000
+      repeat: false
+      onTriggered: if (root.opened) root._holdStart()
+    }
+
+    // While the transcript is up the session must not idle out from under it:
+    // the inhibitor stops the compositor marking the session idle, which is
+    // what the idle daemon's lock and suspend rows wait on. Releasing the
+    // surface releases the hold; the window association is what makes a
+    // compositor respect it.
+    IdleInhibitor {
+      enabled: root.opened
+      window: root.win
+    }
+
+    // A toplevel is mapped unfocused and the keyboard is the compositor's to
+    // give: `requestActivate` asks on the map and this moves the keys into the
+    // transcript once they land. A layer surface got this from its
+    // `keyboardFocus`; a window gets it from being the active one.
+    onVisibleChanged: if (visible) Qt.callLater(function() { requestActivate() })
+    onActiveChanged: {
+      if (!active) return
+      Qt.callLater(function() { if (root.opened) content.forceActiveFocus() })
+    }
 
   // The transcript follows the shared playback clock the way the island does:
   // one position advance per second while the client plays, plus the daemon's
@@ -679,7 +708,7 @@ PanelWindow {
       x: content.lyricsX
       y: 0
       width: content.lyricsW
-      height: root.height
+      height: content.height
       // Track-switch entrance: the transcript fades in place while the cover
       // crossfades, so a switch reads as one new track rather than one
       // element swapping.
@@ -714,8 +743,8 @@ PanelWindow {
         onSeekRequested: seconds => root.seekTo(seconds)
       }
 
-      // The pane's own empty state is one line of text. The fullscreen
-      // surface says it at presentation scale instead; the pane stays
+      // The pane's own empty state is one line of text. The surface says it
+      // at presentation scale instead; the pane stays
       // underneath so its fetch and cache states are unchanged. An idle
       // client has its own surface-level answer below, and its "none" status
       // is not an answer about lyrics, so this block stays out of the way
@@ -963,24 +992,6 @@ PanelWindow {
       }
     }
 
-    IconButton {
-      id: minimizer
-
-      z: 10
-      anchors.bottom: parent.bottom
-      anchors.right: parent.right
-      anchors.bottomMargin: 10
-      anchors.rightMargin: 10
-      name: "minimize"
-      iconSize: 20
-      slotSize: 36
-      flat: true
-      cornerRadius: RoundingPolicy.radius
-      animationsEnabled: root.animOn
-      // Low-key by default so it never competes with the transcript; the
-      // pointer brings it back to full strength.
-      opacity: minimizer.hovered ? 1 : 0.5
-      onClicked: root.close()
-    }
+  }
   }
 }

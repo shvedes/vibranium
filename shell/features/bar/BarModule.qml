@@ -70,6 +70,16 @@ Item {
     return true
   }
 
+  // Close this module's island through the shared host. The mirror of
+  // openIsland(), for a module action that takes the island's place: the
+  // lyrics window is a toplevel, so leaving the card open under it would put
+  // two surfaces on the same job.
+  function closeIsland() {
+    if (!root.barWindow || !root.barWindow.islandHost) return false
+    root.barWindow.islandHost.close()
+    return true
+  }
+
   // Tooltip contract: a module declares what the bubble should say while
   // hovered, and this base owns the single ToolTipBind that reports to the
   // shared host. Every module used to repeat the anchor/barWindow/host trio

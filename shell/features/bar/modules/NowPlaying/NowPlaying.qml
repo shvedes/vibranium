@@ -548,8 +548,14 @@ CollapsibleSlot {
       id: island
 
       // The client the card is actually showing: the island can have switched
-      // away from the module's own pick, and the fullscreen must follow it.
-      onLyricsFullscreenRequested: lyricsOverlay.open(island.player)
+      // away from the module's own pick, and the lyrics window must follow it.
+      // The card closes as the window opens: the window is a toplevel and
+      // covers the bar, so an island left open behind it is a second surface
+      // showing the same track with no way back to it.
+      onLyricsFullscreenRequested: {
+        root.closeIsland()
+        lyricsOverlay.open(island.player)
+      }
     }
   }
 

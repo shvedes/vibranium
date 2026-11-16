@@ -8,10 +8,10 @@ import qs.common
 //
 // Overlay is the topmost level wlr-layer-shell has, and it is where the
 // modal overlays belong: a menu, a launcher, a picker, a password panel.
-// The surfaces that are not modal live below it - the notification pile on
-// the Top layer, the bar on Bottom, the wallpaper on Background - so an
-// open overlay covers the pile instead of the pile drawing over the
-// overlay's dim.
+// The surfaces that are not modal live below it - the notification pile,
+// ordered under this level by its own layer rule, the bar on Bottom and the
+// wallpaper on Background - so an open overlay covers the pile instead of the
+// pile drawing over the overlay's dim.
 //
 // It is also the only level that outlives a fullscreen window: Hyprland
 // fades the whole Top layer when a window goes fullscreen, so an overlay

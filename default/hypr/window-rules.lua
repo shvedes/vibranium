@@ -174,6 +174,11 @@ hl.layer_rule({
   name = "Vibranium Notifications",
   match = { namespace = "^vibranium:notifications$" },
   no_anim = true,
+  -- One step below the modal overlays, which sit at the default order. The
+  -- pile shares their layer now, and `order` counts DOWN (the lowest value is
+  -- on top), so 1 puts an open menu over the cards without depending on which
+  -- surface mapped last.
+  order = 1,
 })
 
 -- The screenshot target picker is a fullscreen dim layer, and the frame the
@@ -189,16 +194,16 @@ hl.layer_rule({
   no_anim = true,
 })
 
--- The fullscreen lyrics surface: at the double-click density the fill is 80%
--- and the desktop reads through it, so what shows through has to be the blur
--- rather than the sharp desktop. `ignore_alpha` is the half that makes this
--- work - without it the rule blurs the fully opaque backdrop too, which is a
--- cost paid for nothing.
+-- The annotation region selector is a fullscreen dim layer, and the frame the
+-- capture pipeline grabs is requested right after it is destroyed. A
+-- `layersOut` fade keeps the compositor painting the surface it is animating
+-- out for the whole animation, which is long enough to be the frame the shot
+-- is made of: the selector would end up inside the screenshot it asked for.
+-- Same rule and same reason as the picker above.
 hl.layer_rule({
-  name = "Vibranium Lyrics Blur",
-  match = { namespace = "^vibranium:lyrics$" },
-  ignore_alpha = 0.2,
-  blur = true
+  name = "Vibranium Screenshot Region",
+  match = { namespace = "^vibranium:screenshot-region$" },
+  no_anim = true,
 })
 
 -- Display the privacy dots overlay above other overlays.

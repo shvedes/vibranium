@@ -46,19 +46,21 @@ PanelWindow {
   anchors.right: true
 
   WlrLayershell.namespace: "vibranium:notifications"
-  // One level below the modal overlays (the menu family in
-  // common/ui/OverlayWindow.qml), so an open menu covers the cards instead
-  // of the cards drawing over the menu's dim.
+  // The same level as the modal overlays (the menu family in
+  // common/ui/OverlayWindow.qml) but below them in the layer's order: the
+  // `vibranium:notifications` layer rule pins `order = 1`, so an open menu
+  // covers the cards instead of the cards drawing over the menu's dim.
   //
   // Two surfaces on one level are ordered by which of them the compositor
   // saw last, and this window is destroyed and rebuilt on every burst of
-  // notifications, so a pile sharing a level with the menus would land
-  // above a menu that was opened before the notification arrived. Separate
-  // levels are the only order that does not depend on that.
+  // notifications, so map order cannot answer this - the rule's explicit
+  // order is what does, and it does not depend on which surface mapped last.
   //
-  // The cost of the level is the fullscreen fade: Hyprland fades the whole
-  // Top layer when a window goes fullscreen, so the pile goes with it.
-  WlrLayershell.layer: WlrLayer.Top
+  // Overlay rather than Top because Hyprland fades the whole Top layer when a
+  // window goes fullscreen, which took the pile with it. Overlay is not faded
+  // that way, so a notification arriving over a fullscreen app stays at full
+  // strength.
+  WlrLayershell.layer: WlrLayer.Overlay
   // Never takes the keyboard. `OnDemand` reads as the polite choice - "this
   // surface may have the keyboard" - but a compositor is free to grant it the
   // moment the surface maps, and this surface maps every time a notification
