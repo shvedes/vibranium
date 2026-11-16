@@ -284,17 +284,16 @@ Item {
     if (child.toLowerCase() === String(row.label ?? "").toLowerCase()) return child
     return String(row.label ?? "") + " " + child
   }
+  // What the caption says under the name. Light and dark are the preview's job,
+  // the current theme is the accent border's, and Enter is already in the footer
+  // legend - so the only thing left for this line to add is a family's size once
+  // it is open. Everything else is a duplicate of a signal the deck already
+  // carries.
   function _meta() {
     const row = panel.currentRow
     if (!row) return ""
-    const bits = []
-    if (panel.family) {
-      bits.push(panel._expanded ? panel.variants.length + " variants" : "Enter to expand")
-    }
-    const t = panel.focusedTheme
-    if (t) bits.push(t.light ? "Light" : "Dark")
-    if (t && panel._isActiveFolder(t.folder)) bits.push("Current")
-    return bits.join(" · ")
+    if (panel.family && panel._expanded) return panel.variants.length + " variants"
+    return ""
   }
 
   // ---- selection -----------------------------------------------------------
@@ -902,6 +901,8 @@ Item {
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: stage.bottom
     anchors.topMargin: Ui.m
+    // Two pills, so they read as separate labels rather than one block.
+    spacing: Ui.s
     // Screen-based, not card-based: the caption's implicit height feeds the
     // deck's vertical budget, so a width tied to bigW would make the budget
     // depend on the deck it is sizing. A wider strip also keeps long family
@@ -915,29 +916,93 @@ Item {
       Glide { duration: Ui.fastMs }
     }
 
-    Text {
-      width: parent.width
-      horizontalAlignment: Text.AlignHCenter
-      text: panel._displayLabel()
-      color: panel.focusedTheme && panel._isActiveFolder(panel.focusedTheme.folder)
-        ? Ui.solid("accent")
-        : Ui.solid("foreground_0")
-      font.pixelSize: Ui.fontCardTitle
-      font.family: Ui.fontFamily
-      font.bold: true
-      elide: Text.ElideMiddle
-      textFormat: Text.PlainText
+    // Two pills, not one stepped shape: the theme's name and its palette line
+    // are separate labels, each on the footer's island. The deck sits on a
+    // dimmed desktop, so a palette foreground is unreadable there on a light
+    // theme; white is the fallback text and the applied theme still reads in
+    // accent.
+    //
+    // Both are sized from TextMetrics, never from a Text's own contentWidth: an
+    // elided Text reports the width it was given, which made the caption shrink
+    // to one letter per row on every theme switch.
+    TextMetrics {
+      id: nameMetrics
+      font: nameText.font
+      text: nameText.text
     }
 
-    Text {
-      width: parent.width
-      horizontalAlignment: Text.AlignHCenter
-      text: panel._meta()
-      color: Ui.tint("foreground_1", 0.65)
-      font.pixelSize: Ui.fontS
-      font.family: Ui.fontFamily
-      elide: Text.ElideRight
-      textFormat: Text.PlainText
+    TextMetrics {
+      id: metaMetrics
+      font: metaText.font
+      text: metaText.text
+    }
+
+    Rectangle {
+      id: namePill
+
+      // Never a padding-only pill: an empty label is not a caption.
+      visible: nameText.text !== ""
+      x: Math.round((parent.width - width) / 2)
+      implicitWidth: nameMetrics.advanceWidth + Ui.l * 2
+      implicitHeight: nameText.implicitHeight + Ui.s * 2
+      width: Math.min(implicitWidth, parent.width)
+      height: implicitHeight
+      radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
+      color: Qt.rgba(0, 0, 0, 0.62)
+      border.width: 1
+      border.color: Qt.rgba(1, 1, 1, 0.18)
+
+      Accessible.role: Accessible.StaticText
+      Accessible.name: panel._displayLabel()
+
+      Text {
+        id: nameText
+
+        anchors.centerIn: parent
+        width: Math.max(0, namePill.width - Ui.l * 2)
+        horizontalAlignment: Text.AlignHCenter
+        text: panel._displayLabel()
+        color: panel.focusedTheme && panel._isActiveFolder(panel.focusedTheme.folder)
+          ? Ui.solid("accent")
+          : "#ffffff"
+        font.pixelSize: Ui.fontCardTitle
+        font.family: Ui.fontFamily
+        font.bold: true
+        elide: Text.ElideMiddle
+        textFormat: Text.PlainText
+      }
+    }
+
+    Rectangle {
+      id: metaPill
+
+      visible: panel._meta() !== ""
+      x: Math.round((parent.width - width) / 2)
+      implicitWidth: metaMetrics.advanceWidth + Ui.l * 2
+      implicitHeight: metaText.implicitHeight + Ui.s * 2
+      width: Math.min(implicitWidth, parent.width)
+      height: implicitHeight
+      radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
+      color: Qt.rgba(0, 0, 0, 0.62)
+      border.width: 1
+      border.color: Qt.rgba(1, 1, 1, 0.18)
+
+      Accessible.role: Accessible.StaticText
+      Accessible.name: panel._meta()
+
+      Text {
+        id: metaText
+
+        anchors.centerIn: parent
+        width: Math.max(0, metaPill.width - Ui.l * 2)
+        horizontalAlignment: Text.AlignHCenter
+        text: panel._meta()
+        color: Qt.rgba(1, 1, 1, 0.85)
+        font.pixelSize: Ui.fontS
+        font.family: Ui.fontFamily
+        elide: Text.ElideRight
+        textFormat: Text.PlainText
+      }
     }
   }
 
@@ -1025,25 +1090,56 @@ Item {
     return nav + decide + back
   }
 
-  Text {
+  // The legend without its per-key markup, for the island's accessible name:
+  // a screen reader should read the keys, not the colour tags.
+  function _legendPlain() {
+    return panel._legend().replace(/<[^>]*>/g, "")
+  }
+
+  // The footer sits on its own dark island rather than straight on the backdrop.
+  // The surface behind it is a dimmed desktop, and a palette foreground on that
+  // is exactly the light-theme failure this avoids: on a light theme
+  // `foreground_1` is a dark colour over an already dark backdrop, so the plain
+  // words vanished. The island is theme-independent - a stronger scrim plus
+  // white text - which is why the words are white instead of a palette leaf;
+  // the key hints keep their palette colours, and the border and rounding make
+  // the island read as a surface of its own rather than a floating line of text.
+  Rectangle {
     id: footer
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
     anchors.bottomMargin: Ui.outerPad * 2
-    width: Math.max(0, panel.width - 2 * Ui.outerPad)
-    horizontalAlignment: Text.AlignHCenter
+    implicitWidth: footerText.implicitWidth + Ui.l * 2
+    implicitHeight: footerText.implicitHeight + Ui.s * 2
+    width: Math.min(implicitWidth, Math.max(0, panel.width - 2 * Ui.outerPad))
+    height: implicitHeight
+    radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
+    color: Qt.rgba(0, 0, 0, 0.62)
+    border.width: 1
+    border.color: Qt.rgba(1, 1, 1, 0.18)
     opacity: panel._fade ? 1 : 0
-    text: panel._legend()
-    color: Ui.tint("foreground_1", 0.7)
-    font.pixelSize: Ui.fontL
-    font.family: Ui.fontFamily
-    elide: Text.ElideRight
-    textFormat: Text.StyledText
+
+    Accessible.role: Accessible.StaticText
+    Accessible.name: panel._legendPlain()
 
     Behavior on opacity {
       enabled: MotionPolicy.enabled
       Glide { duration: Ui.fastMs }
+    }
+
+    Text {
+      id: footerText
+
+      anchors.centerIn: parent
+      width: Math.min(implicitWidth, footer.width - Ui.l * 2)
+      horizontalAlignment: Text.AlignHCenter
+      text: panel._legend()
+      color: "#ffffff"
+      font.pixelSize: Ui.fontL
+      font.family: Ui.fontFamily
+      elide: Text.ElideRight
+      textFormat: Text.StyledText
     }
   }
 }
