@@ -3,176 +3,419 @@
 source vb-lib-cli
 
 usage() {
-	shcat << EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] [URL]
 
-Download video/audio using yt-dlp with browser cookie extraction.
+Download video/audio using yt-dlp.
 
 Options:
-  -h, --help     Display this help and exit
+  -i, --info       List available formats for URL and exit
+  -s, --select     Pick a format interactively with fzf
+      --history    List previous downloads and exit
+  -h, --help       Display this help and exit
 EOF
 }
 
 path_to_file_uri() {
-	local -n _p2u_out=$1
-	local _p2u_path="$2"
-	local _p2u_uri="file://"
-	local i char byte
+  local -n _p2u_out=$1
+  local _p2u_path="$2"
+  local _p2u_uri="file://"
+  local i char byte
 
-	# URI percent-encoding is byte-based. Force a byte-oriented locale.
-	LC_ALL=C
+  # URI percent-encoding is byte-based. Force a byte-oriented locale.
+  local LC_ALL=C
 
-	for ((i = 0; i < ${#_p2u_path}; i++)); do
-		char="${_p2u_path:i:1}"
+  for ((i = 0; i < ${#_p2u_path}; i++)); do
+    char="${_p2u_path:i:1}"
 
-		case "$char" in
-			[a-zA-Z0-9.~_-] | /)
-				_p2u_uri+="$char"
-				;;
-			*)
-				printf -v byte '%02X' "'$char"
-				_p2u_uri+="%$byte"
-				;;
-		esac
-	done
+    case "$char" in
+      [a-zA-Z0-9.~_-] | /)
+        _p2u_uri+="$char"
+        ;;
+      *)
+        printf -v byte '%02X' "'$char"
+        _p2u_uri+="%$byte"
+        ;;
+    esac
+  done
 
-	_p2u_out="$_p2u_uri"
+  _p2u_out="$_p2u_uri"
 }
 
+# Percent escapes are decoded for display only; text/uri-list needs the
+# encoded URI on the clipboard.
+decode_file_uri() {
+  local -n _out=$1
+  local _uri="$2"
+  local _result="" _hex _char
+
+  while [[ $_uri == *%??* ]]; do
+    _hex="${_uri#*%}"
+    _hex="${_hex:0:2}"
+    printf -v _char '%b' "\\x$_hex"
+    _result+="${_uri%%%*}"$_char
+    _uri="${_uri#*%??}"
+  done
+
+  _out="$_result$_uri"
+}
+
+# Normalize the hosts and short links YouTube hands out, and drop tracking
+# query fields that carry no meaning for the download.
+normalize_url() {
+  local -n _n_out=$1
+  local url="$2"
+  local scheme="" base query="" item key
+  local -a params=() kept=()
+
+  if [[ $url =~ ^https?:// ]]; then
+    scheme="${url%%://*}://"
+    url="${url#*://}"
+  elif [[ $url =~ ^([[:alnum:]-]+\.)*(youtube\.com|youtu\.be)/ ]]; then
+    scheme="https://"
+  fi
+
+  base="${url%%\?*}"
+  [[ $url == *\?* ]] && query="${url#*\?}"
+
+  if [[ $base =~ ^([^/]+)/(shorts|live)/([^/?]+) ]]; then
+    base="${BASH_REMATCH[1]}/watch?v=${BASH_REMATCH[3]}"
+  elif [[ $base =~ ^youtu\.be/([^/?]+) ]]; then
+    base="www.youtube.com/watch?v=${BASH_REMATCH[1]}"
+  fi
+
+  base="${base/#m\.youtube\.com/www.youtube.com}"
+  base="${base/#music\.youtube\.com/www.youtube.com}"
+  base="${base/#youtube\.com/www.youtube.com}"
+
+  if [[ -n $query ]]; then
+    IFS='&' read -r -a params <<< "$query"
+    for item in "${params[@]}"; do
+      key="${item%%=*}"
+      case "$key" in
+        si | t | utm_*) continue ;;
+      esac
+      [[ -n $item ]] && kept+=("$item")
+    done
+  fi
+
+  query=""
+  for item in "${kept[@]}"; do
+    if [[ -z $query ]]; then
+      query="$item"
+    else
+      query+="&$item"
+    fi
+  done
+
+  _n_out="$scheme$base"
+  if [[ -n $query ]]; then
+    if [[ $_n_out == *\?* ]]; then
+      _n_out+="&$query"
+    else
+      _n_out+="?$query"
+    fi
+  fi
+}
+
+show_formats=false
+select_format=false
+show_history=false
+
 while [[ $# -gt 0 ]]; do
-	case "$1" in
-		-h | --help)
-			usage
-			exit 0
-			;;
-		*)
-			break
-			;;
-	esac
+  case "$1" in
+    -i | --info)
+      show_formats=true
+      shift
+      ;;
+    -s | --select)
+      select_format=true
+      shift
+      ;;
+    --history)
+      show_history=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
+  esac
 done
 
 source vb-lib-core
 
-URL="${1:-}"
-OUTPUT_DIR="$XDG_DOWNLOAD_DIR"
+HISTORY_FILE="$VIBRANIUM_STATE/vb-util-yt-dlp.history"
 
-# Ordered browser-profile names are tried when no usable cache exists. This is
-# a subset; unavailable profiles fail through yt-dlp, then cookieless is used.
-COOKIE_BR=(chrome chromium firefox brave vivaldi edge opera)
+display_history() {
+  local line timestamp title size path url
 
-if [[ -z "$1" ]]; then
-	term::show_header
-fi
+  if [[ ! -f $HISTORY_FILE ]]; then
+    vb::print "$Y" "No download history yet"
+    return
+  fi
 
-# Try cached cookies, then each browser profile, then cookieless. A successful
-# browser attempt writes the merged cookie jar for later runs; any cached-cookie
-# failure discards that cache and restarts profile selection.
-_try_download() {
-	local url="$1"
-	local cookie_cache="$VIBRANIUM_CACHE/${0##*/}"
-	local _stderr_tmp
-
-	local base_args=(
-		-f "bestvideo+bestaudio/best"
-		--remux-video mp4
-		--quiet --progress
-		--extractor-args "youtube:player_client=tv"
-		--throttled-rate 100K
-		-P "$OUTPUT_DIR"
-		--print-to-file "after_move:filepath" "$DL_PATH_FILE"
-	)
-
-	# Cached-cookie diagnostics use a script-specific path, allowing concurrent
-	# invocations to overwrite and remove each other's stderr files.
-	if [[ -f "$cookie_cache" ]]; then
-		vb::print "$Y" "Downloading..."
-		_stderr_tmp="/tmp/${0##*/}.tmp"
-		if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2> "$_stderr_tmp"; then
-			# A "no longer valid" diagnostic means YouTube rotated the cookies.
-			# An empty diagnostic file also selects this branch, matching the
-			# previous sed exit status when no input line ran its address range.
-			_cookies_rotated=true
-			while IFS= read -r _se_line || [[ -n $_se_line ]]; do
-				_cookies_rotated=false
-				if [[ $_se_line == *'no longer valid'* ]]; then
-					_cookies_rotated=true
-					break
-				fi
-			done < "$_stderr_tmp"
-			if $_cookies_rotated; then
-				vb::print "$Y" "YouTube cookies rotated - cache cleared for next run"
-				rm -f "$cookie_cache"
-			fi
-			rm -f "$_stderr_tmp"
-			return 0
-		fi
-		# Any cached-cookie failure discards diagnostics and cache, then retries the
-		# profile sequence; cookieless fallback can still expose the original error.
-		rm -f "$_stderr_tmp" "$cookie_cache"
-		vb::print "$Y" "Cached cookies stale - re-scanning browsers"
-	fi
-
-	for browser in "${COOKIE_BR[@]}"; do
-		vb::print "$Y" "Trying ${B}${browser}${RS} cookies"
-		# --cookies writes the merged jar to disk when the download succeeds.
-		if yt-dlp "${base_args[@]}" --cookies-from-browser "$browser" \
-			--cookies "$cookie_cache" "$url" 2> /dev/null; then
-			return 0
-		fi
-		# Discard any partial cookie file the failed attempt may have written.
-		rm -f "$cookie_cache"
-	done
-
-	vb::print "$Y" "No browser cookies worked. Downloading without cookies"
-	yt-dlp "${base_args[@]}" "$url"
+  while IFS=$'\t' read -r timestamp title size path url; do
+    printf '%s  |  %-10s  |  %s\n' "$timestamp" "${size:-?}" "$title"
+    printf '   %s\n' "$path"
+  done < "$HISTORY_FILE"
 }
 
-if ! command -v yt-dlp > /dev/null; then
-	if ! term::ask_yes_no Y "${B}yt-dlp${RS} not found. Install it now?"; then
-		operation::result canceled
-		exit 1
-	fi
+if [[ $show_history == true ]]; then
+  display_history
+  exit 0
+fi
 
-	vb-pkg-install --embedded -- yt-dlp
-	term::enable_input
+URL="${1:-}"
+OUTPUT_DIR="$XDG_DOWNLOAD_DIR"
+FORMAT_SELECTOR="bestvideo+bestaudio/best"
+
+if [[ -z $URL ]]; then
+  term::show_header
 fi
 
 term::enable_input
 while true; do
-	if [[ -z "$URL" ]]; then
-		if ! term::prompt_line URL "${Y}[*]${RS} Enter video URL: "; then
-			operation::result canceled "No URL provided"
-			exit 1
-		fi
-	fi
+  if [[ -z "$URL" ]]; then
+    if ! term::prompt_line URL "${Y}[*]${RS} Enter video URL: "; then
+      operation::result canceled "No URL provided"
+      exit 1
+    fi
+  fi
 
-	if [[ $URL =~ ^https?:// ]]; then
-		break
-	fi
+  normalize_url URL "$URL"
 
-	vb::print "$R" "Not a valid URL!"
-	URL=""
+  if [[ $URL =~ ^https?:// ]]; then
+    break
+  fi
+
+  vb::print "$R" "Not a valid URL!"
+  URL=""
 done
 term::disable_input
 
-# yt-dlp writes the final path to a side-channel mktemp. The first trap handles
-# INT; TERM and KILL have no cleanup handler and can leave the file behind.
-DL_PATH_FILE="$(mktemp)"
-trap 'trap "exit 1" INT; rm -f "$DL_PATH_FILE"; printf "\n"; operation::result canceled; exit 1' INT
+if ! command -v yt-dlp > /dev/null; then
+  if ! term::ask_yes_no Y "${B}yt-dlp${RS} not found. Install it now?"; then
+    operation::result canceled
+    exit 1
+  fi
 
-if ! _try_download "$URL"; then
-	rm -f "$DL_PATH_FILE"
-	vb::print "$R" "Something went wrong!"
-	operation::result error
-	exit 1
+  vb-pkg-install --embedded -- yt-dlp
+  term::enable_input
+
+  if ! command -v yt-dlp > /dev/null; then
+    operation::result error "yt-dlp installation failed"
+    exit 1
+  fi
 fi
 
-# Command substitution strips all trailing newlines; explicit single-newline
-# removal follows, so a filename ending in newline bytes cannot round-trip.
-DL_FILE=""
-IFS= read -r DL_FILE < "$DL_PATH_FILE" || [[ -n $DL_FILE ]]
-DL_FILE="${DL_FILE%$'\n'}"
-rm -f "$DL_PATH_FILE"
+# Both --info and --select work from the same extraction; the picker just
+# feeds the chosen format ID back into the download.
+formats_raw=""
+formats=()
+list_formats() {
+  local url="$1"
+  local fmt_file="$VIBRANIUM_CACHE/${0##*/}.formats"
+  local line first
+
+  if ! yt-dlp --list-formats --ignore-config \
+    --extractor-args "youtube:player_client=visionos" \
+    "$url" > "$fmt_file" 2> /dev/null; then
+    rm -f "$fmt_file"
+    return 1
+  fi
+
+  IFS= read -r -d '' formats_raw < "$fmt_file" || formats_raw="$(< "$fmt_file")"
+  formats=()
+  while IFS= read -r line || [[ -n $line ]]; do
+    first="${line%%[[:space:]]*}"
+    [[ $line =~ ^[[:space:]]*$ ]] && continue
+    [[ $line == *'---'* || $line == *' ID '*EXT* ]] && continue
+    [[ $first == \[* || $first == ID ]] && continue
+    formats+=("$line")
+  done < "$fmt_file"
+
+  rm -f "$fmt_file"
+}
+
+if [[ $show_formats == true || $select_format == true ]]; then
+  if ! list_formats "$URL"; then
+    operation::result error "Could not list formats"
+    exit 1
+  fi
+
+  if [[ $show_formats == true ]]; then
+    printf '%s\n' "$formats_raw"
+    exit 0
+  fi
+
+  if ! command -v fzf > /dev/null || (( ${#formats[@]} == 0 )); then
+    vb::print "$R" "fzf not available - use --info to pick a format manually"
+    operation::result error
+    exit 1
+  fi
+
+  fzf_flags=(--prompt 'Format> ' --header 'Select a format' --no-multi --reverse)
+  chosen="$(printf '%s\n' "${formats[@]}" | fzf "${fzf_flags[@]}")" || {
+    operation::result canceled
+    exit 1
+  }
+  read -r format_id _ <<< "$chosen"
+  FORMAT_SELECTOR="$format_id"
+fi
+
+# yt-dlp writes the final path and metadata to side-channel mktemps. INT
+# cancels the operation; the EXIT trap removes them on every other exit path.
+DL_PATH_FILE="$(mktemp)"
+DL_TITLE_FILE="$(mktemp)"
+DL_SIZE_FILE="$(mktemp)"
+
+cleanup_temp_files() {
+  rm -f "$DL_PATH_FILE" "$DL_TITLE_FILE" "$DL_SIZE_FILE"
+}
+
+trap 'trap "exit 1" INT; cleanup_temp_files; printf "\n"; operation::result canceled; exit 1' INT
+trap 'cleanup_temp_files' EXIT
+
+# With metadata embedding on, an existing file makes yt-dlp fail in
+# postprocessing instead of reporting its path. Track pre-existing .part files
+# so only new ones are cleaned up after a failed download.
+declare -A parts_before=()
+for existing_part in "$OUTPUT_DIR"/*.part; do
+  [[ -e $existing_part ]] && parts_before["$existing_part"]=1
+done
+
+cleanup_new_parts() {
+  local part
+  for part in "$OUTPUT_DIR"/*.part; do
+    [[ -e $part && -z ${parts_before[$part]+x} ]] && rm -f "$part"
+  done
+}
+
+# The JS-less visionOS client avoids YouTube's JS challenge entirely, which
+# otherwise delays extraction and full-quality format URLs by several seconds.
+ytdlp_args=(
+  --remux-video mp4
+  --quiet --progress
+  --throttled-rate 100K
+  --no-playlist
+  --playlist-end 1
+  --embed-metadata
+  --embed-subs
+  --ignore-config
+  -P "$OUTPUT_DIR"
+  --print-to-file "after_move:filepath" "$DL_PATH_FILE"
+  --print-to-file "title" "$DL_TITLE_FILE"
+  --print-to-file "filesize_approx" "$DL_SIZE_FILE"
+)
+output_template='%(title)s.%(ext)s'
+last_error=""
+
+read_final_path() {
+  # Command substitution strips all trailing newlines; explicit single-newline
+  # removal follows, so a filename ending in newline bytes cannot round-trip.
+  DL_FILE=""
+  IFS= read -r DL_FILE < "$DL_PATH_FILE" || [[ -n $DL_FILE ]]
+  DL_FILE="${DL_FILE%$'\n'}"
+}
+
+run_download() {
+  local template="$1"
+  local attempt client
+  local err_file="$VIBRANIUM_CACHE/${0##*/}.stderr"
+  local line
+
+  for attempt in 1 2 3; do
+    # The last attempt falls back to yt-dlp's default clients in case the
+    # fast JS-less client yields no formats for a particular video.
+    client=visionos
+    ((attempt == 3)) && client=default
+
+    vb::print "$Y" "Downloading..."
+    if yt-dlp "${ytdlp_args[@]}" --extractor-args "youtube:player_client=$client" \
+      -f "$FORMAT_SELECTOR" -o "$template" "$URL" 2> "$err_file"; then
+      rm -f "$err_file"
+      return 0
+    fi
+
+    while IFS= read -r line || [[ -n $line ]]; do
+      [[ $line == ERROR:* ]] && last_error="$line"
+    done < "$err_file"
+
+    # An existing file fails in postprocessing rather than reporting a path;
+    # retrying the same name cannot help.
+    if grep -qF 'Postprocessing: Error opening input files' "$err_file"; then
+      rm -f "$err_file"
+      return 2
+    fi
+
+    if ((attempt < 3)); then
+      vb::print "$Y" "Download failed - retrying (${attempt}/3)"
+      sleep 2
+    fi
+  done
+
+  rm -f "$err_file"
+  return 1
+}
+
+download_failed() {
+  cleanup_new_parts
+  [[ -n $last_error ]] && vb::print "$R" "$last_error"
+  vb::print "$R" "Something went wrong!"
+  operation::result error
+  exit 1
+}
+
+run_download "$output_template"
+download_status=$?
+
+if ((download_status == 2)); then
+  # Resolve the exact filename yt-dlp would use, then pick the first free
+  # " (n)" variant. The dry run only happens on a collision.
+  collision_file="$(yt-dlp --simulate --print filename --no-playlist \
+    --playlist-end 1 --extractor-args "youtube:player_client=visionos" \
+    --ignore-config --remux-video mp4 -o '%(title)s.%(ext)s' \
+    -P "$OUTPUT_DIR" "$URL" 2> /dev/null)"
+  collision_base="${collision_file%.*}"
+  collision_suffix=1
+  collision_candidate="$collision_base (1).mp4"
+
+  while [[ -e $collision_candidate ]]; do
+    collision_suffix=$((collision_suffix + 1))
+    collision_candidate="$collision_base ($collision_suffix).mp4"
+  done
+
+  # Percent signs are yt-dlp template escapes; double them in a literal name.
+  # A relative template keeps the -P destination in effect.
+  output_template="${collision_candidate#"$OUTPUT_DIR"/}"
+  output_template="${output_template//\%/%%}"
+
+  run_download "$output_template" || download_failed
+elif ((download_status != 0)); then
+  download_failed
+fi
+
+read_final_path
+
+if [[ -z $DL_FILE || ! -f $DL_FILE ]]; then
+  vb::print "$R" "Download finished but the file path was not reported!"
+  operation::result error
+  exit 1
+fi
+
+DL_TITLE=""
+IFS= read -r DL_TITLE < "$DL_TITLE_FILE" || [[ -n $DL_TITLE ]]
+DL_SIZE=""
+IFS= read -r DL_SIZE < "$DL_SIZE_FILE" || [[ -n $DL_SIZE ]]
+
+mkdir -p "${HISTORY_FILE%/*}"
+printf '%s\t%s\t%s\t%s\t%s\n' \
+  "$(date '+%F %T')" "$DL_TITLE" "${DL_SIZE:-?}" "$DL_FILE" "$URL" \
+  >> "$HISTORY_FILE"
 
 # The encoder does not normalize its input. An absolute path yields an empty
 # file:// authority; a relative path would be parsed as a host instead.
@@ -180,8 +423,12 @@ path_to_file_uri DL_URI "$DL_FILE"
 
 # text/uri-list uses CRLF record termination; percent-encoding keeps path bytes
 # intact while the URI crosses clipboard consumers.
-printf '%s\r\n' "$DL_URI" | wl-copy --type text/uri-list
-vb::print "$G" "Copied to clipboard: ${B}${DL_URI}${RS}"
+if printf '%s\r\n' "$DL_URI" | wl-copy --type text/uri-list; then
+  decode_file_uri DL_DISPLAY_URI "$DL_URI"
+  vb::print "$G" "Copied to clipboard: ${B}${DL_DISPLAY_URI}${RS}"
+else
+  vb::print "$Y" "Clipboard copy failed - file saved to ${B}${DL_FILE}${RS}"
+fi
 vb::print "$G" "Video has been saved to ${B}$OUTPUT_DIR${RS}"
 
 operation::result success
