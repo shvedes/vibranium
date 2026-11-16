@@ -19,6 +19,12 @@ Rectangle {
   id: tile
 
   property string file: ""
+  // Directory the picture is read from: the user overlay or the install
+  // tree. Empty falls back to the user overlay for a departing tile.
+  property string dir: ""
+  // A revealed wallpaper the user disabled: the picture stays, and the badge
+  // over it says the theme no longer offers it.
+  property bool disabled: false
   // Position in the deck relative to the selection: 0 is the big card,
   // negative is to its left. The panel's own binding keeps this current.
   property int rel: 0
@@ -45,6 +51,9 @@ Rectangle {
     ? Ui.solid("accent")
     : Ui.tint("foreground_1", 0.10)
   clip: true
+  // A removal in flight fades the whole tile. A revealed disabled wallpaper is
+  // dimmed by a pane over its picture instead (see `frame`), so its badge and
+  // its frame stay fully opaque.
   opacity: tile.pending ? 0.35 : 1
 
   // The cell places and animates the deck; the tile only fades for its own
@@ -56,7 +65,7 @@ Rectangle {
   }
 
   readonly property string path: tile.file !== ""
-    ? SU.joinPath(WallpaperPicker.backgroundsDir, tile.file)
+    ? SU.joinPath(tile.dir !== "" ? tile.dir : WallpaperPicker.backgroundsDir, tile.file)
     : ""
 
   // The content window. A Rectangle's clip is its bounding box and not its
@@ -133,6 +142,55 @@ Rectangle {
       Behavior on opacity {
         enabled: MotionPolicy.enabled
         Glide { duration: Ui.slowMs }
+      }
+    }
+
+    // A revealed disabled wallpaper is dimmed over the picture, not by the
+    // tile's own opacity: the badge and the frame announce a state, and a
+    // transparent tile would make them read as disabled too. It sits under the
+    // badge and over the neighbour veil, so a hidden slice is dimmed twice -
+    // once for being off the selection, once for being hidden.
+    //
+    // The veil is black rather than a palette tint, which is what the deck uses
+    // for its neighbours: `background_0` is a near-white cream on the light
+    // themes, and tinting a picture with it brightens the tile instead of
+    // dimming it. A scrim has one meaning on every palette.
+    Rectangle {
+      anchors.fill: parent
+      radius: RoundingPolicy.radius
+      color: Qt.rgba(0, 0, 0, 0.45)
+      opacity: tile.disabled ? 1 : 0
+
+      Behavior on opacity {
+        enabled: MotionPolicy.enabled
+        Glide { duration: Ui.fastMs }
+      }
+    }
+
+    // The disabled marker, on top of the picture rather than beside it: a
+    // revealed hidden wallpaper has to read as not offered by the theme at a
+    // glance, and Enter is what puts it back.
+    Rectangle {
+      visible: tile.disabled
+
+      anchors.top: parent.top
+      anchors.right: parent.right
+      anchors.margins: Ui.s
+      implicitWidth: badgeLabel.implicitWidth + Ui.s * 2
+      implicitHeight: Math.round(Ui.fontS * 2)
+      radius: Math.round(implicitHeight / 2)
+      color: Ui.tint("background_0", 0.78)
+      border.width: 1
+      border.color: Ui.tint("foreground_1", 0.35)
+
+      Text {
+        id: badgeLabel
+
+        anchors.centerIn: parent
+        text: "Hidden"
+        color: Ui.solid("foreground_0")
+        font.pixelSize: Ui.fontS
+        font.family: Ui.fontFamily
       }
     }
 

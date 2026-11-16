@@ -145,6 +145,24 @@ Item {
     return rec ? String(rec.value ?? "") : ""
   }
 
+  // The directory a row's picture is read from: a user pick and a shipped
+  // wallpaper are both rows, and only the row knows which tree it came from.
+  function _rowDir(abs) {
+    const rows = panel.rows
+    if (!rows || abs < 0 || abs >= rows.length) return ""
+    const rec = rows[abs]
+    return rec ? String(rec.dir ?? "") : ""
+  }
+
+  // A revealed row the user disabled: it carries the Hidden badge and has no
+  // file of its own left to remove.
+  function _rowDisabled(abs) {
+    const rows = panel.rows
+    if (!rows || abs < 0 || abs >= rows.length) return false
+    const rec = rows[abs]
+    return rec ? rec.disabled === true : false
+  }
+
   // The rows the deck instantiates: the window around the selection. It is
   // wider than the cascade shows, so a slide that is still animating in from the
   // edge has a tile to come from.
@@ -175,27 +193,88 @@ Item {
   function _syncWindow() {
     const want = []
     if (panel._leavingFile !== "") {
-      want.push({ abs: -1, file: panel._leavingFile, rel: 0 })
+      // An empty dir lets the tile fall back to the user overlay: the
+      // departing picture is already gone from the listing either way.
+      want.push({ abs: -1, file: panel._leavingFile, rel: 0, dir: "", disabled: false, vanishing: false })
     }
     const abss = panel._windowAbss()
     for (let i = 0; i < abss.length; i++) {
-      want.push({ abs: abss[i], file: panel._rowFile(abss[i]), rel: abss[i] - panel.selIndex })
+      want.push({
+        abs: abss[i],
+        file: panel._rowFile(abss[i]),
+        rel: abss[i] - panel.selIndex,
+        dir: panel._rowDir(abss[i]),
+        disabled: panel._rowDisabled(abss[i]),
+        vanishing: false
+      })
     }
     const wanted = Object.create(null)
     for (let i = 0; i < want.length; i++) wanted[want[i].file] = true
+
+    // A row that leaves the window - the hidden set being hidden again, a theme
+    // swap - fades out in place before it is dropped, so the deck reads as
+    // pictures leaving rather than a snap to the next listing. `_settled` keeps
+    // the open out of it: there the panel's own fade already covers the deck.
+    const animate = panel._settled && MotionPolicy.enabled
+    // A row that is wanted again before its fade finished turns around instead
+    // of being released under the listing that just took it back.
+    for (let i = 0; i < deck.count; i++) {
+      const row = deck.get(i)
+      if (row.vanishing === true && wanted[String(row.file)] === true) {
+        deck.setProperty(i, "vanishing", false)
+      }
+    }
     for (let i = deck.count - 1; i >= 0; i--) {
-      if (wanted[String(deck.get(i).file)] !== true) deck.remove(i)
+      const row = deck.get(i)
+      if (wanted[String(row.file)] === true || row.vanishing === true) continue
+      if (animate) { deck.setProperty(i, "vanishing", true); continue }
+      deck.remove(i)
+    }
+    // Departing rows are parked past the live window, so the ascending patch
+    // below still lines up with `want`; each one releases itself when its fade
+    // ends (see _dropVanished).
+    let departing = 0
+    for (let i = 0; i < deck.count; i++) {
+      if (deck.get(i).vanishing === true) departing++
+    }
+    let at = 0
+    while (departing > 0) {
+      if (deck.get(at).vanishing === true) {
+        deck.move(at, deck.count - 1)
+        departing--
+      } else {
+        at++
+      }
     }
     for (let i = 0; i < want.length; i++) {
       const row = deck.get(i)
       if (row && String(row.file) === want[i].file) {
         deck.setProperty(i, "abs", want[i].abs)
         deck.setProperty(i, "rel", want[i].rel)
+        deck.setProperty(i, "dir", want[i].dir)
+        deck.setProperty(i, "disabled", want[i].disabled)
       } else {
         deck.insert(i, want[i])
       }
     }
-    while (deck.count > want.length) deck.remove(deck.count - 1)
+    // Only live rows are trimmed here: a departing one is released by its fade.
+    while (deck.count > want.length && deck.get(deck.count - 1).vanishing !== true) {
+      deck.remove(deck.count - 1)
+    }
+  }
+
+  // A departing cell's fade is over: release its row. The wallpaper can come
+  // back while the fade runs (a second toggle), in which case the row has
+  // already been turned around and is left alone.
+  function _dropVanished(file) {
+    const name = String(file)
+    if (panel._indexOf(name) >= 0) return
+    for (let i = 0; i < deck.count; i++) {
+      if (String(deck.get(i).file) === name) {
+        deck.remove(i)
+        return
+      }
+    }
   }
 
   function _currentFile() {
@@ -298,6 +377,9 @@ Item {
   function toggleDelete() {
     const file = panel._currentFile()
     if (file === "") return
+    // A revealed hidden wallpaper is already removed from the theme; Enter is
+    // the key that restores it, so removal has nothing to arm here.
+    if (WallpaperPicker.isDisabledRow(file)) return
     if (panel._confirmOpen && panel._confirmFile === file) {
       panel.acceptDelete()
       return
@@ -453,7 +535,14 @@ Item {
       event.accepted = true
       return
     }
-    if (k === Qt.Key_O && !ctrl) { panel.pickFile(); event.accepted = true; return }
+    // The browse and file-chooser verbs are chords, not bare letters: a plain
+    // keypress is left to whatever search trigger owns it.
+    if (k === Qt.Key_H && ctrl) {
+      WallpaperPicker.toggleHidden()
+      event.accepted = true
+      return
+    }
+    if (k === Qt.Key_O && ctrl) { panel.pickFile(); event.accepted = true; return }
     // The deck is horizontal, so both hands get a route: arrows, A/D from
     // WASD and J/K from vim all step the selection. Ctrl+D is claimed above as
     // the removal key, so D here is only the plain one.
@@ -529,7 +618,9 @@ Item {
     clip: true
     // A departing tile outlives the row set it came from: the last wallpaper a
     // theme held still has to fade out over an empty deck.
-    visible: panel.rows.length > 0 || panel._leavingFile !== ""
+    // Departing rows outlive the listing they came from, so the deck stays up
+    // while they fade out even when the last row has already left `rows`.
+    visible: panel.rows.length > 0 || panel._leavingFile !== "" || deck.count > 0
     opacity: panel._fade ? 1 : 0
 
     Behavior on opacity {
@@ -549,6 +640,11 @@ Item {
 
         required property int rel
         required property string file
+        required property string dir
+        required property bool disabled
+        // The row is leaving the window and is fading out before it is
+        // released.
+        required property bool vanishing
 
         // The tile a removal just took out of the listing. It keeps the slot it
         // was read in - the selection does not move on a removal - and leaves
@@ -564,7 +660,47 @@ Item {
         width: panel.tileW(cell.rel)
         height: panel.tileH(cell.rel)
         z: cell.leaving ? 200 : (cell.rel === 0 ? 100 : 50 - Math.min(Math.abs(cell.rel), 40))
-        opacity: cell.leaving ? 1 - panel._leaveProgress : 1
+        // A tile that arrives after the deck has settled - revealing the
+        // disabled wallpapers - fades in over the deck's normal clock instead
+        // of popping into its slot. Tiles placed during the open are already
+        // covered by the panel's own fade, so they start at full opacity.
+        property real appear: 1
+        // The fade a departing row takes on its way out of the window.
+        property real vanish: 1
+        opacity: (cell.leaving ? 1 - panel._leaveProgress : 1) * cell.appear * cell.vanish
+        onVanishingChanged: {
+          vanishAnim.stop()
+          vanishAnim.to = cell.vanishing ? 0 : 1
+          vanishAnim.restart()
+        }
+        Component.onCompleted: {
+          if (!panel._settled || !MotionPolicy.enabled) return
+          cell.appear = 0
+          appearAnim.start()
+        }
+
+        NumberAnimation {
+          id: appearAnim
+
+          target: cell
+          property: "appear"
+          to: 1
+          duration: Ui.normalMs
+          easing.type: Easing.OutCubic
+        }
+
+        NumberAnimation {
+          id: vanishAnim
+
+          target: cell
+          property: "vanish"
+          duration: Ui.normalMs
+          easing.type: Easing.OutCubic
+          onFinished: {
+            const leaving = String(cell.file)
+            if (cell.vanishing) Qt.callLater(() => panel._dropVanished(leaving))
+          }
+        }
 
         Behavior on x {
           enabled: MotionPolicy.enabled && panel._settled
@@ -616,7 +752,9 @@ Item {
         WallpaperEntry {
           anchors.fill: parent
           file: cell.file
+          dir: cell.dir
           rel: cell.rel
+          disabled: cell.disabled
           pending: WallpaperPicker.optimistic.isPending(cell.file)
           deleteArmed: panel._confirmOpen && panel._confirmFile === cell.file
           // The surface's own width is read here as well as inside the geometry:
@@ -638,7 +776,9 @@ Item {
     anchors.top: stage.bottom
     anchors.topMargin: Ui.l
     width: Math.min(panel.bigW, Math.max(0, panel.width - 2 * Ui.outerPad))
-    visible: stage.visible
+    // No name to show until a listing offers one; an empty island would be a
+    // lone pill under the deck.
+    visible: stage.visible && panel._currentFile() !== ""
     opacity: panel._fade ? 1 : 0
 
     Behavior on opacity {
@@ -646,25 +786,48 @@ Item {
       Glide { duration: Ui.fastMs }
     }
 
-    Text {
-      width: parent.width
-      horizontalAlignment: Text.AlignHCenter
-      text: panel._currentFile()
-      color: panel._isApplied(panel._currentFile())
-        ? Ui.solid("accent")
-        : Ui.solid("foreground_0")
-      font.pixelSize: Ui.fontCardTitle
-      font.family: Ui.fontFamily
-      font.bold: true
-      elide: Text.ElideMiddle
-      textFormat: Text.PlainText
+    // The selected file gets the footer's island: it sits over the same dimmed
+    // backdrop, so a palette foreground on it is unreadable on a light theme.
+    // White is the fallback text; the applied wallpaper still reads in accent.
+    Rectangle {
+      id: nameIsland
+
+      x: Math.round((parent.width - width) / 2)
+      implicitWidth: nameText.implicitWidth + Ui.l * 2
+      implicitHeight: nameText.implicitHeight + Ui.s * 2
+      width: Math.min(implicitWidth, parent.width)
+      height: implicitHeight
+      radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
+      color: Qt.rgba(0, 0, 0, 0.62)
+      border.width: 1
+      border.color: Qt.rgba(1, 1, 1, 0.18)
+
+      Accessible.role: Accessible.StaticText
+      Accessible.name: panel._currentFile()
+
+      Text {
+        id: nameText
+
+        anchors.centerIn: parent
+        width: Math.min(implicitWidth, nameIsland.width - Ui.l * 2)
+        horizontalAlignment: Text.AlignHCenter
+        text: panel._currentFile()
+        color: panel._isApplied(panel._currentFile())
+          ? Ui.solid("accent")
+          : "#ffffff"
+        font.pixelSize: Ui.fontCardTitle
+        font.family: Ui.fontFamily
+        font.bold: true
+        elide: Text.ElideMiddle
+        textFormat: Text.PlainText
+      }
     }
   }
 
   EmptyState {
     anchors.centerIn: parent
     width: Math.max(0, panel.width - 64)
-    visible: panel.rows.length === 0
+    visible: panel.rows.length === 0 && deck.count === 0
     opacity: panel._fade ? 1 : 0
     text: "No wallpapers"
     iconName: "image"
@@ -688,32 +851,69 @@ Item {
         + panel._key("Delete", Ui.solid("red")) + " again to remove · "
         + panel._key("Esc", accent) + " cancels"
     }
+    // The reveal verb is only advertised while the theme has something to
+    // reveal: a Ctrl+H that would do nothing is a dead key in the legend.
+    const hidden = WallpaperPicker.hiddenCount > 0
+      ? panel._key("Ctrl+H", Ui.solid("purple"))
+        + (WallpaperPicker.showHidden ? " hide hidden · " : " show hidden · ")
+      : ""
     return panel._key("←/→", accent) + " · " + panel._key("A/D", accent)
       + " · " + panel._key("J/K", accent) + " browse · "
       + panel._key("Enter", accent) + " / " + panel._key("Space", accent) + " apply · "
-      + panel._key("O", Ui.solid("yellow")) + " open · "
+      + hidden
+      + panel._key("Ctrl+O", Ui.solid("yellow")) + " open · "
       + panel._key("Delete", Ui.solid("red")) + " remove · Esc close"
   }
+  // The legend without its per-key markup, for the island's accessible name:
+  // a screen reader should read the keys, not the colour tags.
+  function _legendPlain() {
+    return panel._legend().replace(/<[^>]*>/g, "")
+  }
 
-  Text {
+  // The footer sits on its own dark island rather than straight on the backdrop.
+  // The deck behind it is a dimmed desktop, and a palette foreground on that is
+  // exactly the light-theme failure this avoids: on a light theme `foreground_1`
+  // is a dark colour over an already dark backdrop, so the plain words vanished.
+  // The island is theme-independent - a stronger scrim plus white text - which
+  // is why the words are white instead of a palette leaf; the key hints keep
+  // their palette colours, and the border and rounding make the island read as
+  // a surface of its own rather than a floating line of text.
+  Rectangle {
     id: footer
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
     anchors.bottomMargin: Ui.outerPad * 2
-    width: Math.max(0, panel.width - 2 * Ui.outerPad)
-    horizontalAlignment: Text.AlignHCenter
+    implicitWidth: footerText.implicitWidth + Ui.l * 2
+    implicitHeight: footerText.implicitHeight + Ui.s * 2
+    width: Math.min(implicitWidth, Math.max(0, panel.width - 2 * Ui.outerPad))
+    height: implicitHeight
+    radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
+    color: Qt.rgba(0, 0, 0, 0.62)
+    border.width: 1
+    border.color: Qt.rgba(1, 1, 1, 0.18)
     opacity: panel._fade ? 1 : 0
-    text: panel._legend()
-    color: Ui.tint("foreground_1", 0.7)
-    font.pixelSize: Ui.fontL
-    font.family: Ui.fontFamily
-    elide: Text.ElideRight
-    textFormat: Text.StyledText
+
+    Accessible.role: Accessible.StaticText
+    Accessible.name: panel._legendPlain()
 
     Behavior on opacity {
       enabled: MotionPolicy.enabled
       Glide { duration: Ui.fastMs }
+    }
+
+    Text {
+      id: footerText
+
+      anchors.centerIn: parent
+      width: Math.min(implicitWidth, footer.width - Ui.l * 2)
+      horizontalAlignment: Text.AlignHCenter
+      text: panel._legend()
+      color: "#ffffff"
+      font.pixelSize: Ui.fontL
+      font.family: Ui.fontFamily
+      elide: Text.ElideRight
+      textFormat: Text.StyledText
     }
   }
 

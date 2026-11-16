@@ -374,7 +374,11 @@ Singleton {
     // cannot be raced by a request that supersedes this one mid-callback.
     root._retire(record.key, "cycle_done")
     const names = raw.split("\n").filter(l => l).map(l => SU.basename(l))
+    // A builtin wallpaper the user disabled is not part of the set: the cycle
+    // and the auto pick both read this listing, so recording one as hidden
+    // removes it from what next/prev and the initial choice can reach.
     const files = names.filter(f => ImageExts.ok(f)).sort()
+      .filter(f => !HiddenWallpapers.isHidden(record.theme, f))
     // The theme a listing was issued for has to still be the active one;
     // _onThemeNameChanged retires the cycle outright, and this is the cheap
     // invariant that keeps a commit from ever naming another theme.

@@ -20,8 +20,8 @@ vb-shell wallpaper /path/to/your/beautiful_wallpaper.png
 
 ## The wallpaper cycle
 
-++ctrl+alt+w++ cycles to the next wallpaper of the active theme.
-Your custom wallpapers are **included** in the cycle, alongside the theme's defaults — Vibranium merges the theme's `backgrounds/` folder with your own picks.
+++ctrl+alt+w++ opens the wallpaper picker, which shows the active theme's shipped wallpapers together with your own picks.
+Once applied, a wallpaper joins the theme's cycle: Vibranium merges the theme's installed `backgrounds/` folder with your own picks, so next/prev and the initial choice see one set.
 
 ## Transitions
 
@@ -45,7 +45,11 @@ If you really want to reuse a wallpaper, the file sits in `~/.config/vibranium/t
 
 - **Open the folder** — where your custom wallpapers live
 - **Open** — open selected file
-- **Delete** — remove custom wallpapers
+- **Delete** — remove wallpapers
+
+The picker lists the theme's shipped wallpapers too. A shipped image cannot be removed from the installation, so deleting one records it as disabled in `$VIBRANIUM_STATE/hidden-wallpapers.json` (`~/.local/state/vibranium` by default) and every wallpaper surface then treats it as absent. Deleting a wallpaper you added removes the file instead.
+
+++ctrl+h++ in the picker reveals disabled shipped wallpapers with a **Hidden** badge on the picture; press ++enter++ on one to restore it, or ++ctrl+h++ again to hide them. The same file can be edited by hand — remove the `"<theme>/<file>"` entry from its `hidden` array and the change is picked up live.
 
 ## Tips
 

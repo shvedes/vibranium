@@ -73,6 +73,11 @@ Singleton {
   // an atomic theme swap does not wipe per-theme memory).
   readonly property string wallpaperStateJson: root.vibraniumState + "/wallpaper.json"
 
+  // Builtin wallpapers the user disabled, as "<theme>/<basename>" keys.
+  // Shipped images cannot be removed from the install tree, so removing one
+  // is recorded here instead (see common/state/HiddenWallpapers.qml).
+  readonly property string hiddenWallpapersJson: root.vibraniumState + "/hidden-wallpapers.json"
+
   function userThemesDir(theme) {
     return SU.joinPath(root.themesUserRoot, theme)
   }

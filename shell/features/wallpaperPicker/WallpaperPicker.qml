@@ -22,14 +22,19 @@ import "../../common/process/PanelList.js" as PanelList
 
 // Efficient user wallpaper picker - the cascade overlay's data service.
 //
-// Data source: $XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds
-// For community themes (theme dir has .git), only git-untracked files in
-// backgrounds/ are user wallpapers (shipped ones are tracked). For
-// official themes (no .git), every file is user-provided. The listing is
-// fully native, cached, and async.
+// Data sources: $XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds
+// (user picks) and $VIBRANIUM/themes/$current_theme/backgrounds (shipped).
+// For community themes (user dir has .git), only git-untracked files in the
+// user dir count as user wallpapers (shipped ones are tracked). A user pick
+// shadows a shipped file of the same basename, and a shipped file listed in
+// HiddenWallpapers is not offered at all. The listing is fully native,
+// cached, and async.
 //
 // Efficiency tricks:
-// - One FolderListModel per backgrounds dir (Qt's async, watches for changes)
+// - One FolderListModel over the user backgrounds dir (Qt's async, watches
+//   for changes)
+// - One bounded `find` per theme for the shipped directory, which does not
+//   change under a running session
 // - Git ls-files as a bounded registry job, only for .git themes, re-run
 //   whenever the backgrounds dir changes so drops show up live
 // - The deck's rows derived via JS, never a rescan of the FS
@@ -41,9 +46,13 @@ Singleton {
 
     property bool visible: false
     readonly property bool isOpen: root.visible
+    // Browse mode: shipped wallpapers the user disabled are listed with a
+    // badge so they can be restored. A visit starts with them hidden.
+    property bool showHidden: false
 
     property string currentTheme: ""
     property string backgroundsDir: ""
+    property string builtinDir: ""
     property string themeDir: ""
 
     // Where the listing models' `folder` is spelled, derived from the
@@ -79,12 +88,22 @@ Singleton {
     property var _rawFiles: []
     // User wallpapers after git filter (basenames)
     property var _userFiles: []
-    // The deck's rows: one record per user wallpaper, in listing order.
+    // Shipped wallpapers for the active theme (basenames), unfiltered.
+    property var _builtinFiles: []
+    // Whether the shipped listing has answered; empty is an answer.
+    property bool _builtinListed: false
+    // The deck's rows: one record per offered wallpaper, in listing order.
     property var filtered: []
+    // How many of this theme's shipped wallpapers the user disabled, whether or
+    // not the deck is currently revealing them. The picker's legend has no
+    // Ctrl+H hint to offer when there is nothing to reveal.
+    property int hiddenCount: 0
 
     // Cache for git untracked set
     property var _gitUntracked: null
     property bool _gitRunning: false
+    // Whether the shipped-wallpaper listing is in flight.
+    property bool _builtinRunning: false
     // Whether the theme dir carries .git (re-derived on every _updateDirs)
     property bool _hasGit: false
     // Whether the cached untracked set is current for this _updateDirs pass;
@@ -118,6 +137,7 @@ Singleton {
     readonly property string _probeKey: "gitProbe"
     readonly property string _listKey: "gitList"
     readonly property string _refreshKey: "gitRefresh"
+    readonly property string _builtinKey: "builtinList"
     // Immutable record of the running listing: the handle it must answer to
     // plus the theme and directory its command was built from. The job's
     // callback carries this record, so a reused slot or a replacement run can
@@ -323,6 +343,15 @@ Singleton {
         root._refusal = ""
         root.themeDir = dir.path
         root.backgroundsDir = dir.path + "/backgrounds"
+        // Shipped wallpapers live in the install tree rather than in the user
+        // overlay, so the deck lists both. A community-only theme has no
+        // shipped directory, which the listing below reads as empty.
+        const shipped = Paths.vibraniumHome === ""
+          ? { ok: false, code: "no_install_root", path: "" }
+          : root._checkedPath(theme, Paths.vibraniumHome + "/themes", theme, {
+              mode: "read", operation: "theme_dir", leafRelative: true
+            })
+        root.builtinDir = shipped.ok ? shipped.path + "/backgrounds" : ""
         // Invalidate the git snapshot up front: until the fresh one lands,
         // rows render unfiltered instead of against the previous theme's set.
         root._gitUntracked = null
@@ -337,6 +366,12 @@ Singleton {
         // A new directory is a new listing; the previous one's re-aim budget
         // says nothing about whether this one needs re-aiming.
         root._bgReaims = 0
+        // The shipped listing is a fresh question for this theme.
+        root._builtinFiles = []
+        root._builtinListed = false
+        root._builtinRunning = false
+        root._recomputeFiltered()
+        root._runBuiltinList(theme, root.builtinDir)
         // Check for .git. The probe is issued under its own generation, so
         // the answer describes the directory it named.
         root._probeGit(theme, dir.path)
@@ -344,9 +379,54 @@ Singleton {
 
     function _clearListing() {
         root.backgroundsDir = ""
+        root.builtinDir = ""
         root.themeDir = ""
         root._rawFiles = []
         root._userFiles = []
+        root._builtinFiles = []
+        root._builtinListed = false
+        root._recomputeFiltered()
+    }
+
+    // The shipped listing. One bounded `find` per theme is enough: the install
+    // tree does not change under a running session, and a theme swap retires
+    // this generation and asks the new directory. The generation names the
+    // directory it was issued for, so a listing that settles after a swap
+    // cannot describe the theme that replaced it.
+    function _runBuiltinList(theme, dir) {
+        if (dir === "") return
+        if (root._builtinRunning) return
+        const handle = root._beginWork(root._builtinKey)
+        if (handle.id === 0) return
+        const record = Object.freeze({ handle: handle, theme: theme, dir: dir })
+        root._builtinRunning = true
+        root._spawn(
+            CommandSpec.argv(["find", dir, "-maxdepth", "1", "-xtype", "f"]),
+            { timeoutMs: root._gitTimeoutMs, spawnWatchdogMs: root._gitSpawnMs },
+            (result) => root._onBuiltinListDone(record, result)
+        )
+    }
+
+    // A failed, timed out or answered-empty listing all mean the same thing to
+    // the deck: no shipped wallpaper is offered. The verdict is still marked
+    // listed, so a theme with no shipped directory is not asked again on every
+    // summon; a theme swap starts a fresh question.
+    function _onBuiltinListDone(record, result) {
+        if (root._closing) return
+        if (!RequestGate.current(record.handle)) return
+        root._builtinRunning = false
+        if (record.theme !== root.currentTheme || record.dir !== root.builtinDir) return
+        root._builtinListed = true
+        const raw = Job.succeeded(result) ? String(result.stdout === undefined ? "" : result.stdout) : ""
+        const lines = raw.split("\n")
+        const names = []
+        for (let i = 0; i < lines.length; i++) {
+            const name = SU.basename(lines[i].trim())
+            if (name === "" || !root._imgOk(name)) continue
+            names.push(name)
+        }
+        names.sort()
+        root._builtinFiles = names
         root._recomputeFiltered()
     }
 
@@ -401,6 +481,7 @@ Singleton {
     function _retireGit() {
         RequestGate.invalidateScope(root._gateScope, root._probeKey)
         RequestGate.invalidateScope(root._gateScope, root._listKey)
+        RequestGate.invalidateScope(root._gateScope, root._builtinKey)
         if (root._gitProbeQueued !== null) {
             RequestGate.invalidate(root._gitProbeQueued.handle)
             root._gitProbeQueued = null
@@ -709,10 +790,76 @@ Singleton {
     }
 
     // --- rows ---
-    // The listing is the only input: this is a mapping, not a filter. The deck
-    // has no query, so selecting a wallpaper never narrows the set it browses.
+    // The deck has no query, so selecting a wallpaper never narrows the set it
+    // browses. A user pick and a shipped file with one basename are one row:
+    // the user's file is the one on disk that shadows the shipped copy, and
+    // the row still knows the name is shipped so removing it disables both.
     function _recomputeFiltered() {
-        root.filtered = root._userFiles.map(f => ({ label: f, value: f }))
+        const rows = []
+        const userSet = Object.create(null)
+        for (let i = 0; i < root._userFiles.length; i++) {
+            const f = root._userFiles[i]
+            userSet[f] = true
+            rows.push({
+                label: f,
+                value: f,
+                dir: root.backgroundsDir,
+                shipped: root._builtinFiles.indexOf(f) >= 0,
+                disabled: false
+            })
+        }
+        let hidden = 0
+        for (let i = 0; i < root._builtinFiles.length; i++) {
+            const f = root._builtinFiles[i]
+            if (userSet[f] === true) continue
+            const disabled = HiddenWallpapers.isHidden(root.currentTheme, f)
+            // Counted before the reveal filter: the legend asks whether there is
+            // anything to reveal, not whether it is on screen.
+            if (disabled) hidden++
+            if (disabled && !root.showHidden) continue
+            rows.push({
+                label: f,
+                value: f,
+                dir: root.builtinDir,
+                shipped: true,
+                disabled: disabled
+            })
+        }
+        rows.sort((a, b) => a.label < b.label ? -1 : (a.label > b.label ? 1 : 0))
+        root.hiddenCount = hidden
+        root.filtered = rows
+    }
+
+    // The row a name currently names, or null when the deck does not offer it.
+    // Every action goes through this, so a refused or withdrawn wallpaper can
+    // never be applied or removed by a stale selection.
+    function _rowFor(fileName) {
+        const rows = root.filtered
+        const file = String(fileName)
+        for (let i = 0; i < rows.length; i++) {
+            if (String(rows[i].value) === file) return rows[i]
+        }
+        return null
+    }
+
+    // Whether the deck is currently showing a wallpaper the user disabled. A
+    // revealed one is restorable but has nothing left to remove.
+    function isDisabledRow(fileName): bool {
+        const row = root._rowFor(fileName)
+        return row !== null && row.disabled === true
+    }
+
+    function toggleHidden(): bool {
+        root.showHidden = !root.showHidden
+        root._recomputeFiltered()
+        return root.showHidden
+    }
+
+    // The hidden set is shared state: an edit to hidden-wallpapers.json (or
+    // another surface disabling a wallpaper) retires the row here as well.
+    Connections {
+        target: HiddenWallpapers
+        function onRevChanged() { root._recomputeFiltered() }
     }
 
     // --- IPC / visibility ---
@@ -734,6 +881,11 @@ Singleton {
         if (root._bgUrl !== "" && bgModel.status === FolderListModel.Null) {
             root._reaimBgModel(false)
         }
+        // A shipped listing that never answered is retried here, the one
+        // place a fresh question belongs.
+        if (!root._builtinListed && !root._builtinRunning && root.builtinDir !== "") {
+            root._runBuiltinList(root.currentTheme, root.builtinDir)
+        }
         // A listing that spent its attempt budget is re-armed here, before the
         // scan below, so a summon is the one place a degraded git gets
         // another bounded budget.
@@ -753,10 +905,12 @@ Singleton {
           && root._gitProbe === null
           && root._gitProbeQueued === null
           && !root._gitRunning
+          && root._builtinListed
+          && !root._builtinRunning
           && (!root._hasGit || root._gitFresh)
-        if (known && root._userFiles.length === 0 && root.backgroundsDir !== "") {
+        if (known && root.filtered.length === 0 && root.backgroundsDir !== "") {
             // No wallpapers – notify
-            Exec.notify("No user wallpapers found for current theme", null, { replaceId: 1 })
+            Exec.notify("No wallpapers found for current theme", null, { replaceId: 1 })
             return "ok"
         }
         root.visible = true
@@ -770,6 +924,10 @@ Singleton {
     function close() {
         if (!root.visible) return "ok"
         root.visible = false
+        // Revealing disabled wallpapers is a browse mode of one visit; the
+        // next open starts from the set the theme actually offers.
+        root.showHidden = false
+        root._recomputeFiltered()
         Registry.call("menu", "close")
         return "ok"
     }
@@ -786,15 +944,27 @@ Singleton {
     // decides it as the deletion path: a name the themes root does not contain
     // never reaches Wallpaper.set, and a refusal sets nothing.
     function apply(fileName) {
-        const name = String(fileName)
-        const src = root._checkedPath(name, Paths.themesUserRoot, String(root.currentTheme) + "/backgrounds/" + name, {
-            mode: "read", operation: "wallpaper_source", allowLeaf: true, allowExisting: true
+        const row = root._rowFor(fileName)
+        if (row === null) {
+            root._refuse("wallpaper_not_listed")
+            return false
+        }
+        const name = String(row.value)
+        // The row names its own directory: a user pick lives in the overlay, a
+        // shipped one in the install tree, and the name is judged as one leaf
+        // below whichever of them the row came from.
+        const src = root._checkedPath(name, String(row.dir), name, {
+            mode: "read", operation: "wallpaper_source", leafRelative: true, allowExisting: true
         })
         if (!src.ok) {
             root._refuse(src.code)
             return false
         }
         root._refusal = ""
+        // Choosing a disabled wallpaper is how it is restored: without the
+        // unhide it would be applied and then skipped by the cycle, which
+        // filters the same hidden set.
+        if (row.disabled === true) HiddenWallpapers.show(root.currentTheme, name)
         Wallpaper.set(src.path)
         return true
     }
@@ -827,7 +997,7 @@ Singleton {
     function requestDelete(fileName) {
         if (!fileName) return false
         if (root.optimistic.isPending(fileName)) return false
-        if (root._userFiles.indexOf(fileName) < 0) return false
+        if (root._rowFor(fileName) === null) return false
         root.optimistic.mark(fileName)
         Idle.run(() => root.commitDelete(fileName), 2)
         return true
@@ -836,7 +1006,7 @@ Singleton {
     function commitDelete(fileName) {
         if (!root.optimistic.isPending(fileName)) return
         // File vanished between stages - abort safely.
-        if (root._userFiles.indexOf(fileName) < 0) { root.finishDelete(fileName); return }
+        if (root._rowFor(fileName) === null) { root.finishDelete(fileName); return }
         root.deleteFile(fileName)
     }
 
@@ -874,9 +1044,17 @@ Singleton {
         if (!fileName) return
         const theme = String(root.currentTheme)
         const name = String(fileName)
+        const row = root._rowFor(name)
+        if (row === null) {
+            root._abortDelete(name, "wallpaper_not_listed")
+            return
+        }
         // Both mirrors are authorized before either is removed: the themed
         // copy under the themes root, and the generated copy under the
-        // theme state dir. A refused path removes nothing.
+        // theme state dir. A refused path removes nothing. A shipped image
+        // has no writable copy of its own in the install tree; the overlay
+        // copy Wallpaper.set makes when it is applied is removed here, and
+        // the shipped file itself is disabled below instead.
         const themed = root._checkedPath(name, Paths.themesUserRoot, theme + "/backgrounds/" + name, {
             mode: "write", operation: "leaf_delete", allowLeaf: true, allowExisting: true
         })
@@ -896,7 +1074,7 @@ Singleton {
             root._abortDelete(name, "gate_refused")
             return
         }
-        const record = Object.freeze({ handle: handle, theme: theme, file: name })
+        const record = Object.freeze({ handle: handle, theme: theme, file: name, shipped: row.shipped === true })
         // Step 1: rm both mirrors. Leaf removal only - no recursive flag, no
         // shell, and both authorized paths travel as arguments after `--`. The
         // job bounds the child, so an absent rm settles as a failure instead
@@ -923,6 +1101,10 @@ Singleton {
             return
         }
         root.optimistic.confirm(record.file)
+        // A shipped wallpaper is disabled for the theme that owns it, whether
+        // or not that theme is still the active one. The record is the whole
+        // delete for it: the install tree stays untouched.
+        if (record.shipped) HiddenWallpapers.hide(record.theme, record.file)
         if (record.theme !== root.currentTheme) return
         // Update local list without full rescan
         root._rawFiles = root._rawFiles.filter(f => f !== record.file)
@@ -950,7 +1132,7 @@ Singleton {
         // Step 3: check if backgroundsDir empty via bgModel
         Qt.callLater(() => {
             if (!RequestGate.current(record.handle)) return
-            if (bgModel.count === 0) {
+            if (root._builtinFiles.length === 0 && bgModel.count === 0) {
                 themeDirModel.folder = root._themeUrl
                 Qt.callLater(() => {
                     if (!RequestGate.current(record.handle)) return
