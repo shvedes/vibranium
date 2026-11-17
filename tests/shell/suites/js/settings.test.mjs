@@ -1609,6 +1609,26 @@ group('buildBundle: "after" places a custom item, and items are passed by refere
   })(), false)
 })
 
+group('buildBundle: group children keep their sub and description', () => {
+  const c = catalog('{"pages":[{"id":"a","label":"A","options":[' +
+    '{"key":"A_FLAG","type":"bool","default":true,"label":"Flag","sub":"Why it matters","desc":"Longer <b>why</b>."},' +
+    '{"key":"A_OTHER","type":"bool","default":true,"label":"Other"}],' +
+    '"items":[{"type":"group","id":"g","label":"Group","children":[' +
+    '"A_FLAG",{"id":"x","type":"toggle","label":"Extra","sub":"Child sub","desc":"Child desc"}]}]}]}')
+  const sch = SL.buildSchema(c.sections, 0, '')
+  const b = SL.buildBundle(sch, { A_FLAG: true, A_OTHER: true })
+  const page = b.pages.find((p) => p.id === 'a')
+  const grp = page.items.find((i) => i.type === 'group')
+  eq('the group is built', !!grp, true)
+  eq('both children survive', grp.children.length, 2)
+  eq('an option child keeps its sub', grp.children[0].sub, 'Why it matters')
+  eq('an option child keeps its description', grp.children[0].desc, 'Longer <b>why</b>.')
+  eq('an item child keeps its sub', grp.children[1].sub, 'Child sub')
+  eq('an item child keeps its description', grp.children[1].desc, 'Child desc')
+  eq('the claimed option leaves the page rows', page.items.some((i) => i.var === 'A_FLAG'), false)
+  eq('the unclaimed option stays on the page', page.items.some((i) => i.var === 'A_OTHER'), true)
+})
+
 // ===========================================================================
 section('HyprlandEditor - typed values and the text primitives')
 // ===========================================================================

@@ -450,6 +450,7 @@ Item {
     const kids = root._groupChildrenOf(itm)
     if (kids.length === 0) return 0
     let maxLabel = 0
+    let maxSub = 0
     let hasIcon = false
     for (let k = 0; k < kids.length; k++) {
       const kid = kids[k] ?? {}
@@ -460,11 +461,22 @@ Item {
         return measureOptLabel.implicitWidth
       })
       if (shaped > maxLabel) maxLabel = shaped
+      // A child's sub line paints under its label, so the open dropdown must
+      // reserve the wider of the two or the sub elides on the card that grew
+      // to fit only the labels.
+      const sub = String(kid.sub ?? "")
+      if (sub !== "") {
+        const subW = root._shape("grpsub\u0001" + sub, () => {
+          measureSubStyled.text = MenuLib.styledMarkup(sub)
+          return measureSubStyled.implicitWidth
+        })
+        if (subW > maxSub) maxSub = subW
+      }
     }
-    if (maxLabel === 0) return 0
+    if (maxLabel === 0 && maxSub === 0) return 0
     return root.rowChromeW() + 2 * Ui.m
       + (hasIcon ? Ui.childIconW + Ui.s : 0)
-      + Ui.s + Ui.toggleW + maxLabel
+      + Ui.s + Ui.toggleW + Math.max(maxLabel, maxSub)
   }
 
   // Width the open group dropdown needs, or 0 when none is open - the same

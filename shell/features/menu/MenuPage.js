@@ -234,12 +234,20 @@ function hayFromItem(item, includeMetadata) {
         }
       }
     }
-    // Group children have no row of their own, so their labels are searchable
-    // through the row that opens them.
+    // A group's children are rows of their own, one level down, so every copy
+    // role a page row indexes is searchable through the row that opens them.
+    // Landing on the matching child happens at activation, the way a select
+    // lands on the matching option: one index entry per listed row, and the
+    // sub-target resolved from the query (MenuLib.bestChildIndex).
     if (Array.isArray(item.children)) {
       for (let i = 0; i < item.children.length; i++) {
         const c = item.children[i]
-        if (c && typeof c === "object" && c.label) parts.push(String(c.label))
+        if (!c || typeof c !== "object") continue
+        if (c.label) parts.push(String(c.label))
+        if (c.sub) parts.push(stripForHay(c.sub))
+        if (c.desc) parts.push(stripForHay(c.desc))
+        if (c.warning) parts.push(stripForHay(c.warning))
+        if (c.var) parts.push(String(c.var))
       }
     }
     // Canonical keys help power users ("RECORDING_FPS" -> FPS row) and make

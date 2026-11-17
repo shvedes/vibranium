@@ -789,14 +789,40 @@ function groupSearchResults(hits, lookup, isVisible, query) {
   // spread ("Expected token `}'") and the parse failure takes the whole
   // library down, which takes every menu surface with it - the node suite
   // accepts the syntax, so only the engine can catch this.
-  function mergedRow(hit, item) {
-    const row = Object.assign({}, item || {}, {
+  function mergedRow(hit, item, q) {
+    // A group hit can name one of the children inside the row, the same way a
+    // select hit names an option. Resolve it once here: the result shows the
+    // child's copy, and activation lands the cursor on that child. The row it
+    // jumps to is still the parent, keyed by pageId + row. A query that names
+    // no child - the group's own name, matching every child equally - leaves
+    // the parent row as the result.
+    const childIndex = item && Array.isArray(item.children)
+      ? bestChildIndex(item.children, q, item.label) : -1
+    const kid = childIndex >= 0 ? item.children[childIndex] : null
+    const row = Object.assign({}, kid || item || {}, {
       label: hit.label,
       hay: hit.hay,
       path: hit.path,
       pageId: hit.pageId,
       row: hit.row
     })
+    if (kid) {
+      row.type = "group"
+      row.child = childIndex
+      // Gated children drop out of the live dropdown, so the landing resolves
+      // the uid against the visible children rather than trusting this index.
+      row.childUid = kid.uid
+      row.groupUid = item.uid
+      // The child's uid is unique across children and stable across reorders;
+      // carrying it through the copy above keeps child hits distinct in the
+      // keyed model without inventing a positional key.
+      row.label = String(kid.label)
+      row.sub = kid.sub || ""
+      row.icon = kid.icon || ""
+      row.glyph = kid.glyph || ""
+      row.desc = kid.desc || ""
+      row.warning = kid.warning || ""
+    }
     // An entry-only row has to be KEYED as well as drawn. The panel installs a
     // search projection through a keyed model, and its keying step refuses the
     // WHOLE install on the first row it cannot key instead of skipping that
@@ -842,7 +868,7 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     // one - so the entry supplies the fields a row draws from. The `type` and
     // `call` the entry cannot carry are the reason an external row needs its
     // page: without them it would render and do nothing on Enter.
-    const merged = mergedRow(hit, item)
+    const merged = mergedRow(hit, item, q)
     // A submenu link whose own LABEL spells the query is the section the user
     // is looking for, and it is hoisted instead of filed (see isSectionHit).
     // The test is on the label, not on the hit, because the hit only says the
@@ -1090,6 +1116,62 @@ function bestOptionIndex(options, query, family) {
     if (score <= 0) continue
     if (score > bestScore) {
       best = o
+      bestScore = score
+      tied = false
+    } else if (score === bestScore) {
+      tied = true
+    }
+  }
+  return tied ? -1 : best
+}
+
+// Which child a search query names inside a group row, or -1 when it names
+// none. A group's children are rows of their own one level down, so this is the
+// child-side twin of bestOptionIndex: the same exact-then-fuzzy resolution,
+// over the hay indexing gives the child rather than a second copy of its copy
+// roles. The family label stands in for the select's family prefix, so a query
+// run together ("badges game") reaches a child the same way it reaches an
+// option.
+//
+// The tie rule is the same for the same reason: a query that hits every child
+// equally - the group's own name, carried in every child's hay through the
+// breadcrumb and the parent's copy - says which group to open, not which child
+// to seat. -1 leaves the cursor where the group itself opened it.
+//
+// `query` is compared as handed over and the child's hay is already folded by
+// hayFromItem, so the caller lowercases the query - the same contract
+// bestOptionIndex documents.
+function bestChildIndex(children, query, family) {
+  const q = String(query)
+  if (q === "") return -1
+  const lower = SU.lowerTrim
+  const fam = SU.lowerTrim(family)
+  const list = StoreGuards.asList(children)
+  // Exact label first, bare and family-qualified, mirroring exactOptionIndex.
+  for (let c = 0; c < list.length; c++) {
+    const kid = list[c] || {}
+    const label = lower(kid.label)
+    if (label !== "" && (q === label || q === fam + " " + label
+      || q === fam + "-" + label)) return c
+  }
+  let best = -1
+  let bestScore = 0
+  let tied = false
+  for (let c = 0; c < list.length; c++) {
+    const kid = list[c] || {}
+    const hay = typeof kid.hay === "string" ? kid.hay : ""
+    if (hay === "") continue
+    let score = 0
+    const forms = [hay, fam === "" ? "" : fam + " " + hay]
+    for (let f = 0; f < forms.length; f++) {
+      const text = forms[f]
+      if (text === "") continue
+      const s = fuzzyScore(text, text.split(" "), q)
+      if (s > score) score = s
+    }
+    if (score <= 0) continue
+    if (score > bestScore) {
+      best = c
       bestScore = score
       tied = false
     } else if (score === bestScore) {

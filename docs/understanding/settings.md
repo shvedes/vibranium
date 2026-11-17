@@ -121,12 +121,17 @@ copy. Such children declare no `icon`, and their page goes away with them.
 }
 ```
 
-Child rows render without a sub line - a dropdown lists what can be switched
-on - behind the icon their option declares, at a size one step down from a
-row's own glyph, and a toggle child is flipped in place by Enter or a click.
-A child carrying a `when` guard is left out of the list while the guard says no,
-the way the gated row it replaced was. `after` places the group under the row it belongs
-to; without it the group follows every generated option row on the page.
+Each child is still a whole row: a `sub` line paints under its label, behind
+the icon the option declares and at a size one step down from a row's own glyph.
+Ctrl-I on the child under the cursor unfolds that child's `desc` or `warning` in
+a nested dropdown inside the group's own dropdown. The slot is an overlay, so
+the card keeps its resting size while the rows around the child shift inside the
+clipped dropdown to reveal the copy. The description is keyed by the child and
+folds when the child cursor moves. A toggle child is flipped in place by Enter
+or a click. A child carrying a `when` guard is left out of the list while the
+guard says no, the way a gated page row is. `after` places the group under the
+row it belongs to; without it the group follows every generated option row on
+the page.
 
 ### Conditional visibility
 

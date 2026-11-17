@@ -138,7 +138,7 @@ const catalogRows = () => {
   return rows
 }
 
-// The 73-function public surface, named once so the coverage claim is
+// The 74-function public surface, named once so the coverage claim is
 // checkable rather than asserted in prose.
 const SURFACE = [
   'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'quantize',
@@ -154,7 +154,7 @@ const SURFACE = [
   'nextFlowIndex', 'stageText', 'stageUnitSuffix', 'stageSeedText', 'restKind', 'numberDisplay', 'valueSlotW',
   'optionLabelFor', 'optionSeedIndex', 'optionColumnCount', 'optionRowCount',
   'optionColumnStride', 'optionCellCol', 'optionCellRow', 'leadingNumber',
-  'exactOptionIndex', 'bestOptionIndex', 'selectableEdge', 'keyRoute',
+  'exactOptionIndex', 'bestOptionIndex', 'bestChildIndex', 'selectableEdge', 'keyRoute',
   'rowKeySeq', 'rowSetGuard',
   'gridCellSpec', 'gridGeometry',
   'layoutPageOf',
@@ -174,19 +174,19 @@ const routeName = (over) => {
   return r === null ? null : r.name
 }
 
-suite('menu/MenuLib', 'the menu framework\'s pure layer - 72 functions')
+suite('menu/MenuLib', 'the menu framework\'s pure layer - 73 functions')
 
 // ======================================================================
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // The 72-name ledger plus ten top-level declarations the suite reads
+  // The 73-name ledger plus ten top-level declarations the suite reads
   // separately: the three filter-hay builders and the seven cache `var`s (the
   // six search caches and the scoped-filter hay cache), which the loader picks
   // up because a `.pragma library` namespace is its top-level declarations.
-  eq('82 declarations', Object.keys(M).length, 82)
+  eq('83 declarations', Object.keys(M).length, 83)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 72 named functions are callable', missing, [])
+  eq('all 73 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -206,7 +206,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 82 names', Object.keys(F).length, 82)
+  eq('the live view publishes the same 83 names', Object.keys(F).length, 83)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -524,6 +524,16 @@ group('includeMetadata adds the options and the canonical keys', () => {
   eq('malformed option entries are skipped', M.hayFromItem({ label: 'L', options: ['a', null, 3, { label: 'Ok', value: 0 }] }), 'l ok 0')
   eq('an option with no label contributes only its value', M.hayFromItem({ label: 'L', options: [{ value: 'v' }] }), 'l v')
   eq('an option with a blank value contributes only its label', M.hayFromItem({ label: 'L', options: [{ label: 'Label', value: '  ' }] }), 'l label')
+  // Group children are rows one level down: their whole copy is indexed
+  // through the row that opens them, and the child-side landing resolves the
+  // exact one at activation (bestChildIndex).
+  eq('a group child indexes all of its copy through the parent', M.hayFromItem({
+    label: 'Enabled badges',
+    children: [{ label: 'Game badge', sub: 'Shows activity', desc: '<b>Game</b> status', var: 'GAME' }]
+  }), 'enabled badges game badge shows activity status')
+  eq('without metadata the children are skipped', M.hayFromItem({
+    label: 'Group', children: [{ label: 'Kid' }]
+  }, false), 'group')
   throws('but a null ITEM is a throw', () => M.hayFromItem(null), /label/)
 })
 
@@ -3605,6 +3615,49 @@ group('exactOptionIndex folds the option text and drops falsy values', () => {
   }
 })
 
+group('bestChildIndex: the child a group search lands on', () => {
+  const kids = [
+    { label: 'Game badge', hay: 'game badge shows activity status game' },
+    { label: 'Chat badge', hay: 'chat badge unread count chat' },
+    { label: 'Player badge', hay: 'player badge now playing player' }
+  ]
+  eq('an exact child label wins', M.bestChildIndex(kids, 'chat badge', 'Enabled badges'), 1)
+  eq('a half-typed child label finds it', M.bestChildIndex(kids, 'cha', 'Enabled badges'), 1)
+  eq('a child copy role is reachable', M.bestChildIndex(kids, 'unread', 'Enabled badges'), 1)
+  eq('a family-qualified exact label wins', M.bestChildIndex(kids,
+    'enabled badges player badge', 'Enabled badges'), 2)
+  eq('an empty query names no child', M.bestChildIndex(kids, '', 'Enabled badges'), -1)
+  eq('an unrelated query names no child', M.bestChildIndex(kids, 'zzzz', 'Enabled badges'), -1)
+  eq('a non-array children value is safe', M.bestChildIndex(null, 'game', 'Enabled badges'), -1)
+  eq('a blank child cannot be seated', M.bestChildIndex(
+    [{ label: '' }, { label: 'Game badge', hay: 'game badge' }], 'game', 'Enabled badges'), 1)
+  eq('the group name alone ties and names no child', M.bestChildIndex([
+    { label: 'A', hay: 'badges a' }, { label: 'B', hay: 'badges b' }
+  ], 'badges', 'Badges'), -1)
+})
+
+group('a group hit shows and lands on the matching child', () => {
+  const b = bundle(`{"pages":[{"id":"main","title":"Main","items":[
+    {"type":"group","id":"g","label":"Enabled badges","children":[
+      {"id":"c1","type":"toggle","label":"Game badge","sub":"Shows activity"},
+      {"id":"c2","type":"toggle","label":"Chat badge","sub":"Unread count"}
+    ]}
+  ]}]}`)
+  const idx = M.buildIndex(b)
+  const rows = M.groupSearchResults(M.search(idx, 'chat'), b.byId, () => true, 'chat')
+    .filter(r => r.type !== 'separator')
+  eq('one result row', rows.length, 1)
+  eq('it shows the child, not the group', rows[0].label, 'Chat badge')
+  eq('it keeps the child copy', rows[0].sub, 'Unread count')
+  eq('it carries the child index for activation', rows[0].child, 1)
+  eq('and the child uid for gated-list resolution', rows[0].childUid, 'main#g/c2')
+  eq('it still jumps through the parent row', [rows[0].pageId, rows[0].row], ['main', 0])
+  eq('it keys by the child uid, not the parent uid', rows[0].uid, 'main#g/c2')
+  const parentHit = M.groupSearchResults(M.search(idx, 'badges'), b.byId, () => true, 'badges')
+    .filter(r => r.type !== 'separator')
+  eq('a query naming no child leaves the group row', parentHit[0].label, 'Enabled badges')
+})
+
 // ======================================================================
 section('the keyboard model: edges and routes')
 group('selectableEdge finds the first or the last selectable index', () => {
@@ -4096,8 +4149,8 @@ group('every one of the 70 functions was exercised above', () => {
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 72 long', SURFACE.length, 72)
-  eq('with no duplicates', new Set(SURFACE).size, 72)
+  eq('the surface list is 73 long', SURFACE.length, 73)
+  eq('with no duplicates', new Set(SURFACE).size, 73)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

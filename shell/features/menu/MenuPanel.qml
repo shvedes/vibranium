@@ -3541,6 +3541,36 @@ Rectangle {
       panel.activateItem(it)
       return
     }
+    if (it.type === "group") {
+      // The hit names the row that opens the dropdown; the query can also name
+      // one of its children. Seat that child the way a select hit seats its
+      // option, so redirecting lands on the matching entry instead of leaving
+      // the arrow walk to the user. groupSearchResults resolves the child once
+      // for both display and landing; a hit that names none opens the group on
+      // its stored seed, like a select opened on its stored value.
+      const childUid = it.childUid !== undefined && it.childUid !== null
+        ? String(it.childUid) : ""
+      const targetUid = it.groupUid !== undefined && it.groupUid !== null
+        ? String(it.groupUid) : ""
+      panel.whenSettled((row) => {
+        row.setExpanded(true)
+        if (childUid !== "") Qt.callLater(() => {
+          const r2 = panel.currentRow()
+          if (!r2 || !r2.isGroup || !r2.itm || String(r2.itm.uid) !== targetUid) return
+          // The live children drop gated ones, so the index entry's position
+          // can name a different child. Resolve against what the dropdown
+          // actually lists.
+          const kids = r2.groupChildren
+          for (let i = 0; i < kids.length; i++) {
+            if (kids[i] && String(kids[i].uid) === childUid) {
+              r2.childIndex = i
+              return
+            }
+          }
+        })
+      }, (row) => row.isGroup)
+      return
+    }
     if (it.type === "select") {
       // The option the query names, so the dropdown opens with the cursor
       // on it instead of on whatever the row's stored value left there.

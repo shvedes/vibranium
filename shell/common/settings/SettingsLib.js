@@ -1653,9 +1653,9 @@ function buildItem(opt, current) {
 // disagree. An item child is copied as declared: that is how a switch the shell
 // owns (a launcher plugin, a bar module) embeds the same row its own page used
 // to carry - the provider resolves its pill and its flip by id, so nothing is
-// duplicated but the id. The child rows are ordinary rows - the menu normalizes
-// them like any other - with one difference: they carry no sub line (a dropdown
-// lists what can be switched on, and the row above already says why).
+// duplicated but the id. The child rows are ordinary rows: the menu normalizes
+// them like any other, so a child keeps its own sub line and description and
+// can unfold a ctrl+i dropdown of its own inside the parent's dropdown.
 function buildGroupRow(raw, byKey, values) {
   const row = {}
   for (const k in raw) row[k] = raw[k]
@@ -1667,7 +1667,6 @@ function buildGroupRow(raw, byKey, values) {
     if (key !== null && typeof key === "object" && !Array.isArray(key)) {
       const child = {}
       for (const k in key) child[k] = key[k]
-      delete child.sub
       children.push(child)
       continue
     }
@@ -1675,7 +1674,6 @@ function buildGroupRow(raw, byKey, values) {
     const opt = byKey[key]
     const child = buildItem(opt, values[key])
     if (!child) continue
-    delete child.sub
     children.push(child)
   }
   row.children = children

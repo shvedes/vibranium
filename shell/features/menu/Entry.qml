@@ -285,6 +285,19 @@ Item {
     if (row.childIndex >= kids) row.childIndex = kids > 0 ? kids - 1 : -1
   }
 
+  // A nested description belongs to the child under the cursor, not to the
+  // group row. Panel-side closeTrailingInfo only sees page rows, so arrows, a
+  // click on another child, or collapsing the group have to fold any child
+  // slot left open themselves. Keyed on childIndex so every path is covered.
+  onChildIndexChanged: {
+    const kids = row.groupChildren
+    for (let i = 0; i < kids.length; i++) {
+      if (i === row.childIndex) continue
+      const kid = kids[i]
+      if (kid && Menu.infoOpen(kid)) Menu.setInfo(kid, false)
+    }
+  }
+
   // The value the dropdown cursor should open on. Flow rows seed from the
   // stored stage value so Back lands on the picked option; plain rows seed
   // from live state. `st` can be null (search hits, or a row with no state
@@ -980,7 +993,19 @@ Item {
   }
 
   function toggleInfo() {
-    if (!itm || searchResult || (descText === "" && warnText === "")) return
+    if (!itm || searchResult) return
+    // A group's dropdown holds whole rows: ctrl+i addresses the child under
+    // the cursor, so its description unfolds inside the parent's dropdown.
+    if (row.isGroup && row.dropdownOpen && row.childIndex >= 0) {
+      const kid = row.groupChildren[row.childIndex]
+      if (!kid) return
+      const desc = String(kid.desc ?? "")
+      const warn = String(kid.warning ?? "")
+      if (desc === "" && warn === "") return
+      Menu.setInfo(kid, !Menu.infoOpen(kid))
+      return
+    }
+    if (descText === "" && warnText === "") return
     // An expanded row already renders its description in-shell; there
     // is nothing for ctrl+i to toggle without stacking a second copy.
     if (row.descInShell) return
@@ -2162,12 +2187,66 @@ Item {
       id: groupRoot
 
       width: parent.width
+      // The nested slot is an overlay, excluded from this box, so opening it
+      // cannot resize the card. Rows below slide inside the clipped box.
       implicitHeight: groupCol.height
-      readonly property real rowH: 28
+      clip: true
+
+      readonly property real focusRestH: cursorItem ? cursorItem.restH : 0
+      readonly property real focusBarH: cursorItem ? cursorItem.barH : 0
+      // The bar eases with the child's slot. liveExtra is that same frame's
+      // growth; every push motion below is a pure function of it, so the
+      // column, the rows and the bar share one clock. A Behavior on any of
+      // them re-eases the value a frame late and desynchronises the reveal.
+      readonly property real liveExtra: Math.max(0, focusBarH - focusRestH)
+      readonly property real focusRoom: Math.max(0,
+        groupRoot.height - (cursorItem ? cursorItem.y : 0) - focusRestH)
+
+      // The push has two independent parts: rows below the focused child slide
+      // down to clear the overlay, and the column slides up when the box has no
+      // room left underneath. The up verdict comes from the DESTINATION extra,
+      // held for the unfold so it cannot flip with the live bar.
+      property bool revealedPushUp: false
+      readonly property real overflow: revealedPushUp
+        ? Math.max(0, liveExtra - focusRoom) : 0
+
+      // A child can carry its own sub line or ctrl+i slot, so rows have no
+      // shared fixed height. The cursor follows the live delegate. Holding the
+      // last item while itemAt is null mid-reveal keeps the bar off the row
+      // above; childIndex < 0 is the only clear.
+      property Item cursorItem: null
+      property int cursorIndex: row.childIndex
+      function trackCursor() {
+        if (row.childIndex < 0) {
+          groupRoot.cursorItem = null
+          return
+        }
+        const it = groupRepeater.itemAt(row.childIndex)
+        if (it) groupRoot.cursorItem = it
+      }
+      onCursorIndexChanged: groupRoot.trackCursor()
+      Connections {
+        target: groupRepeater
+
+        function onItemAdded(index, item) { groupRoot.trackCursor() }
+        function onItemRemoved(index, item) { groupRoot.trackCursor() }
+      }
+      function latchDirection() {
+        if (!groupRoot.cursorItem || !(groupRoot.focusSettledExtra > 0)) return
+        groupRoot.revealedPushUp = groupRoot.focusSettledExtra > groupRoot.focusRoom
+      }
+      onCursorItemChanged: groupRoot.latchDirection()
+      onFocusRoomChanged: groupRoot.latchDirection()
+      // The destination extra belongs to the slot, not to the cursor seat, so
+      // the up verdict is sampled here as well. It keeps a bottom child's desc
+      // inside the clipped box instead of past it with no room left to scroll.
+      readonly property real focusSettledExtra: cursorItem ? cursorItem.settledExtra : 0
+      onFocusSettledExtraChanged: groupRoot.latchDirection()
 
       // Entrance fade, matching the select dropdown: opening reads as an
       // arrival rather than watching the card grow under static copy.
       Component.onCompleted: {
+        groupRoot.trackCursor()
         if (MotionPolicy.enabled && row.dropdownOpen) {
           groupRoot.opacity = 0
           groupEnter.restart()
@@ -2185,22 +2264,28 @@ Item {
 
       Rectangle {
 
-        visible: row.dropdownOpen && row.childIndex >= 0
+        visible: row.dropdownOpen && row.childIndex >= 0 && groupRoot.cursorItem !== null
         color: Ui.tint("background_2", 0.7)
         radius: RoundingPolicy.radius
         border.width: 1
         border.color: Ui.solid("background_3")
         x: Ui.m
-        y: row.childIndex * groupRoot.rowH
+        y: groupRoot.cursorItem ? groupRoot.cursorItem.y + groupCol.y : 0
         width: groupRoot.width - 2 * Ui.m
-        height: groupRoot.rowH
+        // The focused row and its nested description share one continuous
+        // background: the bar grows by exactly the overlay's height.
+        height: groupRoot.focusBarH
 
-        // No entrance glide: on creation the child rows have not laid out yet,
-        // so an enabled Behavior would sweep the cursor up from the top.
+        // Glide only between children at rest. During a reveal y follows
+        // groupCol directly; a second glide on top of the bar's own tween
+        // desynchronises the two and breaks the shared edge on collapse.
         Behavior on y {
           enabled: MotionPolicy.enabled && !groupEnter.running
+            && groupRoot.liveExtra <= 0
           NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
         }
+        // Height and y track the delegate directly at reveal time: the child's
+        // slot is the one animation, so the bar must not carry a second curve.
       }
 
       Column {
@@ -2208,13 +2293,21 @@ Item {
 
         x: Ui.m
         width: parent.width - 2 * Ui.m
+        y: -groupRoot.overflow
+
+        // No Behavior: overflow carries the same slot growth the bar.height
+        // reads. A glide here would re-ease that value and leave the column a
+        // frame behind the bar it follows.
 
         Repeater {
+          id: groupRepeater
+
           model: row.groupChildren
 
           delegate: GroupRow {
             width: groupCol.width
             cursor: row.childIndex === index
+            slideY: index > row.childIndex ? groupRoot.liveExtra : 0
             checked: {
               Menu.rev
               return modelData.type === "toggle" ? Menu.isToggleOn(modelData) : false

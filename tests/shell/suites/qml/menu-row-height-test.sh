@@ -247,15 +247,16 @@ t_contains "a chrome row (the inline editor) rests on the primary register" \
 t_not_contains "the delegate instantiates no geometry item" "RowGeometry {" "$ENTRY_SRC"
 t_not_contains "nor does the panel" "RowGeometry {" "$MENU_SRC"
 
-# The kind is decided in ONE place. Four files may name it: the module that
-# owns the rule (MenuRow.js), the MenuLib facade that publishes it, and the two
-# readers. A fifth would be a copy that drifts; a second definition would be a
-# rule that can disagree with itself.
+# The kind is decided in ONE place. Five files may name it: the module that
+# owns the rule (MenuRow.js), the MenuLib facade that publishes it, and three
+# readers - the top-level delegate, the panel's projection, and the nested
+# group-row delegate. A sixth would be a copy that drifts; a second definition
+# would be a rule that can disagree with itself.
 t_eq "the row kind is decided in exactly one module file" "1" \
   "$(grep -l "function restKind" "$MENU_DIR"/*.js | grep -v 'MenuLib.js' | wc -l | tr -d ' ')"
 t_contains "and MenuLib publishes it as a one-line delegate" \
   "function restKind(item, providerSub) { return Row.restKind(item, providerSub) }" "$MENU_LIB_SRC"
-t_eq "and the facade plus the two readers name it in four files" "4" \
+t_eq "and the facade plus the three readers name it in five files" "5" \
   "$(grep -rl "restKind" "$MENU_DIR" --include='*.js' --include='*.qml' | wc -l | tr -d ' ')"
 t_contains "the delegate classifies from the copy it renders" \
   "MenuLib.restKind(itm, row.subText)" "$ENTRY_SRC"
