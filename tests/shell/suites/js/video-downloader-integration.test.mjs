@@ -493,6 +493,9 @@ group('the QML wiring cannot fall back to the clipboard or the island', () => {
   is('the middle-click single-video path leaves the format to the wrapper', target,
     s => !s.includes('--format') && s.includes('startDownload(url, "", tool, true)'),
     'default format')
+  is('the start notification does not echo the link', target,
+    s => s.includes('Exec.notify("Downloader", "Download started")')
+      && !s.includes('"Starting download: " + url'), 'no link')
   const clickStart = qml.indexOf('onClicked: mouse => {')
   const click = qml.slice(clickStart, clickStart + 700)
   is('middle click branches before openIsland', click,

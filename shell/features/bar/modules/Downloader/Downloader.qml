@@ -531,7 +531,7 @@ BarModule {
         Exec.notify("Downloader", "Could not start the download")
         return
       }
-      Exec.notify("Downloader", "Starting download: " + url)
+      Exec.notify("Downloader", "Download started")
     })
   }
 
