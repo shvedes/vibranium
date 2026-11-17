@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
+import qs.services as Core
 import qs.features.clipboard
 import qs.features.pass
 import "Model.js" as Model
@@ -1647,6 +1648,7 @@ PanelCard {
           id: secretBox
           width: parent.width
           sensitive: true
+          capsActive: Core.Keyboard.capsOn
           placeholder: "SECRET"
           onAccepted: text => panel.commitSecret(text)
           onEscaped: panel.escapeChain()
