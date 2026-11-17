@@ -3581,6 +3581,25 @@ group('parseTimeQuery answers "" for a bare keyword and null for anything else',
   eq('a number', TL.parseTimeQuery(42), null)
 })
 
+group('parseTimeQuery accepts the "tiem in" transposition as "time in"', () => {
+  // "tiem" is a frequent typo for "time"; the detector treats it as the same
+  // keyword so the time plugin still claims the query.
+  eq('the canonical form', TL.parseTimeQuery('tiem in Madrid'), 'Madrid')
+  eq('uppercase', TL.parseTimeQuery('TIEM IN BANGKOK'), 'BANGKOK')
+  eq('mixed case', TL.parseTimeQuery('Tiem In Chicago'), 'Chicago')
+  eq('a tab between the words', TL.parseTimeQuery('tiem\tin\ttokyo'), 'tokyo')
+  eq('a run of spaces', TL.parseTimeQuery('tiem    in    paris'), 'paris')
+  eq('a multi-word city', TL.parseTimeQuery('tiem in new york'), 'new york')
+  eq('a leading-space query', TL.parseTimeQuery('   tiem in paris'), 'paris')
+  eq('the city is returned raw, not normalised', TL.parseTimeQuery('tiem in   SaO PaUlO  '), 'SaO PaUlO')
+  eq('a bare typo keyword', TL.parseTimeQuery('tiem in'), '')
+  eq('a bare typo keyword with trailing whitespace', TL.parseTimeQuery('tiem in   '), '')
+  // Near-misses are still refused: only the one transposition is tolerated.
+  for (const q of ['tiem', 'times', 'tiemx in paris', 'tim in paris', 'tiemin', 'what is tiem in paris']) {
+    eq(`${JSON.stringify(q)} is not a time query`, TL.parseTimeQuery(q), null)
+  }
+})
+
 group('parseTimeQuery is total and never throws', () => {
   noThrow('a very long query', () => TL.parseTimeQuery('time in ' + 'a'.repeat(10000)))
   noThrow('a query with a regex metacharacter in the city', () => TL.parseTimeQuery('time in (a|b)+'))
@@ -3940,6 +3959,7 @@ group('tryTime answers ok:true with the resolved zone and the reading', () => {
   eq('the same as the resolver', r.timezone, TL.resolveTimezone('madrid'))
   // Case-insensitive all the way through.
   eq('uppercase query', TL.tryTime('TIME IN MADRID', WHEN).timezone, 'Europe/Madrid')
+  eq('the "tiem in" transposition', TL.tryTime('tiem in madrid', WHEN).timezone, 'Europe/Madrid')
   eq('and a dashed city', TL.tryTime('time in new-york', WHEN).timezone, 'America/New_York')
   // No `error` key on a success - the row renderer checks ok, and a present
   // error would be a lie.
@@ -4807,6 +4827,10 @@ group('time: the plugin decides the zone, the service supplies the clock', () =>
   // formats a time itself.
   eq('it asked the service for the zone it resolved', rec.calls.filter((c) => c[0] === 'requestTime').map((c) => c[1]),
     ['Europe/Madrid'])
+  // Detection accepts the frequent "tiem in" transposition as "time in": the
+  // plugin claims the same row, the label still shows the canonical spelling.
+  eq('the "tiem in" typo claims the same row', impl.items('tiem in madrid')[0], impl.items('time in madrid')[0])
+  eq('the typo keyword alone is still a hint row', impl.items('tiem in')[0], impl.items('time in')[0])
   // An unresolved clock is a pending row, not an error.
   rec.calls.length = 0
   const pend = impl.items('time in new york')

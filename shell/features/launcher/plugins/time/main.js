@@ -24,8 +24,9 @@
 //
 // Matching is case-insensitive: "time in Madrid", "TIME IN BANGKOK" and
 // "time in chicago" all resolve, as do "7:55pm cst" and "7:55PM CST".
-// Unknown cities return ok:false so the caller can render an error entry;
-// a query that is neither "time in ..." nor "<time> <tz>" claims nothing.
+// The "tiem in" transposition is accepted as "time in" too. Unknown cities
+// return ok:false so the caller can render an error entry; a query that is
+// neither "time in ..." nor "<time> <tz>" claims nothing.
 
 // Explicit city -> IANA map (keys are normalized: lowercased, underscores
 // and dashes folded to spaces, whitespace collapsed). Covers capitals,
@@ -379,14 +380,15 @@ function normalizeCity(s) {
     return t
 }
 
-// "time in <city>" detector, case-insensitive. Returns null when the query
-// is not a time query, otherwise the raw city part trimmed ("" when the
-// user typed only "time in" with nothing after it).
+// "time in <city>" detector, case-insensitive. "tiem" is accepted as a
+// spelling of "time" so the common transposition still claims the query.
+// Returns null when the query is not a time query, otherwise the raw city
+// part trimmed ("" when the user typed only the keyword with nothing after).
 function parseTimeQuery(query) {
     let t = _str(query).trim()
     if (t === "") return null
-    if (/^time\s+in\s*$/i.test(t)) return ""
-    let m = t.match(/^time\s+in\s+(.+?)\s*$/i)
+    if (/^(?:time|tiem)\s+in\s*$/i.test(t)) return ""
+    let m = t.match(/^(?:time|tiem)\s+in\s+(.+?)\s*$/i)
     if (!m) return null
     return _str(m[1]).trim()
 }

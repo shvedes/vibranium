@@ -363,6 +363,7 @@ Launcher capabilities are plugins:
 A city's clock reads the way that place reads it, whatever this machine is
 set to: `time in Chicago` shows `01:00 PM` and `time in Madrid` shows
 `13:00`, on a system configured either way. There is no setting for it.
+The common `tiem in <city>` typo is accepted as `time in <city>`.
 
 A typed time with a zone reads back in your local zone, so `7:55pm cst`
 (case-insensitive, with an optional date like `Oct 15 7:55pm CST` or
