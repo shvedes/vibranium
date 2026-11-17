@@ -25,6 +25,32 @@ BarModule {
 
   readonly property var adapter: Bluetooth.defaultAdapter
   readonly property var devices: Ui.trackerValues(Bluetooth.devices)
+
+  // BlueZ publishes defaultAdapter only after its D-Bus handshake, so a null
+  // adapter at boot means "not reported yet", not "no adapter". Painting the
+  // fault red there flashes on every boot while the bar settles. The shared
+  // boot milestone fires before BlueZ does on a cold start, so this uses a
+  // grace that ends on the first adapter report OR a short deadline, whichever
+  // comes first. The seen latch keeps a genuine later removal faulting; the
+  // deadline keeps a machine with no adapter at all faulting eventually.
+  property bool _adapterSeen: false
+  property bool _adapterGraceDone: false
+  readonly property int adapterGraceMs: 2000
+  property Timer adapterGrace: Timer {
+    interval: root.adapterGraceMs
+    repeat: false
+    onTriggered: root._adapterGraceDone = true
+  }
+  Connections {
+    target: Bluetooth
+    function onDefaultAdapterChanged() {
+      if (Bluetooth.defaultAdapter !== null) root._adapterSeen = true
+    }
+  }
+  readonly property bool _adapterPending: root.adapter === null
+    && !root._adapterSeen
+    && !root._adapterGraceDone
+
   readonly property var connectedDevice: {
     for (const d of root.devices) if (d.connected) return d
     return null
@@ -33,13 +59,15 @@ BarModule {
   // Icon + color. Connecting or connected: connected glyph in foreground
   // (the side ticks blink only while connecting). Searching: searching
   // glyph, blinking antennas. Adapter off: off glyph, its crossing line red
-  // and the body dimmed. No adapter: plain glyph, red.
+  // and the body dimmed. No adapter: plain glyph, red - but only once the
+  // backend has settled, so the boot's not-reported-yet window reads dim.
   readonly property string iconName: (root.connecting || root.connectedDevice) ? "bluetooth-connected"
     : root.searching ? "bluetooth-searching"
     : (root.adapter ? (root.adapter.enabled ? "bluetooth" : "bluetooth-off") : "bluetooth")
   readonly property string iconColor: (root.connecting || root.connectedDevice) ? "foreground_0"
     : root.searching ? "foreground_0"
-    : (root.adapter ? (root.adapter.enabled ? "foreground_0" : "foreground_1") : "red")
+    : (root.adapter ? (root.adapter.enabled ? "foreground_0" : "foreground_1")
+                    : (root._adapterPending ? "foreground_1" : "red"))
   // Second tone for the glyph's indicator elements (class="indicator"). The
   // connecting and searching ticks take the regular foreground - user
   // decision: the blink swap solid -> 50% transparent is the animation signal,
@@ -149,13 +177,13 @@ BarModule {
   Behavior on nameSlide {
     Glide { duration: Ui.slowMs }
   }
-  // The glyph's colour is tweened rather than swapped: Icon takes a literal
-  // "#rrggbb" for colorKey (Icons.url), so both endpoints are real colours
-  // and the green-in and the green-out are fades rather than snaps.
+  // The colour snaps rather than tweens. Icon takes a literal "#rrggbb" for
+  // colorKey (Icons.url), so every intermediate tween colour is a distinct
+  // data URL and a fresh SVG decode - ~36 decodes over one 600ms tween. The
+  // reveal is a blink of greenPhase anyway, so one URL per phase is both
+  // cheaper and a truer blink; the retained raster keeps the glyph painted
+  // through the single decode.
   property color glyphColor: reveal.glyphColor
-  Behavior on glyphColor {
-    ColorAnim { duration: reveal.colorMs; easing.type: root.revealed ? Easing.OutCubic : Easing.InOutQuad }
-  }
 
   // Dynamic pill (the NowPlaying convention): a `nameSlide` real animates
   // 0..1 and the width rounds to whole pixels every frame, so neighbours
@@ -267,7 +295,11 @@ BarModule {
   }
 
   onDevicesChanged: root._watchDevices()
-  Component.onCompleted: root._watchDevices()
+  Component.onCompleted: {
+    if (root.adapter !== null) root._adapterSeen = true
+    root.adapterGrace.start()
+    root._watchDevices()
+  }
 
   // Icon + name pill (the NowPlaying pill convention): one icon slot at
   // rest, so the glyph keeps its centred optical canvas, with the name's

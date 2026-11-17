@@ -2167,6 +2167,15 @@ Rectangle {
     id: metrics
     host: panel
   }
+  // Late-boot icon prewarm. The panel persists from boot across open/close, so
+  // its warmer decodes menu glyphs into Qt's shared pixmap cache at THIS
+  // window's DPR before the first summon creates any delegates. Menu rows
+  // paint at Ui.rowIconW, the same side the consuming Icon uses.
+  IconWarmer {
+    id: iconWarmer
+    side: Ui.rowIconW
+  }
+  function prewarmIcons(list) { iconWarmer.warm(list) }
   // Content width as the width engine measured it. The card's width binding and
   // the saved frame read this projection; only the engine writes it.
   readonly property real contentW: metrics.contentW

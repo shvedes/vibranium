@@ -52,6 +52,15 @@ Item {
   // decoded yet; the front stays where it is while this is set.
   property bool _swapPending: false
 
+  // Once a layer has decoded a raster it keeps that raster painted while a new
+  // source loads (Icon.retainWhileLoading). A colour-only change drops
+  // swapReady for the decode even though there is no empty slot to hide, and
+  // requiring it in `visible` blinked the glyph off on every frame of a colour
+  // tween. Latched per layer so a name that has never decoded still waits for
+  // its first raster.
+  property bool _aPainted: false
+  property bool _bPainted: false
+
   Component.onCompleted: {
     _aName = name
   }
@@ -94,13 +103,16 @@ Item {
   implicitWidth: root.size > 0 ? root.size : Math.max(iconA.implicitWidth, iconB.implicitWidth)
   implicitHeight: root.size > 0 ? root.size : Math.max(iconA.implicitHeight, iconB.implicitHeight)
   // Empty hides at once (the owner's own fade goes with it). A non-empty name
-  // shows the slot only once the FRONT layer has something decoded: on an
-  // empty -> non-empty swap the incoming name is staged on the hidden layer,
-  // so binding this to `name` alone painted an empty slot until the trade.
+  // shows the slot once the FRONT layer has something decoded, or has decoded
+  // before and is still retaining that raster through a load: on an empty ->
+  // non-empty swap the incoming name is staged on the hidden layer and has no
+  // retained raster, so binding this to `name` alone painted an empty slot
+  // until the trade. A colour-only change, by contrast, must not blank a glyph
+  // that is already painted.
   visible: root.name !== ""
     && (root._aFront
-      ? root._aName !== "" && iconA.swapReady
-      : root._bName !== "" && iconB.swapReady)
+      ? root._aName !== "" && (iconA.swapReady || root._aPainted)
+      : root._bName !== "" && (iconB.swapReady || root._bPainted))
 
   Icon {
     id: iconA
@@ -114,6 +126,7 @@ Item {
     size: root.size
     opacity: (root._aFront && root._aName !== "") ? 1 : 0
     onSwapReadyChanged: root._tradeIfReady()
+    onReadyChanged: if (ready) root._aPainted = true
     Behavior on opacity {
       enabled: MotionPolicy.enabled
       NumberAnimation { duration: Ui.fastMs }
@@ -132,6 +145,7 @@ Item {
     size: root.size
     opacity: (!root._aFront && root._bName !== "") ? 1 : 0
     onSwapReadyChanged: root._tradeIfReady()
+    onReadyChanged: if (ready) root._bPainted = true
     Behavior on opacity {
       enabled: MotionPolicy.enabled
       NumberAnimation { duration: Ui.fastMs }

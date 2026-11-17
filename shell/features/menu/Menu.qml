@@ -345,6 +345,86 @@ Singleton {
   // milestone's change runs it (see _maybePrewarm).
   property bool _prewarmPending: false
 
+  // Icon raster prewarm, fed from the warm bundles in _maybePrewarm. The
+  // panel's IconWarmer decodes each (glyph, tone) into Qt's shared pixmap
+  // cache ahead of the first summon, so a menu delegate paints its icon in the
+  // frame it is created instead of blanking for the async SVG decode. Only the
+  // decoded raster is warmed here; the recolor string is Icons' own cache.
+  //
+  // The warm is deliberately idle and chunked. Queuing every glyph's async
+  // decode in one turn puts ~180 jobs on Qt's image thread during boot and the
+  // resulting contention can stretch a bar module's own state transition - a
+  // glyph painted in the colour of an intermediate state instead of the settled
+  // one. A delay past the boot milestone plus small batches keep the warm off
+  // that window; the menu cannot be summoned that early in any case.
+  property var _iconWarmRequests: []
+  property int _iconWarmIdx: 0
+  property int _iconWarmTries: 0
+  readonly property int iconWarmBatch: 16
+  readonly property int iconWarmDelayMs: 1000
+
+  function _collectIconRequests(bundles) {
+    const out = []
+    const seen = Object.create(null)
+    const add = (name, accent) => {
+      const n = String(name ?? "")
+      if (n === "") return
+      const a = String(accent ?? "")
+      const key = n + "\u0000" + a
+      if (seen[key] === true) return
+      seen[key] = true
+      out.push({ name: n, colorKey: "foreground_0", accentKey: a })
+    }
+    // Every shipped glyph at the ordinary row tone. Catalog pages, injected
+    // pages and search hits all name a shipped asset, so this baseline covers
+    // a cold first open regardless of which bundle won the prewarm race.
+    const names = Object.keys(Icons._raw)
+    for (let i = 0; i < names.length; i++) add(names[i], "")
+    // Two-tone row glyphs the warm bundles actually accent (a bare name above
+    // is not the URL such a row requests).
+    for (let b = 0; b < bundles.length; b++) {
+      const bundle = bundles[b]
+      const pages = bundle && Array.isArray(bundle.pages) ? bundle.pages : []
+      for (let p = 0; p < pages.length; p++) {
+        const items = pages[p] && Array.isArray(pages[p].items) ? pages[p].items : []
+        for (let i = 0; i < items.length; i++) {
+          const itm = items[i]
+          if (itm && itm.icon) add(itm.icon, root.iconAccentFor(itm))
+        }
+      }
+    }
+    return out
+  }
+
+  function _startIconPrewarm(bundles) {
+    root._iconWarmRequests = root._collectIconRequests(bundles)
+    root._iconWarmIdx = 0
+    root._iconWarmTries = 0
+    iconWarmDelay.restart()
+  }
+
+  property Qml.Timer iconWarmDelay: Qml.Timer {
+    interval: root.iconWarmDelayMs
+    repeat: false
+    onTriggered: Qt.callLater(root._pumpIconPrewarm)
+  }
+
+  function _pumpIconPrewarm() {
+    const panel = root.probeSource
+    if (!panel || typeof panel.prewarmIcons !== "function") {
+      // The panel is created by MenuView on the primary screen; a summon can
+      // land before it is adopted on a slow boot, so retry a bounded number of
+      // turns rather than dropping the warm set.
+      if (root._iconWarmTries++ < 20) Qt.callLater(root._pumpIconPrewarm)
+      return
+    }
+    const end = Math.min(root._iconWarmIdx + root.iconWarmBatch, root._iconWarmRequests.length)
+    if (end <= root._iconWarmIdx) return
+    panel.prewarmIcons(root._iconWarmRequests.slice(root._iconWarmIdx, end))
+    root._iconWarmIdx = end
+    if (root._iconWarmIdx < root._iconWarmRequests.length) Qt.callLater(root._pumpIconPrewarm)
+  }
+
   Connections {
     target: DesktopLayoutState
     function onBootEntrancePlayedChanged() {
@@ -395,12 +475,22 @@ Singleton {
     const prevIndex = root._builtinIndex
     const prevFamily = root._settingsFamily
     let interrupted = false
+    const warmBundles = []
     try {
-      if (root._buildFromFile(Paths.settingsCatalogPath + "#main")) root.evaluateGuards()
-      if (root.open) interrupted = true
-      else if (root._buildFromFile(Paths.settingsCatalogPath + "#utilities"))
+      if (root._buildFromFile(Paths.settingsCatalogPath + "#main")) {
+        warmBundles.push(root.bundle)
         root.evaluateGuards()
+      }
+      if (root.open) interrupted = true
+      else if (root._buildFromFile(Paths.settingsCatalogPath + "#utilities")) {
+        warmBundles.push(root.bundle)
+        root.evaluateGuards()
+      }
     } catch (e) {}
+    // Read the accent variants while the warm containers are still installed.
+    // The icon pump runs after they are restored and feeds the panel, which
+    // persists from late boot and owns the warmer at the menu window's DPR.
+    if (!interrupted) root._startIconPrewarm(warmBundles)
     root.bundle = prevBundle
     root._builtinIndex = prevIndex
     root._settingsFamily = prevFamily

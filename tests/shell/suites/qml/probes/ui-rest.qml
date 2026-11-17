@@ -123,6 +123,10 @@ Item {
   // name, so the first flip is a swap into a layer that has never decoded -
   // the case that used to blank the slot.
   CrossfadeIcon { id: cfIcon; x: 600; y: 0; name: "clock" }
+  // Colour-only changes must not blank a glyph that already decoded: a literal
+  // colour tween produces a new data URL per frame, and every one of those
+  // loads drops swapReady even though retainWhileLoading keeps the raster.
+  CrossfadeIcon { id: cfColor; x: 620; y: 0; name: "bluetooth" }
 
   // GridList: a 3-column grid whose 7 items leave a half-empty final row, a
   // 10-item grid whose last row holds exactly one cell, an empty grid for the
@@ -2130,6 +2134,13 @@ Item {
   }
 
   function turn48() {
+    // CrossfadeIcon colour tween: the front layer holds a decoded glyph.
+    const before = cfColor.visible
+    cfColor.colorKey = "#123456"
+    kv("crossfade.color.before", before)
+    kv("crossfade.color.visible", cfColor.visible)
+    kv("crossfade.color.nameHeld", cfColor.name === "bluetooth")
+
     kv("sweep.contentY.settled", sweepGrid.contentY)
     kv("sweep.landedOnTarget", feq(sweepGrid.contentY, sweepGrid.sweepTo))
     kv("sweep.target", sweepGrid.sweepTo)

@@ -93,6 +93,7 @@ IslandNav 1.0 ui/IslandNav.qml
 Title 1.0 ui/Title.qml
 SlideSwap 1.0 ui/SlideSwap.qml
 ZebraRow 1.0 ui/ZebraRow.qml
+IconWarmer 1.0 ui/IconWarmer.qml
 SortHeader 1.0 ui/SortHeader.qml
 EmptyState 1.0 ui/EmptyState.qml
 LiveMeter 1.0 ui/LiveMeter.qml

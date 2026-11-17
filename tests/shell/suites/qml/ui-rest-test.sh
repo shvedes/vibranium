@@ -230,7 +230,7 @@ t_eq "the offscreen screen reports a DPR of 1" "1" "$(qp_get icon.size.raster.dp
 t_eq "which is what Icon reads through its own window" "1" "$(qp_get icon.dpr.read)"
 t_eq "the debug-bounds overlay is off unless the env var is set" "false" "$(qp_get icon.debugBounds)"
 t_eq "the recolored URL is 422 characters through the Image" "422" "$(qp_get icon.url.known.length)"
-t_eq "the icon URL cache holds the served entries" "13" "$(qp_get icons.cache.size)"
+t_eq "the icon URL cache holds the served entries" "14" "$(qp_get icons.cache.size)"
 t_eq "a settled plain icon is ready" "true" "$(qp_get icon.ready.plainLater)"
 t_eq "and its slot is the 24px token" "24" "$(qp_get icon.state.plainImplicitUnaffected)"
 t_note "Icon._dpr falls back to 1 when the containing window has no usable devicePixelRatio (Icon.qml:81-85), but under offscreen the window DOES report 1, so that fallback arm is never taken here. The DPR-correction path itself is asserted: sourceSize is canvas * dpr, 14 for the default canvas and 40 for a size:40 override."
@@ -263,6 +263,12 @@ t_eq "and the outgoing layer is hidden" "0" "$(qp_get crossfade.late.outgoingOpa
 t_eq "re-asserting the showing name changes nothing" "true" "$(qp_get crossfade.sameName.noop)"
 t_eq "an empty name drops any staged swap" "true" "$(qp_get crossfade.empty.snapped)"
 t_eq "and hides the slot at once" "false" "$(qp_get crossfade.empty.visible)"
+# A colour tween produces a new URL per frame; the front layer's last-good
+# raster stays painted, so the slot must not blink off on each decode.
+t_eq "a decoded colour-changing glyph starts visible" "true" \
+  "$(qp_get crossfade.color.before)"
+t_eq "a colour-only change keeps it visible" "true" "$(qp_get crossfade.color.visible)"
+t_eq "and does not disturb the name" "true" "$(qp_get crossfade.color.nameHeld)"
 
 # ---------------------------------------------------------------------
 # GridList: the column and row arithmetic.
