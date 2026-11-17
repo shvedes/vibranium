@@ -145,8 +145,8 @@ QtObject {
     root.currentIndex >= 0 ? root.folderModel.get(root.currentIndex, "fileSize") : 0)
 
   // View transform. `fitToWindow` is the mode and `zoomFactor` is what it
-  // overrides: panning is only meaningful once the fit has been broken, which
-  // is what the guard on the drag reads.
+  // overrides: dragging an image breaks the fit at the current scale, so a pan
+  // is only ever applied to a broken fit.
   property real zoomFactor: 1.0
   property bool fitToWindow: true
   property int rotationAngle: 0
@@ -1092,23 +1092,34 @@ QtObject {
         MouseArea {
           anchors.fill: parent
           hoverEnabled: true
-          acceptedButtons: Qt.LeftButton | Qt.RightButton
+          acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
 
           onClicked: function(mouse) {
             if (mouse.button === Qt.RightButton)
               root.openMenuAt(mouse.x, mouse.y)
           }
 
-          // Panning is a delta, not an absolute position: the drag is
-          // accumulated from the last pointer position, so a press that lands
-          // off the image does not jump it, and the follow-on events are
-          // independent of how the window was resized mid-drag.
+          // Panning is a delta from the last pointer position, not an absolute
+          // placement, so a press that lands off the image does not jump it and
+          // the follow-on events are independent of a mid-drag window resize.
+          // `mouse.button` is NoButton on a move, so the held buttons are read
+          // from `mouse.buttons`; `mouse.button` only identifies the press.
           property real _lastX: 0
           property real _lastY: 0
+          property real _pressX: 0
+          property real _pressY: 0
+          readonly property real _dragThreshold: 4
+          property bool _panArmed: false
+          property bool _panning: false
 
           onPressed: function(mouse) {
-            _lastX = mouse.x
-            _lastY = mouse.y
+            if (mouse.button === Qt.LeftButton || mouse.button === Qt.MiddleButton) {
+              _lastX = mouse.x
+              _lastY = mouse.y
+              _pressX = mouse.x
+              _pressY = mouse.y
+              _panArmed = true
+            }
           }
           onPositionChanged: function(mouse) {
             // The chrome reveal is proximity to the two bars, not pointer
@@ -1116,14 +1127,42 @@ QtObject {
             // window puts both away again.
             root.hoverNearTop = mouse.y < 72
             root.hoverNearBottom = mouse.y > viewport.height - 76
-            // Panning is the left button's drag only; a right-button drag is
-            // the gesture that opens the context menu, not a move of the image.
-            if (pressed && mouse.button === Qt.LeftButton && !root.fitToWindow) {
-              root.panX += mouse.x - _lastX
-              root.panY += mouse.y - _lastY
-              _lastX = mouse.x
-              _lastY = mouse.y
+            // Both a left and a middle drag move the image; a right-button
+            // drag opens the context menu, not a move. Arming on the press and
+            // starting only past a small threshold keeps a plain click - and
+            // the jitter of a double-click - from disturbing the fit.
+            if (!_panArmed) return
+            if (!(mouse.buttons & (Qt.LeftButton | Qt.MiddleButton))) {
+              _panArmed = false
+              return
             }
+            if (!_panning) {
+              const travel = Math.abs(mouse.x - _pressX) + Math.abs(mouse.y - _pressY)
+              if (travel < _dragThreshold) return
+              _panning = true
+              // A drag that starts in fit mode breaks the fit at the current
+              // scale, so the image can be moved from the first press without a
+              // separate zoom step and without a jump in size when the mode
+              // changes.
+              if (root.fitToWindow) {
+                root.fitToWindow = false
+                root.zoomFactor = img.fitScale
+              }
+            }
+            root.panX += mouse.x - _lastX
+            root.panY += mouse.y - _lastY
+            _lastX = mouse.x
+            _lastY = mouse.y
+          }
+          onReleased: function(mouse) {
+            if (mouse.button === Qt.LeftButton || mouse.button === Qt.MiddleButton) {
+              _panArmed = false
+              _panning = false
+            }
+          }
+          onCanceled: {
+            _panArmed = false
+            _panning = false
           }
           onExited: {
             root.hoverNearTop = false
