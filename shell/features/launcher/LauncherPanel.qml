@@ -25,7 +25,8 @@ import "../../common/ui/PanelKeys.js" as PanelKeys
 //   enter          activate current row (or run armed action)
 //   delete/ctrl+d  remove current row, from the list or the filtered field
 //   ctrl+i         toggle description
-//   backspace      empty field: peel action/info/mode, then de-focus to list
+//   backspace      empty field: peel action/info/mode, then de-focus to list;
+//                  empty list: close the launcher
 //   esc            single ESC close when in normal root, otherwise peel
 //
 // The list-mode routes below are the seat: a summon runs before its
@@ -864,7 +865,16 @@ PanelCard {
       case "escape": panel.escapeChain(); event.accepted = true; return
       case "back":
         if (panel._deleteIndex >= 0) { panel.closeDelete(); event.accepted = true; return }
-        if (focusCtrl.mode === "list") { focusCtrl.grabFilter(); event.accepted = true; return }
+        if (focusCtrl.mode === "list") {
+          // An empty field in list mode has nothing left to hand back to: taking
+          // the field again would only bounce to the empty-field chain and loop.
+          // Close the surface instead. A query still goes to the field, where a
+          // native Backspace trims it one character at a time.
+          if (searchField.text !== "") focusCtrl.grabFilter()
+          else AppLauncher.close()
+          event.accepted = true
+          return
+        }
         break
     }
 
