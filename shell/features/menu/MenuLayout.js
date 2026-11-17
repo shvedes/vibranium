@@ -45,17 +45,22 @@ function headerFor(pool, section) {
 // so it installs instantly too. The caller supplies the live flags because
 // the panel and the menu singleton own them.
 function rowSyncPlan(input) {
-  const wideProjection = input.searching && input.rowCount > input.fullRows
   const reveal = input.intent === "reveal"
   const scopedGiant = reveal && input.scopedActive && !input.searching
     && input.sourceCount > input.fullRows
-  const wholesale = !reveal || wideProjection
   const ranked = input.searching
+  // A ranked projection is a whole-page replacement in content but not in
+  // timing: the panel already installs it in the query's own turn. Giving a
+  // wide ranked set the wholesale plan adds beginSwap/endSwap plus a second
+  // fit across several event-loop turns, which is the visible pause between
+  // the field echo and the card resize on a large index. Keyed, non-gliding
+  // writes are enough for a re-ranked set; only a non-reveal rebuild needs
+  // the swap window.
+  const wholesale = !reveal && !ranked
   const glide = !wholesale && !ranked && !scopedGiant
     && input.rowCount <= input.fullRows && input.animationsEnabled
   const blocker = reveal
-    ? (wideProjection ? "wide-projection"
-      : (ranked ? "ranked-projection" : ""))
+    ? (ranked ? "ranked-projection" : "")
     : input.intent
   return {
     intent: input.intent,
