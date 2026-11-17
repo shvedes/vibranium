@@ -522,7 +522,14 @@ LayerSurface {
       showTimer.restart()
     }
   }
-  on_ReqChanged: if (root.visible) Qt.callLater(root.place)
+  on_ReqChanged: if (root.visible) {
+    // The text binds _req and updates in this turn. A winner swap while the
+    // bubble is shown must move it now too: deferring place left the new text
+    // painted at the outgoing module's x/y for a frame. Keep the deferred pass
+    // for the configure that follows a new anchor.
+    root.place()
+    Qt.callLater(root.place)
+  }
   onVisibleChanged: {
     // Place on the spot as well as after the configure: the first present is
     // built from the bubble's coordinates now, and the deferred-only pass left
