@@ -9,6 +9,7 @@ import QtQuick.Controls as Ctl
 import qs.common
 import "../text/EditUtils.js" as EditUtils
 import "../motion/Marquee.js" as Marquee
+import "../motion/CapsJitter.js" as CapsJitter
 
 // Single-line text field: bordered box, placeholder, built-in clear
 // affordance, an opt-in password reveal eye plus optional launcher-style
@@ -90,6 +91,19 @@ Rectangle {
   // Live reveal state. The eye button flips it; consumers may drive it
   // themselves (a policy reset on submit/cancel is theirs to own).
   property bool revealed: false
+  // CapsLock state for a password-capable field, handed in by the consumer.
+  // While caps is on and motion is enabled, the echo paints as per-glyph
+  // cells that jump on their own rhythm - the same effect PasswordBox draws -
+  // so the field itself reports the locked key instead of needing a chip.
+  property bool capsActive: false
+
+  // Whether this field can mask at all; a plain search field is left alone.
+  readonly property bool _capsField: root.sensitive || root.echoMode === TextInput.Password
+  // The native control's glyphs are hidden while the caps echo paints, so
+  // the two never double-draw. Focus, editing, selection and the caret stay
+  // with the control; only its paint yields.
+  readonly property bool _capsPaint: root.capsActive && MotionPolicy.enabled
+    && input.text.length > 0 && root._capsField
 
   // Emacs readline keys (Ctrl-W erase word, Alt-F/B word
   // jump). On by default - the menu and launcher rely on them.
@@ -485,7 +499,7 @@ Rectangle {
       height: parent.height
       verticalAlignment: TextInput.AlignVCenter
       clip: true
-      color: Theme.color("foreground_0")
+      color: root._capsPaint ? "transparent" : Theme.color("foreground_0")
       selectionColor: Theme.color("accent")
       selectedTextColor: Theme.color("background_0")
       font.pixelSize: root.fontSize
@@ -581,6 +595,156 @@ Rectangle {
 
       onAccepted: root.accepted(text)
       onTextEdited: root.type(input.text)
+    }
+
+    // Caps echo: one cell per character, mirroring the control's left-aligned
+    // text at the same type size. Each cell carries its own transform pose, so
+    // the row's measure never sees the motion, and the mask/plain faces
+    // crossfade on reveal instead of switching in one frame.
+    Item {
+      id: capsEcho
+
+      anchors.fill: parent
+      visible: root._capsPaint
+      clip: true
+
+      property int tick: 0
+
+      function jitterX(i) {
+        return root.capsActive ? CapsJitter.offsetX(i, capsEcho.tick) : 0
+      }
+
+      function jitterY(i) {
+        return root.capsActive ? CapsJitter.offsetY(i, capsEcho.tick) : 0
+      }
+
+      function syncModel() {
+        const len = input.text.length
+        while (capsModel.count > len) capsModel.remove(capsModel.count - 1)
+        while (capsModel.count < len) capsModel.append({})
+      }
+
+      Component.onCompleted: syncModel()
+
+      ListModel {
+        id: capsModel
+      }
+
+      Connections {
+        target: input
+
+        function onTextChanged() {
+          capsEcho.syncModel()
+        }
+      }
+
+      Timer {
+        id: capsJitter
+
+        repeat: true
+        running: capsEcho.visible
+        interval: 110
+        onTriggered: {
+          capsEcho.tick += 1
+          interval = CapsJitter.nextInterval()
+        }
+      }
+
+      Row {
+        id: capsRow
+
+        x: 0
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 0
+
+        Repeater {
+          model: capsModel
+
+          Item {
+            id: capsCell
+
+            required property int index
+
+            readonly property bool masked: input.echoMode === TextInput.Password
+            readonly property string plainText: capsCell.index < input.text.length
+              ? input.text[capsCell.index] : ""
+            readonly property string glyphChar: capsCell.masked
+              ? root.passwordCharacter : capsCell.plainText
+
+            width: capsCell.masked ? capsMask.implicitWidth : capsPlain.implicitWidth
+            height: Math.max(capsMask.implicitHeight, capsPlain.implicitHeight)
+
+            Behavior on width {
+              enabled: MotionPolicy.enabled
+              NumberAnimation {
+                duration: Ui.fastMs
+                easing.type: Easing.OutCubic
+              }
+            }
+
+            property real jx: capsEcho.jitterX(capsCell.index)
+            property real jy: capsEcho.jitterY(capsCell.index)
+
+            Behavior on jx {
+              enabled: MotionPolicy.enabled
+              NumberAnimation {
+                duration: 220
+                easing.type: Easing.OutCubic
+              }
+            }
+            Behavior on jy {
+              enabled: MotionPolicy.enabled
+              NumberAnimation {
+                duration: 220
+                easing.type: Easing.OutCubic
+              }
+            }
+
+            transform: Translate {
+              x: capsCell.jx
+              y: capsCell.jy
+            }
+
+            Text {
+              id: capsMask
+
+              anchors.centerIn: parent
+              text: root.passwordCharacter
+              opacity: capsCell.masked ? 1 : 0
+              color: Theme.color("foreground_0")
+              font.pixelSize: root.fontSize
+              font.family: Ui.fontFamily
+
+              Behavior on opacity {
+                enabled: MotionPolicy.enabled
+                NumberAnimation {
+                  duration: Ui.fastMs
+                  easing.type: Easing.OutCubic
+                }
+              }
+            }
+
+            Text {
+              id: capsPlain
+
+              anchors.centerIn: parent
+              text: capsCell.plainText
+              opacity: capsCell.masked ? 0 : 1
+              color: Theme.color("foreground_0")
+              font.pixelSize: root.fontSize
+              font.family: Ui.fontFamily
+
+              Behavior on opacity {
+                enabled: MotionPolicy.enabled
+                NumberAnimation {
+                  duration: Ui.fastMs
+                  easing.type: Easing.OutCubic
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 

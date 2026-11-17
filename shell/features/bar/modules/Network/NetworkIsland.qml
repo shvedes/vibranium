@@ -1822,6 +1822,7 @@ Item {
               // Ctrl+A + backspace clears).
               revealable: true
               clearable: false
+              capsActive: Core.Keyboard.capsOn
               placeholder: "Password"
               onEdited: text => root.passwordText = text
               onAccepted: text => root.submitPassword(text)
