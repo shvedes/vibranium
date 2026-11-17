@@ -107,6 +107,11 @@ Singleton {
   // still in flight, which is not a fault.
   readonly property bool forecastUnavailable: root._forecastUnavailable
   property bool _forecastUnavailable: false
+  // The first cycle has settled once a report parsed or its retry burst was
+  // spent. Until then a null current means loading, not a fault; a last-good
+  // report survives a later failure, so the flag only gates the initial state.
+  readonly property bool forecastSettled: root._forecastSettled
+  property bool _forecastSettled: false
 
   // Location editor state (the island drives these; shared so two
   // monitors never edit divergently).
@@ -213,6 +218,7 @@ Singleton {
   // their own burst, so one provider in flight is a property of the state
   // machine rather than a scheduling accident.
   function refresh() {
+    root._forecastSettled = false
     root.forecastRetries = 0
     root.dailyForecastRetries = 0
     root.wttrFallbackActive = false
@@ -530,6 +536,7 @@ Singleton {
     try {
       const parsed = JSON.parse(raw)
       root.report = parsed
+      root._forecastSettled = true
       // The wttr.in leg carries no day/night flag, so its icon only ever
       // fills an empty state (Model.provisionalCurrentIcon keeps a resolved
       // one). Filling it is right for the location-resolution leg and wrong
@@ -566,6 +573,7 @@ Singleton {
       // one that has none, and re-issuing it asks the same host the same
       // question. The last good report stays on screen until the next cycle.
       root.wttrFallbackActive = false
+      root._forecastSettled = true
       return
     }
     root.forecastRetries++
@@ -616,6 +624,7 @@ Singleton {
       const parsed = JSON.parse(raw)
       const parsedCurrent = Model.openMeteoCurrentCondition(parsed)
       root.dailyForecastReport = parsed
+      root._forecastSettled = true
       root.conditionIcon = Model.currentIcon(parsedCurrent, root.conditionIcon)
       root.dailyForecastRetries = 0
       root.finishSavingLocation()

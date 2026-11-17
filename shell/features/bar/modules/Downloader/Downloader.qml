@@ -47,9 +47,9 @@ BarModule {
   // connectivity glyph's own (Ui.blinkMs), counted rather than held.
   property int _blinkLeft: 0
   property bool _blinkOn: false
-  // Writable rather than readonly: a Behavior can only animate a property it
-  // may assign, and the tween between resting ink and the red blink is the
-  // whole point of this one.
+  // The blink snaps between two real colours, so each blink is one data URL
+  // (Icons.url), not the ~30 a tween through intermediate hex colours would
+  // decode; the retained raster covers the single decode per endpoint.
   property color glyphColor: root._blinkOn ? Ui.solid("red")
     : Ui.solid("foreground_0")
 
@@ -818,10 +818,6 @@ BarModule {
     anchors.centerIn: parent
     name: "download-alt"
     colorKey: String(root.glyphColor)
-  }
-
-  Behavior on glyphColor {
-    ColorAnim { duration: Math.round(Ui.blinkMs / 2) }
   }
 
   // The bar carries the busy state only while the island is closed: with the

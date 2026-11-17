@@ -134,7 +134,10 @@ BarModule {
       colorKey: "foreground_0"
       // cloud-off carries its crossing slash as class="indicator", so it
       // paints red while the cloud body keeps the bar foreground tone.
-      accentKey: Core.Weather.current ? "" : "red"
+      // A null current before the first completed cycle is loading, not a
+      // fault; a last-good report survives a later failure, so gate red on
+      // settled to keep the first fetch from painting a crossed cloud.
+      accentKey: Core.Weather.current ? "" : (Core.Weather.forecastSettled ? "red" : "")
       opacity: 1
       Behavior on opacity { enabled: MotionPolicy.enabled; NumberAnimation { duration: Ui.fastMs } }
     }

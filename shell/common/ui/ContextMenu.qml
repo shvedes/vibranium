@@ -233,11 +233,21 @@ Card {
               }
 
               IconImage {
+                id: entryIcon
+                property bool _painted: false
                 anchors.centerIn: parent
+                // First paint waits for the decoded frame; the latch then keeps
+                // the retained raster visible across later source swaps.
                 visible: entryRow.iconSource !== ""
+                  && (status === Image.Ready || _painted)
                 width: 16
                 height: 16
                 asynchronous: true
+                // retain/cache are backing-Image properties (IconImage's
+                // documented extension point), not exposed on IconImage itself.
+                backer.retainWhileLoading: true
+                backer.cache: true
+                onStatusChanged: if (status === Image.Ready) entryIcon._painted = true
                 // A DBusMenu icon is an Image.source-ready URL (theme-resolved
                 // or embedded png data), so it needs no themed-name lookup.
                 source: entryRow.iconSource

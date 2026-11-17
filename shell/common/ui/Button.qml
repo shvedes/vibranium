@@ -155,14 +155,31 @@ Item {
         anchors.centerIn: parent
         spacing: Ui.s
 
-        IconImage {
-
+        // Reserved slot: sized from the configured icon alone, so an in-flight
+        // decode cannot collapse the row and shift the label.
+        Item {
           visible: root.icon !== ""
           anchors.verticalCenter: parent.verticalCenter
           width: visible ? 14 : 0
           height: visible ? 14 : 0
-          source: root.icon
-          asynchronous: true
+
+          IconImage {
+            id: btnIcon
+            property bool _painted: false
+            anchors.centerIn: parent
+            // First paint waits for the decoded frame; the latch then keeps
+            // the retained raster visible across later source swaps.
+            visible: root.icon !== "" && (status === Image.Ready || _painted)
+            width: 14
+            height: 14
+            source: root.icon
+            asynchronous: true
+            // retain/cache are backing-Image properties (IconImage's
+            // documented extension point), not exposed on IconImage itself.
+            backer.retainWhileLoading: true
+            backer.cache: true
+            onStatusChanged: if (status === Image.Ready) btnIcon._painted = true
+          }
         }
 
         Text {

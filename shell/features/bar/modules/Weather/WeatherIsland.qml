@@ -176,7 +176,7 @@ Item {
             colorKey: "foreground_0"
             // cloud-off carries its crossing slash as class="indicator", so it
             // paints red while the cloud body keeps the island foreground tone.
-            accentKey: root.weather && root.weather.current ? "" : "red"
+            accentKey: root.weather && root.weather.current ? "" : (root.weather && root.weather.forecastSettled ? "red" : "")
             size: 48
           }
 

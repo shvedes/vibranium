@@ -41,6 +41,22 @@ BarModule {
   readonly property var connectedWifi: root.connectedNetwork
     && root.connectedNetwork.device === root.wifiDevice ? root.connectedNetwork : null
 
+  // NetworkManager publishes its device graph after this module is built and
+  // rebuilds it with fresh wrappers while settling, so neither an empty list
+  // nor a first connected report is a stable "settled" signal: both were
+  // observed to flip pending off one frame before the real link landed. The
+  // bounded grace is the only signal that survives that assembly; after it a
+  // still-absent link is a genuine fault and paints red.
+  property bool _devicesGraceDone: false
+  readonly property int devicesGraceMs: 2000
+  Timer {
+    id: devicesGrace
+    interval: root.devicesGraceMs
+    repeat: false
+    onTriggered: root._devicesGraceDone = true
+  }
+  readonly property bool _devicesPending: !root._devicesGraceDone
+
   readonly property string ssid: root.connectedWifi ? root.connectedWifi.name : ""
   // Link changes are user-meaningful events: wifi roam, cable plug,
   // captive drop. Backend lists rebuild with fresh object wrappers
@@ -67,7 +83,10 @@ BarModule {
   // swallows the transition that actually happened, so a link coming up at
   // startup reported nothing and only its later loss was seen. Taking the
   // reading when the module appears means every later change is real.
-  Component.onCompleted: root._lastLinkKey = root._linkKey()
+  Component.onCompleted: {
+    root._lastLinkKey = root._linkKey()
+    devicesGrace.start()
+  }
 
   onConnectedNetworkChanged: {
     const key = root._linkKey()
@@ -116,6 +135,7 @@ BarModule {
       if (root.linkNote === "metered") return "yellow"
       return "foreground_0"
     }
+    if (root._devicesPending) return "foreground_1"
     return root.wifiOff ? "foreground_1" : "red"
   }
   // Second tone for the glyph's indicator elements. Only the wifi-off
@@ -290,13 +310,11 @@ BarModule {
   Behavior on nameSlide {
     Glide { duration: Ui.slowMs }
   }
-  // The glyph's colour is tweened rather than swapped: Icon takes a literal
-  // "#rrggbb" for colorKey (Icons.url), so both endpoints are real colours
-  // and the green-in and the green-out are fades rather than snaps.
+  // Icon takes a literal hex for colorKey (Icons.url -> data URL), so an
+  // intermediate tween colour is a fresh decode; the reveal is a binary
+  // greenPhase blink, so one URL per phase is correct and the retained raster
+  // covers the decode.
   property color glyphColor: reveal.glyphColor
-  Behavior on glyphColor {
-    ColorAnim { duration: reveal.colorMs; easing.type: root.revealed ? Easing.OutCubic : Easing.InOutQuad }
-  }
 
   // Dynamic pill (the NowPlaying convention): a `nameSlide` real animates
   // 0..1 and the width rounds to whole pixels every frame, so neighbours

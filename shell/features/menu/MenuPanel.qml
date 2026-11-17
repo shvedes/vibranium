@@ -1510,6 +1510,15 @@ Rectangle {
   onGridColsChanged: {
     if (!Menu.open || panel.searching) return
     if (panel._seenGridCols === panel.gridCols) return
+    // No width ease to ride (closed, or motion off): the geometry is final
+    // now, so re-weave in this turn and publish card and rows together.
+    // A live glide keeps the debounce and waits for the width to settle.
+    if (!panel.shown || !MotionPolicy.enabled) {
+      recompTimer.stop()
+      panel._seenGridCols = panel.gridCols
+      panel.recomputeRows("reveal", true)
+      return
+    }
     recompTimer.restart()
   }
 
@@ -1531,7 +1540,7 @@ Rectangle {
       // summon and every back navigation, since both resize the card.
       // Most columns do not reach a header at all, and the candidate
       // then compares equal, which is the early return doing its job.
-      panel.recomputeRows("reveal")
+      panel.recomputeRows("reveal", true)
     }
   }
 
@@ -1672,7 +1681,10 @@ Rectangle {
     // the same add/remove transitions run; only the 400ms guard debounce
     // in front of it is specific to this mechanism.
     function onGuardWhenChanged() {
-      panel.recomputeRows("reveal")
+      // This reveal is debounced upstream, so publishing it same-turn is
+      // safe: sameTurn bypasses the quiesce hold and geometry and rows
+      // land together instead of the card resizing a turn before its rows.
+      panel.recomputeRows("reveal", true)
     }
 
     function onResultsChanged() {
@@ -1709,7 +1721,7 @@ Rectangle {
     }
 
     function onScopedRowsChanged() {
-      panel.recomputeRows("reveal")
+      panel.recomputeRows("reveal", true)
     }
 
     function onBundleChanged() {
@@ -1725,8 +1737,9 @@ Rectangle {
       metrics.clearShapeCache()
       panel._quiesceDisarm()
       // Different containers mean a different row set outright, and the
-      // metric maps above were just dropped with nothing to glide.
-      panel.recomputeRows("rebuild")
+      // metric maps above were just dropped with nothing to glide. A genuine
+      // new container is one wholesale swap, so publish it same-turn.
+      panel.recomputeRows("rebuild", true)
     }
 
     // A store change flipped a showIf verdict - reveal/hide animated.
@@ -1859,7 +1872,7 @@ Rectangle {
         if (panel.keySeq(panel.rowsModel) === panel._lastSeq
           && panel._rowsPending === false
           && panel.keySeq(panel._records) === panel._lastSeq)
-          Qt.callLater(() => panel.applyFrameState())
+          panel.applyFrameState()
         focusCtrl.grabList()
         panel.queueFit()
       } else {
@@ -1903,7 +1916,7 @@ Rectangle {
 
   function scheduleCondReveal() {
     if (!panel._condPending && !Menu.slotClosing) {
-      panel.recomputeRows("reveal")
+      panel.recomputeRows("reveal", true)
       return
     }
     // Dropdown still easing shut: park until the row's slot reports.
@@ -1920,7 +1933,7 @@ Rectangle {
     function onSlotClosingChanged() {
       if (!Menu.slotClosing && panel._condPending && Menu.open) {
         panel._condPending = false
-        panel.recomputeRows("reveal")
+        panel.recomputeRows("reveal", true)
       }
     }
   }
