@@ -3,13 +3,16 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 
-// Glyph swap with a fade: two Icons share one fixed slot and trade
-// opacity when `name` flips - the same crossfade the network island's
-// speed-test title uses for its caps/action titles, on the icon axis.
-// Opacity never touches measure, so the slot holds its size throughout
-// and surrounding rows never reflow mid-fade. Empty swaps snap: going
-// to "" hides the slot at once (a vanishing glyph always coincides
-// with its owner's own show/hide fade).
+// Glyph swap with a fade (optionally a slidefade): two Icons share one fixed
+// slot and trade opacity when `name` flips - the same crossfade the network
+// island's speed-test title uses for its caps/action titles, on the icon
+// axis. `rise` adds vertical travel (incoming from below, outgoing above) and
+// `slideX` adds horizontal travel (incoming from the right, outgoing left),
+// both in step with the fade - the icon counterpart of SlideSwap's text
+// travel. Opacity and transform never touch measure, so the slot holds its
+// size throughout and surrounding rows never reflow mid-swap.
+// Empty swaps snap: going to "" hides the slot at once (a vanishing glyph
+// always coincides with its owner's own show/hide fade).
 //
 // A swap is staged on the hidden layer and the front is traded only once
 // that layer can paint. Swapping first blanked the slot for as long as the
@@ -38,6 +41,19 @@ Item {
   // size, still DPR-corrected; 0 falls back to the bar slot/canvas
   // tokens (in which case the slot measures the layers' own slots).
   property real size: 0
+  // Optional vertical slidefade travel. > 0 stages the incoming glyph `rise`
+  // px below and sends the outgoing one `rise` px above as the trades; 0
+  // (default) keeps the pure crossfade every existing consumer uses. Set it
+  // once at construction - it is captured for the staged layer at swap time.
+  property real rise: 0
+  // Horizontal counterpart: > 0 stages the incoming glyph `slideX` px to the
+  // right and sends the outgoing one `slideX` px left. Independent of `rise`;
+  // 0 (default) keeps the pure crossfade.
+  property real slideX: 0
+  // Whether the fade and any travel run. Defaults to the shell's global
+  // motion policy; a consumer whose swap must stay alive with animations off
+  // (the launcher badge cycle) sets true explicitly.
+  property bool animate: MotionPolicy.enabled
 
   // Double buffer. _aName starts tracking `name` so the first paint
   // lands without motion; onCompleted freezes it into a snapshot (the
@@ -60,9 +76,18 @@ Item {
   // its first raster.
   property bool _aPainted: false
   property bool _bPainted: false
+  // Travel offsets for the two layers: the hidden layer waits below/right of
+  // the slot, the front sits at rest, and the outgoing layer leaves above/left
+  // when the front trades.
+  property real _aRise: 0
+  property real _bRise: 0
+  property real _aX: 0
+  property real _bX: 0
 
   Component.onCompleted: {
     _aName = name
+    _bRise = rise
+    _bX = slideX
   }
 
   onNameChanged: {
@@ -80,8 +105,15 @@ Item {
       else _aName = ""
       return
     }
-    if (_aFront) _bName = name
-    else _aName = name
+    if (_aFront) {
+      _bName = name
+      _bRise = root.rise
+      _bX = root.slideX
+    } else {
+      _aName = name
+      _aRise = root.rise
+      _aX = root.slideX
+    }
     _swapPending = true
     // The staged layer's own name -> source binding lands with this change
     // notification, so its status cannot be trusted from inside this
@@ -97,6 +129,17 @@ Item {
     const incoming = root._aFront ? iconB : iconA
     if (!incoming.swapReady) return
     root._swapPending = false
+    if (root._aFront) {
+      root._aRise = -root.rise
+      root._bRise = 0
+      root._aX = -root.slideX
+      root._bX = 0
+    } else {
+      root._bRise = -root.rise
+      root._aRise = 0
+      root._bX = -root.slideX
+      root._aX = 0
+    }
     root._aFront = !root._aFront
   }
 
@@ -125,10 +168,22 @@ Item {
     indicatorAnim: root.indicatorAnim
     size: root.size
     opacity: (root._aFront && root._aName !== "") ? 1 : 0
+    transform: Translate {
+      x: root._aX
+      y: root._aRise
+      Behavior on x {
+        enabled: root.animate
+        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+      }
+      Behavior on y {
+        enabled: root.animate
+        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+      }
+    }
     onSwapReadyChanged: root._tradeIfReady()
     onReadyChanged: if (ready) root._aPainted = true
     Behavior on opacity {
-      enabled: MotionPolicy.enabled
+      enabled: root.animate
       NumberAnimation { duration: Ui.fastMs }
     }
   }
@@ -144,10 +199,22 @@ Item {
     indicatorAnim: root.indicatorAnim
     size: root.size
     opacity: (!root._aFront && root._bName !== "") ? 1 : 0
+    transform: Translate {
+      x: root._bX
+      y: root._bRise
+      Behavior on x {
+        enabled: root.animate
+        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+      }
+      Behavior on y {
+        enabled: root.animate
+        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+      }
+    }
     onSwapReadyChanged: root._tradeIfReady()
     onReadyChanged: if (ready) root._bPainted = true
     Behavior on opacity {
-      enabled: MotionPolicy.enabled
+      enabled: root.animate
       NumberAnimation { duration: Ui.fastMs }
     }
   }

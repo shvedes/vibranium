@@ -232,6 +232,54 @@
                 "desc": "Mark PWA and TUI entries with a badge."
             },
             {
+                "key": "shell.launcher.showGameBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Show game badges",
+                "sub": "Show/hide game badges",
+                "desc": "Mark games with a controller badge (any entry in the Game category)."
+            },
+            {
+                "key": "shell.launcher.showChatBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Show chat badges",
+                "sub": "Show/hide chat badges",
+                "desc": "Mark chat, messaging and call entries with a chat badge."
+            },
+            {
+                "key": "shell.launcher.showBrowserBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Show browser badges",
+                "sub": "Show/hide browser badges",
+                "desc": "Mark web browser entries with a globe badge."
+            },
+            {
+                "key": "shell.launcher.showDocumentBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Show document badges",
+                "sub": "Show/hide document badges",
+                "desc": "Mark office and document entries with a file badge."
+            },
+            {
+                "key": "shell.launcher.showMediaBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Show media badges",
+                "sub": "Show/hide media badges",
+                "desc": "Mark audio, video and image entries with a media badge."
+            },
+            {
+                "key": "shell.launcher.showSystemBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Show system badges",
+                "sub": "Show/hide system badges",
+                "desc": "Mark system, settings and administration tools with a settings badge."
+            },
+            {
                 "key": "shell.launcher.showDescriptions",
                 "type": "bool",
                 "default": true,

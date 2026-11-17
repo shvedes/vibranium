@@ -74,9 +74,31 @@ Item {
     font.pixelSize: Ui.fontXs
     font.family: Ui.fontFamily
   }
-  // Right-side managed-entry marker ("webapp" | "tui"), recolored from
-  // the shell's own assets/icons set - dimmed to trail-chrome prominence.
-  readonly property string badgeName: modelData ? String(modelData.badge ?? "") : ""
+  // Right-side badge, recolored from the shell's own assets/icons set and
+  // dimmed to trail-chrome prominence. A row can match several families at
+  // once, so the delegate cycles every gated stem the record carries; a single
+  // match stays static. The helper normalizes the model role back to a plain
+  // array: QML hands a row's JS array back as a V4Sequence, which
+  // Array.isArray rejects.
+  readonly property var badgeList: LauncherLib.badgeList(modelData)
+  property int badgeIndex: 0
+  readonly property string badgeName: row.badgeList.length > 0
+    ? String(row.badgeList[Math.min(row.badgeIndex, row.badgeList.length - 1)] ?? "") : ""
+  // A new record (keystroke, rescan, toggle) restarts the cycle on the first
+  // stem, so the primary badge is what a freshly filtered row shows.
+  onBadgeListChanged: row.badgeIndex = 0
+
+  // One badge per 1.5s, deliberately NOT gated by the shell's animation
+  // policy: the cycle is the only signal that a row has more than one family,
+  // so parking on the first stem would hide the rest whenever animations are
+  // off. The crossfade opts into animate: true below so the swap still slides.
+  Timer {
+    interval: 1500
+    repeat: true
+    running: row.badgeList.length > 1
+    onTriggered: row.badgeIndex = (row.badgeIndex + 1) % row.badgeList.length
+    onRunningChanged: if (!running) row.badgeIndex = 0
+  }
 
   // Live line metrics for the resting line heights below. clipFontMetrics
   // already measures the sub size; the title needs its own (fontL).
@@ -296,19 +318,25 @@ Item {
       }
     }
 
-    // Managed-entry badge, mirroring the menu's right-side trail chrome
-    // (chevrons/toggles). Pure indicator - no interaction; hidden when the
-    // setting is off (empty source) or the entry is not managed.
-    Icon {
+    // Badge slot, mirroring the menu's right-side trail chrome
+    // (chevrons/toggles). Pure indicator - no interaction; hidden when every
+    // family is off (empty source). The shared crossfade trades one glyph for
+    // the next; the next enters from the right while the old one leaves left,
+    // and the small travel keeps the direction readable in a 16px slot
+    // without moving the label column.
+    CrossfadeIcon {
       id: badgeImg
 
-      visible: row.badgeName !== ""
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       size: 16
       name: row.badgeName
       colorKey: "foreground_1"
       opacity: 0.7
+      slideX: Math.max(2, Math.round(Ui.s / 2))
+      // The badge cycle is the one animation that keeps running with the
+      // global animation switch off.
+      animate: true
     }
 
     Column {
@@ -322,8 +350,11 @@ Item {
       height: Math.max(implicitHeight, row.linesH)
       anchors.left: leadSlot.visible ? leadSlot.right : parent.left
       anchors.leftMargin: leadSlot.visible ? 8 : 0
-      anchors.right: badgeImg.visible ? badgeImg.left : parent.right
-      anchors.rightMargin: badgeImg.visible ? 6 : 10
+      // Gate on the badge NAME, not the slot's visible: CrossfadeIcon stays
+      // invisible until its first raster decodes, and anchoring on that would
+      // let the label run under the badge and then shorten on decode.
+      anchors.right: row.badgeName !== "" ? badgeImg.left : parent.right
+      anchors.rightMargin: row.badgeName !== "" ? 6 : 10
       anchors.verticalCenter: parent.verticalCenter
       spacing: 1
 

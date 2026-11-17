@@ -970,6 +970,61 @@ group('appRow maps a record into the row the launcher renders', () => {
   eq('no options at all reads as every option off', [bare.sub, bare.desc, bare.icon, bare.badge], ['', '', '', ''])
   eq('and the boolean flags default to false', [bare.runInTerminal, bare.removable], [false, false])
   eq('a non-string badge is stringified when enabled', LL.appRow(rec, { showBadges: true }).badge, 'webapp')
+  // The game badge rides its own switch, so it is neither enabled by the
+  // PWA/TUI one nor hidden by it being off.
+  const game = { ...rec, badge: 'gamepad' }
+  eq('the game badge is off under the PWA/TUI switch alone', LL.appRow(game, { showBadges: true }).badge, '')
+  eq('and shows under its own switch', LL.appRow(game, { showGameBadge: true }).badge, 'gamepad')
+  eq('with the PWA/TUI switch off it still shows', LL.appRow(game, { showBadges: false, showGameBadge: true }).badge, 'gamepad')
+  eq('and the game switch does not gate a webapp', LL.appRow(rec, { showBadges: true, showGameBadge: false }).badge, 'webapp')
+  // Each category family owns a switch, so no family is enabled or hidden by
+  // another family's toggle.
+  const chat = { ...rec, badge: 'chat' }
+  eq('chat is off under the PWA/TUI switch alone', LL.appRow(chat, { showBadges: true }).badge, '')
+  eq('chat shows under its own switch', LL.appRow(chat, { showChatBadge: true }).badge, 'chat')
+  eq('the game switch does not gate chat', LL.appRow(chat, { showGameBadge: true }).badge, '')
+  const browser = { ...rec, badge: 'globe' }
+  eq('a browser is off under the PWA/TUI switch alone', LL.appRow(browser, { showBadges: true }).badge, '')
+  eq('a browser shows under its own switch', LL.appRow(browser, { showBrowserBadge: true }).badge, 'globe')
+  eq('the chat switch does not gate a browser', LL.appRow(browser, { showChatBadge: true }).badge, '')
+  const doc = { ...rec, badge: 'file' }
+  eq('a document is off under the PWA/TUI switch alone', LL.appRow(doc, { showBadges: true }).badge, '')
+  eq('a document shows under its own switch', LL.appRow(doc, { showDocumentBadge: true }).badge, 'file')
+  for (const stem of ['headphones', 'clapperboard', 'image']) {
+    const media = { ...rec, badge: stem }
+    eq(`${stem} is off under the PWA/TUI switch alone`, LL.appRow(media, { showBadges: true }).badge, '')
+    eq(`${stem} shows under the media switch`, LL.appRow(media, { showMediaBadge: true }).badge, stem)
+    eq(`${stem} is not gated by the document switch`, LL.appRow(media, { showDocumentBadge: true }).badge, '')
+  }
+  const system = { ...rec, badge: 'settings' }
+  eq('a system badge is off under the PWA/TUI switch alone', LL.appRow(system, { showBadges: true }).badge, '')
+  eq('a system badge shows under its own switch', LL.appRow(system, { showSystemBadge: true }).badge, 'settings')
+  eq('the media switch does not gate system', LL.appRow(system, { showMediaBadge: true }).badge, '')
+
+  // A multi-badge record is filtered, not collapsed: the row carries every
+  // enabled family in precedence order and `badge` is the first of those.
+  const multi = { ...rec, badge: 'gamepad', badges: ['gamepad', 'chat', 'file', 'settings', 'headphones'] }
+  const allOn = LL.appRow(multi, {
+    showGameBadge: true, showChatBadge: true, showDocumentBadge: true,
+    showSystemBadge: true, showMediaBadge: true,
+  })
+  eq('the whole cycle', allOn.badges, ['gamepad', 'chat', 'file', 'settings', 'headphones'])
+  eq('badge is the first of the cycle', allOn.badge, 'gamepad')
+  const noChat = LL.appRow(multi, {
+    showGameBadge: true, showChatBadge: false, showDocumentBadge: true,
+    showSystemBadge: true, showMediaBadge: true,
+  })
+  eq('a disabled family is removed, not reordered', noChat.badges, ['gamepad', 'file', 'settings', 'headphones'])
+  eq('and the first remaining stem leads', noChat.badge, 'gamepad')
+  const onlyMedia = LL.appRow(multi, { showMediaBadge: true })
+  eq('only the enabled family survives', onlyMedia.badges, ['headphones'])
+  eq('and leads the row', onlyMedia.badge, 'headphones')
+  const browserMulti = { ...rec, badge: 'chat', badges: ['chat', 'globe', 'image'] }
+  eq('a browser keeps its place in a cycle',
+    LL.appRow(browserMulti, { showChatBadge: true, showBrowserBadge: true, showMediaBadge: true }).badges,
+    ['chat', 'globe', 'image'])
+  eq('a legacy single-badge record is a one-item cycle',
+    LL.appRow(rec, { showBadges: true }).badges, ['webapp'])
 })
 
 group('fileRow is the openable target the fallback slot offers', () => {
@@ -1053,10 +1108,176 @@ group('TUI wins over PWA, so a terminal is never classified as a webapp', () => 
   eq('an --app-id= exec alone badges webapp', LL.appRecord({ name: 'y', id: 'i', execString: 'chromium --app-id=org.x' }).badge, 'webapp')
 })
 
+group('a game is the freedesktop Game category', () => {
+  // The category is the whole rule: storefront shortcuts (Steam, Heroic,
+  // PrismLauncher) already write it, so Exec and Icon are intentionally not
+  // inspected. The negative cases below pin that simplification, so a
+  // reintroduced shortcut-specific rule is a visible change.
+  const rec = categories => LL.appRecord({ name: 'x', id: 'i', categories })
+  eq('the Game category alone badges game', rec(['Game']).badge, 'gamepad')
+  eq('the Game category among others', rec(['Game', 'Strategy', 'Simulation']).badge, 'gamepad')
+  eq('the category is case-sensitive, as the spec is', rec(['game']).badge, '')
+  eq('a non-game category stays unbadged', rec(['Utility']).badge, '')
+  eq('the PWA badge still wins over the Game category', rec(['PWA', 'Game']).badge, 'webapp')
+  eq('and TUI still wins over it', rec(['TUI', 'Game']).badge, 'tui')
+  eq('a Game entry is still not launcher-managed', rec(['Game']).removable, false)
+  eq('a Steam Exec without the category is not a game',
+    LL.appRecord({ name: 'Hades', id: 'i', execString: 'steam steam://rungameid/1145360' }).badge, '')
+  eq('a Steam icon without the category is not a game',
+    LL.appRecord({ name: 'Hades', id: 'i', icon: 'steam_icon_1145360' }).badge, '')
+  eq('a Heroic shortcut without the category is not a game',
+    LL.appRecord({ name: 'Crow', id: 'i', execString: 'xdg-open heroic://launch?appName=Crow&runner=legendary' }).badge, '')
+  eq('a Prism shortcut without the category is not a game',
+    LL.appRecord({ name: 'x', id: 'i', execString: 'prismlauncher --launch "Fabulously Optimized"' }).badge, '')
+
+  // The badge is an icon stem, so each exact name has to exist as a shipped
+  // asset - `game` did not, and a missing stem renders a silent blank slot.
+  // The scan keys assets by basename (`file/file.svg` registers as `file`),
+  // so the lookup walks the tree rather than only the top level.
+  const iconExists = name => {
+    const stack = [path.join(SHELL_DIR, 'assets/icons')]
+    while (stack.length > 0) {
+      const dir = stack.pop()
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name)
+        if (entry.isDirectory()) stack.push(p)
+        else if (entry.name === `${name}.svg`) return true
+      }
+    }
+    return false
+  }
+  for (const name of ['gamepad', 'chat', 'globe', 'file', 'settings', 'headphones', 'clapperboard', 'image'])
+    eq(`${name} is a shipped icon asset`, iconExists(name), true)
+})
+
+group('freedesktop categories fill the chat, document and media badges', () => {
+  // Same category walk as Game: one exact comparison per category, and the
+  // badge is the icon stem the row hands to Icon.
+  const rec = categories => LL.appRecord({ name: 'x', id: 'i', categories })
+
+  eq('Chat', rec(['Chat']).badge, 'chat')
+  eq('InstantMessaging', rec(['InstantMessaging']).badge, 'chat')
+  eq('IRCClient', rec(['IRCClient']).badge, 'chat')
+  eq('Telephony', rec(['Telephony']).badge, 'chat')
+  eq('VideoConference', rec(['VideoConference']).badge, 'chat')
+  eq('ContactManagement', rec(['ContactManagement']).badge, 'chat')
+  eq('Email is not chat', rec(['Email']).badge, '')
+
+  eq('Office', rec(['Office']).badge, 'file')
+  eq('WordProcessor', rec(['WordProcessor']).badge, 'file')
+  eq('Spreadsheet', rec(['Spreadsheet']).badge, 'file')
+  eq('Presentation', rec(['Presentation']).badge, 'file')
+  eq('TextEditor', rec(['TextEditor']).badge, 'file')
+  eq('Document', rec(['Document']).badge, 'file')
+
+  eq('Video takes the clapperboard', rec(['Video']).badge, 'clapperboard')
+  eq('AudioVideo takes the clapperboard', rec(['AudioVideo']).badge, 'clapperboard')
+  eq('AudioVideoEditing takes the clapperboard', rec(['AudioVideoEditing']).badge, 'clapperboard')
+  eq('Player takes the clapperboard', rec(['Player']).badge, 'clapperboard')
+  eq('Recorder takes the clapperboard', rec(['Recorder']).badge, 'clapperboard')
+  eq('Audio takes the headphones', rec(['Audio']).badge, 'headphones')
+  eq('Music takes the headphones', rec(['Music']).badge, 'headphones')
+  eq('Graphics takes the image glyph', rec(['Graphics']).badge, 'image')
+  eq('Photography takes the image glyph', rec(['Photography']).badge, 'image')
+
+  // The glyph choice is order-independent: video outranks audio, and both
+  // outrank the image family.
+  eq('audio before video still reads as video', rec(['Audio', 'Video']).badge, 'clapperboard')
+  eq('video before audio reads the same', rec(['Video', 'Audio']).badge, 'clapperboard')
+  eq('audio before graphics reads as audio', rec(['Graphics', 'Audio']).badge, 'headphones')
+  eq('graphics alone stays image', rec(['Graphics', 'AudioVideo']).badge, 'clapperboard')
+
+  // Badge precedence, highest first: managed, game, chat, browser, document,
+  // media.
+  eq('Game outranks chat', rec(['Chat', 'Game']).badge, 'gamepad')
+  eq('chat outranks the browser', rec(['WebBrowser', 'Chat']).badge, 'chat')
+  eq('the browser outranks documents', rec(['Office', 'WebBrowser']).badge, 'globe')
+  eq('chat outranks documents', rec(['Office', 'Chat']).badge, 'chat')
+  eq('documents outrank media', rec(['Video', 'Office']).badge, 'file')
+  eq('PWA still outranks the families', rec(['PWA', 'Chat']).badge, 'webapp')
+  eq('and TUI still outranks them', rec(['TUI', 'Office']).badge, 'tui')
+  eq('categories stay case-sensitive', rec(['chat', 'office', 'video']).badge, '')
+  eq('a badge category is not launcher-managed', rec(['Chat']).removable, false)
+})
+
+group('system and settings categories take the settings glyph', () => {
+  // Settings/administration is the family. `Network` alone is excluded on
+  // purpose: browsers, mail and chat clients declare it too.
+  const rec = categories => LL.appRecord({ name: 'x', id: 'i', categories })
+
+  eq('System', rec(['System']).badge, 'settings')
+  eq('Settings', rec(['Settings']).badge, 'settings')
+  eq('HardwareSettings', rec(['HardwareSettings']).badge, 'settings')
+  eq('DesktopSettings', rec(['DesktopSettings']).badge, 'settings')
+  eq('PackageManager', rec(['PackageManager']).badge, 'settings')
+  eq('Security', rec(['Security']).badge, 'settings')
+  eq('Monitor', rec(['Monitor']).badge, 'settings')
+  eq('FileTools', rec(['FileTools']).badge, 'settings')
+  eq('FileManager', rec(['FileManager']).badge, 'settings')
+  eq('TerminalEmulator', rec(['TerminalEmulator']).badge, 'settings')
+  eq('Networking', rec(['Networking']).badge, 'settings')
+  eq('System;Network', rec(['System', 'Network']).badge, 'settings')
+  eq('Network alone is not a system tool', rec(['Network']).badge, '')
+  eq('a browser gets the globe, not settings', rec(['Network', 'WebBrowser']).badge, 'globe')
+  eq('system categories stay case-sensitive', rec(['system']).badge, '')
+
+  // System sits under the content families: game, chat and document win.
+  eq('game outranks system', rec(['System', 'Game']).badge, 'gamepad')
+  eq('chat outranks system', rec(['Settings', 'Chat']).badge, 'chat')
+  eq('documents outrank system', rec(['Office', 'Settings']).badge, 'file')
+  eq('system outranks media', rec(['Settings', 'AudioVideo']).badge, 'settings')
+  eq('the browser outranks system', rec(['Settings', 'WebBrowser']).badge, 'globe')
+  eq('PWA still outranks system', rec(['PWA', 'System']).badge, 'webapp')
+  eq('a system entry is not launcher-managed', rec(['System']).removable, false)
+})
+
+group('appRecord carries every matching badge, first one first', () => {
+  const rec = categories => LL.appRecord({ name: 'x', id: 'i', categories })
+  eq('a single match', rec(['Chat']).badges, ['chat'])
+  eq('and badge is its first stem', rec(['Chat']).badge, 'chat')
+  // Discord is the motivating case: Chat and Game at once, game first by
+  // precedence, both kept for the delegate to cycle.
+  eq('game and chat both survive, in precedence order', rec(['Chat', 'Game']).badges, ['gamepad', 'chat'])
+  eq('category list order does not change the badge order',
+    rec(['Chat', 'Game']).badges, rec(['Game', 'Chat']).badges)
+  eq('three families', rec(['System', 'Chat', 'Game']).badges, ['gamepad', 'chat', 'settings'])
+  eq('game, document, system and media can all coexist',
+    rec(['Graphics', 'Office', 'Settings', 'Game']).badges, ['gamepad', 'file', 'settings', 'image'])
+  // Media is one family with one glyph even when several media categories
+  // match, so it adds one stem rather than one per category.
+  eq('media contributes exactly one stem', rec(['Audio', 'Video', 'Graphics']).badges, ['clapperboard'])
+  eq('a browser is a browser', rec(['Network', 'WebBrowser']).badges, ['globe'])
+  eq('browser and chat both survive, chat first', rec(['WebBrowser', 'Chat']).badges, ['chat', 'globe'])
+  eq('browser and media both survive, browser first',
+    rec(['WebBrowser', 'AudioVideo']).badges, ['globe', 'clapperboard'])
+  eq('browser categories stay case-sensitive', rec(['webbrowser']).badges, [])
+  // Launcher-owned entries stay exclusive: the badge describes the entry
+  // itself, not its content.
+  eq('a PWA stays single', rec(['PWA', 'Game', 'Chat']).badges, ['webapp'])
+  eq('a TUI stays single', rec(['TUI', 'Office']).badges, ['tui'])
+  eq('no match is no cycle', rec(['Utility']).badges, [])
+})
+
+group('badgeList normalizes the shapes a model role hands back', () => {
+  eq('a plain array', LL.badgeList({ badges: ['gamepad', 'chat'] }), ['gamepad', 'chat'])
+  // Quickshell hands a JS array stored in a model role back as a V4Sequence:
+  // array-like (length, index) but not Array.isArray. That shape must still
+  // reach the delegate as a cycle.
+  eq('a V4Sequence-like list',
+    LL.badgeList({ badges: { length: 2, 0: 'gamepad', 1: 'chat' } }), ['gamepad', 'chat'])
+  eq('a one-item list', LL.badgeList({ badges: ['chat'] }), ['chat'])
+  eq('the legacy single badge', LL.badgeList({ badge: 'chat' }), ['chat'])
+  eq('no badge', LL.badgeList({}), [])
+  eq('a null record', LL.badgeList(null), [])
+  eq('a malformed string is not a sequence', LL.badgeList({ badges: 'gamepad', badge: 'chat' }), ['chat'])
+  eq('empty stems are skipped', LL.badgeList({ badges: ['', 'chat', ''] }), ['chat'])
+})
+
 group('execString wins over exec, and a missing one is not an error', () => {
   eq('execString is preferred', LL.appRecord({ name: 'y', id: 'i', execString: 'vb-launch-tui -- a', exec: 'firefox' }).badge, 'tui')
   eq('exec is the fallback', LL.appRecord({ name: 'y', id: 'i', exec: 'vb-launch-tui -- a' }).badge, 'tui')
   eq('a non-string execString is stringified', LL.appRecord({ name: 'y', id: 'i', execString: 42 }).label, 'y')
+  eq('a non-string icon does not break the game scan', LL.appRecord({ name: 'y', id: 'i', icon: 7 }).badge, '')
   noThrow('neither field', () => LL.appRecord({ name: 'y', id: 'i' }))
   // appRecord has no null-entry guard: the entry is a QML singleton the
   // controller always supplies, and the seam is named in the header rather
@@ -2302,6 +2523,12 @@ group('rowContentEqual compares every field the delegate paints', () => {
     swatch: '#ff8800', swatchEdge: '#000000',
   }
   eq('an identical row', LL.rowContentEqual(base, Object.assign({}, base)), true)
+  // The delegate cycles the whole sequence, so a changed secondary stem is a
+  // repaint even when the first badge is unchanged.
+  eq('a different badge sequence',
+    LL.rowContentEqual({ ...base, badges: ['b'] }, { ...base, badges: ['b', 'chat'] }), false)
+  eq('an absent badge sequence equals an empty one',
+    LL.rowContentEqual(base, { ...base, badges: [] }), true)
   for (const k of ['label', 'sub', 'desc', 'icon', 'badge', 'command', 'swatch', 'swatchEdge']) {
     eq(`a different ${k}`, LL.rowContentEqual(base, Object.assign({}, base, { [k]: 'other' })), false)
   }

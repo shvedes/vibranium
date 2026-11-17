@@ -13,8 +13,8 @@
 //      that fills Icons._raw lands even later: at Component.onCompleted the
 //      icon set is 0 entries and every icon's source is still the empty
 //      string, so a snapshot taken there would "prove" that no icon name
-//      resolves. On the first turn the scan is in (178 assets) and the URLs
-//      are real. Text metrics move too - the same label measures 187 wide at
+//      resolves. On the first turn the scan is in and the URLs are real. Text
+//      metrics move too - the same label measures 187 wide at
 //      onCompleted and 249 on a later turn, which is why PanelCard's
 //      recalcWidth() is called at turn 20 and its numbers are compared
 //      against TextMetrics read on that same turn.

@@ -143,6 +143,14 @@ Item {
   readonly property bool showDescriptions: Settings.value("shell.launcher.showDescriptions") === true
   readonly property bool showIcons: Settings.value("shell.launcher.showIcons") !== false
   readonly property bool showBadges: Settings.value("shell.launcher.showBadges") !== false
+  // Independent of showBadges: the game marker is a separate toggle, not a
+  // third member of the shell-only webapp/tui family.
+  readonly property bool showGameBadge: Settings.value("shell.launcher.showGameBadge") !== false
+  readonly property bool showChatBadge: Settings.value("shell.launcher.showChatBadge") !== false
+  readonly property bool showBrowserBadge: Settings.value("shell.launcher.showBrowserBadge") !== false
+  readonly property bool showDocumentBadge: Settings.value("shell.launcher.showDocumentBadge") !== false
+  readonly property bool showMediaBadge: Settings.value("shell.launcher.showMediaBadge") !== false
+  readonly property bool showSystemBadge: Settings.value("shell.launcher.showSystemBadge") !== false
   readonly property bool showClipSuggestion: Settings.value("shell.launcher.showClipboardSuggestion") !== false
   readonly property string sortMethod: Settings.value("shell.launcher.sortMethod") === "frequency" ? "frequency" : "alphabetical"
   readonly property bool autoSelect: Settings.value("shell.launcher.autoSelect") === true
@@ -459,6 +467,12 @@ Item {
       if (key === "shell.launcher.searchEngine"
         || key === "shell.launcher.showIcons"
         || key === "shell.launcher.showBadges"
+        || key === "shell.launcher.showGameBadge"
+        || key === "shell.launcher.showChatBadge"
+        || key === "shell.launcher.showBrowserBadge"
+        || key === "shell.launcher.showDocumentBadge"
+        || key === "shell.launcher.showMediaBadge"
+        || key === "shell.launcher.showSystemBadge"
         || key === "shell.launcher.showClipboardSuggestion") root.recompute()
     }
 
@@ -837,7 +851,13 @@ Item {
       showDescriptions: root.showDescriptions,
       noDescriptionText: root.noDescriptionText,
       showIcons: root.showIcons,
-      showBadges: root.showBadges
+      showBadges: root.showBadges,
+      showGameBadge: root.showGameBadge,
+      showChatBadge: root.showChatBadge,
+      showBrowserBadge: root.showBrowserBadge,
+      showDocumentBadge: root.showDocumentBadge,
+      showMediaBadge: root.showMediaBadge,
+      showSystemBadge: root.showSystemBadge
     }
     const toRow = rec => LauncherLib.appRow(rec, rowOptions)
     for (let i = 0; i < shown; i++) {

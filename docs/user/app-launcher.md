@@ -22,6 +22,41 @@ desktop file never appears as a dead row. ++enter++ launches the
 selected entry; descriptions of the highlighted app are available via
 ++ctrl+i++ as a dropdown under the row.
 
+Games are marked with a controller badge. The category is the whole rule: any
+entry that declares `Categories=Game` is a game, and the category list is
+already indexed, so recognizing one costs no extra scan. Storefront shortcuts
+(Steam, Heroic, PrismLauncher) ship that category themselves; their `Exec` and
+icon are not inspected.
+
+The rest of the badge families come from the same category list. Chat and
+call entries (`Chat`, `InstantMessaging`, `IRCClient`, `Telephony`,
+`VideoConference`, `ContactManagement`) get a chat glyph; browsers
+(`WebBrowser`) get a globe glyph; documents and office entries (`Office`,
+`WordProcessor`, `Spreadsheet`, `Presentation`, `TextEditor`, `Document`)
+get a file glyph; media entries get headphones
+for `Audio`/`Music`, a clapperboard for `Video`/`AudioVideo`/`Player`/
+`Recorder`, and an image glyph for `Graphics`/`Photography`. System and
+settings tools (`System`, `Settings`, `HardwareSettings`,
+`DesktopSettings`, `PackageManager`, `Security`, `Monitor`, `FileTools`,
+`FileManager`, `TerminalEmulator`, `Networking`) get a settings glyph.
+Plain `Network` alone is not enough, since browsers, mail and chat clients
+declare it too; browsers get their globe from `WebBrowser`. `System;Network`
+matches through `System`. Categories are case-sensitive, so only the exact
+spellings count.
+
+An entry that matches several families cycles its badge: the shared icon
+crossfade slides each glyph in from the right as the previous one leaves
+left, every 1.5 seconds, in precedence order and starting with the first.
+This badge cycle keeps running even when shell animations are off, so the
+other families stay discoverable; the rest of the shell still honors the
+animation setting.
+
+Each family has its own switch under Menu -> Settings -> App launcher:
+**Show game badges**, **Show chat badges**, **Show browser badges**,
+**Show document badges**, **Show media badges** and **Show system badges**.
+None is nested under the PWA/TUI badge toggle, so any one can be hidden on
+its own.
+
 !!! tip
     Enable **Show app descriptions** in the settings to render each app's
     description directly as the entry subtitle instead of behind Ctrl-I.
@@ -432,8 +467,9 @@ skipped with a warning and never blocks the launcher.
 ## Settings
 
 Configure in **Vibranium Menu** -> **Settings** -> **App Launcher**:
-show icons, show PWA/TUI badges, show web apps, search engine, sort
-order, auto-select, app description display and focus-first behavior.
+show icons, show PWA/TUI badges, show game, chat, browser, document, media
+and system badges, show web apps, search engine, sort order, auto-select,
+app description display and focus-first behavior.
 
 **Focus first** focuses an existing window of the app instead of
 spawning a new instance. Window identity is derived from the desktop

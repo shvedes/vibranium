@@ -60,18 +60,56 @@ function indexFingerprint(entryCount, sortMethod, usageSignal, tryExecSignal) {
 // search never touches QObject property lookups.
 function appRecord(entry) {
   const cats = entry.categories ?? []
-  // One walk of the category list answers all three questions the record and
-  // its managed/TUI/PWA verdict ask of it: excluded (this function's own
-  // filter) and the two names the launch classification tests. Each was a
-  // separate indexOf scan of the same short array per entry.
+  // One walk of the category list answers everything the record's managed
+  // and badge verdicts ask of it: excluded (this function's own filter) and
+  // the names the badge families are built from. Each was a separate indexOf
+  // scan of the same short array per entry before; the families below stay on
+  // that walk, so a category list is read once, never once per question.
+  //
+  // Category names are case-sensitive in the freedesktop spec, so every test
+  // is exact. Audio, video and image are separate flags rather than one
+  // media flag because the glyph is chosen after the walk (video > audio >
+  // image), which keeps the answer independent of the order the categories
+  // happen to be listed in.
   let catsTUI = false
   let catsPWA = false
+  let catsGame = false
+  let catsChat = false
+  let catsBrowser = false
+  let catsDocument = false
+  let catsVideo = false
+  let catsAudio = false
+  let catsImage = false
+  let catsSystem = false
   for (let i = 0; i < cats.length; i++) {
     const cat = cats[i]
     if (BASE_EXCLUDED_CATEGORIES.indexOf(cat) >= 0) return null
     if (cat === "TUI") catsTUI = true
     else if (cat === "PWA") catsPWA = true
+    else if (cat === "Game") catsGame = true
+    else if (cat === "Chat" || cat === "InstantMessaging" || cat === "IRCClient"
+      || cat === "Telephony" || cat === "VideoConference"
+      || cat === "ContactManagement") catsChat = true
+    else if (cat === "WebBrowser") catsBrowser = true
+    else if (cat === "Office" || cat === "WordProcessor"
+      || cat === "Spreadsheet" || cat === "Presentation"
+      || cat === "TextEditor" || cat === "Document") catsDocument = true
+    else if (cat === "Video" || cat === "AudioVideo"
+      || cat === "AudioVideoEditing" || cat === "Player"
+      || cat === "Recorder") catsVideo = true
+    else if (cat === "Audio" || cat === "Music") catsAudio = true
+    else if (cat === "Graphics" || cat === "Photography") catsImage = true
+    else if (cat === "System" || cat === "Settings" || cat === "HardwareSettings"
+      || cat === "DesktopSettings" || cat === "PackageManager"
+      || cat === "Security" || cat === "Monitor" || cat === "FileTools"
+      || cat === "FileManager" || cat === "TerminalEmulator"
+      || cat === "Networking") catsSystem = true
   }
+  const hasMedia = catsVideo || catsAudio || catsImage
+  const mediaBadge = catsVideo ? "clapperboard" : catsAudio ? "headphones" : "image"
+  // System tools are the settings/administration family. Plain `Network` is
+  // deliberately absent: browsers, mail and chat clients declare it too, so it
+  // only counts when paired with `System`, which matches on its own.
   const keywords = entry.keywords ?? []
   const hay = [
     entry.name,
@@ -91,13 +129,22 @@ function appRecord(entry) {
   // --app=<url> / --app-id=<id> exec, TUI category or vb-launch-tui
   // exec. TUI wins over PWA: vb-launch-tui's own window-matching
   // --app-id=org.vb.term.float flag must never classify a TUI as a
-  // webapp. `badge` drives the right-side webapp/tui indicator.
+  // webapp. `badge` drives the right-side icon indicator: webapp/tui for
+  // launcher-owned entries, gamepad/chat/globe/file/settings and the media
+  // glyphs for the category families.
   const _exec = String(entry.execString ?? entry.exec ?? "")
   const _isTUI = _exec.indexOf("vb-launch-tui") >= 0 || catsTUI
   const _isPWA = !_isTUI && (_exec.indexOf("vb-launch-webapp") >= 0
     || _exec.indexOf("--app=") >= 0
     || _exec.indexOf("--app-id=") >= 0
     || catsPWA)
+  // Games are the freedesktop Game category and nothing else. Every storefront
+  // (Steam, Heroic, PrismLauncher) and native game writes that category, so
+  // Exec and Icon are not inspected for this verdict - a shortcut that names a
+  // game without the category is not a game badge. The badge value is a
+  // shipped icon stem, not a semantic id: the row hands it straight to Icon,
+  // which resolves `badge + ".svg"` under assets/icons - `gamepad` here,
+  // exactly like `webapp` and `tui`.
   // `removable` is isManagedEntry's verdict read off the split above instead
   // of asked for again: the two named flags ARE that function's test, and
   // calling it here re-scanned the exec string and the category list for an
@@ -105,6 +152,23 @@ function appRecord(entry) {
   // definition for every other caller (and for the shapes the suite pins),
   // so the two move together or the suite says so.
   const _removable = _isTUI || _isPWA
+  // Every family the entry matches, in badge precedence order. Launcher-owned
+  // entries stay exclusive: a PWA/TUI badge describes the entry itself, while
+  // the category families describe content, so mixing the two would say the
+  // wrong thing about the row. `badge` remains the first stem for readers that
+  // need one; `badges` is what the delegate cycles through.
+  let badges
+  if (_isPWA) badges = ["webapp"]
+  else if (_isTUI) badges = ["tui"]
+  else {
+    badges = []
+    if (catsGame) badges.push("gamepad")
+    if (catsChat) badges.push("chat")
+    if (catsBrowser) badges.push("globe")
+    if (catsDocument) badges.push("file")
+    if (catsSystem) badges.push("settings")
+    if (hasMedia) badges.push(mediaBadge)
+  }
   // Launch handling keeps the original entry: the controller reads its
   // id/exec for activation and usage bumps, and the snapshot stays
   // identity-stable with the DesktopEntries list it came from.
@@ -123,8 +187,32 @@ function appRecord(entry) {
     words: hay.split(" "),
     removable: _removable,
     managed: _removable,
-    badge: _isPWA ? "webapp" : _isTUI ? "tui" : ""
+    badge: badges.length > 0 ? badges[0] : "",
+    badges: badges
   }
+}
+
+// The badge cycle as a plain array, from either shape a record's `badges`
+// takes. appRow builds a real JS array, but when that row crosses into a QML
+// model role the engine hands the array back as a V4Sequence: array-like
+// (length, index, join) yet `Array.isArray` false. A delegate guarding on
+// Array.isArray there collapsed every cycle to the single `badge` - the
+// one-static-glyph symptom this normalizer prevents. A malformed string is not
+// a sequence; a legacy record with only `badge` is a one-item list.
+function badgeList(rec) {
+  if (!rec) return []
+  const raw = rec.badges
+  const out = []
+  if (raw !== null && raw !== undefined && typeof raw === "object"
+    && typeof raw.length === "number") {
+    for (let i = 0; i < raw.length; i++) {
+      const stem = SU.textOf(raw[i])
+      if (stem !== "") out.push(stem)
+    }
+  }
+  if (out.length > 0) return out
+  const one = SU.textOf(rec.badge)
+  return one !== "" ? [one] : []
 }
 
 // The row one app record renders as. One mapping for exact and rescued
@@ -138,6 +226,27 @@ function appRow(rec, options) {
   const opt = options || {}
   const showDesc = opt.showDescriptions === true
   const desc = SU.textOf(rec && rec.desc)
+  // Every badge family has its own switch, on par with the PWA/TUI pair
+  // rather than nested under it, so a user can keep one glyph and hide the
+  // rest. Filtering keeps the record's precedence order, so `badges` is the
+  // exact cycle the delegate runs and `badge` stays its first stem. The three
+  // media stems share one toggle, and the legacy single-`badge` record shape
+  // is read as a one-element list.
+  const src = badgeList(rec)
+  const badges = []
+  for (let i = 0; i < src.length; i++) {
+    const stem = SU.textOf(src[i])
+    if (stem === "") continue
+    let on = opt.showBadges === true
+    if (stem === "gamepad") on = opt.showGameBadge === true
+    else if (stem === "chat") on = opt.showChatBadge === true
+    else if (stem === "globe") on = opt.showBrowserBadge === true
+    else if (stem === "file") on = opt.showDocumentBadge === true
+    else if (stem === "settings") on = opt.showSystemBadge === true
+    else if (stem === "headphones" || stem === "clapperboard" || stem === "image")
+      on = opt.showMediaBadge === true
+    if (on) badges.push(stem)
+  }
   return {
     kind: "app",
     uid: rec.uid,
@@ -145,7 +254,8 @@ function appRow(rec, options) {
     sub: showDesc ? (desc !== "" ? desc : String(opt.noDescriptionText ?? "")) : "",
     desc: showDesc ? "" : desc,
     icon: opt.showIcons === true ? rec.icon : "",
-    badge: opt.showBadges === true ? String(rec.badge ?? "") : "",
+    badge: badges.length > 0 ? badges[0] : "",
+    badges: badges,
     app: rec.app,
     runInTerminal: rec.runInTerminal === true,
     removable: rec.removable === true
@@ -1087,6 +1197,12 @@ function rowContentEqual(a, b, ignoreSub) {
   if (SU.textOf(a.desc) !== SU.textOf(b.desc)) return false
   if (SU.textOf(a.icon) !== SU.textOf(b.icon)) return false
   if (SU.textOf(a.badge) !== SU.textOf(b.badge)) return false
+  // The delegate cycles every gated stem, so a changed secondary badge (one
+  // toggle hiding a single family) has to repaint the row even when the first
+  // stem is unchanged.
+  const ab = Array.isArray(a.badges) ? a.badges.join(",") : ""
+  const bb = Array.isArray(b.badges) ? b.badges.join(",") : ""
+  if (ab !== bb) return false
   if (SU.textOf(a.command) !== SU.textOf(b.command)) return false
   // The fabricated dot of a color row. It is painted instead of an icon rather
   // than beside one, so a swatch that changed under an unchanged label would
