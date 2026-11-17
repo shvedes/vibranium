@@ -104,6 +104,10 @@ Rectangle {
   // with the control; only its paint yields.
   readonly property bool _capsPaint: root.capsActive && MotionPolicy.enabled
     && input.text.length > 0 && root._capsField
+  // PasswordBox's 44px box and 24px echo are the reference motion; a field
+  // with less type or height gets proportionally smaller travel and a slower
+  // cadence, and a roomier one gets the reverse.
+  readonly property real _capsScale: CapsJitter.poseScale(root.fontSize, root.height)
 
   // Emacs readline keys (Ctrl-W erase word, Alt-F/B word
   // jump). On by default - the menu and launcher rely on them.
@@ -161,6 +165,10 @@ Rectangle {
 
   signal accepted(string text)
   signal edited(string text)
+  // CapsLock pressed. Wayland key events carry no absolute lock state, so a
+  // consumer that binds capsActive to Keyboard.capsOn reports the press back
+  // through Keyboard.toggleCaps(); without this the state never moves.
+  signal capsToggled()
   signal navigationRequested(int key, int modifiers)
   // Escape is consumed here and handed to the consumer as a signal so
   // focus position never decides who handles it.
@@ -268,6 +276,21 @@ Rectangle {
 
   function wordBackward() {
     input.cursorPosition = EditUtils.boundaryBackward(input.text, input.cursorPosition)
+  }
+
+  // The caps echo hides the control's glyphs by making its text colour
+  // transparent, and the default caret is painted in that colour, so the
+  // caret would vanish with the glyphs. This delegate keeps a visible caret
+  // for exactly as long as the echo is up; the control still positions it.
+  Component {
+    id: capsCaret
+
+    Rectangle {
+      width: 1
+      height: Math.max(1, input.cursorRectangle.height)
+      visible: input.cursorVisible
+      color: Theme.color("foreground_0")
+    }
   }
 
   implicitWidth: 200
@@ -500,6 +523,7 @@ Rectangle {
       verticalAlignment: TextInput.AlignVCenter
       clip: true
       color: root._capsPaint ? "transparent" : Theme.color("foreground_0")
+      cursorDelegate: root._capsPaint ? capsCaret : null
       selectionColor: Theme.color("accent")
       selectedTextColor: Theme.color("background_0")
       font.pixelSize: root.fontSize
@@ -539,6 +563,10 @@ Rectangle {
             root.navigationRequested(event.key, event.modifiers)
             return
           }
+        }
+        if (event.key === Qt.Key_CapsLock && !event.isAutoRepeat) {
+          root.capsToggled()
+          return
         }
         if (event.matches(StandardKey.SelectAll)) {
           input.selectAll()
@@ -611,11 +639,11 @@ Rectangle {
       property int tick: 0
 
       function jitterX(i) {
-        return root.capsActive ? CapsJitter.offsetX(i, capsEcho.tick) : 0
+        return root.capsActive ? CapsJitter.offsetX(i, capsEcho.tick, root._capsScale) : 0
       }
 
       function jitterY(i) {
-        return root.capsActive ? CapsJitter.offsetY(i, capsEcho.tick) : 0
+        return root.capsActive ? CapsJitter.offsetY(i, capsEcho.tick, root._capsScale) : 0
       }
 
       function syncModel() {
@@ -643,10 +671,10 @@ Rectangle {
 
         repeat: true
         running: capsEcho.visible
-        interval: 110
+        interval: CapsJitter.nextInterval(root._capsScale)
         onTriggered: {
           capsEcho.tick += 1
-          interval = CapsJitter.nextInterval()
+          interval = CapsJitter.nextInterval(root._capsScale)
         }
       }
 

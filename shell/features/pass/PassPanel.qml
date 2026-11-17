@@ -1652,6 +1652,7 @@ PanelCard {
           placeholder: "SECRET"
           onAccepted: text => panel.commitSecret(text)
           onEscaped: panel.escapeChain()
+          onCapsToggled: Core.Keyboard.toggleCaps()
         }
 
         Text {

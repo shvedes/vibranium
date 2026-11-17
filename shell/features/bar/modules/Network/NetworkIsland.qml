@@ -1827,6 +1827,7 @@ Item {
               onEdited: text => root.passwordText = text
               onAccepted: text => root.submitPassword(text)
               onEscaped: root.passwordSsid = ""
+              onCapsToggled: Core.Keyboard.toggleCaps()
               Component.onCompleted: {
                 if (row.isPasswordRow) passField.grabFocus()
               }
