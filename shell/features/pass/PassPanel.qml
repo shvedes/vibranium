@@ -475,7 +475,7 @@ PanelCard {
       panel.rowData = visible
     }
     panel.bakeEditor()
-    panel.syncRows(frameToken, panel.filterText === "")
+    panel.syncRows(frameToken, panel.filterText === "", panel.filterText !== "")
   }
 
   // Folds the open inline editor into the rebuilt rows by role, not by
@@ -529,17 +529,23 @@ PanelCard {
   property bool _rowsPending: false
   property int _pendingFrameToken: -1
   property bool _pendingResumeTracking: false
+  // A same-turn install invalidates an already queued flush: the stale
+  // closure would otherwise read the new pending payload and write twice.
+  property int _flushEpoch: 0
   property bool _openSeat: false
   property int _swapGen: 0
   property int _pageTransitionGen: 0
   property string listError: ""
 
-  function syncRows(frameToken, resumeTracking) {
+  function syncRows(frameToken, resumeTracking, sameTurn) {
     panel._pendingFrameToken = frameToken
     panel._pendingResumeTracking = resumeTracking === true
-    if (panel._rowsPending) return
+    if (panel._rowsPending && sameTurn !== true) return
     panel._rowsPending = true
-    Qt.callLater(() => {
+    if (sameTurn === true) panel._flushEpoch++
+    const epoch = panel._flushEpoch
+    const flush = () => {
+      if (panel._flushEpoch !== epoch) return
       panel._rowsPending = false
       const frameToken = panel._pendingFrameToken
       const shouldResume = panel._pendingResumeTracking
@@ -729,7 +735,13 @@ PanelCard {
         queueCommit()
         if (panel.editorMode === "" && !panel.secretOpen) focusCtrl.reassert()
       }
-    })
+    }
+    // A query writes rowData (the card's width) synchronously in rebuild().
+    // Install the painted model in that turn too: a deferred _rows left the
+    // main page's rows inside the search-result box for a frame. The field
+    // echo and _rows are disjoint properties, so this cannot re-enter.
+    if (sameTurn === true) flush()
+    else Qt.callLater(flush)
   }
 
   PanelFocus {
