@@ -93,7 +93,10 @@ URIs.
 
 Deleting (or clearing) the entry the system clipboard currently serves also
 empties the system clipboard, so the content cannot resurrect itself after a
-reboot - wl-clipboard otherwise keeps re-offering whatever it served last.
+reboot - wl-clipboard otherwise keeps re-offering whatever it served last. When
+a single delete removes that entry, the row that moves into the top slot is
+copied to the clipboard in its place, so paste returns the new first entry
+instead of the one just deleted.
 
 Credential entries carried over from an older history file keep their row and
 their metadata but never their payload: the file that held the cipher text also

@@ -678,10 +678,16 @@ Singleton {
         + " of " + root.maxHistory)
     }
     root._persist()
+    // The row that was deleted is the one the system clipboard serves. The
+    // row promoted into the top slot has to take over the selection; without
+    // this the old bytes stay on the clipboard and paste returns the row the
+    // user just removed.
+    if (idx === 0 && h.length > 0) root._reserveAfterDelete = true
     // The panel closing itself here is a real transition: the last row went,
     // the panel went with it.
     root._hideIfEmpty()
     Qt.callLater(() => root.finishDelete(id))
+    Qt.callLater(() => root._maybeReserveCurrent())
   }
   property var _captured: ({})
   function finishDelete(id) {
@@ -943,6 +949,21 @@ Singleton {
       root._notify("Clipboard", "Copy already in progress")
       return
     }
+  }
+
+  // Deleting the clipboard's current row leaves its content on the selection.
+  // Copy the row promoted into the top slot so paste uses that instead. A
+  // snapshot clear started by the same delete is a separate wl-copy child and
+  // claims the selection on its own schedule; the re-serve must wait for it to
+  // drain or the clear can wipe the fresh copy.
+  property bool _reserveAfterDelete: false
+  function _maybeReserveCurrent() {
+    if (!root._reserveAfterDelete) return
+    if (clearProc.running) return
+    root._reserveAfterDelete = false
+    if (copyProc.running) return
+    const entry = root.history.length > 0 ? root.history[0] : null
+    if (entry) root.copyEntry(entry)
   }
 
   // Re-serve a freshly captured row so this shell owns the system selection
@@ -2022,6 +2043,9 @@ Singleton {
     stdout: StdioCollector {}
     stderr: StdioCollector {}
     onExited: (exitCode, exitStatus) => {
+      // A re-serve parked behind this clear can run now, on either outcome:
+      // a failed clear still leaves stale bytes on the selection.
+      Qt.callLater(() => root._maybeReserveCurrent())
       // `wl-copy --clear` emptying the SYSTEM clipboard is how a deleted entry
       // stops being re-captured on the next boot.
       if (exitCode !== 0) return
