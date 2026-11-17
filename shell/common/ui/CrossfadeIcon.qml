@@ -93,7 +93,14 @@ Item {
 
   implicitWidth: root.size > 0 ? root.size : Math.max(iconA.implicitWidth, iconB.implicitWidth)
   implicitHeight: root.size > 0 ? root.size : Math.max(iconA.implicitHeight, iconB.implicitHeight)
+  // Empty hides at once (the owner's own fade goes with it). A non-empty name
+  // shows the slot only once the FRONT layer has something decoded: on an
+  // empty -> non-empty swap the incoming name is staged on the hidden layer,
+  // so binding this to `name` alone painted an empty slot until the trade.
   visible: root.name !== ""
+    && (root._aFront
+      ? root._aName !== "" && iconA.swapReady
+      : root._bName !== "" && iconB.swapReady)
 
   Icon {
     id: iconA
