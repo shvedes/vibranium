@@ -62,7 +62,16 @@ PanelCard {
   // a row boundary whatever a surface decides to space its rows by.
   rowSpacing: list.spacing
   bottomReserve: panel.statusReserve
-  exactListH: list.contentHeight > 0 ? list.fitHeight(panel.availListH) : -1
+  // Latch the NEW row set's model height in the keystroke turn (updateFit
+  // below), so the card reaches its final height with the width write instead
+  // of holding the previous fit until contentHeight settles a few frames
+  // later. The live measurement is still used for slot growth and the opening
+  // snap; only the keystroke's resting height is latched.
+  exactListH: panel._latchedListH >= 0 ? panel._latchedListH
+    : (list.contentHeight > 0 ? list.fitHeight(panel.availListH) : -1)
+  fitPending: panel._fitPending
+  property real _latchedListH: -1
+  property bool _fitPending: false
   // The list owns the growth claim (List.revealNeedH) and the rule that turns
   // it into a region lives once, in SlotGrowth.js, so this surface and the
   // menu cannot answer the same question two different ways. What the card
@@ -395,6 +404,21 @@ PanelCard {
     return p !== "" && Pass.optimistic.isPending(p)
   }
 
+  // The card's resting height for a query comes from the row model, which is
+  // final in this turn, instead of list.fitHeight() - that walks delegates
+  // whose geometry has not been laid out yet, so it lands a turn or two after
+  // the width write and glides the card a second time when results settle.
+  // Browse and page transitions keep the live measurement.
+  function updateFit() {
+    if (panel.filterText === "" || panel.rowData.length === 0) {
+      panel._latchedListH = -1
+    } else {
+      const model = panel.snappedListH(panel.availListH)
+      panel._latchedListH = model > 0 ? model : -1
+    }
+    panel._fitPending = false
+  }
+
   function rebuild() {
     const frameToken = panel.frames.begin(panel.frameOwner)
     // Package missing: no rows at all. The overlay owns the visual; an
@@ -474,6 +498,7 @@ PanelCard {
       // Same: empty model, the overlay below owns the visual.
       panel.rowData = visible
     }
+    panel.updateFit()
     panel.bakeEditor()
     panel.syncRows(frameToken, panel.filterText === "", panel.filterText !== "")
   }
