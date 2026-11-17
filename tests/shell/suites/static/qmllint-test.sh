@@ -136,7 +136,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # `model` unqualified, which cost 11 `unqualified` warnings and 12 info notes.
 # The delegate now declares `required property var modelData` and reads it
 # through its own id, matching the ArchUpdates table, so both figures fell.
-RECORDED_FILE_COUNT=260
+RECORDED_FILE_COUNT=261
 RECORDED_WARNING_COUNT=103
 RECORDED_INFO_COUNT=23
 

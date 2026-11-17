@@ -327,6 +327,33 @@ WlSessionLockSurface {
     cursorShape: Qt.BlankCursor
   }
 
+  // Clock band: a block above the auth field with real air around it, capped at
+  // a fifth of the surface rather than the whole upper third. Every term is
+  // measured here, so a short or fractionally-scaled output shrinks the clock
+  // instead of painting it over the field - the same rule as the pickers'
+  // content band. The block is bottom-anchored to this limit, so the time sits
+  // close to the field without crowding the top edge.
+  readonly property real clockTop: Math.max(Ui.l, Math.round(surface.height * 0.13))
+  readonly property real clockBottom: panel.y - Math.round(surface.height * 0.10)
+  readonly property real clockMaxH: Math.max(0, Math.min(
+    Math.round(surface.height * 0.20), surface.clockBottom - surface.clockTop))
+
+  // Huge time, with the optional date directly under it. The block is sized
+  // from the band above and pinned to its lower edge, so it never touches the
+  // field, and it rides the same entry fade as the panel.
+  LockClock {
+    id: lockClock
+
+    anchors.horizontalCenter: parent.horizontalCenter
+    y: surface.clockBottom - height
+    maxWidth: Math.max(0,
+      Math.min(surface.width * 0.86, surface.width - 2 * Ui.outerPad))
+    maxHeight: surface.clockMaxH
+    withDate: Settings.lockscreenDate
+    visible: Settings.lockscreenClock && surface.clockMaxH > 0
+    opacity: panel.appearK
+  }
+
   // The field itself sits dead center; indicators hang off it absolutely
   // so toggling them can never shift the input. Only this panel animates,
   // and only on entry - unlock tears the whole surface down instantly.
@@ -351,13 +378,6 @@ WlSessionLockSurface {
     opacity: appearK
     scale: 0.94 + 0.06 * appearK
 
-    CapsChip {
-      active: Keyboard.capsOn
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.bottom: authBox.top
-      anchors.bottomMargin: 12
-    }
-
     PasswordBox {
       id: authBox
 
@@ -367,9 +387,12 @@ WlSessionLockSurface {
       busy: Lockscreen.authenticating
 
       // The field names itself with a glyph instead of a word: the same
-      // lock the password manager puts on its vault rows, sitting in the
-      // field's left chrome slot, always visible.
+      // lock the password manager puts on its vault rows, in the field's
+      // left chrome slot, trading to the eye while the echo is revealed.
       iconName: "lock"
+      // Caps does not need a chip above the box: with caps on, every echo
+      // glyph jumps, so the field itself carries the state.
+      capsActive: Keyboard.capsOn
       placeholder: ""
 
       onSubmitted: Lockscreen.tryUnlock()

@@ -306,8 +306,8 @@ Variants {
     }
 
     // Card layout: the input box is pinned to the card's exact center and
-    // never moves; the heading hangs above it through the caps slot, so the
-    // slot's animated height glides the heading alone.
+    // never moves; the heading hangs above it at a fixed offset, because caps
+    // is drawn on the field's own glyphs and needs no slot.
     Item {
 
       readonly property real k: win.showK
@@ -323,44 +323,14 @@ Variants {
         id: heading
 
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: capsSlot.top
-        anchors.bottomMargin: 6
+        anchors.bottom: authBox.top
+        anchors.bottomMargin: 18
         text: "AUTHENTICATION"
         color: Ui.tint("foreground_0", 0.9)
         font.pixelSize: 18
         font.family: Ui.fontFamily
         font.bold: true
         font.letterSpacing: 6
-      }
-
-      // CapsLock chip lifted from the lockscreen. The slot collapses to
-      // nothing while hidden and expands behind the fading chip when caps
-      // engages, so the heading slides up and settles back smoothly.
-      // State comes from the shared Keyboard singleton: synced from Hyprland
-      // when the request lands, toggled by key presses on the focused field.
-      Item {
-        id: capsSlot
-
-        width: parent.width
-        height: Keyboard.capsOn ? capsChip.height + 24 : 0
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: authBox.top
-        anchors.bottomMargin: 12
-
-        Behavior on height {
-          enabled: MotionPolicy.enabled
-          NumberAnimation {
-            duration: 200
-            easing.type: Easing.OutCubic
-          }
-        }
-
-        CapsChip {
-          id: capsChip
-
-          active: Keyboard.capsOn
-          anchors.centerIn: parent
-        }
       }
 
       PasswordBox {
@@ -385,8 +355,12 @@ Variants {
         // the opposite default - only an explicit true shows plain text.
         hidden: !Polkit.responseVisible
         // The same lock the password manager puts on its vault rows, in the
-        // field's left chrome slot, always visible.
+        // field's left chrome slot, trading to the eye while the echo is
+        // revealed.
         iconName: "lock"
+        // Caps is drawn on the field's own glyphs, exactly as on the
+        // lockscreen: no chip sits above the box, and the heading never moves.
+        capsActive: Keyboard.capsOn
         placeholder: promptIsGeneric ? "" : promptLabel
 
         // The only two places in this file where the field's contents are

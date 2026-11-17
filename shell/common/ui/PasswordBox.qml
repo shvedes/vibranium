@@ -7,6 +7,7 @@ import QtQuick
 // back to the wrapper instead of to the Qt control.
 import QtQuick.Controls as Ctl
 import qs.common
+import "../motion/CapsJitter.js" as CapsJitter
 
 // Shared authentication field backing the lockscreen and the polkit dialog.
 // A flat 320x44 box whose border tells the state story (accent focused,
@@ -26,6 +27,45 @@ Rectangle {
   // so, so consumer bindings keep working untouched. clear() drops it -
   // fresh prompts never inherit plain text.
   property bool revealed: false
+
+  // CapsLock state, handed in by the consumer (Keyboard.capsOn). The box
+  // itself only reports the key press through capsToggled(); the on/off
+  // state lives with the shell's keyboard service. While caps is on every
+  // echo glyph jumps on its own random rhythm, so the field is the indicator
+  // and no chip has to sit above it.
+  property bool capsActive: false
+
+  // Per-glyph jump state for capsActive. A tick is a new random pose; glyph
+  // i's pose is derived from the tick and its index, so a tick moves every
+  // glyph without touching the model and delegates never rebuild.
+  property int capsTick: 0
+
+  function jitterX(i) {
+    if (!MotionPolicy.enabled || !root.capsActive) return 0
+    return CapsJitter.offsetX(i, root.capsTick)
+  }
+
+  function jitterY(i) {
+    if (!MotionPolicy.enabled || !root.capsActive) return 0
+    return CapsJitter.offsetY(i, root.capsTick)
+  }
+
+  // Irregular cadence: a steady metronome reads as a wobble, while the point
+  // is a scramble that changes its own rhythm. The effect exists only while
+  // the global animation switch is on: with animations off the field stays
+  // still rather than jumping in one frame.
+  Timer {
+    id: capsJitter
+
+    repeat: true
+    running: MotionPolicy.enabled && root.capsActive && root.animated
+      && passwordInput.text.length > 0
+    interval: 110
+    onTriggered: {
+      root.capsTick += 1
+      interval = CapsJitter.nextInterval()
+    }
+  }
 
   // Silences border fades and the shake for minimal setups.
   property bool animated: true
@@ -310,6 +350,7 @@ Rectangle {
       spacing: 6
 
       Behavior on x {
+        enabled: MotionPolicy.enabled
         NumberAnimation {
           duration: 150
           easing.type: Easing.OutCubic
@@ -323,18 +364,104 @@ Rectangle {
       Repeater {
         model: glyphModel
 
-        Text {
+        Item {
+          id: glyphCell
+
           required property int index
 
-          // A departing glyph's delegate is rebound against the new, shorter
-          // text before the model trims it. Reading past the end would answer
-          // undefined and log one warning per secret character; the guard keeps
-          // the frame silent while the row is already on its way out.
-          text: (root.hidden && !root.revealed) ? Ui.passwordEcho
-            : (index < passwordInput.text.length ? passwordInput.text[index] : "")
-          color: Theme.color("foreground_0")
-          font.pixelSize: 24
-          font.family: Ui.fontFamily
+          // Which face is in front, and the character behind it. A departing
+          // glyph's delegate is rebound against the new, shorter text before
+          // the model trims it; the guard keeps the frame silent while the
+          // row is already on its way out.
+          readonly property bool masked: root.hidden && !root.revealed
+          readonly property string plainText: index < passwordInput.text.length
+            ? passwordInput.text[index] : ""
+          // The symbol this cell currently paints, for readers that measure
+          // the row instead of sampling its two faces.
+          readonly property string glyphChar: masked ? Ui.passwordEcho : plainText
+
+          // The cell takes the width of the face in front, tweened, so the
+          // row's eased recentring follows the symbol fading in instead of
+          // snapping to its measure.
+          width: masked ? maskGlyph.implicitWidth : plainGlyph.implicitWidth
+          height: Math.max(maskGlyph.implicitHeight, plainGlyph.implicitHeight)
+
+          Behavior on width {
+            enabled: MotionPolicy.enabled && root.animated
+            NumberAnimation {
+              duration: Ui.fastMs
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          // Caps on: each glyph jumps to its own pose on every tick. A
+          // transform only, so the row's measure and its eased recentring
+          // never see the motion. With animations running the pose glides and
+          // the path is followable; with the global switch off the same pose
+          // lands in one frame.
+          property real jx: root.jitterX(glyphCell.index)
+          property real jy: root.jitterY(glyphCell.index)
+
+          Behavior on jx {
+            enabled: MotionPolicy.enabled && root.animated
+            NumberAnimation {
+              duration: 220
+              easing.type: Easing.OutCubic
+            }
+          }
+          Behavior on jy {
+            enabled: MotionPolicy.enabled && root.animated
+            NumberAnimation {
+              duration: 220
+              easing.type: Easing.OutCubic
+            }
+          }
+
+          transform: Translate {
+            x: glyphCell.jx
+            y: glyphCell.jy
+          }
+
+          // Two faces in one slot: the mask and the character crossfade on
+          // the reveal switch, so a mode change is a fade rather than a
+          // frame of different glyphs.
+          Text {
+            id: maskGlyph
+
+            anchors.centerIn: parent
+            text: Ui.passwordEcho
+            opacity: glyphCell.masked ? 1 : 0
+            color: Theme.color("foreground_0")
+            font.pixelSize: 24
+            font.family: Ui.fontFamily
+
+            Behavior on opacity {
+              enabled: MotionPolicy.enabled && root.animated
+              NumberAnimation {
+                duration: Ui.fastMs
+                easing.type: Easing.OutCubic
+              }
+            }
+          }
+
+          Text {
+            id: plainGlyph
+
+            anchors.centerIn: parent
+            text: glyphCell.plainText
+            opacity: glyphCell.masked ? 0 : 1
+            color: Theme.color("foreground_0")
+            font.pixelSize: 24
+            font.family: Ui.fontFamily
+
+            Behavior on opacity {
+              enabled: MotionPolicy.enabled && root.animated
+              NumberAnimation {
+                duration: Ui.fastMs
+                easing.type: Easing.OutCubic
+              }
+            }
+          }
         }
       }
     }
@@ -354,95 +481,21 @@ Rectangle {
     font.letterSpacing: root.failure ? 0 : 6
   }
 
-  // Leading glyph: the field's own mark, at the far left of the box. It
-  // shares the left chrome slot the menu fields use for their role icon,
-  // and it never fades out - the echo owns the middle of the box, the
-  // glyph owns its left edge, and a long secret may not cover it.
-  Icon {
+  // Leading glyph: the field's own mark at the far left of the box, sharing
+  // the left chrome slot the menu fields use for their role icon. It never
+  // fades out - the echo owns the middle of the box, the glyph owns its left
+  // edge, and a long secret may not cover it. A revealed echo trades the
+  // mark for the eye through the shared crossfade, so the reveal state is
+  // read on the field itself instead of on a badge beside it.
+  CrossfadeIcon {
     id: fieldIcon
 
     anchors.left: parent.left
     anchors.leftMargin: Ui.m
     anchors.verticalCenter: parent.verticalCenter
     size: 16
-    name: root.iconName
+    name: root.revealed && root.iconName !== "" ? "eye" : root.iconName
     colorKey: root.iconColorKey
     visible: root.iconName !== ""
-  }
-
-  // Reveal badge: floats off the box's left edge while Ctrl+H has flipped
-  // the echo to plain text. Eye glyph is bare rectangles: the lens is a
-  // rounded square rotated 45deg then stretched horizontally, with a solid
-  // round pupil.
-  Rectangle {
-
-    anchors.right: root.left
-    anchors.rightMargin: 12
-    anchors.verticalCenter: root.verticalCenter
-    height: root.height
-    width: eyeGlyph.width + 24
-    radius: RoundingPolicy.radius
-    color: Ui.tint("purple", 0.08)
-    border.width: 1
-    border.color: Ui.tint("purple", 0.45)
-    opacity: root.revealed ? 1 : 0
-
-    transform: Translate {
-
-      // Hidden state sits pushed toward the box; revealing slides the
-      // badge up into place instead of popping it.
-      y: root.revealed ? 0 : 8
-
-      Behavior on y {
-        NumberAnimation {
-          duration: 150
-        }
-      }
-    }
-
-    Behavior on opacity {
-      NumberAnimation {
-        duration: 150
-      }
-    }
-    Behavior on anchors.bottomMargin {
-      NumberAnimation {
-        duration: 150
-      }
-    }
-
-    Item {
-      id: eyeGlyph
-
-      anchors.centerIn: parent
-      width: 21
-      height: 13
-
-      Rectangle {
-        id: lens
-
-        anchors.centerIn: parent
-        width: 9
-        height: 9
-        radius: RoundingPolicy.radius
-        antialiasing: true
-        color: "transparent"
-        border.width: 1
-        border.color: Theme.color("purple")
-        transform: [
-          Rotation { origin.x: 4.5; origin.y: 4.5; angle: 45 },
-          Scale { origin.x: 4.5; origin.y: 4.5; xScale: 1.65 }
-        ]
-      }
-
-      Rectangle {
-        anchors.centerIn: parent
-        width: 5
-        height: 5
-        radius: RoundingPolicy.radius
-        antialiasing: true
-        color: Theme.color("purple")
-      }
-    }
   }
 }

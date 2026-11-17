@@ -7,12 +7,12 @@
 # which echo mode a field ends up in, when a reveal state is dropped, when the
 # failure window opens and closes, and what each signal promises to carry.
 #
-# The probe (probes/textinput.qml) puts 24 InputFields and 13 PasswordBoxes in
+# The probe (probes/textinput.qml) puts 24 InputFields and 14 PasswordBoxes in
 # a real Window, steps through four event-loop turns with a repeating Timer and
 # five named deadlines, and reports one key per observation. The pump is not
 # ceremony:
 #
-#   * the mode chip and the reveal badge fade over Ui.fastMs, so their opacity
+#   * the mode chip fades over Ui.fastMs, so its opacity
 #     is mid-flight on the first turn and 1 on a later one
 #   * the ghost placeholder cross-slidefades (one layer rises out as the
 #     other rises in, the enter holding a short pause so total light dips
@@ -494,9 +494,10 @@ t_eq "no caps event either" "0" "$(qp_get pw.signalAfter.capsToggled)"
 t_eq "and no navigation" "0" "$(qp_get pw.signalAfter.navigate)"
 t_note "PasswordBox.edited is documented as 'Real keystrokes only - programmatic text syncs never fire this' (PasswordBox.qml:70), and the lockscreen relies on it: it assigns authBox.text to sync sibling surfaces (LockscreenSurfaceView.qml:112) with the comment 'Programmatic assignment never fires edited'."
 
-t_section "the box has no caps state of its own"
+t_section "the box takes caps as an input and draws it on the glyphs"
 t_eq "capsOn is not a property of PasswordBox" "undefined" "$(qp_get pw.capsState.notAPropertyOfTheBox)"
-t_note "The box only reports the key press; the state lives in the consumer. Both call sites do onCapsToggled: Keyboard.toggleCaps() and render Keyboard.capsOn in a separate CapsChip (PolkitView.qml:190, LockscreenSurfaceView.qml:365), so a consumer that ignores the signal has no indicator at all."
+t_eq "capsActive is the consumer-driven input, off by default" "false" "$(qp_get pw.capsState.capsActiveDefault)"
+t_note "The box still only reports the key press; the on/off state lives in the consumer's Keyboard singleton, which both the lockscreen and the polkit overlay pass as capsActive. Each field is then its own caps indicator - every echo glyph jumps - so neither needs a chip above it."
 t_skip "capsToggled fires for both directions" "needs a CapsLock key event; the handler (PasswordBox.qml:217-218) is unreachable headlessly"
 t_skip "the submitted payload and its single emission" "onAccepted needs Enter"
 t_skip "the edited payload on a real keystroke" "onTextEdited needs a keystroke; the negative contract is asserted above"
@@ -546,6 +547,16 @@ t_eq "a masked box stays masked while the probe runs" "true" "$(qp_get glyph.wip
 t_eq "and is not revealed" "false" "$(qp_get glyph.wipedBeforeClear.revealed)"
 t_eq "the owner still reads the secret" "s3cret" "$(qp_get pw.ownerReadback)"
 t_eq "exactly" "true" "$(qp_get pw.ownerReadback.isSecret)"
+
+t_section "caps makes the field itself jump, while animations are on"
+t_eq "the display row holds every glyph" "6" "$(qp_get caps.glyph.count)"
+if [[ "$(qp_get probe.motion.enabled)" == "true" ]]; then
+  t_eq "all of them take a pose while caps is on" "6" "$(qp_get caps.glyph.moved)"
+  t_eq "and all return to rest when it drops" "6" "$(qp_get caps.glyph.atRest)"
+else
+  t_skip "caps poses move the glyphs while animations are on" \
+    "MotionPolicy is disabled on this host; with animations off the field stays still"
+fi
 
 t_section "a failure re-masks a revealed password without clearing it"
 t_eq "the reveal is dropped on failure" "false" "$(qp_get fail.revealed.stillRevealed)"
@@ -680,23 +691,18 @@ t_eq "the event loop actually ran" "true" "$(qp_get anim.eventLoopRan)"
 t_eq "the chip is already visible on the first turn" "true" "$(qp_get anim.chip.visible)"
 t_eq "with its opacity above zero" "true" "$(qp_get anim.chip.opacity.gtZero)"
 t_eq "and not above one" "true" "$(qp_get anim.chip.opacity.leOne)"
-t_match "the reveal badge's opacity is a real fraction on the first turn" \
-  '^0?\.[0-9]+$|^1$' "$(qp_get anim.badge.opacity)"
-t_eq "with the eye glyph's own width" "45" "$(qp_get anim.badge.width)"
 t_eq "by 600ms the chip has landed" "1" "$(qp_get settle.chip.opacity)"
 t_eq "and stays visible" "true" "$(qp_get settle.chip.visible)"
 t_eq "at the chip's own inset" "8" "$(qp_get settle.chip.x)"
 t_eq "and the lead inset is the chip plus two gaps" "true" "$(qp_get settle.chip.leadInsetIsChipPlusGaps)"
-t_eq "the badge has landed too" "1" "$(qp_get settle.badge.opacity)"
 
 if [[ "$(qp_get probe.motion.enabled)" == "true" ]]; then
   t_eq "the chip fade is mid-flight on the first turn" "true" "$(qp_get anim.chip.opacity.inFlight)"
-  t_eq "and so is the reveal badge" "true" "$(qp_get anim.badge.opacity.inFlight)"
   t_eq "the outgoing ghost is rising out mid-flight" "true" "$(qp_get anim.ghost.A.exiting)"
   t_eq "and the incoming one is rising in" "true" "$(qp_get anim.ghost.B.entering)"
   t_eq "with total light dipped below full (the visible fade)" "true" "$(qp_get anim.ghost.dip)"
 else
-  t_skip "the chip and badge fades are mid-flight on the first turn" \
+  t_skip "the chip fade is mid-flight on the first turn" \
     "MotionPolicy is disabled on this host, so the tween lands in the turn it is asked for"
   t_skip "the ghost slide is mid-flight on the first turn" \
     "MotionPolicy is disabled on this host, so the tween lands in the turn it is asked for"

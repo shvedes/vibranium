@@ -3,9 +3,11 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 
-// CapsLock indicator chip shared by the lockscreen and the polkit dialog.
-// Sized from its own label, driven by its active input, and fading/scaling
-// between states; consumers only position it.
+// CapsLock indicator chip: sized from its own label, driven by its active
+// input, and fading/scaling between states; consumers only position it. The
+// password fields draw caps on their own glyphs (PasswordBox.capsActive), so
+// no surface instantiates this today; it remains the label-form indicator for
+// a surface that wants one.
 Rectangle {
   id: root
 

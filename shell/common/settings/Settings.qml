@@ -267,6 +267,8 @@ Singleton {
         const v = root.value("shell.lockscreen.dim")
     return typeof v === "number" && v >= 0 && v <= 100 ? v : 50
   }
+  readonly property bool lockscreenClock: root.value("shell.lockscreen.clock") === true
+  readonly property bool lockscreenDate: root.value("shell.lockscreen.date") === true
   readonly property bool lockscreenNowPlaying: root.value("shell.lockscreen.nowPlaying") !== false
   readonly property bool lockscreenPauseMusic: root.value("shell.lockscreen.pauseMusic") !== false
   // The always-on copy of the capture dots for when the bar cannot be seen

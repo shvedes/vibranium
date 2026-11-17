@@ -1,5 +1,6 @@
 module qs.features.lock
 
+LockClock 1.0 LockClock.qml
 singleton Lockscreen 1.0 Lockscreen.qml
 LockscreenSurfaceView 1.0 LockscreenSurfaceView.qml
 NowPlaying 1.0 NowPlaying.qml

@@ -9,8 +9,8 @@
 // only correct after an event-loop turn, and each of them reads as a plausible
 // wrong answer if sampled immediately:
 //
-//   * the mode chip and the reveal badge fade through `Behavior on opacity`,
-//     so `opacity` is mid-flight on the first turn and 1 on a later one;
+//   * the mode chip fades through `Behavior on opacity`, so `opacity` is
+//     mid-flight on the first turn and 1 on a later one;
 //   * the failure border cross-fades over 150ms through `Behavior on
 //     border.color`, so mid-flash its value is a blend of the two ends;
 //   * `PasswordBox.failure` is `failureTimer.running` and the window is
@@ -138,6 +138,9 @@ Window {
   PasswordBox { id: lateStill; y: 1520; animated: false }
   PasswordBox { id: pwFocus; y: 1580 }
   PasswordBox { id: pwFocusTwin; y: 1640; x: 320 }
+  // Caps jitter sampled without a tween: the poses are read on both sides of
+  // the switch in one turn, which a Behavior would smear.
+  PasswordBox { id: pwCaps; y: 1700; x: 600; animated: false }
 
   // ---- the event loop -------------------------------------------------
 
@@ -889,6 +892,12 @@ Window {
     kv("pw.signal.navigate", pwNavCount)
     kv("pw.signal.navigateDir", pwNavDir)
     kv("pw.capsState.notAPropertyOfTheBox", typeof pwMask.capsOn)
+    kv("pw.capsState.capsActiveDefault", pwMask.capsActive)
+    // Caps on for the first turn, so the glyph poses can be read once the
+    // delegates have rebuilt; onFirstTick puts it back. This box has
+    // animations off, so its poses are exact rather than mid-tween.
+    pwCaps.text = "s3cret"
+    pwCaps.capsActive = true
 
     pwMask.text = "s3cret"
     pwRevealed.text = "s3cret"
@@ -995,11 +1004,10 @@ Window {
 
   // ---- the event-loop turns -------------------------------------------
 
-  // 40ms in. The chip and the badge are mid-fade, the failure window is still
-  // open, and the display rows have settled on their text.
+  // 40ms in. The chip is mid-fade, the failure window is still open, and the
+  // display rows have settled on their text.
   function onFirstTick() {
     const chip = chipOf(chipFader)
-    const badge = badgeOf(pwRevealed)
     kv("anim.eventLoopRan", true)
     kv("anim.chip.opacity", chip ? chip.opacity : "missing")
     kv("anim.chip.opacity.gtZero", chip ? chip.opacity > 0 : false)
@@ -1008,9 +1016,6 @@ Window {
     kv("anim.chip.visible", chip ? chip.visible : "missing")
     kv("anim.chip.x", chip ? chip.x : "missing")
     kv("anim.chip.leadInset", chipFader.leadInset)
-    kv("anim.badge.opacity", badge ? badge.opacity : "missing")
-    kv("anim.badge.opacity.inFlight", badge ? (badge.opacity > 0 && badge.opacity < 1) : false)
-    kv("anim.badge.width", badge ? badge.width : "missing")
 
     kv("tick1.fail.window", pwWindow.failure)
     kv("tick1.fail.short", pwShort.failure)
@@ -1032,6 +1037,31 @@ Window {
     kv("glyph.revealed.text", glyphText(pwRevealed))
     kv("glyph.revealed.isPlaintext", glyphText(pwRevealed) === pwRevealed.text)
     kv("glyph.revealed.echoMode", pwRevealed.input.echoMode)
+
+    // Caps: the field is its own indicator. Every glyph holds an independent
+    // pose, carried by a transform so the row's measure and recentring never
+    // see the motion, and dropping caps returns all of them to rest.
+    const capsRow = repeaterOf(pwCaps)
+    let capsMoved = 0
+    if (capsRow) {
+      for (let i = 0; i < capsRow.count; i++) {
+        const glyph = capsRow.itemAt(i)
+        const tr = glyph && glyph.transform ? glyph.transform[0] : null
+        if (tr && (Math.abs(tr.x) > 0.01 || Math.abs(tr.y) > 0.01)) capsMoved++
+      }
+    }
+    kv("caps.glyph.count", capsRow ? capsRow.count : -1)
+    kv("caps.glyph.moved", capsMoved)
+    pwCaps.capsActive = false
+    let capsAtRest = 0
+    if (capsRow) {
+      for (let i = 0; i < capsRow.count; i++) {
+        const glyph = capsRow.itemAt(i)
+        const tr = glyph ? glyph.transform[0] : null
+        if (tr && Math.abs(tr.x) <= 0.01 && Math.abs(tr.y) <= 0.01) capsAtRest++
+      }
+    }
+    kv("caps.glyph.atRest", capsAtRest)
     kv("glyph.plainEcho.count", glyphCount(pwPlainEcho))
     kv("glyph.plainEcho.text", glyphText(pwPlainEcho))
     kv("glyph.plainEcho.isPlaintext", glyphText(pwPlainEcho) === pwPlainEcho.text)
@@ -1122,7 +1152,6 @@ Window {
     kv("settle.chip.x", chipOf(chipFader) ? chipOf(chipFader).x : "missing")
     kv("settle.chip.leadInset", chipFader.leadInset)
     kv("settle.chip.leadInsetIsChipPlusGaps", chipFader.leadInset === 2 * Ui.s + chipOf(chipFader).width)
-    kv("settle.badge.opacity", badgeOf(pwRevealed) ? badgeOf(pwRevealed).opacity : "missing")
 
     // The flip landed and the retire timer ran: the outgoing layer
     // rests invisible back in the staging slot below (+8), the
@@ -1346,20 +1375,6 @@ Window {
     return out
   }
 
-  // The widest descendant rectangle of the box is the reveal badge; the two
-  // nested ones are its lens and pupil.
-  function badgeOf(p) {
-    const all = descendants(p, [])
-    let best = null
-    for (let i = 0; i < all.length; i++) {
-      const n = all[i]
-      if (!n || n === p || n.border === undefined || n.radius === undefined) continue
-      if (n.text !== undefined) continue
-      if (!best || n.width > best.width) best = n
-    }
-    return best
-  }
-
   function descendants(o, out) {
     const kids = o.children || []
     for (let i = 0; i < kids.length; i++) {
@@ -1392,7 +1407,7 @@ Window {
     let out = ""
     for (let i = 0; i < r.count; i++) {
       const it = r.itemAt(i)
-      if (it && it.text !== undefined) out += it.text
+      if (it && it.glyphChar !== undefined) out += it.glyphChar
     }
     return out
   }

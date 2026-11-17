@@ -1270,6 +1270,26 @@
         "showItemCount": true,
         "options": [
             {
+                "key": "shell.lockscreen.clock",
+                "type": "bool",
+                "default": false,
+                "label": "Clock",
+                "sub": "Large time above the field"
+            },
+            {
+                "key": "shell.lockscreen.date",
+                "type": "bool",
+                "default": false,
+                "label": "Show date",
+                "sub": "Short date line below the time",
+                "showIf": [
+                    {
+                        "key": "shell.lockscreen.clock",
+                        "eq": true
+                    }
+                ]
+            },
+            {
                 "key": "shell.lockscreen.backgroundMode",
                 "type": "string",
                 "default": "background",
