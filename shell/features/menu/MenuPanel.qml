@@ -631,6 +631,13 @@ Rectangle {
       if (same && !plan.wholesale) return
     }
 
+    // Publish the row set before the install. A search projection installs
+    // synchronously now, and its head seat resolves selectable rows against
+    // rowsModel; publishing after the install left the seat scanning the
+    // outgoing set, which parked the cursor on the incoming set's leading
+    // separator. The equality check above still compares against the outgoing
+    // set, captured in `prev`.
+    panel.rowsModel = candidate
     if (!panel.syncRowsList(candidate, plan, records)) return
     panel.projectRows(candidate)
     // A close latch belongs to a row this model still lists. `candidate` is
@@ -638,7 +645,6 @@ Rectangle {
     // no view timing: keyed sync destroys a delegate exactly when its key
     // leaves, so anything pruned here has no delegate left to report.
     Menu.pruneSlotCloses(candidate)
-    panel.rowsModel = candidate
     panel.queueFit()
     metrics.recalcWidth()
   }
@@ -1207,7 +1213,7 @@ Rectangle {
     // (see _quiesceReady); motion installs proceed as before. Held payloads
     // re-queue through the normal coalescing, so the latest wins.
     if (!plan.glide && !panel._quiesceReady()) {
-      panel._queueRows(records, plan)
+      panel._queueRows(records, plan, true)
       return
     }
     panel._releaseSwap()
@@ -1343,7 +1349,7 @@ Rectangle {
     }, 2)
   }
 
-  function _queueRows(records, plan) {
+  function _queueRows(records, plan, defer) {
     if (records === null) {
       panel._invalidatePendingRows()
       return
@@ -1355,7 +1361,7 @@ Rectangle {
       panel._releaseSwap()
     if (panel._rowsPending) return
     panel._rowsPending = true
-    Idle.run(() => {
+    const flush = () => {
       if (!panel._rowsPending) return
       const generation = panel._pendingGen
       const candidate = panel._pendingCandidate
@@ -1365,7 +1371,21 @@ Rectangle {
       panel._rowsPending = false
       if (candidate === null || generation !== panel._pendingGen) return
       panel._installRows(candidate, install, generation)
-    })
+    }
+    // A search projection is installed in this turn instead of on the next
+    // event-loop hop. recomputeRows has already published rowsModel and the
+    // card's new width synchronously, so deferring only the view's model
+    // paints the resized window with no result rows for a frame - visible
+    // with motion off, where no slide fade masks the gap. setQuery is already
+    // a Qt.callLater turn out of the field's text-change signal, so writing
+    // the model here cannot re-enter that signal. A write the quiesce
+    // handshake has not settled still defers, through the forced path in
+    // _installRows, so back-to-back installs cannot strand delegates.
+    if (defer !== true && (panel.searching || panel.scopedSearching)) {
+      flush()
+      return
+    }
+    Idle.run(flush)
   }
 
   // Arm the latch and start its window together: the sync that arms it is
@@ -2252,6 +2272,10 @@ Rectangle {
     // blinked the selection bar for a frame - on exactly the first open of a
     // picker in a process, while every later open already had its width.
     if (!panel.shown) return
+    // A width that snaps has no glide to unveil against. Arming the settle on
+    // one holds a freshly installed result row's copy at textReveal ~ 0 until
+    // its column lays out, which reads as a blank row for that frame.
+    if (!MotionPolicy.enabled) return
     panel._widthSettling = true
     widthSettle.restart()
   }
