@@ -683,23 +683,13 @@
         "items": [
             {
                 "type": "submenu",
-                "label": "Clock",
-                "page": "bar-module-clock"
-            },
-            {
-                "type": "submenu",
-                "label": "Volume",
-                "page": "bar-module-volume"
-            },
-            {
-                "type": "submenu",
-                "label": "Weather",
-                "page": "bar-module-weather"
-            },
-            {
-                "type": "submenu",
                 "label": "Arch updates",
                 "page": "bar-module-archupdates"
+            },
+            {
+                "type": "submenu",
+                "label": "Color Picker",
+                "page": "bar-module-colorpicker"
             },
             {
                 "type": "submenu",
@@ -713,8 +703,18 @@
             },
             {
                 "type": "submenu",
-                "label": "Color Picker",
-                "page": "bar-module-colorpicker"
+                "label": "Weather",
+                "page": "bar-module-weather"
+            },
+            {
+                "type": "submenu",
+                "label": "Volume",
+                "page": "bar-module-volume"
+            },
+            {
+                "type": "submenu",
+                "label": "Clock",
+                "page": "bar-module-clock"
             },
             {
                 "type": "submenu",
