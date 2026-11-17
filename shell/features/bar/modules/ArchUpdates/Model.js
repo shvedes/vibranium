@@ -3,6 +3,7 @@
 .import "../../../../common/math/Range.js" as Range
 .import "../../../../common/collections/StoreGuards.js" as StoreGuards
 .import "../../../../common/text/StringUtils.js" as SU
+.import "../../../../common/collections/TableSort.js" as TableSort
 
 // Pure model behind the arch updates island: the package search, the
 // official/AUR split, the selection algebra, the per-row projection the
@@ -214,6 +215,33 @@ function rowView(pkg, selected) {
 //
 // Every cap arrives as an argument. The numbers are the island's chrome,
 // not a table-wide policy.
+// Header sorting over the filtered set. Only the two text columns sort, and
+// both read numbers as numbers ("10.1" after "9.2") through the shared
+// natural compare. A package with no candidate version sorts after the ones
+// that have one - absent is not "smallest" - and equal rows keep the order
+// they arrived in, so a column flip never shuffles a tie.
+function sortPackages(packages, key, direction) {
+  const list = StoreGuards.asList(packages).slice()
+  const k = String(key || "")
+  if (k !== "name" && k !== "version") return list
+  const field = k === "name" ? "name" : "candidate"
+  // Package names are case-insensitive in practice; versions are not touched.
+  const read = pkg => String(pkg && pkg[field] || "")
+  const norm = value => (k === "name" ? value.toLowerCase() : value)
+  list.sort((a, b) => {
+    const av = read(a)
+    const bv = read(b)
+    if (av === "" && bv !== "") return 1
+    if (bv === "" && av !== "") return -1
+    const d = TableSort.applyDirection(
+      TableSort.naturalCompare(norm(av), norm(bv)), direction)
+    if (d !== 0) return d
+    return TableSort.naturalCompare(String(a && a.name || "").toLowerCase(),
+      String(b && b.name || "").toLowerCase())
+  })
+  return list
+}
+
 function columnWidths(nameWidth, verWidth, viewport, rowChrome, caps) {
   const ver = Range.clamp(Math.ceil(verWidth) + caps.verPad, caps.minVer, caps.verCap)
   const name = Range.clamp(Math.ceil(nameWidth), caps.minName,
@@ -240,6 +268,7 @@ if (typeof module !== "undefined") {
     pruneKeys: pruneKeys,
     rowWindow: rowWindow,
     rowView: rowView,
+    sortPackages: sortPackages,
     columnWidths: columnWidths
   }
 }

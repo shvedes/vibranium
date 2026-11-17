@@ -64,8 +64,8 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/vb-qmldir.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 
 # The two numbers shell/README.md:139 publishes.
-DOC_QMLDIRS=46
-DOC_FEATURES_QMLDIRS=43
+DOC_QMLDIRS=47
+DOC_FEATURES_QMLDIRS=44
 
 # shell/README.md:147 - the wrapper names an unaliased QtQuick.Controls import
 # would shadow.

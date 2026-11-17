@@ -1,0 +1,5 @@
+module qs.features.bar.modules.Downloader
+
+Downloader 1.0 Downloader.qml
+DownloaderIsland 1.0 DownloaderIsland.qml
+IconSweep 1.0 IconSweep.qml

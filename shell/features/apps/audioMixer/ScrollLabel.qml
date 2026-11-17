@@ -42,9 +42,9 @@ Item {
   implicitHeight: label.implicitHeight
   clip: true
 
-  readonly property bool scrollable: root.scrolling && MotionPolicy.enabled
-    && label.implicitWidth > root.width + 0.5
   readonly property real overflow: Math.max(0, label.implicitWidth - root.width)
+  readonly property bool scrollable: root.scrolling
+    && Marquee.scrollable(overflow)
   readonly property int legMs: Marquee.legMs(overflow)
   // A beat at each end: long enough to read the head of a name before it moves
   // and to read the tail before it returns, and the same two numbers the

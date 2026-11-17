@@ -427,6 +427,7 @@
                         "weather",
                         "nowPlaying",
                         "colorPicker",
+                        "downloader",
                         "powerProfile",
                         "privacy",
                         "printers",
@@ -446,7 +447,8 @@
                         "weather",
                         "printers",
                         "privacy",
-                        "nowPlaying"
+                        "nowPlaying",
+                        "downloader"
                     ]
                 },
                 "visibility": "internal"
@@ -580,6 +582,11 @@
                 "id": "bar-nowPlaying",
                 "type": "toggle",
                 "label": "Now Playing"
+            },
+            {
+                "id": "bar-downloader",
+                "type": "toggle",
+                "label": "Downloader"
             },
             {
                 "id": "bar-bluetooth",

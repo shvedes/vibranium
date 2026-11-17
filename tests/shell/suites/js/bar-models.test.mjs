@@ -97,8 +97,8 @@ group('the five libraries load and publish a function surface', () => {
   for (const [label, lib] of [['BarLib', B], ['ArchUpdates/Model', AU], ['Volume/Model', VO], ['Workspaces/Model', WSM], ['common/NowPlaying', CN]]) {
     is(`${label} loaded`, lib, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
   }
-  eq('BarLib publishes the nineteen layout helpers plus the shared insert rule', Object.keys(B).length, 20)
-  eq('ArchUpdates/Model publishes the seventeen model functions plus four table vars', Object.keys(AU).length, 21)
+  eq('BarLib publishes the twenty layout helpers plus the shared insert rule', Object.keys(B).length, 21)
+  eq('ArchUpdates/Model publishes the eighteen model functions plus four table vars', Object.keys(AU).length, 22)
   eq('Volume/Model publishes thirteen functions', Object.keys(VO).length, 13)
   eq('Workspaces/Model publishes the number-strip helpers', Object.keys(WSM).length, 3)
 })
@@ -397,6 +397,24 @@ group('the list is mutated in place', () => {
   const list = ['a', 'b']
   is('the same array comes back', B.insertBeforeAnchor(list, 'a', 'new'), (v) => v === list, 'returns its argument')
   eq('and it was changed in place', list, ['new', 'a', 'b'])
+})
+
+section('BarLib.renameSlots - the persisted slot rename')
+const rs = (raw, over) => B.renameSlots(raw, over || { videoDownloader: 'downloader' })
+group('the old id is rewritten in every zone', () => {
+  eq('left', rs({ left: ['videoDownloader'], center: [], right: [] }).left, ['downloader'])
+  eq('right', rs({ left: [], center: [], right: ['videoDownloader'] }).right, ['downloader'])
+  eq('the disabled list follows it', rs({ left: [], center: [], right: [], disabled: ['videoDownloader'] }).disabled, ['downloader'])
+  eq('an unrelated id is untouched', rs({ left: ['clock', 'videoDownloader'] }).left, ['clock', 'downloader'])
+})
+group('the rewrite is idempotent and collision-safe', () => {
+  eq('a new id already present keeps its place',
+    rs({ left: ['videoDownloader', 'downloader'] }).left, ['downloader'])
+  eq('a second run does not move it',
+    rs(rs({ left: ['videoDownloader'] })).left, ['downloader'])
+  eq('the option still carries all four keys', Object.keys(rs({})), ['left', 'center', 'right', 'disabled'])
+  eq('a non-object is refused', rs(null), null)
+  eq('an array is refused', rs([]), [])
 })
 
 section('BarLib.normalizeLayout - the write-path layout policy')

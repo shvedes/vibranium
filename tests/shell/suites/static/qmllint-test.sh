@@ -132,7 +132,11 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   word of it is then read as a category name. The sentence that documents this
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
-RECORDED_FILE_COUNT=254
+# The downloader island's format table used to read its delegate's injected
+# `model` unqualified, which cost 11 `unqualified` warnings and 12 info notes.
+# The delegate now declares `required property var modelData` and reads it
+# through its own id, matching the ArchUpdates table, so both figures fell.
+RECORDED_FILE_COUNT=259
 RECORDED_WARNING_COUNT=103
 RECORDED_INFO_COUNT=23
 

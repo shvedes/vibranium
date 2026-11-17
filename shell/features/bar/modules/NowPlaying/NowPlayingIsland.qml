@@ -70,7 +70,9 @@ Item {
   property bool islandSelfAnimating: false
   property var islandHost: null
   readonly property bool animOn: MotionPolicy.enabled
-  readonly property bool marqueeEnabled: root.animOn && root.islandHost !== null && root.islandHost.open
+  // Reading a clipped title is accessibility, not decoration: the marquee
+  // follows the island being open, never the animation setting.
+  readonly property bool marqueeEnabled: root.islandHost !== null && root.islandHost.open
 
   readonly property bool blockBrowsers: Settings.value("shell.osd.blockBrowsers") !== false
   readonly property var players: NP.sortPlayers(

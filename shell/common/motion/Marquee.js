@@ -16,6 +16,16 @@ var PER_PIXEL_MS = 24
 var MIN_MS = 1800
 var MAX_MS = 9000
 
+// Whether a clipped label has anything to reveal. Scrolling is an
+// accessibility behavior, not decoration: the animation setting governs how
+// the shell moves, not whether a title that does not fit can ever be read.
+// Callers still apply their own "is this row visible" gate; this only answers
+// the overflow question.
+function scrollable(overflow) {
+  const n = Number(overflow)
+  return isFinite(n) && n > 0.5
+}
+
 // Milliseconds for one leg over `overflow` pixels, or the floor when the
 // overflow is not a finite number. The clamp keeps the same 1800..9000
 // window every caller already used.
@@ -32,6 +42,7 @@ if (typeof module !== "undefined") {
     PER_PIXEL_MS: PER_PIXEL_MS,
     MIN_MS: MIN_MS,
     MAX_MS: MAX_MS,
+    scrollable: scrollable,
     legMs: legMs
   }
 }

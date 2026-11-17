@@ -53,6 +53,10 @@ Item {
   property real slotSize: 0
   property real cornerRadius: RoundingPolicy.radius
   property bool flat: false
+  // Optional border in a theme key, for a chip that has to read as a bounded
+  // control. Empty keeps the corner-mode default, which is no border on a
+  // flat slot and the neutral edge otherwise.
+  property string borderKey: ""
   // Kill switch: disables color/border/scale tweens; the final state
   // still lands instantly. Follows the Button lib contract.
   property bool animationsEnabled: true
@@ -155,15 +159,17 @@ Item {
       // anims below, like every other hoverable chrome in the shell.
       color: root.color
       radius: root.radius
-      border.width: root.flat ? 0 : 1
+      border.width: root.borderKey !== "" ? 1 : (root.flat ? 0 : 1)
       // Focus is Qt's, the ring is the shell's: the accent border is the
       // ring this control has always worn, so a focused slot reads the
       // accent a press does, and a flat slot still shows focus in its fill.
-      border.color: root.flat
-        ? (root._focused ? Ui.tint("accent", 0.15) : "transparent")
-        : root.bright || root.pressed || root._focused ? Theme.color("accent")
-        : root.hovered ? Ui.tint("foreground_1", 0.7)
-        : Ui.tint("foreground_1", 0.4)
+      border.color: root.borderKey !== ""
+        ? Ui.tint(root.borderKey, root.hovered ? 0.55 : 0.3)
+        : root.flat
+          ? (root._focused ? Ui.tint("accent", 0.15) : "transparent")
+          : root.bright || root.pressed || root._focused ? Theme.color("accent")
+          : root.hovered ? Ui.tint("foreground_1", 0.7)
+          : Ui.tint("foreground_1", 0.4)
 
       Behavior on color {
         enabled: root.animationsEnabled

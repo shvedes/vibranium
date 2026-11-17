@@ -69,6 +69,11 @@ ListView {
   // hold: any cursor step re-centers. > 0 = the view holds while the
   // cursor roams within `scrolloff` rows of its current viewport slot.
   property int scrolloff: 0
+  // Follow policy for a table a person reads with the mouse: a seated row
+  // keeps the place it already has, and the view moves only when the row is
+  // outside the viewport at all - by the least amount that brings it back.
+  // A menu wants its cursor centred; a table wants its rows to stay put.
+  property bool centerFollow: true
   // Sliding selection bar, library-driven: one bar gliding behind
   // transparent delegates. Consumers bind highlightMotion to their
   // animation gate; the active slot still owns height tracking.
@@ -1421,6 +1426,16 @@ ListView {
     // argument); trackCursor usually measured it a line above already.
     const live = root.itemAtIndex(index)
     const rh = live ? live.height : root.rowHeightAt(index)
+    // Reveal-only follow (see centerFollow): a visible row is left where it
+    // is, and an off-screen one is brought just inside the edge it left
+    // through, never re-centred.
+    if (!root.centerFollow) {
+      const top = root.contentY
+      const bottom = top + root.height
+      if (ry >= top && ry + rh <= bottom) return -1
+      return Range.clamp(ry < top ? ry : ry + rh - root.height, 0,
+        root.clampY(Infinity))
+    }
     if (root.scrolloff > 0) {
       const margin = root.scrolloff * rh
       if (ry - margin >= root.contentY

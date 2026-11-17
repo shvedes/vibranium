@@ -1,0 +1,516 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+SELF="${0##*/}"
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTION] URL
+
+Download a video with yt-dlp or a file with wget or aria2c.
+
+With --tool auto (the default), the link is classified before anything runs:
+known media hosts and HLS/DASH manifests go to yt-dlp, a path naming a file
+goes to aria2c when it is installed (wget otherwise), and an ambiguous link
+stops instead of guessing.
+
+Options:
+      --tool TOOL   auto (default), yt-dlp, wget, or aria2c
+      --classify URL
+                    Print kind, engine and reason for URL and exit
+      --probe       Exit 0 if any download engine is installed, 1 if none
+  -f, --format ID   Format selector passed to yt-dlp (yt-dlp only)
+      --subdir NAME Save below the download directory
+      --subdir-tag NAME  Playlist preset folder (yt-dlp only)
+      --playlist-history URL
+                     Record a playlist batch as one folder history row
+                     (yt-dlp only)
+      --embed-thumbnail  Embed cover art in the media file (yt-dlp only)
+      --history      List previous downloads
+      --history-delete N
+                     Delete history entry N
+      --history-clear
+                     Delete the whole download history
+      --missing PATH...
+                     Print each PATH that no longer exists
+  -h, --help        Display this help and exit
+
+The history options are passed to vb-util-yt-dlp, which owns the shared
+history file this command appends to.
+EOF
+}
+
+option_requires_value() {
+  printf '%s: option %s needs a value\n' "$SELF" "$1" >&2
+  usage >&2
+  exit 2
+}
+
+SELF_PATH="$(readlink -f -- "${BASH_SOURCE[0]}" 2>/dev/null \
+  || printf '%s' "${BASH_SOURCE[0]}")"
+SELF_DIR="$(cd -- "$(dirname -- "$SELF_PATH")" && pwd)"
+CLASSIFIER="$SELF_DIR/../shell/features/bar/modules/Downloader/DownloadsLib.js"
+
+source vb-lib-core
+
+STATE_DIR="${VIBRANIUM_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/vibranium}"
+export VIBRANIUM_STATE="$STATE_DIR"
+HISTORY_FILE="$STATE_DIR/vb-util-yt-dlp.history"
+DOWNLOAD_DIR="${XDG_DOWNLOAD_DIR:-$HOME/Downloads}"
+
+YTDLP="$(command -v vb-util-yt-dlp || true)"
+if [[ -z $YTDLP ]]; then
+  YTDLP="$SELF_DIR/vb-util-yt-dlp"
+fi
+
+# The history is one file with one owner. A history request is answered by the
+# wrapper that already rewrites and lists it, not by a second implementation.
+for arg in "$@"; do
+  case "$arg" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --probe)
+      # The island only needs to know whether any kind of download can run.
+      # wget alone is enough for a file, so a missing yt-dlp is not a missing
+      # downloader and must not turn the whole card into an install prompt.
+      if command -v yt-dlp > /dev/null || command -v wget > /dev/null \
+        || command -v aria2c > /dev/null; then
+        exit 0
+      fi
+      exit 1
+      ;;
+    --history | --history-delete | --history-clear | --missing \
+      | --info | --playlist-info | --preview)
+      # These are media-side reads, not downloads: the wrapper owns the yt-dlp
+      # invocation and its output format, so the dispatcher only forwards them.
+      if [[ ! -x $YTDLP ]]; then
+        printf '%s: vb-util-yt-dlp is not installed\n' "$SELF" >&2
+        exit 1
+      fi
+      exec "$YTDLP" "$@"
+      ;;
+  esac
+done
+
+tool="auto"
+cli_format=""
+subdir=""
+subdir_tag=""
+playlist_history=""
+embed_thumbnail=false
+classify_only=false
+url=""
+
+while (($# > 0)); do
+  case "$1" in
+    --classify)
+      classify_only=true
+      shift
+      ;;
+    --tool)
+      (($# >= 2)) || option_requires_value "$1"
+      tool="${2,,}"
+      shift 2
+      ;;
+    -f | --format)
+      (($# >= 2)) || option_requires_value "$1"
+      cli_format="$2"
+      shift 2
+      ;;
+    --subdir)
+      (($# >= 2)) || option_requires_value "$1"
+      subdir="$2"
+      shift 2
+      ;;
+    --subdir-tag)
+      (($# >= 2)) || option_requires_value "$1"
+      subdir_tag="$2"
+      shift 2
+      ;;
+    --playlist-history)
+      (($# >= 2)) || option_requires_value "$1"
+      playlist_history="$2"
+      shift 2
+      ;;
+    --embed-thumbnail)
+      embed_thumbnail=true
+      shift
+      ;;
+    -*)
+      printf '%s: unknown option %s\n' "$SELF" "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      if [[ -n $url ]]; then
+        printf '%s: only one URL can be downloaded at a time\n' "$SELF" >&2
+        exit 2
+      fi
+      url="$1"
+      shift
+      ;;
+  esac
+done
+
+case "$tool" in
+  auto | yt-dlp | wget | aria2c) ;;
+  *)
+    printf '%s: --tool must be auto, yt-dlp, wget, or aria2c\n' "$SELF" >&2
+    exit 2
+    ;;
+esac
+
+if [[ -z $url ]]; then
+  printf '%s: missing URL\n' "$SELF" >&2
+  usage >&2
+  exit 2
+fi
+
+# Keep this vocabulary identical to vb-util-yt-dlp's writer: the island parses
+# both row kinds with the same reader.
+tsv_escape() {
+  local -n _tsv_out=$1
+  local _tsv_text="$2"
+  _tsv_text="${_tsv_text//\\/\\\\}"
+  _tsv_text="${_tsv_text//$'\t'/\\t}"
+  _tsv_text="${_tsv_text//$'\n'/\\n}"
+  _tsv_text="${_tsv_text//$'\r'/\\r}"
+  _tsv_out="$_tsv_text"
+}
+
+CLASSIFY_KIND=""
+CLASSIFY_ENGINE=""
+CLASSIFY_REASON=""
+
+classify_url() {
+  local line
+  local script
+
+  if ! command -v node > /dev/null; then
+    printf '%s: classifying a link needs nodejs\n' "$SELF" >&2
+    return 1
+  fi
+  if [[ ! -r $CLASSIFIER ]]; then
+    printf '%s: classifier not found: %s\n' "$SELF" "$CLASSIFIER" >&2
+    return 1
+  fi
+
+  script='
+const fs = require("fs")
+const vm = require("vm")
+const file = process.argv[1]
+const url = process.argv[2]
+const src = fs.readFileSync(file, "utf8")
+  .replace(/^[ \t]*\.pragma[ \t]+library[ \t]*;?[ \t]*$/m, "")
+const sandbox = {}
+vm.createContext(sandbox)
+vm.runInContext(src, sandbox, { filename: file })
+const r = sandbox.classifyUrl(url)
+process.stdout.write([r.kind, r.engine, r.reason].join("\u001f"))
+'
+  line="$(node -e "$script" "$CLASSIFIER" "$url" 2>/dev/null)" || {
+    printf '%s: could not classify the link\n' "$SELF" >&2
+    return 1
+  }
+  # The unit separator keeps an empty engine field from collapsing into the
+  # reason: IFS whitespace (tab) would merge the two tabs into one delimiter.
+  IFS=$'\x1f' read -r CLASSIFY_KIND CLASSIFY_ENGINE CLASSIFY_REASON <<< "$line"
+  if [[ -z $CLASSIFY_KIND ]]; then
+    printf '%s: could not classify the link\n' "$SELF" >&2
+    return 1
+  fi
+}
+
+# Direct files are better served by aria2c when it is present: it supports
+# the same schemes and can split the transfer. The classifier stays a pure
+# URL decision; this is the installed-engine preference, applied before both
+# the printed verdict and the run.
+prefer_aria2c() {
+  if [[ $CLASSIFY_KIND == file && $CLASSIFY_ENGINE == wget ]] \
+    && command -v aria2c > /dev/null; then
+    CLASSIFY_ENGINE="aria2c"
+  fi
+}
+
+if [[ $classify_only == true ]]; then
+  if ! classify_url "$url"; then
+    exit 2
+  fi
+  prefer_aria2c
+  printf '%s\t%s\t%s\n' \
+    "$CLASSIFY_KIND" "$CLASSIFY_ENGINE" "$CLASSIFY_REASON"
+  exit 0
+fi
+
+# URI percent escapes are byte-based, so the scan forces the C locale. A
+# malformed escape is kept literally rather than dropped.
+percent_decode() {
+  local -n _pd_out=$1
+  local _pd_in="$2" _pd_hex _pd_char
+  local LC_ALL=C
+
+  _pd_out=""
+  while [[ $_pd_in == *%* ]]; do
+    _pd_out+="${_pd_in%%%*}"
+    _pd_in="${_pd_in#*%}"
+    _pd_hex="${_pd_in:0:2}"
+    if [[ $_pd_hex =~ ^[0-9A-Fa-f]{2}$ ]]; then
+      printf -v _pd_char '%b' "\\x$_pd_hex"
+      _pd_out+="$_pd_char"
+      _pd_in="${_pd_in:2}"
+    else
+      _pd_out+="%"
+    fi
+  done
+  _pd_out+="$_pd_in"
+}
+
+sanitize_name() {
+  local -n _sn_out=$1
+  local _sn_name="$2"
+
+  # A decoded slash must not become a directory, and control bytes have no
+  # place in a filename the history and the clipboard carry around. Both are
+  # tr's own job rather than a byte-by-byte shell rewrite.
+  _sn_name="$(printf '%s' "$_sn_name" | tr '/' '_' | tr -d '\000-\037\177')"
+  _sn_name="${_sn_name#"${_sn_name%%[![:space:]]*}"}"
+  _sn_name="${_sn_name%"${_sn_name##*[![:space:]]}"}"
+  if [[ -z $_sn_name || $_sn_name == . || $_sn_name == .. ]]; then
+    _sn_name="download"
+  fi
+  if ((${#_sn_name} > 200)); then
+    _sn_name="${_sn_name:0:200}"
+  fi
+  _sn_out="$_sn_name"
+}
+
+# The name comes from the URL path, not from the server: the final path has to
+# be known before the transfer starts, so collisions and the history row are
+# decided without parsing wget output.
+url_basename() {
+  local -n _ub_out=$1
+  local _ub_url="$2" _ub_rest _ub_path _ub_name
+
+  _ub_rest="${_ub_url#*://}"
+  if [[ $_ub_rest == */* ]]; then
+    _ub_path="${_ub_rest#*/}"
+  else
+    _ub_path=""
+  fi
+  _ub_path="${_ub_path%%#*}"
+  _ub_path="${_ub_path%%\?*}"
+  # basename already drops a trailing slash and keeps the last path segment;
+  # the URL query/fragment has to be stripped first because basename has no
+  # notion of URL syntax.
+  _ub_name="$(basename -- "$_ub_path")"
+  percent_decode _ub_name "$_ub_name"
+  sanitize_name _ub_name "$_ub_name"
+  _ub_out="$_ub_name"
+}
+
+free_path() {
+  local -n _fp_out=$1
+  local _fp_dir="$2" _fp_name="$3" _fp_stem _fp_ext _fp_n=1
+  local _fp_target="$_fp_dir/$_fp_name"
+
+  if [[ ! -e $_fp_target ]]; then
+    _fp_out="$_fp_target"
+    return
+  fi
+
+  if [[ $_fp_name == *.* && ${_fp_name##*.} != "" ]]; then
+    _fp_ext="${_fp_name##*.}"
+    _fp_stem="$(basename -- "$_fp_name" ".$_fp_ext")"
+    _fp_ext=".$_fp_ext"
+  else
+    _fp_stem="$_fp_name"
+    _fp_ext=""
+  fi
+  while [[ -e "$_fp_dir/$_fp_stem ($_fp_n)$_fp_ext" ]]; do
+    _fp_n=$((_fp_n + 1))
+  done
+  _fp_out="$_fp_dir/$_fp_stem ($_fp_n)$_fp_ext"
+}
+
+append_history() {
+  local title="$1" size="$2" path="$3" url="$4" engine="$5"
+  local h_title h_path h_url
+
+  mkdir -p "$(dirname -- "$HISTORY_FILE")"
+  tsv_escape h_title "$title"
+  tsv_escape h_path "$path"
+  tsv_escape h_url "$url"
+  # The sixth field names the engine for a file row. It is not a yt-dlp format
+  # id, and the island's downloadedFormats only matches real ids.
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$(date '+%F %T')" "$h_title" "$size" "$h_path" "$h_url" "$engine" \
+    >> "$HISTORY_FILE"
+}
+
+if [[ $tool == auto ]]; then
+  if ! classify_url "$url"; then
+    exit 2
+  fi
+  prefer_aria2c
+  case "$CLASSIFY_KIND:$CLASSIFY_ENGINE" in
+    media:yt-dlp)
+      tool="yt-dlp"
+      ;;
+    file:wget)
+      tool="wget"
+      ;;
+    file:aria2c)
+      tool="aria2c"
+      ;;
+    *)
+      printf '%s: could not tell what this link is (%s); pass --tool yt-dlp or --tool wget\n' \
+        "$SELF" "$CLASSIFY_REASON" >&2
+      exit 2
+      ;;
+  esac
+fi
+
+if [[ $tool != yt-dlp ]]; then
+  if [[ -n $cli_format ]]; then
+    printf '%s: --format is only for yt-dlp\n' "$SELF" >&2
+    exit 2
+  fi
+  if [[ -n $subdir_tag ]]; then
+    printf '%s: --subdir-tag is only for yt-dlp\n' "$SELF" >&2
+    exit 2
+  fi
+  if [[ -n $playlist_history ]]; then
+    printf '%s: --playlist-history is only for yt-dlp\n' "$SELF" >&2
+    exit 2
+  fi
+  if [[ $embed_thumbnail == true ]]; then
+    printf '%s: --embed-thumbnail is only for yt-dlp\n' "$SELF" >&2
+    exit 2
+  fi
+fi
+
+if [[ $tool == yt-dlp ]]; then
+  argv=()
+  if [[ -n $cli_format ]]; then
+    argv+=(--format "$cli_format")
+  fi
+  if [[ -n $subdir ]]; then
+    argv+=(--subdir "$subdir")
+  fi
+  if [[ -n $subdir_tag ]]; then
+    argv+=(--subdir-tag "$subdir_tag")
+  fi
+  if [[ -n $playlist_history ]]; then
+    argv+=(--playlist-history "$playlist_history")
+  fi
+  if [[ $embed_thumbnail == true ]]; then
+    argv+=(--embed-thumbnail)
+  fi
+  argv+=("$url")
+
+  if [[ ! -x $YTDLP ]]; then
+    printf '%s: vb-util-yt-dlp is not installed\n' "$SELF" >&2
+    exit 1
+  fi
+  exec "$YTDLP" "${argv[@]}"
+fi
+
+if [[ $tool == wget ]]; then
+  if ! command -v wget > /dev/null; then
+    printf '%s: wget is not installed\n' "$SELF" >&2
+    exit 1
+  fi
+else
+  # aria2c needs the torrent metadata before it can name its output. The
+  # .torrent itself is an ordinary file, so that is the supported entry point.
+  if [[ $url == magnet:* ]]; then
+    printf '%s: magnet links are not supported; download the .torrent file and pass it to aria2c\n' \
+      "$SELF" >&2
+    exit 2
+  fi
+  if ! command -v aria2c > /dev/null; then
+    printf '%s: aria2c is not installed\n' "$SELF" >&2
+    exit 1
+  fi
+fi
+
+dest="$DOWNLOAD_DIR"
+if [[ -n $subdir ]]; then
+  dest="$dest/$subdir"
+fi
+if ! mkdir -p "$dest"; then
+  printf '%s: could not create %s\n' "$SELF" "$dest" >&2
+  exit 1
+fi
+
+name=""
+target=""
+url_basename name "$url"
+free_path target "$dest" "$name"
+part="$target.part"
+# aria2c names its output itself, so it must be handed the collision-resolved
+# basename, not the URL's original name: after a collision the final rename
+# looks for "name (1).part" and the transfer wrote "name.part".
+part_name="$(basename -- "$part")"
+
+download_error=""
+download_status=0
+rm -f "$part" "$part.aria2"
+vb::print "$Y" "Downloading..."
+if [[ $tool == wget ]]; then
+  download_error="$(
+    wget -nv --tries=3 --timeout=30 -O "$part" -- "$url" 2>&1 > /dev/null
+  )" || download_status=$?
+else
+  aria_args=(--no-conf --quiet=true --summary-interval=0
+    --console-log-level=warn --max-tries=3 --timeout=30)
+  # aria2c's own multi-connection split. Its SFTP transport is single-stream,
+  # so asking it to split there would only be rejected or silently ignored.
+  if [[ $url != sftp:* ]]; then
+    aria_args+=(--max-connection-per-server=8 --split=8 --min-split-size=1M)
+  fi
+  aria_args+=(--dir="$dest" --out="$part_name" "$url")
+  download_error="$(
+    aria2c "${aria_args[@]}" 2>&1 > /dev/null
+  )" || download_status=$?
+fi
+if ((download_status != 0)); then
+  rm -f "$part" "$part.aria2"
+  if [[ -n $download_error ]]; then
+    printf '%s\n' "$download_error" >&2
+  fi
+  operation::result error "Download failed"
+  exit 1
+fi
+rm -f "$part.aria2"
+
+if [[ ! -f $part ]]; then
+  operation::result error "Download finished but no file was written"
+  exit 1
+fi
+if ! mv -- "$part" "$target"; then
+  rm -f "$part"
+  operation::result error "Download finished but the file could not be moved"
+  exit 1
+fi
+
+title="$name"
+if [[ $name == *.* && ${name##*.} != "" ]]; then
+  title="$(basename -- "$name" ".${name##*.}")"
+fi
+if [[ -z $title ]]; then
+  title="$name"
+fi
+
+size="$(stat -c %s -- "$target" 2>/dev/null || true)"
+if [[ -z $size ]]; then
+  size="?"
+fi
+
+append_history "$title" "$size" "$target" "$url" "$tool"
+
+vb::print "$G" "File has been saved to ${B}${target}${RS}"
+operation::result success

@@ -444,8 +444,12 @@ t_eq "and the box is still the token" "true" "$(qp_get layout.big.heightStillTok
 t_note "fontSize does not change InputField's height: implicitHeight is the bare Ui.inputHeight token (InputField.qml:177) and fontSize only feeds font.pixelSize (261). A 24px type in a 32px box is the intended embedding knob for chat rows, not a bug."
 t_eq "the text starts at the lead inset" "8" "$(qp_get layout.text.x)"
 t_eq "which is the declared inset" "true" "$(qp_get layout.text.xIsLeadInset)"
-t_eq "and its right edge is inside the box" "192" "$(qp_get layout.text.rightEdge)"
+t_eq "and it stops where the clear affordance begins" "176" "$(qp_get layout.text.rightEdge)"
 t_eq "so the chrome never runs under the text" "true" "$(qp_get layout.text.fitsInBox)"
+t_eq "and the control is clipped by its viewport" "true" "$(qp_get layout.text.clipped)"
+t_eq "the idle layout is wide enough for the whole value" "true" "$(qp_get layout.text.idleNoOverflow)"
+t_eq "so the marquee starts at the lead inset too" "8" "$(qp_get layout.text.idleX)"
+t_eq "with the text still inside the box" "true" "$(qp_get layout.text.idleClipped)"
 
 t_section "PasswordBox defaults"
 t_eq "the box is 320 wide" "320" "$(qp_get pw.default.width)"

@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import qs.common
 import "Model.js" as Model
+import "../../../../common/collections/TableSort.js" as TableSort
 
 // Arch updates island: searchable package table for official and AUR
 // updates with macOS-Finder-style checkboxes. Rows are selected with a
@@ -42,7 +43,22 @@ Item {
   // array, and its dependency set is packages+query alone - this array
   // IS the list's stableModel, so a selection change must not hand it a
   // new array (a new stableModel recreates every delegate).
-  readonly property var _liveRows: Model.rowWindow(root.filtered, root._rowWindow)
+  // Sorted, then padded. `sortKey` "" is the service's own order - what the
+  // table showed before its headers were clickable.
+  readonly property var _sorted: root.sortKey === ""
+    ? root.filtered
+    : Model.sortPackages(root.filtered, root.sortKey, root.sortDir)
+  readonly property var _liveRows: Model.rowWindow(root._sorted, root._rowWindow)
+
+  // Header sorting. TableSort owns the click convention - a new column starts
+  // ascending, the sorted one flips - shared with the video downloader table.
+  property string sortKey: ""
+  property string sortDir: "asc"
+
+  function toggleSort(key) {
+    root.sortDir = TableSort.nextDirection(root.sortKey, root.sortDir, key)
+    root.sortKey = key
+  }
   // The table is a placeholder while a fetch or an update is in flight,
   // while the fetch failed, or while there is nothing to show: its rows
   // stand blank under a veil. One switch says so everywhere - the rows'
@@ -448,17 +464,15 @@ Item {
           opacity: 0.5
           transformOrigin: Item.Center
 
-          // A looping animation has no Behavior to disable and `Animation` has
-          // no `enabled` member, so `running` is the gate. With the switch off
-          // the reset below parks the rotation at 0 and the icon is the same
-          // glyph the header shows statically, so the busy state is still
-          // legible - it just stops moving.
+          // The spinner is the busy state, not decoration: it keeps turning
+          // even when global animations are off. A stopped glyph still says
+          // "busy" less clearly than the motion that names a running check.
           RotationAnimation on rotation {
             from: 0
             to: 360
             duration: 1000
             loops: Animation.Infinite
-            running: root.skeleton && MotionPolicy.enabled
+            running: root.skeleton
             onRunningChanged: if (!running) statusIcon.rotation = 0
           }
         }
@@ -700,35 +714,36 @@ Item {
                 height: parent.height
               }
 
-              Title {
-                level: 5
+              SortHeader {
                 width: parent.width - root._rowInner - root.verColW
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Package"
-                elide: Text.ElideNone
-                color: Ui.tint("foreground_1", 0.6)
-                font.pixelSize: Ui.fontXs
-                font.bold: true
+                sortKey: "name"
+                activeKey: root.sortKey
+                onClicked: root.toggleSort("name")
               }
 
-              Title {
-                level: 5
+              SortHeader {
                 width: root.verColW
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Version"
-                elide: Text.ElideNone
-                horizontalAlignment: Text.AlignRight
-                color: Ui.tint("foreground_1", 0.6)
-                font.pixelSize: Ui.fontXs
-                font.bold: true
+                alignRight: true
+                // The column is the new version of a pending update; ordering
+                // a queue of pending updates by it tells nobody anything.
+                sortable: false
               }
             }
 
-            // Click-only: toggles all. No hover effects anywhere in the
-            // table - rows, header and checkboxes alike.
+            // Click-only: the checkbox region toggles all. No hover effects
+            // anywhere in the table - rows, header and checkboxes alike. The
+            // area stops after the checkbox because the column headers own
+            // the rest of the row now that they are clickable.
             MouseArea {
 
-              anchors.fill: parent
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: root._rowInset + root._checkW + root._gap
+              height: parent.height
               onClicked: root.toggleAll()
             }
           }

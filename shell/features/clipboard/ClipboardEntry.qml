@@ -150,9 +150,9 @@ Item {
         height: titleText.implicitHeight
         clip: true
 
-        readonly property bool scrollable: row.pathLike && MotionPolicy.enabled
-          && titleText.implicitWidth > width
         readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
+        readonly property bool scrollable: row.pathLike
+          && Marquee.scrollable(overflow)
         readonly property int legMs: Marquee.legMs(overflow)
         readonly property int startPauseMs: 1200
         readonly property int endpointPauseMs: 400

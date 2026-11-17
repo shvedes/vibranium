@@ -170,6 +170,36 @@ function insertBeforeAnchor(list, anchor, id) {
 // never decides what one renders. `stale` holds ids the registry no longer
 // serves and must be dropped on write; the caller documents why each is
 // stale. Returns the normalized option, or null when `raw` is not an object.
+// A persisted slot id can outlive the module it named. The layout option is
+// the only place a slot id lives, so an upgrade rewrites it once instead of
+// leaving a dead row that no registry slot resolves. `renames` is old -> new;
+// zones and the disabled list are both mapped, and a new id already present
+// wins over its old spelling.
+function renameSlots(raw, renames) {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return raw
+  const map = renames || {}
+  const out = { left: [], center: [], right: [], disabled: [] }
+  const seen = {}
+  for (const zone of ["left", "center", "right"]) {
+    const list = raw[zone]
+    if (!Array.isArray(list)) continue
+    for (const id of list) {
+      if (typeof id !== "string" || id === "") continue
+      const next = map[id] || id
+      if (seen[next] !== undefined) continue
+      seen[next] = true
+      out[zone].push(next)
+    }
+  }
+  const dis = StoreGuards.asList(raw.disabled)
+  for (const id of dis) {
+    if (typeof id !== "string" || id === "") continue
+    const next = map[id] || id
+    if (out.disabled.indexOf(next) < 0) out.disabled.push(next)
+  }
+  return out
+}
+
 function normalizeLayout(raw, zones, isStandalone, isOwned, permanent, alwaysOn, stale, pinned) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null
   const out = { left: [], center: [], right: [], disabled: [] }

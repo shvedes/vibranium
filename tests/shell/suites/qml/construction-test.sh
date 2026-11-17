@@ -357,7 +357,7 @@ supplied.qs.common.LyricsPane=player: null"
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=253
+EXPECTED_DECLARED_COUNT=257
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -378,7 +378,7 @@ EXPECTED_DECLARED_COUNT=253
 # radial gradient, with no singleton and no window behind it.
 # qs.common.HiddenWallpapers is clean for the same reason: a FileView and a
 # JsonAdapter over one state file, with no window and no environment.
-EXPECTED_CLEAN_COUNT=117
+EXPECTED_CLEAN_COUNT=121
 EXPECTED_NEEDS_COUNT=126
 EXPECTED_UNCREATABLE_COUNT=9
 
@@ -427,7 +427,7 @@ CASE_COUNT="$(grep -c '^    \["' "$WORKLIST")"
 
 t_section "the work list comes from the qmldir files, not from a hand-written list"
 
-t_eq "the number of qmldir files" "46" "$QMLDIR_COUNT"
+t_eq "the number of qmldir files" "47" "$QMLDIR_COUNT"
 
 # The declared surface itself, held still. Every count below is measured
 # against a list that moved, so without this the suite would stay green while

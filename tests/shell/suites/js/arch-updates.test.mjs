@@ -15,6 +15,7 @@ import {
 
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const AL = loadLib(path.join(SHELL, 'services/system/ArchUpdatesLib.js'))
+const AM = loadLib(path.join(SHELL, 'features/bar/modules/ArchUpdates/Model.js'))
 
 suite('arch-updates', 'ArchUpdatesLib.parseUpdates')
 
@@ -53,6 +54,32 @@ group('caps and skips', () => {
   const long = 'n'.repeat(200) + ' 1 -> 2'
   eq('an overlong name is capped at 128', AL.parseUpdates(long, 'official')[0].name.length, 128)
   eq('whitespace-only lines are skipped', AL.parseUpdates('   \n\t\n', 'official'), [])
+})
+
+// ---------------------------------------------------------------------------
+section('header sorting')
+
+group('sortPackages', () => {
+  const pkgs = [
+    { name: 'zsh', candidate: '5.9-1', source: 'official' },
+    { name: 'Alacritty', candidate: '0.13.2-1', source: 'official' },
+    { name: 'bat', candidate: '0.24.0-1', source: 'official' },
+  ]
+  eq('name ascending ignores case', AM.sortPackages(pkgs, 'name', 'asc').map(p => p.name),
+    ['Alacritty', 'bat', 'zsh'])
+  eq('name descending', AM.sortPackages(pkgs, 'name', 'desc').map(p => p.name),
+    ['zsh', 'bat', 'Alacritty'])
+  eq('versions read as numbers', AM.sortPackages(pkgs, 'version', 'asc').map(p => p.name),
+    ['Alacritty', 'bat', 'zsh'])
+  eq('versions descending', AM.sortPackages(pkgs, 'version', 'desc').map(p => p.name),
+    ['zsh', 'bat', 'Alacritty'])
+  eq('an unsorted key is the service order', AM.sortPackages(pkgs, '', 'asc').map(p => p.name),
+    ['zsh', 'Alacritty', 'bat'])
+  eq('a package with no version sorts last',
+    AM.sortPackages([{ name: 'a', candidate: '' }, { name: 'b', candidate: '1' }], 'version', 'desc')
+      .map(p => p.name), ['b', 'a'])
+  eq('the input is not mutated', pkgs[0].name, 'zsh')
+  eq('a non-array sorts to nothing', AM.sortPackages(undefined, 'name', 'asc').length, 0)
 })
 
 finish()

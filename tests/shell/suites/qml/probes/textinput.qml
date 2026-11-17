@@ -83,6 +83,15 @@ Window {
   InputField { id: big; y: 200; fontSize: 24 }
   InputField { id: counter; y: 240; counterVisible: true; counterMatched: 3; counterTotal: 7 }
   InputField { id: twin; y: 280; x: 320; placeholder: "Twin" }
+  // Idle-marquee geometry: never focused, so the full-width layout is the one
+  // in play when the suite reads it.
+  InputField {
+    id: marqueeField
+    y: 1800
+    width: 200
+    scrollWhenIdle: true
+    text: "https://www.youtube.com/watch?v=aaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
 
   // The masking surface.
   InputField { id: masked; y: 320; sensitive: true }
@@ -804,13 +813,25 @@ Window {
     kv("layout.big.backToFontM", big.input.font.pixelSize)
     kv("layout.big.heightStillToken", big.implicitHeight === Ui.inputHeight)
 
-    // The text never runs under the chrome.
+    // The text never runs under the chrome: the viewport starts at the lead
+    // inset, ends where the clear affordance begins, and the control rides
+    // inside it. Reported in box coordinates, so the numbers are the contract.
     plain.text = "abcd"
-    kv("layout.text.x", plain.input.x)
-    kv("layout.text.xIsLeadInset", plain.input.x === plain.leadInset)
-    kv("layout.text.rightEdge", plain.input.x + plain.input.width)
-    kv("layout.text.fitsInBox", plain.input.x + plain.input.width <= plain.width)
+    const vp = viewportOf(plain)
+    kv("layout.text.x", vp ? vp.x + plain.input.x : "missing")
+    kv("layout.text.xIsLeadInset", vp ? vp.x + plain.input.x === plain.leadInset : "missing")
+    kv("layout.text.rightEdge", vp ? vp.x + vp.width : "missing")
+    kv("layout.text.fitsInBox", vp ? vp.x + vp.width <= plain.width : "missing")
+    kv("layout.text.clipped", vp ? vp.clip : "missing")
     plain.text = ""
+    // The idle marquee's contract: the control is laid out at the whole value
+    // so it never scrolls its own text, and the viewport does the clipping.
+    const mv = viewportOf(marqueeField)
+    kv("layout.text.idleX", mv ? mv.x + marqueeField.input.x : "missing")
+    kv("layout.text.idleNoOverflow",
+      marqueeField.input.width >= Math.ceil(marqueeField.input.contentWidth))
+    kv("layout.text.idleClipped",
+      mv ? mv.x + mv.width <= marqueeField.width : "missing")
   }
 
   // ---- PasswordBox -----------------------------------------------------
@@ -1247,6 +1268,15 @@ Window {
       const n = kids[i]
       if (!n || n === p.input) continue
       if (n.text !== undefined && n.elide !== undefined && typeof n.wrapMode === "number") return n
+    }
+    return null
+  }
+
+  // The clipping viewport the text control rides in, for the layout contract.
+  function viewportOf(p) {
+    const kids = p.children || []
+    for (let i = 0; i < kids.length; i++) {
+      if (kids[i] && kids[i].objectName === "textViewport") return kids[i]
     }
     return null
   }

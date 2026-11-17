@@ -29,6 +29,7 @@ import qs.features.bar.modules.Tray
 import qs.features.bar.modules.Printers
 import qs.features.bar.modules.NowPlaying
 import qs.features.bar.modules.Workspaces
+import qs.features.bar.modules.Downloader
 import "../../common/math/Range.js" as Range
 import "BarLib.js" as BarLib
 import "../../common/text/UnitIpc.js" as UnitIpc
@@ -132,7 +133,11 @@ Singleton {
   // Single source of truth: shell.statusbar.layout
   // { left, center, right, disabled }. Zones hold every known slot;
   // `disabled` is the dumb on/off list for static slots.
-  readonly property var storedLayout: Settings.statusbarLayout
+  // A slot rename is applied on read as well as written back once, so the
+  // first frame after an upgrade already renders the new id and no boot has
+  // to wait for the migration write.
+  readonly property var storedLayout: BarLib.renameSlots(
+    Settings.statusbarLayout, root._renamedSlotIds)
   // Zones only (all modules, including disabled) - the drag order source.
   // Derived from storedLayout to keep moveSlot math unchanged.
   readonly property var positions: ({
@@ -304,6 +309,10 @@ Singleton {
   // on every write so an upgraded file heals instead of leaking a dead
   // entry. See _normalizeLayout for why an id is on this list.
   readonly property var _staleSlotIds: ["microphone"]
+  // Old persisted slot ids and their current names. The island module was
+  // renamed from VideoDownloader to Downloader; the layout key is the only
+  // thing that still carries the old name in a user's file.
+  readonly property var _renamedSlotIds: ({ videoDownloader: "downloader" })
   // Pinned slots: map of slot id -> zone it is pinned to. Pinned slots are
   // non-rearrangeable (a drag never moves them) and always resolve to the
   // end of their pinned zone, so e.g. the session group stays parked on the
@@ -1006,12 +1015,12 @@ Singleton {
     Registry.register(root.tag, root)
     // Modules render group members through memberComponent; the layout only
     // ever holds standalone slots + group keys.
-    root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, archUpdates: archUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, logout: logoutComp, tray: trayComp }
+    root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, archUpdates: archUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, logout: logoutComp, tray: trayComp, downloader: downloaderComp }
     // Session = tray + logout. Logout is the static anchor on the bar's far
     // corner; the tray sits directly to its left and slides out leftward off
     // it without ever moving logout.
     root._groups = { session: ["tray", "logout"] }
-    root._zones = { workspaces: "left", privacy: "right", clock: "center", weather: "right", keyboardLayout: "right", bluetooth: "right", battery: "right", network: "right", printers: "right", powerProfile: "right", archUpdates: "right", colorPicker: "right", nightLight: "right", nowPlaying: "right", volume: "right", session: "right" }
+    root._zones = { workspaces: "left", privacy: "right", clock: "center", weather: "right", keyboardLayout: "right", bluetooth: "right", battery: "right", network: "right", printers: "right", powerProfile: "right", archUpdates: "right", colorPicker: "right", nightLight: "right", nowPlaying: "right", volume: "right", session: "right", downloader: "right" }
     // Right-zone default order: the keyboard layout indicator, bluetooth,
     // battery and the network module join the zone ahead of the session
     // group, in toggle order - bluetooth and battery slot in directly before
@@ -1019,7 +1028,7 @@ Singleton {
     // live on the overlay, and anchors on `battery` to sit where the shipped
     // default layout puts it: after battery, clear of the pinned session
     // group on the far corner.
-    root._placeBefore = { privacy: "battery", weather: "session", keyboardLayout: "session", bluetooth: "network", battery: "network", network: "volume", printers: "session", powerProfile: "session", archUpdates: "session", colorPicker: "session", nightLight: "session", nowPlaying: "session", volume: "session" }
+    root._placeBefore = { privacy: "battery", weather: "session", keyboardLayout: "session", bluetooth: "network", battery: "network", network: "volume", printers: "session", downloader: "powerProfile", powerProfile: "session", archUpdates: "session", colorPicker: "session", nightLight: "session", nowPlaying: "session", volume: "session" }
     // Empty: every static slot is toggleable today. The map stays because
     // BarLib.normalizeLayout takes it as an input, and it is where a future
     // always-on slot (one the user may not switch off) is declared.
@@ -1076,6 +1085,7 @@ Singleton {
     // touching `disabled`.
     function onReadyChanged() {
       if (Settings.ready) {
+        root._migrateRenamedSlotsOnce()
         root.syncAllModulesFromSettings()
         root._migrateStaleSlotsOnce()
       }
@@ -1086,6 +1096,11 @@ Singleton {
     id: workspacesComp
 
     Workspaces {}
+  }
+  Component {
+    id: downloaderComp
+
+    Downloader {}
   }
   Component {
     id: privacyComp
@@ -1329,6 +1344,17 @@ Singleton {
     return BarLib.normalizeLayout(raw, root.zones,
       id => root._isStandaloneSlot(id), id => root.isOwned(id),
       root._permanent, root._alwaysOnIds, root._staleSlotIds, root._pinned)
+  }
+
+  // Rewrite a layout that still names a slot by its old id. Idempotent: after
+  // the write the raw and mapped objects are equal, so a second boot does
+  // nothing. Runs before the slot heal, which then sees the current names.
+  function _migrateRenamedSlotsOnce() {
+    if (!Settings.ready) return false
+    const raw = Settings.statusbarLayout
+    const next = BarLib.renameSlots(raw, root._renamedSlotIds)
+    if (JSON.stringify(raw) === JSON.stringify(next)) return false
+    return root.setOption("layout", next)
   }
 
   // Heal for the superseded "microphone" slot id: an upgraded file is

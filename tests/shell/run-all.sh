@@ -148,6 +148,9 @@ describe() {
   boot-catalog) printf 'the 47-unit boot catalog against UnitGate rules' ;;
   
   ipptool) printf 'the nine IPP request templates and the parser that reads them' ;;
+  video-downloader-integration) printf 'the downloader data contract: boundaries, fuzz, round trip' ;;
+  video-downloader-cli) printf 'bin/vb-util-yt-dlp end to end against stubs' ;;
+  downloader-cli) printf 'bin/vb-util-download routing, wget and history' ;;
   qmllint) printf 'the reproducible lint baseline and its warning breakdown' ;;
   assets) printf 'every shipped icon is reachable, and every reference resolves' ;;
   hyprland-editor-cli) printf 'the node CLI over the Hyprland config editor' ;;

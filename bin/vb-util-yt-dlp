@@ -10,8 +10,28 @@ Download video/audio using yt-dlp.
 
 Options:
   -i, --info       List available formats for URL and exit
+      --preview    Print title and low-res thumbnail URL for URL and exit
+      --playlist-info URL
+                   List a playlist's entries (playlist, index, title, duration,
+                   url)
   -s, --select     Pick a format interactively with fzf
+  -f, --format ID  Use a specific format ID for the download
+      --subdir NAME
+                   Save into NAME/ below the download directory
+      --subdir-tag NAME
+                   Tag an existing playlist folder with the preset name
+      --playlist-history URL
+                   Record a playlist batch as one folder history row
+      --embed-thumbnail
+                   Embed the video thumbnail as cover art
       --history    List previous downloads and exit
+      --history-delete N
+                   Delete history entry N and exit
+      --history-clear
+                   Delete the whole download history and exit
+      --missing PATH...
+                   Print each PATH that no longer exists and exit
+      --probe      Exit 0 when yt-dlp is installed, 1 when it is not
   -h, --help       Display this help and exit
 EOF
 }
@@ -71,14 +91,14 @@ normalize_url() {
   if [[ $url =~ ^https?:// ]]; then
     scheme="${url%%://*}://"
     url="${url#*://}"
-  elif [[ $url =~ ^([[:alnum:]-]+\.)*(youtube\.com|youtu\.be)/ ]]; then
+  elif [[ $url =~ ^([[:alnum:]-]+\.)*(youtube\.com|youtu\.be|youtube-nocookie\.com)/ ]]; then
     scheme="https://"
   fi
 
   base="${url%%\?*}"
   [[ $url == *\?* ]] && query="${url#*\?}"
 
-  if [[ $base =~ ^([^/]+)/(shorts|live)/([^/?]+) ]]; then
+  if [[ $base =~ ^([^/]+)/(shorts|live|embed|v)/([^/?]+) ]]; then
     base="${BASH_REMATCH[1]}/watch?v=${BASH_REMATCH[3]}"
   elif [[ $base =~ ^youtu\.be/([^/?]+) ]]; then
     base="www.youtube.com/watch?v=${BASH_REMATCH[1]}"
@@ -86,6 +106,8 @@ normalize_url() {
 
   base="${base/#m\.youtube\.com/www.youtube.com}"
   base="${base/#music\.youtube\.com/www.youtube.com}"
+  base="${base/#www\.youtube-nocookie\.com/www.youtube.com}"
+  base="${base/#youtube-nocookie\.com/www.youtube.com}"
   base="${base/#youtube\.com/www.youtube.com}"
 
   if [[ -n $query ]]; then
@@ -118,9 +140,30 @@ normalize_url() {
   fi
 }
 
+# An option that takes a value must not shift past the end of argv: a bare
+# --history-delete used to leave the loop on the same word forever.
+option_requires_value() {
+  printf '%s: option %s needs a value\n' "${0##*/}" "$1" >&2
+  usage >&2
+  exit 2
+}
+
 show_formats=false
+show_preview=false
+playlist_info=false
+playlist_history=false
+playlist_url=""
 select_format=false
 show_history=false
+history_clear=false
+cli_format=""
+subdir=""
+subdir_tag=""
+embed_thumbnail=false
+history_delete_line=""
+history_delete_set=false
+check_missing=false
+check_tool=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -128,12 +171,63 @@ while [[ $# -gt 0 ]]; do
       show_formats=true
       shift
       ;;
+    --preview)
+      show_preview=true
+      shift
+      ;;
+    --playlist-info)
+      playlist_info=true
+      shift
+      ;;
     -s | --select)
       select_format=true
       shift
       ;;
+    -f | --format)
+      (($# >= 2)) || option_requires_value "$1"
+      cli_format="$2"
+      shift 2
+      ;;
     --history)
       show_history=true
+      shift
+      ;;
+    --history-delete)
+      (($# >= 2)) || option_requires_value "$1"
+      history_delete_set=true
+      history_delete_line="$2"
+      shift 2
+      ;;
+    --history-clear)
+      history_clear=true
+      shift
+      ;;
+    --subdir-tag)
+      (($# >= 2)) || option_requires_value "$1"
+      subdir_tag="$2"
+      shift 2
+      ;;
+    --playlist-history)
+      (($# >= 2)) || option_requires_value "$1"
+      playlist_history=true
+      playlist_url="$2"
+      shift 2
+      ;;
+    --subdir)
+      (($# >= 2)) || option_requires_value "$1"
+      subdir="$2"
+      shift 2
+      ;;
+    --embed-thumbnail)
+      embed_thumbnail=true
+      shift
+      ;;
+    --missing)
+      check_missing=true
+      shift
+      ;;
+    --probe)
+      check_tool=true
       shift
       ;;
     -h | --help)
@@ -149,6 +243,136 @@ done
 source vb-lib-core
 
 HISTORY_FILE="$VIBRANIUM_STATE/vb-util-yt-dlp.history"
+# Folder tags and the per-entry index are bookkeeping, not the download folder.
+# Keeping them here leaves the playlist itself with nothing but media files.
+FOLDERS_FILE="$VIBRANIUM_STATE/vb-util-yt-dlp.folders"
+ENTRIES_FILE="$VIBRANIUM_STATE/vb-util-yt-dlp.entries"
+
+# History is TSV and a title or path may legally contain a tab or a newline.
+# The writer escapes those - and the escape itself - so one download stays one
+# row; DownloadsLib.js parses the same vocabulary on the shell side.
+tsv_escape() {
+  local -n _tsv_out=$1
+  local _tsv_text="$2"
+  _tsv_text="${_tsv_text//\\/\\\\}"
+  _tsv_text="${_tsv_text//$'\t'/\\t}"
+  _tsv_text="${_tsv_text//$'\n'/\\n}"
+  _tsv_text="${_tsv_text//$'\r'/\\r}"
+  _tsv_out="$_tsv_text"
+}
+
+tsv_unescape() {
+  local -n _tsv_out=$1
+  local _tsv_text="$2" _tsv_res="" _tsv_i _tsv_c _tsv_n
+  for ((_tsv_i = 0; _tsv_i < ${#_tsv_text}; _tsv_i++)); do
+    _tsv_c="${_tsv_text:_tsv_i:1}"
+    if [[ $_tsv_c != '\' ]]; then
+      _tsv_res+="$_tsv_c"
+      continue
+    fi
+    _tsv_n="${_tsv_text:_tsv_i+1:1}"
+    case "$_tsv_n" in
+      t) _tsv_res+=$'\t'; _tsv_i=$((_tsv_i + 1)) ;;
+      n) _tsv_res+=$'\n'; _tsv_i=$((_tsv_i + 1)) ;;
+      r) _tsv_res+=$'\r'; _tsv_i=$((_tsv_i + 1)) ;;
+      '\') _tsv_res+='\'; _tsv_i=$((_tsv_i + 1)) ;;
+      *) _tsv_res+='\' ;;
+    esac
+  done
+  _tsv_out="$_tsv_res"
+}
+
+# The folder tag used to live in a hidden .vb-util-yt-dlp.preset file inside
+# the download. It belongs in state: a playlist folder should hold the media
+# and nothing the downloader needs to remember.
+folder_tag_read() {
+  local dir="$1" escaped path tag found=""
+
+  tsv_escape escaped "$dir"
+  [[ -f $FOLDERS_FILE ]] || { printf '%s' ""; return 0; }
+  while IFS=$'\t' read -r path tag; do
+    if [[ $path == "$escaped" ]]; then
+      tsv_unescape found "$tag"
+    fi
+  done < "$FOLDERS_FILE"
+  printf '%s' "$found"
+}
+
+folder_tag_write() {
+  local dir="$1" tag="$2" escaped escaped_tag tmp
+
+  tsv_escape escaped "$dir"
+  tsv_escape escaped_tag "$tag"
+  mkdir -p "${FOLDERS_FILE%/*}"
+  tmp="$(mktemp)" || return 1
+  if [[ -f $FOLDERS_FILE ]]; then
+    awk -F'\t' -v p="$escaped" 'NF < 2 || $1 != p' "$FOLDERS_FILE" > "$tmp" \
+      || { rm -f "$tmp"; return 1; }
+  fi
+  printf '%s\t%s\n' "$escaped" "$escaped_tag" >> "$tmp"
+  mv -- "$tmp" "$FOLDERS_FILE"
+}
+
+# A playlist row's size is the whole folder, not the one file that just landed.
+# The find/awk pair sums file bytes and leaves directory entries out of it.
+folder_size() {
+  local dir="$1"
+
+  find "$dir" -type f -printf '%s\n' 2> /dev/null \
+    | awk '{ total += $1 } END { printf "%.0f", total }'
+}
+
+# The group row is upserted by folder, so every finished entry updates the one
+# row for the batch instead of appending another file row.
+record_playlist_history() {
+  local title="$1" dir="$2" url="$3" tag="$4" size format tmp
+  local h_title h_path h_url
+
+  [[ -n $title ]] || title="${dir##*/}"
+  [[ -n $title ]] || title="Playlist"
+  size="$(folder_size "$dir")"
+  [[ -n $size ]] || size="?"
+  format="playlist"
+  [[ -n $tag ]] && format+=":$tag"
+
+  tsv_escape h_title "$title"
+  tsv_escape h_path "$dir"
+  tsv_escape h_url "$url"
+  mkdir -p "${HISTORY_FILE%/*}"
+  tmp="$(mktemp)" || return 1
+  if [[ -f $HISTORY_FILE ]]; then
+    awk -F'\t' -v p="$h_path" '
+      NF < 6 { print; next }
+      $4 == p && ($6 == "playlist" || index($6, "playlist:") == 1) { next }
+      { print }
+    ' "$HISTORY_FILE" > "$tmp" \
+      || { rm -f "$tmp"; return 1; }
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$(date '+%F %T')" "$h_title" "$size" "$h_path" "$h_url" "$format" \
+    >> "$tmp"
+  mv -- "$tmp" "$HISTORY_FILE"
+}
+
+# The history row is one row, but the island still needs to know which entry
+# files are already held. This sidecar is that index, keyed by folder and URL.
+record_playlist_entry() {
+  local dir="$1" url="$2" path="$3" escaped_dir escaped_url escaped_path tmp
+
+  tsv_escape escaped_dir "$dir"
+  tsv_escape escaped_url "$url"
+  tsv_escape escaped_path "$path"
+  mkdir -p "${ENTRIES_FILE%/*}"
+  tmp="$(mktemp)" || return 1
+  if [[ -f $ENTRIES_FILE ]]; then
+    awk -F'\t' -v d="$escaped_dir" -v u="$escaped_url" \
+      'NF < 3 || $1 != d || $2 != u' "$ENTRIES_FILE" > "$tmp" \
+      || { rm -f "$tmp"; return 1; }
+  fi
+  printf '%s\t%s\t%s\n' "$escaped_dir" "$escaped_url" "$escaped_path" \
+    >> "$tmp"
+  mv -- "$tmp" "$ENTRIES_FILE"
+}
 
 display_history() {
   local line timestamp title size path url
@@ -159,19 +383,144 @@ display_history() {
   fi
 
   while IFS=$'\t' read -r timestamp title size path url; do
+    tsv_unescape title "$title"
+    tsv_unescape path "$path"
     printf '%s  |  %-10s  |  %s\n' "$timestamp" "${size:-?}" "$title"
     printf '   %s\n' "$path"
   done < "$HISTORY_FILE"
 }
+
+# The island shows one row per entry and needs to drop one; the numbering it
+# uses is the display numbering, so blank lines do not count. The rewrite is a
+# temp file moved into place, so a failed write never truncates the history.
+delete_history_line() {
+  local line="$1" tmp entries_tmp playlist_path playlist_format line_info
+
+  if [[ ! $line =~ ^[0-9]+$ ]] || ((line < 1)); then
+    vb::print "$R" "Not a history entry: ${line:-<empty>}"
+    return 1
+  fi
+  if [[ ! -f $HISTORY_FILE ]]; then
+    vb::print "$R" "No download history yet"
+    return 1
+  fi
+
+  tmp="$(mktemp)" || return 1
+  # The numbering is the island's: it parses history rows, so a blank line or
+  # a short malformed line is not a row and must not shift the count. Such a
+  # line stays in the file untouched.
+  if ! awk -F'\t' -v drop="$line" '
+    {
+      if ($0 ~ /^[[:space:]]*$/) { print; next }
+      if (NF < 4) { print; next }
+      n++
+      if (n != drop) print
+    }' "$HISTORY_FILE" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  line_info="$(awk -F'\t' -v drop="$line" '
+    {
+      if ($0 ~ /^[[:space:]]*$/) next
+      if (NF < 4) next
+      n++
+      if (n == drop) { print $4 "\t" $6; exit }
+    }' "$HISTORY_FILE")"
+  IFS=$'\t' read -r playlist_path playlist_format <<< "$line_info"
+  mv "$tmp" "$HISTORY_FILE"
+
+  # Deleting the batch's one row also drops its held-entry index. The folder
+  # itself stays, exactly as deleting a file row never touches the file.
+  if [[ ($playlist_format == playlist || $playlist_format == playlist:*) \
+    && -n $playlist_path && -f $ENTRIES_FILE ]]; then
+    entries_tmp="$(mktemp)" || return 1
+    if ! awk -F'\t' -v p="$playlist_path" 'NF < 3 || $1 != p' \
+      "$ENTRIES_FILE" > "$entries_tmp"; then
+      rm -f "$entries_tmp"
+      return 1
+    fi
+    mv "$entries_tmp" "$ENTRIES_FILE"
+  fi
+}
+
+if [[ $history_clear == true ]]; then
+  # The island's Clear in the Recent table: the history is one append-only
+  # file and this empties it, so every entry is gone at once. A fresh state
+  # root has no directory yet; creating it is part of owning the file.
+  mkdir -p "${HISTORY_FILE%/*}"
+  : > "$HISTORY_FILE"
+  : > "$ENTRIES_FILE"
+  exit 0
+fi
+
+if [[ $history_delete_set == true ]]; then
+  delete_history_line "$history_delete_line" || exit 1
+  exit 0
+fi
 
 if [[ $show_history == true ]]; then
   display_history
   exit 0
 fi
 
+# The island asks whether the tool this wrapper drives is on PATH before it
+# offers a download UI. Exit 0 when it is there, 1 when it is not; nothing is
+# printed either way.
+if [[ $check_tool == true ]]; then
+  command -v yt-dlp > /dev/null || exit 1
+  exit 0
+fi
+
+# The Recent table in the island asks whether the files its entries name are
+# still there. Paths are arguments, never a script body, so nothing here needs
+# quoting, and an entry whose file moved is simply printed.
+if [[ $check_missing == true ]]; then
+  for _missing_path in "$@"; do
+    [[ -e $_missing_path ]] || printf '%s\n' "$_missing_path"
+  done
+  exit 0
+fi
+
 URL="${1:-}"
+if [[ $playlist_history == true && -z ${subdir:-} ]]; then
+  printf '%s: --playlist-history needs --subdir\n' "${0##*/}" >&2
+  exit 2
+fi
 OUTPUT_DIR="$XDG_DOWNLOAD_DIR"
-FORMAT_SELECTOR="bestvideo+bestaudio/best"
+if [[ -n ${subdir:-} ]]; then
+  # A playlist is a collection, so it lands in a folder of its own. The shell
+  # names the folder; the wrapper does the join and creates it.
+  playlist_dir="$OUTPUT_DIR/$subdir"
+  # The same playlist at another quality is another copy, not a merge: once
+  # the plain folder exists, the preset goes into the name. The first run
+  # keeps the bare name, every later preset gets its own folder, and a rerun
+  # of a preset reuses that folder. The marker is what tells a rerun from a
+  # different preset - the bare name alone cannot.
+  if [[ -d $playlist_dir && -n ${subdir_tag:-} ]]; then
+    recorded_preset="$(folder_tag_read "$playlist_dir")"
+    legacy_preset="$playlist_dir/.vb-util-yt-dlp.preset"
+    if [[ -f $legacy_preset ]]; then
+      if [[ -z $recorded_preset ]]; then
+        IFS= read -r recorded_preset < "$legacy_preset"
+        [[ -n $recorded_preset ]] \
+          && folder_tag_write "$playlist_dir" "$recorded_preset"
+      fi
+      rm -f "$legacy_preset"
+    fi
+    if [[ $recorded_preset != "$subdir_tag" ]]; then
+      playlist_dir="$playlist_dir ($subdir_tag)"
+    fi
+  fi
+  OUTPUT_DIR="$playlist_dir"
+  mkdir -p "$OUTPUT_DIR"
+  if [[ -n ${subdir_tag:-} ]]; then
+    folder_tag_write "$OUTPUT_DIR" "$subdir_tag"
+    # Old versions left this marker here. Migrate and clean it even when the
+    # selected folder is the suffixed one.
+    rm -f "$OUTPUT_DIR/.vb-util-yt-dlp.preset"
+  fi
+fi
+FORMAT_SELECTOR="${cli_format:-bestvideo+bestaudio/best}"
 
 if [[ -z $URL ]]; then
   term::show_header
@@ -241,6 +590,47 @@ list_formats() {
   rm -f "$fmt_file"
 }
 
+if [[ $show_preview == true ]]; then
+  preview_info="$(yt-dlp --simulate --ignore-config \
+    --extractor-args "youtube:player_client=visionos" \
+    --print '%(id)s' --print '%(title)s' "$URL" 2> /dev/null)" || {
+    operation::result error "Could not load preview"
+    exit 1
+  }
+
+  preview_lines=()
+  while IFS= read -r line || [[ -n $line ]]; do
+    preview_lines+=("$line")
+  done <<< "$preview_info"
+
+  preview_id="${preview_lines[0]:-}"
+  preview_title="${preview_lines[1]:-}"
+  preview_thumb=""
+  if [[ $preview_id =~ ^[A-Za-z0-9_-]{11}$ ]]; then
+    preview_thumb="https://i.ytimg.com/vi/$preview_id/mqdefault.jpg"
+  fi
+
+  printf '%s\n%s\n' "$preview_title" "$preview_thumb"
+  exit 0
+fi
+
+# A playlist link is listed entry by entry instead of downloaded as one
+# video. The five fields are tab separated and the playlist's own name leads
+# each line, because a watch link that carries `list=` still extracts one
+# video: the first entry's title is not the playlist's. The duration is "NA"
+# when the flat listing does not know it, which the island reads as a cell
+# with no value.
+if [[ $playlist_info == true ]]; then
+  if ! yt-dlp --flat-playlist --ignore-config \
+    --extractor-args "youtube:player_client=visionos" \
+    --print $'%(playlist_title)s\t%(playlist_index)s\t%(title)s\t%(duration_string)s\t%(url)s' \
+    "$URL" 2> /dev/null; then
+    operation::result error "Could not list the playlist"
+    exit 1
+  fi
+  exit 0
+fi
+
 if [[ $show_formats == true || $select_format == true ]]; then
   if ! list_formats "$URL"; then
     operation::result error "Could not list formats"
@@ -264,7 +654,13 @@ if [[ $show_formats == true || $select_format == true ]]; then
     exit 1
   }
   read -r format_id _ <<< "$chosen"
-  FORMAT_SELECTOR="$format_id"
+  # A video-only row carries no sound: ask for the best audio with it, and keep
+  # the row itself as the fallback for videos that have no separate track.
+  if [[ $chosen == *'video only'* ]]; then
+    FORMAT_SELECTOR="$format_id+bestaudio/$format_id"
+  else
+    FORMAT_SELECTOR="$format_id"
+  fi
 fi
 
 # yt-dlp writes the final path and metadata to side-channel mktemps. INT
@@ -305,12 +701,21 @@ ytdlp_args=(
   --playlist-end 1
   --embed-metadata
   --embed-subs
+  # Live chat is a subtitle stream to yt-dlp, and embedding subs downloads it
+  # like one - leaving a `.live_chat.json` beside the video. It cannot be
+  # embedded into an mp4 and nobody asked for it, so it is excluded.
+  --sub-langs "all,-live_chat"
   --ignore-config
   -P "$OUTPUT_DIR"
   --print-to-file "after_move:filepath" "$DL_PATH_FILE"
   --print-to-file "title" "$DL_TITLE_FILE"
   --print-to-file "filesize_approx" "$DL_SIZE_FILE"
 )
+# Cover art is opt-in: metadata is always embedded, but converting and
+# attaching a thumbnail is extra work that only the audio capture asks for.
+if [[ $embed_thumbnail == true ]]; then
+  ytdlp_args+=(--embed-thumbnail --convert-thumbnails jpg)
+fi
 output_template='%(title)s.%(ext)s'
 last_error=""
 
@@ -412,10 +817,32 @@ IFS= read -r DL_TITLE < "$DL_TITLE_FILE" || [[ -n $DL_TITLE ]]
 DL_SIZE=""
 IFS= read -r DL_SIZE < "$DL_SIZE_FILE" || [[ -n $DL_SIZE ]]
 
-mkdir -p "${HISTORY_FILE%/*}"
-printf '%s\t%s\t%s\t%s\t%s\n' \
-  "$(date '+%F %T')" "$DL_TITLE" "${DL_SIZE:-?}" "$DL_FILE" "$URL" \
-  >> "$HISTORY_FILE"
+if [[ $playlist_history == true ]]; then
+  # A batch is one thing in Recent: its folder, its folder size and the
+  # playlist URL. The per-entry index keeps the held-entry ticks alive without
+  # putting those rows back in the history.
+  record_playlist_history "${subdir:-}" "$OUTPUT_DIR" "${playlist_url:-$URL}" \
+    "${subdir_tag:-}"
+  record_playlist_entry "$OUTPUT_DIR" "$URL" "$DL_FILE"
+  rm -f "$OUTPUT_DIR/.vb-util-yt-dlp.preset"
+else
+  # Six columns: the format selector is what lets the shell mark a format as
+  # already downloaded on a re-fetch (it may name a merge, "137+bestaudio/137",
+  # which the shell reads back down to the row id). Older lines simply have five
+  # fields.
+  mkdir -p "${HISTORY_FILE%/*}"
+  history_title=""
+  history_path=""
+  history_url=""
+  history_format=""
+  tsv_escape history_title "$DL_TITLE"
+  tsv_escape history_path "$DL_FILE"
+  tsv_escape history_url "$URL"
+  tsv_escape history_format "$FORMAT_SELECTOR"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$(date '+%F %T')" "$history_title" "${DL_SIZE:-?}" "$history_path" \
+    "$history_url" "$history_format" >> "$HISTORY_FILE"
+fi
 
 # The encoder does not normalize its input. An absolute path yields an empty
 # file:// authority; a relative path would be parsed as a host instead.

@@ -136,7 +136,10 @@ Item {
         z: 1
         color: "transparent"
         border.width: root._focused ? 1 : 0
-        border.color: Ui.tint("accent", 0.9)
+        // The ring belongs to the button, not to the theme: a red Cancel with
+        // an accent-green focus ring reads as another control's border.
+        border.color: root.variant === "primary"
+          ? Qt.lighter(root.accentColor, 1.35) : Ui.tint("accent", 0.9)
 
         Behavior on border.color {
           enabled: root.animationsEnabled

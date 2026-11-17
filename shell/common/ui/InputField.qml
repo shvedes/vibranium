@@ -8,6 +8,7 @@ import QtQuick
 import QtQuick.Controls as Ctl
 import qs.common
 import "../text/EditUtils.js" as EditUtils
+import "../motion/Marquee.js" as Marquee
 
 // Single-line text field: bordered box, placeholder, built-in clear
 // affordance, an opt-in password reveal eye plus optional launcher-style
@@ -50,6 +51,17 @@ Rectangle {
   // Clear affordance on the right; embedders with tight space turn it
   // off and regain symmetric text insets.
   property bool clearable: true
+  // Space the text keeps from the clear affordance. The affordance itself
+  // sits Ui.s from the box edge, so the default lands its glyph flush on the
+  // text; a caller that wants the xmark breathing on both sides widens this
+  // (the downloader's URL field passes 2 * Ui.s, which leaves the glyph the
+  // same distance from the link and from the border).
+  property real clearGap: Ui.s
+  // A value that does not fit scrolls back and forth while the field is
+  // unfocused and under the pointer - the marquee the island titles use.
+  // Focusing the field puts the view back at the start of the text, where the
+  // caret lives; leaving it stops the slide.
+  property bool scrollWhenIdle: false
   // The glyph the clear affordance wears. Empty (default) keeps the
   // crossed bars this primitive has always drawn; a name paints the
   // shipped icon instead - the color picker's code field wears an
@@ -141,6 +153,10 @@ Rectangle {
   signal escaped()
   signal prefixEntered(string prefix, string payload)
   signal backspaceEmpty()
+  // The clear affordance was pressed. Distinct from edited(""): a consumer
+  // that owns more than the text - a card reset, say - listens here, while
+  // ordinary erasing keeps its plain meaning.
+  signal cleared()
   // Delete/Ctrl-D while `deleteKeys` is on, taken ahead of text editing.
   signal deleteRequested()
 
@@ -242,6 +258,9 @@ Rectangle {
 
   implicitWidth: 200
   implicitHeight: Ui.inputHeight
+  // The idle marquee slides the text control past the field's own left edge;
+  // without clipping here the glyph run paints across the card behind it.
+  clip: true
   radius: RoundingPolicy.radius
   color: Theme.color("background_1")
   border.width: 1
@@ -266,6 +285,13 @@ Rectangle {
     onTapped: root.grabFocus()
   }
 
+  // The idle slide is pointer-driven, not ambient: a long URL stays put until
+  // the pointer is actually over the field.
+  HoverHandler {
+    id: fieldHover
+    cursorShape: Qt.IBeamCursor
+  }
+
   // Insets the text yields to the chip (left) and counter/clear/eye (right).
   // Chip and text Glide together so the caret never overlaps the traveling chip.
   readonly property real leadInset: root.effectiveChipActive ? Ui.s + chip.width + Ui.s : root.basePadding
@@ -276,9 +302,65 @@ Rectangle {
   // slot stays reserved beside it.
   readonly property real eyeSlot: root.revealable ? eyeButton.width + Ui.s : 0
   readonly property real clearSlot: root.clearable && !root.counterVisible && input.text !== ""
-    ? clearButton.width + Ui.s : 0
+    ? clearButton.width + root.clearGap : 0
   readonly property real rightInset: root.counterVisible ? counterRow.width + Ui.s + eyeSlot
     : Math.max(root.basePadding, root.clearSlot + eyeSlot)
+
+  // The text's full width at the field's own type size, independent of the
+  // control's current width: the idle scroll needs to know how much is cut
+  // off without asking the item it is moving.
+  TextMetrics {
+    id: idleMetrics
+
+    font.pixelSize: root.fontSize
+    font.family: Ui.fontFamily
+    text: input.text
+  }
+
+  // How far the idle marquee has slid the text. The control's x and width
+  // move together, so its right edge stays put and the clipped tail never
+  // runs under the clear affordance.
+  property real _idleScroll: 0
+  readonly property real idleOverflow: {
+    if (!root.scrollWhenIdle || input.activeFocus || !fieldHover.hovered) return 0
+    const avail = root.width - root.leadInset - root.rightInset
+    return Math.max(0, idleMetrics.width - avail)
+  }
+
+  onActiveFocusChanged: root._idleScroll = 0
+  onIdleOverflowChanged: root._idleScroll = 0
+
+  SequentialAnimation {
+    id: idleScroll
+
+    // The field's idle scroll is how a URL longer than the box is read at
+    // all; like the title marquees it follows overflow, not the motion theme.
+    running: root.idleOverflow > 0
+    loops: Animation.Infinite
+    NumberAnimation {
+      target: root
+      property: "_idleScroll"
+      from: 0
+      to: root.idleOverflow
+      duration: Marquee.legMs(root.idleOverflow)
+      easing.type: Easing.InOutSine
+    }
+    PauseAnimation { duration: 400 }
+    // Back the way it came: the tail is on screen at the end of the outward
+    // leg, so the return leg starts where that leg ended. Starting from
+    // -overflow instead slid the head past the left inset and left a blank
+    // band, which read as the text jumping across the field.
+    NumberAnimation {
+      target: root
+      property: "_idleScroll"
+      from: root.idleOverflow
+      to: 0
+      duration: Marquee.legMs(root.idleOverflow)
+      easing.type: Easing.InOutSine
+    }
+    PauseAnimation { duration: 400 }
+    onStopped: root._idleScroll = 0
+  }
 
   // Mode chip - launcher-style, rendered by the shared ui/Chip component.
   Chip {
@@ -343,131 +425,163 @@ Rectangle {
     }
   }
 
-  Ctl.TextField {
-    id: input
+  // The text is its own clipped viewport. The native control scrolls its text
+  // to the caret whenever the value overflows and holds that offset, so a
+  // marquee that moved the control moved nothing: the head stayed cut and the
+  // slide never reached the paint. Inside this viewport the control is either
+  // laid out at the full text width (idle, sliding) or at the viewport width
+  // (focused, where its own caret scrolling belongs).
+  Item {
+    id: textViewport
+    objectName: "textViewport"
 
     x: root.leadInset
-    width: parent.width - root.leadInset - root.rightInset
-    // The box above is the chrome: the style's own background and its
-    // padding would draw a second field inside this one. The control keeps
-    // everything that is not paint.
-    background: null
-    padding: 0
-    leftPadding: 0
-    rightPadding: 0
-    topPadding: 0
-    bottomPadding: 0
-    // Revealed unmasks whatever masked mode the field carries; while
-    // masked, the ligature freeze below keeps the echo glyphs stable.
-    echoMode: root.revealed && root.revealable ? TextInput.Normal
-      : (root.sensitive ? TextInput.Password : root.echoMode)
-    passwordCharacter: root.passwordCharacter
-    inputMethodHints: root.sensitive ? Qt.ImhSensitiveData : Qt.ImhNone
-    // The ghost is shell-painted (ghostBox above owns the placeholder
-    // paint): Qt's own placeholder item can only snap, so it stays
-    // blank and the overlay cross-slidefades placeholder flips on the
-    // shell's terms. The empty-text / no-preedit / ghostWhileFocused
-    // show rule lives in root._ghostShown; the hint color below is a shell
-    // token, because the native placeholder item never paints.
-    placeholderText: ""
-    // Masked echo must never shape: the shell follows the system font,
-    // often a programming face whose `calt` substitutes asterisk runs
-    // (the middle star of `***` jumps to a raised alternate and back as
-    // the run grows). Masked text has no legitimate ligatures, so freeze
-    // the echo glyphs exactly as designed. Search fields keep defaults.
-    font.features: input.echoMode === TextInput.Password
-      ? ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 }) : ({})
+    width: Math.max(0, parent.width - root.leadInset - root.rightInset)
     height: parent.height
-    verticalAlignment: TextInput.AlignVCenter
     clip: true
-    color: Theme.color("foreground_0")
-    selectionColor: Theme.color("accent")
-    selectedTextColor: Theme.color("background_0")
-    font.pixelSize: root.fontSize
-    font.family: Ui.fontFamily
 
-    Behavior on x { Glide {} }
-    Behavior on width { Glide {} }
+    Ctl.TextField {
+      id: input
 
-    // The text field riding its own insets, per frame. Both edges move on the
-    // same curve so the caret never overlaps the traveling chip, and this is
-    // where that claim is checkable.
+      // The idle marquee lays the control out at the text's own width and slides
+      // it inside the viewport, so the only offset in play is ours: an
+      // overflowing control would scroll its own text to the caret and cancel
+      // the slide. Focus hands the geometry back to the control, which then
+      // keeps the caret in view itself while the value is being edited.
+      readonly property bool marqueeLay: root.scrollWhenIdle && !input.activeFocus
+      x: input.marqueeLay ? -root._idleScroll : 0
+      width: input.marqueeLay
+        ? Math.max(textViewport.width, Math.ceil(input.contentWidth))
+        : textViewport.width
+      // The box above is the chrome: the style's own background and its
+      // padding would draw a second field inside this one. The control keeps
+      // everything that is not paint.
+      background: null
+      padding: 0
+      leftPadding: 0
+      rightPadding: 0
+      topPadding: 0
+      bottomPadding: 0
+      // Revealed unmasks whatever masked mode the field carries; while
+      // masked, the ligature freeze below keeps the echo glyphs stable.
+      echoMode: root.revealed && root.revealable ? TextInput.Normal
+        : (root.sensitive ? TextInput.Password : root.echoMode)
+      passwordCharacter: root.passwordCharacter
+      inputMethodHints: root.sensitive ? Qt.ImhSensitiveData : Qt.ImhNone
+      // The ghost is shell-painted (ghostBox above owns the placeholder
+      // paint): Qt's own placeholder item can only snap, so it stays
+      // blank and the overlay cross-slidefades placeholder flips on the
+      // shell's terms. The empty-text / no-preedit / ghostWhileFocused
+      // show rule lives in root._ghostShown; the hint color below is a shell
+      // token, because the native placeholder item never paints.
+      placeholderText: ""
+      // Masked echo must never shape: the shell follows the system font,
+      // often a programming face whose `calt` substitutes asterisk runs
+      // (the middle star of `***` jumps to a raised alternate and back as
+      // the run grows). Masked text has no legitimate ligatures, so freeze
+      // the echo glyphs exactly as designed. Search fields keep defaults.
+      font.features: input.echoMode === TextInput.Password
+        ? ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 }) : ({})
+      height: parent.height
+      verticalAlignment: TextInput.AlignVCenter
+      clip: true
+      color: Theme.color("foreground_0")
+      selectionColor: Theme.color("accent")
+      selectedTextColor: Theme.color("background_0")
+      font.pixelSize: root.fontSize
+      font.family: Ui.fontFamily
 
-    Keys.onEscapePressed: event => {
-      event.accepted = true
-      root.escaped()
-    }
+      // The insets glide as chips and counters come and go; the idle marquee
+      // moves the control every frame and must not be eased twice.
+      Behavior on x {
+        enabled: MotionPolicy.enabled && root._idleScroll === 0
+        Glide {}
+      }
+      Behavior on width {
+        enabled: MotionPolicy.enabled && root._idleScroll === 0
+        Glide {}
+      }
 
-    // BeforeItem: the native control accepts Delete/Ctrl-D as editing keys and
-    // would keep the destructive-key branch from ever seeing them.
-    Keys.priority: Keys.BeforeItem
-    Keys.onPressed: event => {
-      if (root.forwardNavigation) {
-        const plain = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier
-          | Qt.MetaModifier | Qt.ShiftModifier)) === 0
-        if (event.key === Qt.Key_Backtab
-            || (plain && (event.key === Qt.Key_Tab
-              || event.key === Qt.Key_Up || event.key === Qt.Key_Down))) {
-          event.accepted = true
-          root.navigationRequested(event.key, event.modifiers)
-          return
-        }
-      }
-      if (event.matches(StandardKey.SelectAll)) {
-        input.selectAll()
+      // The text field riding its own insets, per frame. Both edges move on the
+      // same curve so the caret never overlaps the traveling chip, and this is
+      // where that claim is checkable.
+
+      Keys.onEscapePressed: event => {
         event.accepted = true
-        return
+        root.escaped()
       }
-      const ctrl = event.modifiers & Qt.ControlModifier
-      const alt = event.modifiers & Qt.AltModifier
-      if (root.deleteKeys && ((event.key === Qt.Key_D && ctrl) || event.key === Qt.Key_Delete)) {
-        event.accepted = true
-        root.deleteRequested()
-        return
-      }
-      if (event.key === Qt.Key_W && ctrl && root.emacsKeys) {
-        if (root.eraseWord()) event.accepted = true
-        return
-      }
-      if (event.key === Qt.Key_H && ctrl && root.revealable) {
-        root.toggleReveal()
-        event.accepted = true
-        return
-      }
-      if (event.key === Qt.Key_F && alt && root.emacsKeys) {
-        root.wordForward()
-        event.accepted = true
-        return
-      }
-      if (event.key === Qt.Key_B && alt && root.emacsKeys) {
-        root.wordBackward()
-        event.accepted = true
-        return
-      }
-      if (!root.chipActive && root.prefixes.length > 0 && event.text.length === 1) {
-        const pref = root.prefixes
-        for (let i = 0; i < pref.length; i++) {
-          if (event.text === pref[i]) {
+
+      // BeforeItem: the native control accepts Delete/Ctrl-D as editing keys and
+      // would keep the destructive-key branch from ever seeing them.
+      Keys.priority: Keys.BeforeItem
+      Keys.onPressed: event => {
+        if (root.forwardNavigation) {
+          const plain = (event.modifiers & (Qt.ControlModifier | Qt.AltModifier
+            | Qt.MetaModifier | Qt.ShiftModifier)) === 0
+          if (event.key === Qt.Key_Backtab
+              || (plain && (event.key === Qt.Key_Tab
+                || event.key === Qt.Key_Up || event.key === Qt.Key_Down))) {
             event.accepted = true
-            root.prefixEntered(pref[i], text)
+            root.navigationRequested(event.key, event.modifiers)
             return
           }
         }
+        if (event.matches(StandardKey.SelectAll)) {
+          input.selectAll()
+          event.accepted = true
+          return
+        }
+        const ctrl = event.modifiers & Qt.ControlModifier
+        const alt = event.modifiers & Qt.AltModifier
+        if (root.deleteKeys && ((event.key === Qt.Key_D && ctrl) || event.key === Qt.Key_Delete)) {
+          event.accepted = true
+          root.deleteRequested()
+          return
+        }
+        if (event.key === Qt.Key_W && ctrl && root.emacsKeys) {
+          if (root.eraseWord()) event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_H && ctrl && root.revealable) {
+          root.toggleReveal()
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_F && alt && root.emacsKeys) {
+          root.wordForward()
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_B && alt && root.emacsKeys) {
+          root.wordBackward()
+          event.accepted = true
+          return
+        }
+        if (!root.chipActive && root.prefixes.length > 0 && event.text.length === 1) {
+          const pref = root.prefixes
+          for (let i = 0; i < pref.length; i++) {
+            if (event.text === pref[i]) {
+              event.accepted = true
+              root.prefixEntered(pref[i], text)
+              return
+            }
+          }
+        }
+        // In-mode echo guard (see activePrefix): swallow the repeat.
+        if (root.chipActive && root.activePrefix !== "" && text === ""
+          && event.text.length === 1 && event.text === root.activePrefix) {
+          event.accepted = true
+          return
+        }
+        if (event.key === Qt.Key_Backspace && text === "") {
+          event.accepted = true
+          root.backspaceEmpty()
+        }
       }
-      // In-mode echo guard (see activePrefix): swallow the repeat.
-      if (root.chipActive && root.activePrefix !== "" && text === ""
-        && event.text.length === 1 && event.text === root.activePrefix) {
-        event.accepted = true
-        return
-      }
-      if (event.key === Qt.Key_Backspace && text === "") {
-        event.accepted = true
-        root.backspaceEmpty()
-      }
-    }
 
-    onAccepted: root.accepted(text)
-    onTextEdited: root.type(input.text)
+      onAccepted: root.accepted(text)
+      onTextEdited: root.type(input.text)
+    }
   }
 
   // Matched/total counter - bare text ahead of the clear affordance slot.
@@ -518,6 +632,7 @@ Rectangle {
       onClicked: {
         input.text = ""
         root.edited("")
+        root.cleared()
         root.grabFocus()
       }
     }
