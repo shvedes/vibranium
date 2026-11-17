@@ -1570,7 +1570,11 @@ Rectangle {
     // Leaving search replaces the whole projection with the page's rows:
     // an identity swap, not a row appearing or disappearing, and the
     // cursor is re-seated from the page's remembered frame.
-    if (!panel.searching) panel.recomputeRows("rebuild")
+    // The card is resized to the page's rows in this turn. Install them in
+    // this turn too: a deferred _records would paint the outgoing search
+    // projection (separators and all) in the full-page box for a frame.
+    // resetSearch writes query, not the field, so this cannot re-enter.
+    if (!panel.searching) panel.recomputeRows("rebuild", true)
   }
   onCurrentPageIdChanged: {
     // A new page means a new row set: any reveal claim from the page being
@@ -1694,8 +1698,9 @@ Rectangle {
       }
       // Arming or clearing the "/" filter trims and restores the CURRENT
       // page's rows: rows leave and come back in place, so this is a
-      // reveal like any other.
-      panel.recomputeRows("reveal")
+      // reveal like any other. Clearing also restores the full page box in
+      // this turn, so the restored rows have to land in it this turn too.
+      panel.recomputeRows("reveal", !Menu.scopedActive)
     }
 
     function onScopedRowsChanged() {
