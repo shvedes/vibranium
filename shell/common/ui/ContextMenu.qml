@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Effects
 import Quickshell.Widgets
 import qs.common
 
@@ -31,13 +32,8 @@ import qs.common
 // that can outgrow the screen - the tray's, whose remote entries are the
 // application's business - sets it and gets a flickable; the rest do not and
 // pay nothing for it.
-Card {
+Item {
   id: root
-
-  // A pointer menu is a hairline over the desktop rather than a framed panel:
-  // the shared card's 2px edge reads as a box on a surface this small, so the
-  // edge here is the 1px faint token every other one in the shell uses.
-  border.width: 1
 
   // Rows, in the order they draw. See the record shape above.
   property var entries: []
@@ -77,217 +73,245 @@ Card {
   width: implicitWidth
   height: implicitHeight
 
-  Flickable {
-    id: flick
+  // A slight drop shadow lifts the card off whatever sits behind it, giving
+  // the menu the volume a flat rectangle lacks. It is a sibling of the card
+  // rather than a child: the card clips its children and paints its own
+  // surface beneath them, so a child shadow would be clipped and drawn over
+  // the card. Declared first so it paints behind the card.
+  RectangularShadow {
+    anchors.fill: card
+
+    radius: RoundingPolicy.radius
+    color: "#66000000"
+    // Pixels, not a fraction, so the halo does not grow with the card as
+    // its rows change.
+    blur: 10
+    spread: 1
+    offset: ({ x: 0, y: 2 })
+  }
+
+  Card {
+    id: card
 
     anchors.fill: parent
-    anchors.margins: root.padding
-    contentWidth: width
-    contentHeight: menuCol.implicitHeight
-    boundsBehavior: Flickable.StopAtBounds
-    clip: true
-    // A capped list drags; an uncapped one is exactly as tall as its rows, so
-    // there is nothing to drag and the pointer belongs to the rows.
-    interactive: root.maxHeight > 0 && root.contentHeight > root.shownHeight
 
-    Column {
-      id: menuCol
+    // A pointer menu is a hairline over the desktop rather than a framed panel:
+    // the shared card's 2px edge reads as a box on a surface this small, so the
+    // edge here is the 1px faint token every other one in the shell uses.
+    border.width: 1
 
-      width: flick.width
-      spacing: root.rowGap
+    Flickable {
+      id: flick
 
-      Repeater {
-        model: root.entries
+      anchors.fill: parent
+      anchors.margins: root.padding
+      contentWidth: width
+      contentHeight: menuCol.implicitHeight
+      boundsBehavior: Flickable.StopAtBounds
+      clip: true
+      // A capped list drags; an uncapped one is exactly as tall as its rows, so
+      // there is nothing to drag and the pointer belongs to the rows.
+      interactive: root.maxHeight > 0 && root.contentHeight > root.shownHeight
 
-        delegate: Item {
-          id: entryRow
+      Column {
+        id: menuCol
 
-          required property var modelData
+        width: flick.width
+        spacing: root.rowGap
 
-          readonly property bool isSeparator: modelData.separator === true
-          readonly property bool rowEnabled: modelData.enabled !== false
-          readonly property string iconName: String(modelData.icon ?? "")
-          readonly property string iconSource: String(modelData.iconSource ?? "")
-          readonly property bool hasIcon: entryRow.iconName !== "" || entryRow.iconSource !== ""
-          readonly property string indicator: String(modelData.indicator ?? "")
-          readonly property bool checked: modelData.checked === true
-          readonly property bool partial: modelData.partial === true
-          readonly property bool hasChildren: modelData.hasChildren === true
+        Repeater {
+          model: root.entries
 
-          implicitWidth: entryContent.implicitWidth + 2 * root.rowPadding
-          // At least as wide as its own content, and as wide as the column
-          // when a caller stretches the card. The max() is what keeps this
-          // off a binding loop: a row may grow to the column, never shrink to
-          // it, so the column's implicit width stays the widest row's
-          // intrinsic width and the card sizes from that. A plain
-          // `width: menuCol.width` closes the circle (card width <- column
-          // implicit width <- row width <- card width) and Qt breaks it by
-          // leaving the list 0x0 - a card with no rows in it.
-          width: Math.max(entryRow.implicitWidth, menuCol.width)
-          height: entryRow.isSeparator ? 1 : root.rowHeight
+          delegate: Item {
+            id: entryRow
 
-          // A divider is not a row: it takes no hover fill, no cursor and no
-          // click, and drawing it at one pixel keeps a long menu's groups from
-          // reading as gaps in a list.
-          Rectangle {
-            anchors.fill: parent
-            visible: entryRow.isSeparator
-            color: Ui.solid("background_3")
-            opacity: 0.7
-          }
+            required property var modelData
 
-          Rectangle {
-            anchors.fill: parent
-            visible: !entryRow.isSeparator
-            // The hover fill is a row's own chrome, so it follows the same
-            // rounding as the card it sits in (Qt clamps it to half the row).
-            radius: RoundingPolicy.radius
-            color: Ui.tint("foreground_0", 0.07)
-            // A pointer menu has no keyboard cursor, so the hovered row is
-            // the one the cursor is on. It wears the same 1px edge the menu's
-            // focus bar carries, so a highlighted row reads the same whether
-            // it was reached by a key or by the pointer.
-            border.width: 1
-            border.color: Ui.solid("background_3")
-            opacity: rowMa.containsMouse && entryRow.rowEnabled ? 1 : 0
-          }
+            readonly property bool isSeparator: modelData.separator === true
+            readonly property bool rowEnabled: modelData.enabled !== false
+            readonly property string iconName: String(modelData.icon ?? "")
+            readonly property string iconSource: String(modelData.iconSource ?? "")
+            readonly property bool hasIcon: entryRow.iconName !== "" || entryRow.iconSource !== ""
+            readonly property string indicator: String(modelData.indicator ?? "")
+            readonly property bool checked: modelData.checked === true
+            readonly property bool partial: modelData.partial === true
+            readonly property bool hasChildren: modelData.hasChildren === true
 
-          // One row of content: optional indicator, optional icon, label,
-          // optional chevron. The optional columns are hidden rather than
-          // zero-width, because a positioner skips hidden items - a zero-width
-          // column would still take its share of the spacing.
-          Row {
-            id: entryContent
+            implicitWidth: entryContent.implicitWidth + 2 * root.rowPadding
+            // At least as wide as its own content, and as wide as the column
+            // when a caller stretches the card. The max() is what keeps this
+            // off a binding loop: a row may grow to the column, never shrink to
+            // it, so the column's implicit width stays the widest row's
+            // intrinsic width and the card sizes from that. A plain
+            // `width: menuCol.width` closes the circle (card width <- column
+            // implicit width <- row width <- card width) and Qt breaks it by
+            // leaving the list 0x0 - a card with no rows in it.
+            width: Math.max(entryRow.implicitWidth, menuCol.width)
+            height: entryRow.isSeparator ? 1 : root.rowHeight
 
-            visible: !entryRow.isSeparator
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.leftMargin: root.rowPadding
-            anchors.rightMargin: root.rowPadding
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 9
-            // Dimming rides the whole row, so the glyph and the label stay one
-            // weight instead of the icon reading brighter than its word.
-            opacity: entryRow.rowEnabled ? 1 : Ui.disabledOpacity
-
-            // Indicator column (check / radio).
-            Item {
-              visible: entryRow.indicator !== ""
-              width: 16
-              height: 16
-
-              Rectangle {
-                anchors.centerIn: parent
-                visible: entryRow.indicator === "radio"
-                width: 12
-                height: 12
-                radius: RoundingPolicy.radius
-                color: "transparent"
-                border.width: 1
-                border.color: Ui.solid("foreground_0")
-                opacity: entryRow.checked ? 1 : 0.7
-              }
-
-              Rectangle {
-                anchors.centerIn: parent
-                visible: entryRow.indicator === "radio" && entryRow.checked
-                width: 6
-                height: 6
-                radius: RoundingPolicy.radius
-                color: Ui.solid("foreground_0")
-              }
-
-              Rectangle {
-                anchors.centerIn: parent
-                visible: entryRow.indicator === "check"
-                width: 12
-                height: 12
-                radius: RoundingPolicy.radius
-                color: "transparent"
-                border.width: 1
-                border.color: Ui.solid("foreground_0")
-                opacity: 0.7
-              }
-
-              Title {
-                level: 5
-                anchors.centerIn: parent
-                visible: entryRow.indicator === "check" && entryRow.checked
-                text: entryRow.partial ? "–" : "✓"
-                color: Ui.solid("foreground_0")
-              }
+            // A divider is not a row: it takes no hover fill, no cursor and no
+            // click, and drawing it at one pixel keeps a long menu's groups from
+            // reading as gaps in a list.
+            Rectangle {
+              anchors.fill: parent
+              visible: entryRow.isSeparator
+              color: Ui.solid("background_3")
+              opacity: 0.7
             }
 
-            // Icon column: a themed glyph, or the image URL a remote menu
-            // hands over.
-            Item {
-              visible: entryRow.hasIcon
-              width: 16
-              height: 16
+            Rectangle {
+              anchors.fill: parent
+              visible: !entryRow.isSeparator
+              // The hover fill is a row's own chrome, so it follows the same
+              // rounding as the card it sits in (Qt clamps it to half the row).
+              radius: RoundingPolicy.radius
+              color: Ui.tint("foreground_0", 0.07)
+              // A pointer menu has no keyboard cursor, so the hovered row is
+              // the one the cursor is on. It wears the same 1px edge the menu's
+              // focus bar carries, so a highlighted row reads the same whether
+              // it was reached by a key or by the pointer.
+              border.width: 1
+              border.color: Ui.solid("background_3")
+              opacity: rowMa.containsMouse && entryRow.rowEnabled ? 1 : 0
+            }
 
-              Icon {
-                anchors.centerIn: parent
-                visible: entryRow.iconName !== ""
-                name: entryRow.iconName
-                size: 16
-              }
+            // One row of content: optional indicator, optional icon, label,
+            // optional chevron. The optional columns are hidden rather than
+            // zero-width, because a positioner skips hidden items - a zero-width
+            // column would still take its share of the spacing.
+            Row {
+              id: entryContent
 
-              IconImage {
-                id: entryIcon
-                property bool _painted: false
-                anchors.centerIn: parent
-                // First paint waits for the decoded frame; the latch then keeps
-                // the retained raster visible across later source swaps.
-                visible: entryRow.iconSource !== ""
-                  && (status === Image.Ready || _painted)
+              visible: !entryRow.isSeparator
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.leftMargin: root.rowPadding
+              anchors.rightMargin: root.rowPadding
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: 9
+              // Dimming rides the whole row, so the glyph and the label stay one
+              // weight instead of the icon reading brighter than its word.
+              opacity: entryRow.rowEnabled ? 1 : Ui.disabledOpacity
+
+              // Indicator column (check / radio).
+              Item {
+                visible: entryRow.indicator !== ""
                 width: 16
                 height: 16
-                asynchronous: true
-                // retain/cache are backing-Image properties (IconImage's
-                // documented extension point), not exposed on IconImage itself.
-                backer.retainWhileLoading: true
-                backer.cache: true
-                onStatusChanged: if (status === Image.Ready) entryIcon._painted = true
-                // A DBusMenu icon is an Image.source-ready URL (theme-resolved
-                // or embedded png data), so it needs no themed-name lookup.
-                source: entryRow.iconSource
+
+                Rectangle {
+                  anchors.centerIn: parent
+                  visible: entryRow.indicator === "radio"
+                  width: 12
+                  height: 12
+                  radius: RoundingPolicy.radius
+                  color: "transparent"
+                  border.width: 1
+                  border.color: Ui.solid("foreground_0")
+                  opacity: entryRow.checked ? 1 : 0.7
+                }
+
+                Rectangle {
+                  anchors.centerIn: parent
+                  visible: entryRow.indicator === "radio" && entryRow.checked
+                  width: 6
+                  height: 6
+                  radius: RoundingPolicy.radius
+                  color: Ui.solid("foreground_0")
+                }
+
+                Rectangle {
+                  anchors.centerIn: parent
+                  visible: entryRow.indicator === "check"
+                  width: 12
+                  height: 12
+                  radius: RoundingPolicy.radius
+                  color: "transparent"
+                  border.width: 1
+                  border.color: Ui.solid("foreground_0")
+                  opacity: 0.7
+                }
+
+                Title {
+                  level: 5
+                  anchors.centerIn: parent
+                  visible: entryRow.indicator === "check" && entryRow.checked
+                  text: entryRow.partial ? "–" : "✓"
+                  color: Ui.solid("foreground_0")
+                }
+              }
+
+              // Icon column: a themed glyph, or the image URL a remote menu
+              // hands over.
+              Item {
+                visible: entryRow.hasIcon
+                width: 16
+                height: 16
+
+                Icon {
+                  anchors.centerIn: parent
+                  visible: entryRow.iconName !== ""
+                  name: entryRow.iconName
+                  size: 16
+                }
+
+                IconImage {
+                  id: entryIcon
+                  property bool _painted: false
+                  anchors.centerIn: parent
+                  // First paint waits for the decoded frame; the latch then keeps
+                  // the retained raster visible across later source swaps.
+                  visible: entryRow.iconSource !== ""
+                    && (status === Image.Ready || _painted)
+                  width: 16
+                  height: 16
+                  asynchronous: true
+                  // retain/cache are backing-Image properties (IconImage's
+                  // documented extension point), not exposed on IconImage itself.
+                  backer.retainWhileLoading: true
+                  backer.cache: true
+                  onStatusChanged: if (status === Image.Ready) entryIcon._painted = true
+                  // A DBusMenu icon is an Image.source-ready URL (theme-resolved
+                  // or embedded png data), so it needs no themed-name lookup.
+                  source: entryRow.iconSource
+                }
+              }
+
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: String(entryRow.modelData.label ?? "")
+                color: Ui.solid("foreground_0")
+                font.pixelSize: Ui.fontM
+                font.family: Ui.fontFamily
+              }
+
+              // Submenu chevron.
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: entryRow.hasChildren
+                text: "›"
+                color: Ui.solid("foreground_0")
+                opacity: 0.6
+                font.pixelSize: Ui.fontM
+                font.family: Ui.fontFamily
               }
             }
 
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              text: String(entryRow.modelData.label ?? "")
-              color: Ui.solid("foreground_0")
-              font.pixelSize: Ui.fontM
-              font.family: Ui.fontFamily
-            }
+            MouseArea {
+              id: rowMa
 
-            // Submenu chevron.
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              visible: entryRow.hasChildren
-              text: "›"
-              color: Ui.solid("foreground_0")
-              opacity: 0.6
-              font.pixelSize: Ui.fontM
-              font.family: Ui.fontFamily
-            }
-          }
-
-          MouseArea {
-            id: rowMa
-
-            anchors.fill: parent
-            hoverEnabled: true
-            // A dimmed row still answers the pointer, so the cursor can say
-            // why: the blocked cursor over a row that would do nothing reads
-            // as "not available" rather than as a dead click. A divider gets
-            // the plain arrow, since it is neither.
-            cursorShape: entryRow.isSeparator ? Qt.ArrowCursor
-              : (entryRow.rowEnabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor)
-            onClicked: {
-              if (entryRow.isSeparator || !entryRow.rowEnabled) return
-              root.activated(entryRow.modelData)
+              anchors.fill: parent
+              hoverEnabled: true
+              // A dimmed row still answers the pointer, so the cursor can say
+              // why: the blocked cursor over a row that would do nothing reads
+              // as "not available" rather than as a dead click. A divider gets
+              // the plain arrow, since it is neither.
+              cursorShape: entryRow.isSeparator ? Qt.ArrowCursor
+                : (entryRow.rowEnabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor)
+              onClicked: {
+                if (entryRow.isSeparator || !entryRow.rowEnabled) return
+                root.activated(entryRow.modelData)
+              }
             }
           }
         }
