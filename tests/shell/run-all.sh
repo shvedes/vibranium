@@ -137,6 +137,14 @@ discover() {
 
 discover
 
+# The widest suite name, measured once at discovery. The live progress lines
+# and the final table share it: a hardcoded width lets a long name push its
+# timing field out of line with every other row.
+NAME_WIDTH=12
+for _name in "${SUITE_NAME[@]}"; do
+  ((${#_name} > NAME_WIDTH)) && NAME_WIDTH=${#_name}
+done
+
 # --- what each suite covers ------------------------------------------------
 
 describe() {
@@ -316,9 +324,9 @@ _progress() {
   # looks identical to a hang.
   local slow=""
   ((ms >= 3000)) && slow=" ${C_DIM}(slow)${C_OFF}"
-  printf '%s[%2d/%2d]%s %s%-10s%s %-24s %6dms  %selapsed %ds%s%s\n' \
+  printf '%s[%2d/%2d]%s %s%-10s%s %-*s %6dms  %selapsed %ds%s%s\n' \
     "$C_DIM" "$done" "$total" "$C_OFF" \
-    "$colour" "$status" "$C_OFF" "$name" "$ms" \
+    "$colour" "$status" "$C_OFF" "$NAME_WIDTH" "$name" "$ms" \
     "$C_DIM" "$elapsed" "$C_OFF" "$slow" >&2
 }
 
@@ -400,10 +408,14 @@ _run_one() {
   local t0 t1 rc_status
   : >"$results"
   t0=$(date +%s%N)
+  # No suite may inherit a controlling terminal. The downloader CLIs wait for
+  # a keypress on /dev/tty after a result; with a TTY present the run stalls
+  # on every failure case instead of finishing. setsid drops the terminal so
+  # an automatic run is non-interactive wherever it is launched from.
   if [[ $kind == node ]]; then
-    SHELL_TEST_RESULTS="$results" node "$path" >"$log" 2>&1
+    SHELL_TEST_RESULTS="$results" setsid -w node "$path" >"$log" 2>&1
   else
-    SHELL_TEST_RESULTS="$results" bash "$path" >"$log" 2>&1
+    SHELL_TEST_RESULTS="$results" setsid -w bash "$path" >"$log" 2>&1
   fi
   rc_status=$?
   printf '%s' "$rc_status" >"$rc_file"

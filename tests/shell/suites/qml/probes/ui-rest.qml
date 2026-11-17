@@ -52,6 +52,10 @@ Item {
   height: 900
 
   property int phase: 0
+  // The CrossfadeIcon flip is staged only once its front raster has decoded.
+  // Reading `visible` before then answers false on a loaded machine, which is
+  // a probe race, not the slot-blanking behaviour this section pins.
+  property bool cfFlipDone: false
   property string scrimError: "not-attempted"
 
   // ---- tween sample buffers -------------------------------------------
@@ -694,6 +698,32 @@ Item {
     } catch (e) {
       kv("probe.thrown", "" + (e && e.message ? e.message : e))
     }
+  }
+
+  // Flip into the never-decoded layer only after the front layer can paint,
+  // so `initial.visible` measures the gate rather than decode latency. The
+  // staged name is set here, so the incoming layer is still undecoded when
+  // the front is checked. Retried each tick until ready; idempotent.
+  function crossfadeFlip() {
+    if (cfFlipDone) return
+    const layers = iconLayers(cfIcon)
+    if (layers.length < 2 || !layers[0].swapReady) return
+    cfFlipDone = true
+    kv("crossfade.layers", layers.length)
+    kv("crossfade.initial.front", cfIcon._aFront)
+    kv("crossfade.initial.visible", cfIcon.visible)
+    cfIcon.name = "mic-off"
+    kv("crossfade.flip.pending", cfIcon._swapPending)
+    kv("crossfade.flip.frontHeld", cfIcon._aFront === true)
+    kv("crossfade.flip.staged", cfIcon._bName)
+    kv("crossfade.flip.outgoingOpacity", layers[0].opacity)
+  }
+
+  Timer {
+    interval: 12
+    repeat: true
+    running: !cfFlipDone
+    onTriggered: crossfadeFlip()
   }
 
   // ---- helpers --------------------------------------------------------
@@ -1719,18 +1749,9 @@ Item {
     kv("pc.gate.targetHeight", cardGate.cardHeight)
     kv("pc.gate.shrinking", cardGate.cardHeight < root.gateStartH)
 
-    // CrossfadeIcon: flip into a layer that has never decoded. The front has
-    // to stay on the old layer for this turn - that frame is the one that
-    // used to be empty, because the incoming Image had nothing to retain.
-    const layers = iconLayers(cfIcon)
-    kv("crossfade.layers", layers.length)
-    kv("crossfade.initial.front", cfIcon._aFront)
-    kv("crossfade.initial.visible", cfIcon.visible)
-    cfIcon.name = "mic-off"
-    kv("crossfade.flip.pending", cfIcon._swapPending)
-    kv("crossfade.flip.frontHeld", cfIcon._aFront === true)
-    kv("crossfade.flip.staged", cfIcon._bName)
-    kv("crossfade.flip.outgoingOpacity", layers[0].opacity)
+    // CrossfadeIcon: flipped by crossfadeFlip() once the front raster is
+    // ready. Doing it on a fixed turn raced the decode under parallel load.
+    crossfadeFlip()
   }
 
   // ---- turns 2..8: the tweens, sampled in flight ----------------------

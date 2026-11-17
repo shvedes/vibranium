@@ -1351,8 +1351,9 @@ ShellRoot {
       kv("ih.shared.cardHeight", h.card.height)
       // The switch is a discrete content change on an open host, so the height
       // glides from 140 to the new 90 rather than snapping; the sampled turn
-      // may land anywhere inside that span.
-      kv("ih.shared.cardHeightDropping", h.card.height >= 90 && h.card.height <= 140)
+      // may land anywhere inside that span. The last Glide frame can land a
+      // fraction below its target, so the lower bound carries a pixel of slack.
+      kv("ih.shared.cardHeightDropping", h.card.height >= 89 && h.card.height <= 141)
       // ...and the twin's slot is frozen too: show() saves the live size when
       // the component is unchanged, which is the case neither the content
       // change nor the content size change covers.
@@ -1396,6 +1397,12 @@ ShellRoot {
       root.h1CountBeforeSecond = h1.diagnostics().count
       h2.show(anchorSecond, compWide)
       kv("ih.inst.h2Opened", h2.open)
+      // Read the served-slot state here, on the turn that performs the show.
+      // Ten idle turns later a loaded host can have advanced the pump past the
+      // open without the Loader having published its item, which made these
+      // two reads race the cadence rather than the state machine.
+      kv("ih.inst.h2Content", root.live(h2.content))
+      kv("ih.inst.h2IsOpenForSecond", h2.isOpenFor(anchorSecond))
       kv("ih.inst.h1OpenAfter", h1.open)
     } catch (e) {
       kv("probe.error", "phase67: " + (e && e.message ? e.message : e))
@@ -1416,9 +1423,7 @@ ShellRoot {
       kv("ih.inst.h2FrozenSelf", h2._frozenW("self"))
       kv("ih.inst.h1FrozenSelf", h1._frozenW("self"))
       kv("ih.inst.h1Content", root.live(h1.content))
-      kv("ih.inst.h2Content", root.live(h2.content))
       kv("ih.inst.h1IsOpenForShared", h1.isOpenFor(anchorShared))
-      kv("ih.inst.h2IsOpenForSecond", h2.isOpenFor(anchorSecond))
       h2.close()
       root.h3.close()
       kv("ih.inst.h3Closed", !root.h3.open)

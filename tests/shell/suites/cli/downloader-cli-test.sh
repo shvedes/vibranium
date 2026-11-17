@@ -127,15 +127,20 @@ export FAKE_YTDLP_LOG FAKE_WGET_LOG FAKE_ARIA2C_LOG
 # Helpers
 # ---------------------------------------------------------------------------
 
+# The dispatcher reports failures through operation::result, which waits for a
+# keypress on /dev/tty when one exists. setsid -w drops the controlling terminal
+# before the call, so every case stays non-interactive even when this suite is
+# launched from a terminal; the PATH is set inside env so setsid itself still
+# resolves from the suite's own PATH.
 run_cli() {
-  PATH="$TOOL_PATH" "$CLI" "$@" >"$R/out" 2>"$R/err"
+  setsid -w env PATH="$TOOL_PATH" "$CLI" "$@" >"$R/out" 2>"$R/err"
   RC=$?
   OUT="$(<"$R/out")"
   ERR="$(<"$R/err")"
 }
 
 run_cli_no_wget() {
-  PATH="$BASE_PATH" "$CLI" "$@" >"$R/out" 2>"$R/err"
+  setsid -w env PATH="$BASE_PATH" "$CLI" "$@" >"$R/out" 2>"$R/err"
   RC=$?
   OUT="$(<"$R/out")"
   ERR="$(<"$R/err")"
@@ -148,7 +153,7 @@ run_cli_no_aria2c() {
   mkdir -p "$dir"
   ln -sf "$FAKE_BIN/wget" "$dir/wget"
   ln -sf "$FAKE_BIN/vb-util-yt-dlp" "$dir/vb-util-yt-dlp"
-  PATH="$dir:$BASE_PATH" "$CLI" "$@" >"$R/out" 2>"$R/err"
+  setsid -w env PATH="$dir:$BASE_PATH" "$CLI" "$@" >"$R/out" 2>"$R/err"
   RC=$?
   OUT="$(<"$R/out")"
   ERR="$(<"$R/err")"
