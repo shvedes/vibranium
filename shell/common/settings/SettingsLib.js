@@ -451,6 +451,9 @@ function parseOption(raw, fileNamespace) {
     flow: flow,
     default: raw.default
   }
+  // Glyph the row paints in its icon slot. Only carried when declared, so the
+  // record of a plain setting keeps its shape.
+  if (typeof raw.icon === "string" && raw.icon !== "") opt.icon = raw.icon
 
   const check = validateValue(opt, opt.default)
   if (!check.ok) return { error: key + ": bad default " + JSON.stringify(opt.default) + " (" + check.error + ")" }
@@ -1413,24 +1416,29 @@ function buildPages(schema, values) {
 
   // Generated option rows with the declared custom items woven in. A custom
   // item may name `after` an option key, so it sits under that row instead
-  // of after every option on the page.
+  // of after every option on the page. An option a group item claims is drawn
+  // inside that group instead of as a row of its own.
   function sectionItems(section) {
     const items = []
+    const claimed = _claimedKeys(section)
     for (let o = 0; o < section.options.length; o++) {
-      const item = buildItem(section.options[o], values[section.options[o].key])
+      const opt = section.options[o]
+      if (claimed[opt.key] === true) continue
+      const item = buildItem(opt, values[opt.key])
       if (item) items.push(item)
     }
     for (let i = 0; i < section.items.length; i++) {
       const raw = section.items[i]
       if (!raw || typeof raw !== "object") continue
+      const entry = raw.type === "group" ? buildGroupRow(raw, schema.byKey, values) : raw
       if (typeof raw.after === "string" && raw.after !== "") {
         const at = items.findIndex(x => x.var === raw.after || x.id === raw.after)
         if (at >= 0) {
-          items.splice(at + 1, 0, raw)
+          items.splice(at + 1, 0, entry)
           continue
         }
       }
-      items.push(raw)
+      items.push(entry)
     }
     return items
   }
@@ -1491,6 +1499,24 @@ function buildBundle(schema, values) {
   return { pages: pages }
 }
 
+// Option keys a group item claims, as a prototype-less set: a claimed option is
+// rendered inside its group's dropdown and never as a row of its own. It keeps
+// its schema entry either way - that is what makes the child row validate, seed
+// and persist like any other row.
+function _claimedKeys(section) {
+  const claimed = Object.create(null)
+  const list = section.items || []
+  for (let i = 0; i < list.length; i++) {
+    const raw = list[i]
+    if (!raw || raw.type !== "group" || !Array.isArray(raw.children)) continue
+    for (let k = 0; k < raw.children.length; k++) {
+      const key = raw.children[k]
+      if (typeof key === "string" && key !== "") claimed[key] = true
+    }
+  }
+  return claimed
+}
+
 // The content walk both counters below share: non-hidden options, then custom
 // items with separators dropped. `objectItems` is the subset that is a real
 // row rather than a bare marker, so each caller keeps its own answer for
@@ -1500,9 +1526,11 @@ function buildBundle(schema, values) {
 // mutes it), so the counters describe the page's static shape and a value
 // change cannot make a section link or its count appear and disappear.
 function _visibleContent(section, byKey, values) {
+  const claimed = _claimedKeys(section)
   let options = 0
   for (let o = 0; o < section.options.length; o++) {
     if (section.options[o].hidden) continue
+    if (claimed[section.options[o].key] === true) continue
     options++
   }
   let items = 0
@@ -1553,6 +1581,7 @@ function buildItem(opt, current) {
     label: opt.label,
     desc: opt.desc || undefined
   }
+  if (typeof opt.icon === "string" && opt.icon !== "") base.icon = opt.icon
   if (opt.sub !== "") base.sub = opt.sub
   if (opt.warning !== "") base.warning = opt.warning
   // Store-driven conditions ride as data; bash guards flow through the
@@ -1614,4 +1643,41 @@ function buildItem(opt, current) {
       return base
     }
   }
+}
+
+// A group row: one dropdown that lists whole entries, built from the option
+// keys and whole items its `children` name.
+//
+// An option child is resolved through the schema rather than written a second
+// time, so the row the dropdown draws and the row the store validates cannot
+// disagree. An item child is copied as declared: that is how a switch the shell
+// owns (a launcher plugin, a bar module) embeds the same row its own page used
+// to carry - the provider resolves its pill and its flip by id, so nothing is
+// duplicated but the id. The child rows are ordinary rows - the menu normalizes
+// them like any other - with one difference: they carry no sub line (a dropdown
+// lists what can be switched on, and the row above already says why).
+function buildGroupRow(raw, byKey, values) {
+  const row = {}
+  for (const k in raw) row[k] = raw[k]
+  row.type = "group"
+  const children = []
+  const keys = Array.isArray(raw.children) ? raw.children : []
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]
+    if (key !== null && typeof key === "object" && !Array.isArray(key)) {
+      const child = {}
+      for (const k in key) child[k] = key[k]
+      delete child.sub
+      children.push(child)
+      continue
+    }
+    if (typeof key !== "string" || !byKey || byKey[key] === undefined) continue
+    const opt = byKey[key]
+    const child = buildItem(opt, values[key])
+    if (!child) continue
+    delete child.sub
+    children.push(child)
+  }
+  row.children = children
+  return row
 }

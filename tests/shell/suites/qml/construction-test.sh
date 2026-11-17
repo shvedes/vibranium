@@ -190,7 +190,7 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 127 of the 260 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 128 of the 261 declared types, and every one of them
 # through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
@@ -279,6 +279,7 @@ qs.features.lock.Lockscreen
 qs.features.lock.NowPlaying
 qs.features.menu.Entry
 qs.features.menu.GridCell
+qs.features.menu.GroupRow
 qs.features.menu.InlineEditor
 qs.features.menu.Menu
 qs.features.menu.MenuFilterBar
@@ -350,8 +351,8 @@ EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null
 supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 260 declared entries over 47 qmldir files, one of which is excluded from the
-# work list (boot/Boot.qml), so 259 cases are built. The 136 that are not built
+# 261 declared entries over 47 qmldir files, one of which is excluded from the
+# work list (boot/Boot.qml), so 260 cases are built. The 137 that are not built
 # are the needs-environment and declared-but-uncreatable sets below. A
 # singleton (RowGeometry, Paths) is not creatable either; the probe's case for
 # one names it and lets the engine build it, which is why a singleton that
@@ -360,7 +361,7 @@ supplied.qs.common.LyricsPane=player: null"
 # both clean headless builds - plain items over Icons/Texts.)
 # qs.common.BootGate is the shared milestone gate: a QtObject over a
 # Connections watch, declared through an explicit default child list.
-EXPECTED_DECLARED_COUNT=260
+EXPECTED_DECLARED_COUNT=261
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -385,7 +386,7 @@ EXPECTED_DECLARED_COUNT=260
 # Connections watch on the already-constructed DesktopLayoutState singleton,
 # with no window or environment behind it.
 EXPECTED_CLEAN_COUNT=123
-EXPECTED_NEEDS_COUNT=127
+EXPECTED_NEEDS_COUNT=128
 EXPECTED_UNCREATABLE_COUNT=9
 
 # --------------------------------------------------------------------------

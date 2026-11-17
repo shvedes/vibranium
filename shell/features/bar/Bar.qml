@@ -453,8 +453,9 @@ Singleton {
 
   // --- generic module on/off ("settings module") ---
   // Static slots toggle through the layout `disabled` array only - there
-  // are no per-module Enabled keys. The bar-enabled settings page lists
-  // one provider toggle per id below (see _toggleIds); the menu resolves
+  // are no per-module Enabled keys. The Enabled modules group on the
+  // Statusbar settings page lists one provider toggle per id below (see
+  // _toggleIds); the menu resolves
   // each row's pill and flip through the registered surfaces, so a flip
   // lands straight in `disabled` with no intermediate store key to drift.
   // Owned dynamic modules never enter `disabled`: the bar only governs

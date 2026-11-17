@@ -143,8 +143,9 @@ Item {
   readonly property bool showDescriptions: Settings.value("shell.launcher.showDescriptions") === true
   readonly property bool showIcons: Settings.value("shell.launcher.showIcons") !== false
   readonly property bool showBadges: Settings.value("shell.launcher.showBadges") !== false
-  // Independent of showBadges: the game marker is a separate toggle, not a
-  // third member of the shell-only webapp/tui family.
+  // One switch per family under the master above. PWA/TUI is a sibling of the
+  // categories, not the master itself.
+  readonly property bool showManagedBadge: Settings.value("shell.launcher.showManagedBadge") !== false
   readonly property bool showGameBadge: Settings.value("shell.launcher.showGameBadge") !== false
   readonly property bool showChatBadge: Settings.value("shell.launcher.showChatBadge") !== false
   readonly property bool showBrowserBadge: Settings.value("shell.launcher.showBrowserBadge") !== false
@@ -467,6 +468,7 @@ Item {
       if (key === "shell.launcher.searchEngine"
         || key === "shell.launcher.showIcons"
         || key === "shell.launcher.showBadges"
+        || key === "shell.launcher.showManagedBadge"
         || key === "shell.launcher.showGameBadge"
         || key === "shell.launcher.showChatBadge"
         || key === "shell.launcher.showBrowserBadge"
@@ -852,6 +854,7 @@ Item {
       noDescriptionText: root.noDescriptionText,
       showIcons: root.showIcons,
       showBadges: root.showBadges,
+      showManagedBadge: root.showManagedBadge,
       showGameBadge: root.showGameBadge,
       showChatBadge: root.showChatBadge,
       showBrowserBadge: root.showBrowserBadge,

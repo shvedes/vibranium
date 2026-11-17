@@ -19,7 +19,9 @@ import "../../common/math/Range.js" as Range
 //
 // DESIGN RULES (user directives):
 // - Plain entries everywhere. Selects expand into an inline dropdown of
-//   OptionRow boxes - arrows drive the cursor, Enter picks. Numbers and
+//   OptionRow boxes - arrows drive the cursor, Enter picks. A group row
+//   unfolds the same way over whole entries (GroupRow), so a nested family
+//   of toggles is one row on the page. Numbers and
 //   ranges show just their value - +/- keys and the wheel adjust, Enter
 //   opens the numeric editor.
 // - Selection background switches INSTANTLY; rows do not paint hover
@@ -66,6 +68,7 @@ Item {
   readonly property bool isText: ptype === "text"
   readonly property bool isSubmenu: ptype === "submenu"
   readonly property bool isExpandable: ptype === "expandable"
+  readonly property bool isGroup: ptype === "group"
   readonly property bool infoOnly: itm && itm.infoOnly === true
   readonly property bool hasStepper: isNumber || isRange
 
@@ -87,6 +90,40 @@ Item {
   // no stride (0 = key falls through).
   readonly property int optionCount: row.optionList.length
   readonly property int optionColumnStride: MenuLib.optionColumnStride(optionCount)
+  // Child rows of a group row. The row set is a projection that converts role
+  // payloads and can drop a nested array, so the live page item is resolved by
+  // uid the way a flow row's stages are - uids always survive the mirror.
+  readonly property var groupSource: {
+    Menu.rev
+    if (!row.isGroup || searchResult || !itm || !itm.uid) return null
+    const pristine = Menu.itemByUid(itm.uid)
+    return pristine && pristine.type === "group" && Array.isArray(pristine.children)
+      ? pristine : null
+  }
+  // The children the dropdown lists. A child carrying its own `when` (a bar
+  // module that does not exist on this chassis) is a gated row like any other,
+  // so it is left out while its verdict is false instead of being offered as a
+  // switch that does nothing. rev is read because a guard batch answers later.
+  readonly property var groupChildren: {
+    Menu.rev
+    const src = row.groupSource
+    if (!src || !Array.isArray(src.children)) return []
+    const kids = src.children
+    const out = []
+    for (let i = 0; i < kids.length; i++) {
+      const kid = kids[i]
+      if (!kid) continue
+      // Only a child with a guard of its own is asked: an ungated child is
+      // always usable, and a provider's `visible` predicate describes a page
+      // row, not a switch inside a dropdown.
+      const gated = (typeof kid.when === "string" && kid.when.trim() !== "")
+        || (kid.requires !== undefined && kid.requires !== null)
+      if (gated && Menu.isUnavailable(kid)) continue
+      out.push(kid)
+    }
+    return out
+  }
+  readonly property bool hasGroup: row.groupChildren.length > 0
   readonly property bool hasEditor: hasStepper || isText
 
   // Free-text prompt hosted inside a select row's expansion: picking the
@@ -226,6 +263,7 @@ Item {
   readonly property bool confirmOpen: row.activeConfirm !== null && expanded
   readonly property bool dropdownOpen: row.confirmOpen ? false
     : row.isFlow ? (expanded && row.flowKind === "select")
+    : row.isGroup ? (expanded && row.hasGroup)
     : (isSelect && expanded && !row.promptOpen)
   readonly property bool editorOpen: row.confirmOpen ? false
     : row.isFlow ? (expanded && (row.flowKind === "number"
@@ -235,6 +273,17 @@ Item {
   // Dropdown cursor; -1 closed. Starts on the stored choice so Enter-
   // Enter re-picks it without touching the arrows.
   property int optionIndex: -1
+
+  // Group dropdown cursor; -1 closed. A group lists its children in one
+  // column, so the cursor is the child the arrows and Enter act on.
+  property int childIndex: -1
+
+  // A guard landing (or a store write) can remove a child under the cursor;
+  // the index then points past the end, so it retreats to the last child.
+  onGroupChildrenChanged: {
+    const kids = row.groupChildren.length
+    if (row.childIndex >= kids) row.childIndex = kids > 0 ? kids - 1 : -1
+  }
 
   // The value the dropdown cursor should open on. Flow rows seed from the
   // stored stage value so Back lands on the picked option; plain rows seed
@@ -251,6 +300,10 @@ Item {
 
   onDropdownOpenChanged: {
     if (!dropdownOpen) return
+    if (row.isGroup) {
+      row.childIndex = row.groupChildren.length > 0 ? 0 : -1
+      return
+    }
     const optList = row.optionList
     optionIndex = optList.length === 0
       ? -1 : MenuLib.optionSeedIndex(optList, row.optionSeed())
@@ -637,6 +690,9 @@ Item {
         case "expandable":
           if (!row.infoOnly && (bodyText !== "" || descText !== "")) setExpanded(!expanded)
           break
+        case "group":
+          setExpanded(!expanded)
+          break
         case "result":
           if (itm) {
             const panel = Menu.probeSource
@@ -689,6 +745,22 @@ Item {
     }
   }
 
+  // Flip one child entry of a group row through the routes a page row uses, so
+  // a toggle inside a dropdown persists exactly like a toggle on the page.
+  function flipChild(child) {
+    if (!child) return
+    const _wasFiltered = Menu.scopedActive
+    try {
+      const state = !Menu.isToggleOn(child)
+      if (Menu.handleToggle(child, state)) return
+      if (child.var === "" && !child.onToggle) return
+      Menu.setChecked(child, state)
+      if (child.onToggle) Menu.runCommand(child.onToggle, state)
+    } finally {
+      if (_wasFiltered && Menu.scopedActive) Menu.clearScoped()
+    }
+  }
+
   function setExpanded(value) {
     if (!itm || searchResult) return
     Menu.setExpanded(itm, value)
@@ -697,6 +769,7 @@ Item {
   function collapse() {
     setExpanded(false)
     optionIndex = -1
+    row.childIndex = -1
     row.confirmStage = 0
     row.deleteArmed = false
     row.promptOpen = false
@@ -755,6 +828,15 @@ Item {
 
   // Panel-driven dropdown navigation; returns true when consumed.
   function moveOption(direction) {
+    if (row.isGroup) {
+      const kids = row.groupChildren.length
+      // A direction of 0 is a page key that has no column to page to: leave it
+      // for the row's own step handling.
+      if (!row.dropdownOpen || kids === 0 || direction === 0) return false
+      const base = row.childIndex < 0 ? (direction > 0 ? -1 : kids) : row.childIndex
+      row.childIndex = ((base + direction) % kids + kids) % kids
+      return true
+    }
     const opts = row.optionList
     if (!dropdownOpen || opts.length === 0) return false
     // A dropdown that has just been opened (or whose cursor was cleared)
@@ -770,6 +852,12 @@ Item {
 
   function pickCurrent() {
     if (!dropdownOpen || !itm) return false
+    if (row.isGroup) {
+      const kids = row.groupChildren
+      if (row.childIndex < 0 || row.childIndex >= kids.length) return false
+      row.flipChild(kids[row.childIndex])
+      return true
+    }
     const opts = row.optionList
     if (optionIndex < 0 || optionIndex >= opts.length) return false
     pick(opts[optionIndex].value)
@@ -1187,6 +1275,7 @@ Item {
         : row.isSelect ? selectText.left
         : row.hasStepper ? valueText.left
         : row.isText ? textVal.left
+        : row.isGroup ? chevronExp.left
         : (row.isSubmenu || row.searchResult) ? chevronFwd.left
         : row.isExpandable ? chevronExp.left
         : parent.right
@@ -1701,8 +1790,11 @@ Item {
       Chevron {
         anchors.centerIn: parent
         direction: "right"
-        color: row.sel ? Theme.color("accent")
-          : Ui.tint("foreground_1", 0.5)
+        // The same rule a group's chevron follows: accent marks something that
+        // is open. A link is never open - the page it opens replaces this one -
+        // so it stays muted, and being merely focused (the cursor bar already
+        // says that) does not tint it.
+        color: Ui.tint("foreground_1", 0.5)
       }
     }
 
@@ -1717,13 +1809,20 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       width: visible ? Ui.chevronW : 0
       height: 16
-      visible: row.isExpandable && !row.infoOnly && (row.descText !== "" || row.bodyText !== "")
+      visible: (row.isGroup && row.hasGroup)
+        || (row.isExpandable && !row.infoOnly && (row.descText !== "" || row.bodyText !== ""))
 
       Chevron {
         anchors.centerIn: parent
         direction: row.expanded ? "up" : "down"
-        color: row.expanded || row.sel ? Theme.color("accent")
-          : Ui.tint("foreground_1", 0.5)
+        // A group's chevron marks the open dropdown, not the focused row. The
+        // cursor bar already says which row is selected, and an accent arrow on
+        // a collapsed group claimed an expansion that was not there yet.
+        color: row.isGroup
+          ? (row.dropdownOpen ? Theme.color("accent")
+            : Ui.tint("foreground_1", 0.5))
+          : (row.expanded || row.sel ? Theme.color("accent")
+            : Ui.tint("foreground_1", 0.5))
       }
     }
 
@@ -1930,6 +2029,7 @@ Item {
         // closing (view -> -1) cut instantly.
         property int stageKey: !row.expanded ? -1
           : row.isFlow ? row.flowIndex
+          : row.isGroup ? 1004
           : row.dropdownOpen ? 1001 : row.editorOpen ? 1002
           : row.confirmOpen ? 1003 : 1000
         property int _prevStageKey: -1
@@ -1947,6 +2047,7 @@ Item {
           width: parent.width
           height: item ? item.implicitHeight : 0
           sourceComponent: wrapCol.confirmView ? confirmComp
+            : row.isGroup ? groupComp
             : wrapCol.dropdownView ? optionsComp
             : wrapCol.editorView ? editorComp
             : row.expanded ? bodyComp : null
@@ -2046,6 +2147,84 @@ Item {
         text: MenuLib.styledMarkup(row.isExpandable && row.bodyText !== ""
           ? row.bodyText : row.descText)
         visible: text !== ""
+      }
+    }
+  }
+
+  Component {
+    id: groupComp
+
+    // Inline dropdown of entries: the compact form of the rows this entry
+    // groups, one column, one cursor. The arrows walk it exactly like a select
+    // dropdown, Enter flips the child under the cursor, and the bar paints the
+    // selection behind the row the cursor holds.
+    Item {
+      id: groupRoot
+
+      width: parent.width
+      implicitHeight: groupCol.height
+      readonly property real rowH: 28
+
+      // Entrance fade, matching the select dropdown: opening reads as an
+      // arrival rather than watching the card grow under static copy.
+      Component.onCompleted: {
+        if (MotionPolicy.enabled && row.dropdownOpen) {
+          groupRoot.opacity = 0
+          groupEnter.restart()
+        }
+      }
+      NumberAnimation {
+        id: groupEnter
+
+        target: groupRoot
+        property: "opacity"
+        to: 1
+        duration: Ui.fastMs + 20
+        easing.type: Easing.OutCubic
+      }
+
+      Rectangle {
+
+        visible: row.dropdownOpen && row.childIndex >= 0
+        color: Ui.tint("background_2", 0.7)
+        radius: RoundingPolicy.radius
+        border.width: 1
+        border.color: Ui.solid("background_3")
+        x: Ui.m
+        y: row.childIndex * groupRoot.rowH
+        width: groupRoot.width - 2 * Ui.m
+        height: groupRoot.rowH
+
+        // No entrance glide: on creation the child rows have not laid out yet,
+        // so an enabled Behavior would sweep the cursor up from the top.
+        Behavior on y {
+          enabled: MotionPolicy.enabled && !groupEnter.running
+          NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+        }
+      }
+
+      Column {
+        id: groupCol
+
+        x: Ui.m
+        width: parent.width - 2 * Ui.m
+
+        Repeater {
+          model: row.groupChildren
+
+          delegate: GroupRow {
+            width: groupCol.width
+            cursor: row.childIndex === index
+            checked: {
+              Menu.rev
+              return modelData.type === "toggle" ? Menu.isToggleOn(modelData) : false
+            }
+            onPicked: {
+              row.childIndex = index
+              row.flipChild(modelData)
+            }
+          }
+        }
       }
     }
   }

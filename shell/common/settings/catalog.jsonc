@@ -8,7 +8,7 @@
 {
   "title": "Settings",
   "pages": [
-    // --- settings page 1/53 (shell) ---
+    // --- settings page 1/51 (shell) ---
     {
         "group": "shell",
         "label": "General",
@@ -188,13 +188,53 @@
             }
         ]
     },
-    // --- settings page 2/53 (shell) ---
+    // --- settings page 2/51 (shell) ---
     {
         "group": "shell",
         "label": "App launcher",
         "icon": "grid",
         "showItemCount": true,
         "options": [
+            {
+                "key": "shell.launcher.showIcons",
+                "type": "bool",
+                "default": true,
+                "label": "Show icons",
+                "sub": "Show/hide app icons",
+                "desc": "Show app icons in launcher results."
+            },
+            {
+                "key": "shell.launcher.showDescriptions",
+                "type": "bool",
+                "default": true,
+                "label": "Show descriptions",
+                "sub": "Show/hide app description"
+            },
+            {
+                "key": "APP_LAUNCHER_ALWAYS_FOCUS",
+                "type": "bool",
+                "default": false,
+                "label": "Focus first",
+                "sub": "Focus existing windows instead",
+                "desc": "Focus existing windows instead of opening new instances.",
+                "warning": "Sometimes it can misbehave!"
+            },
+            {
+                "key": "shell.launcher.autoSelect",
+                "type": "bool",
+                "default": false,
+                "label": "Auto-select",
+                "sub": "Auto-select remaining entry",
+                "desc": "Select the remaining entry automatically."
+            },
+            {
+                "key": "shell.launcher.showClipboardSuggestion",
+                "type": "bool",
+                "default": true,
+                "label": "Clipboard suggestion",
+                "sub": "Suggest clipboard contents",
+                "desc": "Suggest opening the newest copied file/path/link."
+            },
             {
                 "key": "shell.launcher.searchEngine",
                 "type": "string",
@@ -216,77 +256,6 @@
                 }
             },
             {
-                "key": "shell.launcher.showIcons",
-                "type": "bool",
-                "default": true,
-                "label": "Show icons",
-                "sub": "Show/hide app icons",
-                "desc": "Show app icons in launcher results."
-            },
-            {
-                "key": "shell.launcher.showBadges",
-                "type": "bool",
-                "default": true,
-                "label": "Show PWA/TUI badges",
-                "sub": "Show/hide PWA/TUI badges",
-                "desc": "Mark PWA and TUI entries with a badge."
-            },
-            {
-                "key": "shell.launcher.showGameBadge",
-                "type": "bool",
-                "default": true,
-                "label": "Show game badges",
-                "sub": "Show/hide game badges",
-                "desc": "Mark games with a controller badge (any entry in the Game category)."
-            },
-            {
-                "key": "shell.launcher.showChatBadge",
-                "type": "bool",
-                "default": true,
-                "label": "Show chat badges",
-                "sub": "Show/hide chat badges",
-                "desc": "Mark chat, messaging and call entries with a chat badge."
-            },
-            {
-                "key": "shell.launcher.showBrowserBadge",
-                "type": "bool",
-                "default": true,
-                "label": "Show browser badges",
-                "sub": "Show/hide browser badges",
-                "desc": "Mark web browser entries with a globe badge."
-            },
-            {
-                "key": "shell.launcher.showDocumentBadge",
-                "type": "bool",
-                "default": true,
-                "label": "Show document badges",
-                "sub": "Show/hide document badges",
-                "desc": "Mark office and document entries with a file badge."
-            },
-            {
-                "key": "shell.launcher.showMediaBadge",
-                "type": "bool",
-                "default": true,
-                "label": "Show media badges",
-                "sub": "Show/hide media badges",
-                "desc": "Mark audio, video and image entries with a media badge."
-            },
-            {
-                "key": "shell.launcher.showSystemBadge",
-                "type": "bool",
-                "default": true,
-                "label": "Show system badges",
-                "sub": "Show/hide system badges",
-                "desc": "Mark system, settings and administration tools with a settings badge."
-            },
-            {
-                "key": "shell.launcher.showDescriptions",
-                "type": "bool",
-                "default": true,
-                "label": "Show descriptions",
-                "sub": "Show/hide app description"
-            },
-            {
                 "key": "shell.launcher.sortMethod",
                 "type": "string",
                 "default": "alphabetical",
@@ -303,38 +272,151 @@
                 }
             },
             {
-                "key": "shell.launcher.autoSelect",
-                "type": "bool",
-                "default": false,
-                "label": "Auto-select",
-                "sub": "Auto-select remaining entry",
-                "desc": "Select the remaining entry automatically."
-            },
-            {
-                "key": "shell.launcher.showClipboardSuggestion",
+                "key": "shell.launcher.showBadges",
                 "type": "bool",
                 "default": true,
-                "label": "Clipboard suggestion",
-                "sub": "Suggest clipboard contents",
-                "desc": "Suggest opening the newest copied file/path/link."
+                "label": "Show badges",
+                "sub": "Master switch for every badge",
+                "desc": "Hide every launcher badge at once. Each family is switched on its own under Enabled badges."
             },
             {
-                "key": "APP_LAUNCHER_ALWAYS_FOCUS",
+                "key": "shell.launcher.showManagedBadge",
                 "type": "bool",
-                "default": false,
-                "label": "Focus first",
-                "sub": "Focus existing windows instead",
-                "desc": "Focus existing windows instead of opening new instances.",
-                "warning": "Sometimes it can misbehave!"
+                "default": true,
+                "label": "PWA / TUI",
+                "icon": "webapp",
+                "desc": "Mark web apps and terminal entries with their launcher badge."
+            },
+            {
+                "key": "shell.launcher.showGameBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Game",
+                "icon": "gamepad",
+                "desc": "Mark games with a controller badge (any entry in the Game category)."
+            },
+            {
+                "key": "shell.launcher.showChatBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Chat",
+                "icon": "chat",
+                "desc": "Mark chat, messaging and call entries with a chat badge."
+            },
+            {
+                "key": "shell.launcher.showBrowserBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Browser",
+                "icon": "globe",
+                "desc": "Mark web browser entries with a globe badge."
+            },
+            {
+                "key": "shell.launcher.showDocumentBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Document",
+                "icon": "file",
+                "desc": "Mark office and document entries with a file badge."
+            },
+            {
+                "key": "shell.launcher.showMediaBadge",
+                "type": "bool",
+                "default": true,
+                "label": "Media",
+                "icon": "headphones",
+                "desc": "Mark audio, video and image entries with a media badge."
+            },
+            {
+                "key": "shell.launcher.showSystemBadge",
+                "type": "bool",
+                "default": true,
+                "label": "System",
+                "icon": "settings",
+                "desc": "Mark system, settings and administration tools with a settings badge."
             }
         ],
         "items": [
+            // One dropdown for the seven badge families: each key stays its own
+            // option (same store write, same seed), the group row just renders
+            // them under the master "Show badges" toggle instead of as seven
+            // near-identical rows on the page.
             {
-                "type": "submenu",
+                "type": "group",
+                "id": "enabledBadges",
+                "label": "Enabled badges",
+                "sub": "Control enabled badges",
+                "icon": "grid",
+                "after": "shell.launcher.showBadges",
+                "showIf": [
+                    {
+                        "key": "shell.launcher.showBadges",
+                        "eq": true
+                    }
+                ],
+                "children": [
+                    "shell.launcher.showManagedBadge",
+                    "shell.launcher.showDocumentBadge",
+                    "shell.launcher.showBrowserBadge",
+                    "shell.launcher.showSystemBadge",
+                    "shell.launcher.showMediaBadge",
+                    "shell.launcher.showGameBadge",
+                    "shell.launcher.showChatBadge"
+                ]
+            },
+            // The plugin switches used to be a page of their own; the dropdown
+            // carries them beside the rest of the launcher's settings. Their ids
+            // are what the launcher's provider resolves the pill and the flip
+            // through, so each row is the same switch it was on that page.
+            {
+                "type": "group",
+                "id": "enabledPlugins",
                 "label": "Enabled plugins",
-                "sub": "Toggle AppLauncher plugins",
+                "sub": "Control enabled plugins",
                 "icon": "list",
-                "page": "launcher-enabled"
+                "after": "enabledBadges",
+                "children": [
+                    {
+                        "id": "launcher-fx",
+                        "type": "toggle",
+                        "label": "Currency converter"
+                    },
+                    {
+                        "id": "launcher-binary",
+                        "type": "toggle",
+                        "label": "Binary Launcher"
+                    },
+                    {
+                        "id": "launcher-constants",
+                        "type": "toggle",
+                        "label": "Named constants"
+                    },
+                    {
+                        "id": "launcher-unit",
+                        "type": "toggle",
+                        "label": "Unit converter"
+                    },
+                    {
+                        "id": "launcher-calc",
+                        "type": "toggle",
+                        "label": "Calculator"
+                    },
+                    {
+                        "id": "launcher-websearch",
+                        "type": "toggle",
+                        "label": "Web search"
+                    },
+                    {
+                        "id": "launcher-time",
+                        "type": "toggle",
+                        "label": "Timezone"
+                    },
+                    {
+                        "id": "launcher-color",
+                        "type": "toggle",
+                        "label": "Colors"
+                    }
+                ]
             },
             {
                 "id": "clearUsageHistory",
@@ -352,58 +434,7 @@
             }
         ]
     },
-    // --- settings page 3/53 (shell) ---
-    {
-        "group": "shell",
-        "id": "launcher-enabled",
-        "label": "Enabled plugins",
-        "icon": "list",
-        "showItemCount": true,
-        "options": [],
-        "items": [
-            {
-                "id": "launcher-fx",
-                "type": "toggle",
-                "label": "Currency converter"
-            },
-            {
-                "id": "launcher-binary",
-                "type": "toggle",
-                "label": "Binary Launcher"
-            },
-            {
-                "id": "launcher-constants",
-                "type": "toggle",
-                "label": "Named constants"
-            },
-            {
-                "id": "launcher-unit",
-                "type": "toggle",
-                "label": "Unit converter"
-            },
-            {
-                "id": "launcher-calc",
-                "type": "toggle",
-                "label": "Calculator"
-            },
-            {
-                "id": "launcher-websearch",
-                "type": "toggle",
-                "label": "Web search"
-            },
-            {
-                "id": "launcher-time",
-                "type": "toggle",
-                "label": "Timezone"
-            },
-            {
-                "id": "launcher-color",
-                "type": "toggle",
-                "label": "Colors"
-            }
-        ]
-    },
-    // --- settings page 4/53 (shell) ---
+    // --- settings page 3/51 (shell) ---
     {
         "group": "shell",
         "id": "bar",
@@ -561,19 +592,8 @@
         "items": [
             {
                 "type": "submenu",
-                "label": "Enabled modules",
-                "icon": "list",
-                "page": "bar-enabled",
-                "showIf": [
-                    {
-                        "key": "shell.statusbar.enabled",
-                        "eq": true
-                    }
-                ]
-            },
-            {
-                "type": "submenu",
                 "label": "Module options",
+                "sub": "Control module options",
                 "icon": "settings",
                 "page": "bar-modules",
                 "showIf": [
@@ -582,103 +602,110 @@
                         "eq": true
                     }
                 ]
+            },
+            // The module switches used to be a page of their own; the dropdown
+            // keeps them beside the rest of the bar's settings. Each child is
+            // the provider toggle the bar already resolves by id, so a flip
+            // lands in the layout's disabled array exactly as it did there.
+            {
+                "type": "group",
+                "id": "enabledModules",
+                "label": "Enabled modules",
+                "sub": "Control enabled modules",
+                "icon": "list",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.enabled",
+                        "eq": true
+                    }
+                ],
+                "children": [
+                    {
+                        "id": "bar-keyboardLayout",
+                        "type": "toggle",
+                        "label": "Keyboard layout"
+                    },
+                    {
+                        "id": "bar-powerProfile",
+                        "type": "toggle",
+                        "label": "Power profile"
+                    },
+                    {
+                        "id": "bar-archUpdates",
+                        "type": "toggle",
+                        "label": "Arch updates"
+                    },
+                    {
+                        "id": "bar-colorPicker",
+                        "type": "toggle",
+                        "label": "Color picker"
+                    },
+                    {
+                        "id": "bar-session",
+                        "type": "toggle",
+                        "label": "Power & Tray"
+                    },
+                    {
+                        "id": "bar-nightLight",
+                        "type": "toggle",
+                        "label": "Night Light",
+                        "when": "[[ \"$CHASSIS_TYPE\" != vm ]]"
+                    },
+                    {
+                        "id": "bar-nowPlaying",
+                        "type": "toggle",
+                        "label": "Now Playing"
+                    },
+                    {
+                        "id": "bar-downloader",
+                        "type": "toggle",
+                        "label": "Downloader"
+                    },
+                    {
+                        "id": "bar-bluetooth",
+                        "type": "toggle",
+                        "label": "Bluetooth"
+                    },
+                    {
+                        "id": "bar-printers",
+                        "type": "toggle",
+                        "label": "Printers"
+                    },
+                    {
+                        "id": "bar-battery",
+                        "type": "toggle",
+                        "label": "Battery"
+                    },
+                    {
+                        "id": "bar-network",
+                        "type": "toggle",
+                        "label": "Network"
+                    },
+                    {
+                        "id": "bar-privacy",
+                        "type": "toggle",
+                        "label": "Privacy"
+                    },
+                    {
+                        "id": "bar-weather",
+                        "type": "toggle",
+                        "label": "Weather"
+                    },
+                    {
+                        "id": "bar-volume",
+                        "type": "toggle",
+                        "label": "Volume"
+                    },
+                    {
+                        "id": "bar-clock",
+                        "type": "toggle",
+                        "label": "Clock"
+                    }
+                ]
             }
         ]
     },
-    // --- settings page 5/53 (shell) ---
-    {
-        "group": "shell",
-        "id": "bar-enabled",
-        "label": "Enabled modules",
-        "desc": "Which static modules are shown in the bar.",
-        "icon": "grid",
-        "showItemCount": true,
-        "options": [],
-        "items": [
-            {
-                "id": "bar-keyboardLayout",
-                "type": "toggle",
-                "label": "Keyboard layout"
-            },
-            {
-                "id": "bar-powerProfile",
-                "type": "toggle",
-                "label": "Power profile"
-            },
-            {
-                "id": "bar-archUpdates",
-                "type": "toggle",
-                "label": "Arch updates"
-            },
-            {
-                "id": "bar-colorPicker",
-                "type": "toggle",
-                "label": "Color picker"
-            },
-            {
-                "id": "bar-session",
-                "type": "toggle",
-                "label": "Power & Tray"
-            },
-            {
-                "id": "bar-nightLight",
-                "type": "toggle",
-                "label": "Night Light",
-                "when": "[[ \"$CHASSIS_TYPE\" != vm ]]"
-            },
-            {
-                "id": "bar-nowPlaying",
-                "type": "toggle",
-                "label": "Now Playing"
-            },
-            {
-                "id": "bar-downloader",
-                "type": "toggle",
-                "label": "Downloader"
-            },
-            {
-                "id": "bar-bluetooth",
-                "type": "toggle",
-                "label": "Bluetooth"
-            },
-            {
-                "id": "bar-printers",
-                "type": "toggle",
-                "label": "Printers"
-            },
-            {
-                "id": "bar-battery",
-                "type": "toggle",
-                "label": "Battery"
-            },
-            {
-                "id": "bar-network",
-                "type": "toggle",
-                "label": "Network"
-            },
-            {
-                "id": "bar-privacy",
-                "type": "toggle",
-                "label": "Privacy"
-            },
-            {
-                "id": "bar-weather",
-                "type": "toggle",
-                "label": "Weather"
-            },
-            {
-                "id": "bar-volume",
-                "type": "toggle",
-                "label": "Volume"
-            },
-            {
-                "id": "bar-clock",
-                "type": "toggle",
-                "label": "Clock"
-            }
-        ]
-    },
-    // --- settings page 6/53 (shell) ---
+    // --- settings page 4/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-modules",
@@ -771,7 +798,7 @@
             }
         ]
     },
-    // --- settings page 7/53 (shell) ---
+    // --- settings page 5/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-power",
@@ -789,7 +816,7 @@
             }
         ]
     },
-    // --- settings page 8/53 (shell) ---
+    // --- settings page 6/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-nowplaying",
@@ -815,7 +842,7 @@
             }
         ]
     },
-    // --- settings page 9/53 (shell) ---
+    // --- settings page 7/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-recording",
@@ -833,7 +860,7 @@
             }
         ]
     },
-    // --- settings page 10/53 (shell) ---
+    // --- settings page 8/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-volume",
@@ -886,7 +913,7 @@
             }
         ]
     },
-    // --- settings page 11/53 (shell) ---
+    // --- settings page 9/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-clock",
@@ -952,7 +979,7 @@
             }
         ]
     },
-    // --- settings page 12/53 (shell) ---
+    // --- settings page 10/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-weather",
@@ -1031,7 +1058,7 @@
             }
         ]
     },
-    // --- settings page 13/53 (shell) ---
+    // --- settings page 11/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-archupdates",
@@ -1049,7 +1076,7 @@
             }
         ]
     },
-    // --- settings page 14/53 (shell) ---
+    // --- settings page 12/51 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-colorpicker",
@@ -1066,7 +1093,7 @@
             }
         ]
     },
-    // --- settings page 15/53 (shell) ---
+    // --- settings page 13/51 (shell) ---
     {
         "group": "shell",
         "label": "Audio",
@@ -1128,7 +1155,7 @@
             }
         ]
     },
-    // --- settings page 16/53 (shell) ---
+    // --- settings page 14/51 (shell) ---
     {
         "group": "shell",
         "label": "Screenshots",
@@ -1191,7 +1218,7 @@
             }
         ]
     },
-    // --- settings page 17/53 (shell) ---
+    // --- settings page 15/51 (shell) ---
     {
         "group": "shell",
         "label": "OSD",
@@ -1234,7 +1261,7 @@
             }
         ]
     },
-    // --- settings page 18/53 (shell) ---
+    // --- settings page 16/51 (shell) ---
     {
         "group": "shell",
         "label": "Night Light",
@@ -1275,7 +1302,7 @@
             }
         ]
     },
-    // --- settings page 19/53 (shell) ---
+    // --- settings page 17/51 (shell) ---
     {
         "group": "shell",
         "label": "Color picker",
@@ -1310,7 +1337,7 @@
             }
         ]
     },
-    // --- settings page 20/53 (shell) ---
+    // --- settings page 18/51 (shell) ---
     {
         "group": "shell",
         "label": "Lock screen",
@@ -1449,7 +1476,7 @@
             }
         ]
     },
-    // --- settings page 21/53 (shell) ---
+    // --- settings page 19/51 (shell) ---
     {
         "group": "shell",
         "id": "idle",
@@ -1489,7 +1516,7 @@
         ],
         "items": []
     },
-    // --- settings page 22/53 (shell) ---
+    // --- settings page 20/51 (shell) ---
     {
         "group": "shell",
         "id": "media-controls",
@@ -1531,7 +1558,7 @@
             }
         ]
     },
-    // --- settings page 23/53 (shell) ---
+    // --- settings page 21/51 (shell) ---
     {
         "group": "shell",
         "id": "power",
@@ -1634,7 +1661,7 @@
         ],
         "items": []
     },
-    // --- settings page 24/53 (env) ---
+    // --- settings page 22/51 (env) ---
     {
         "group": "env",
         "label": "Recording",
@@ -1761,7 +1788,7 @@
             }
         ]
     },
-    // --- settings page 25/53 (env) ---
+    // --- settings page 23/51 (env) ---
     {
         "group": "env",
         "label": "Brightness",
@@ -1803,7 +1830,7 @@
             }
         ]
     },
-    // --- settings page 26/53 (hypr) ---
+    // --- settings page 24/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland",
@@ -1843,7 +1870,7 @@
         ],
         "options": []
     },
-    // --- settings page 27/53 (hypr) ---
+    // --- settings page 25/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-edit",
@@ -1881,7 +1908,7 @@
         ],
         "options": []
     },
-    // --- settings page 28/53 (hypr) ---
+    // --- settings page 26/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input",
@@ -2012,7 +2039,7 @@
             }
         ]
     },
-    // --- settings page 29/53 (hypr) ---
+    // --- settings page 27/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input-touchpad",
@@ -2073,9 +2100,23 @@
                     "ctl": "input.touchpad.disable_while_typing"
                 }
             }
+        ],
+        "items": [
+            {
+                "type": "group",
+                "id": "touchpadToggles",
+                "label": "Additional options",
+                "sub": "Control additional options",
+                "icon": "list",
+                "children": [
+                    "hypr.input.touchpad.disable_while_typing",
+                    "hypr.input.touchpad.natural_scroll",
+                    "hypr.input.touchpad.tap_to_click"
+                ]
+            }
         ]
     },
-    // --- settings page 30/53 (hypr) ---
+    // --- settings page 28/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input-layouts",
@@ -2128,7 +2169,7 @@
             }
         ]
     },
-    // --- settings page 31/53 (hypr) ---
+    // --- settings page 29/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance",
@@ -2204,7 +2245,7 @@
         ],
         "options": []
     },
-    // --- settings page 32/53 (hypr) ---
+    // --- settings page 30/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-gaps",
@@ -2297,7 +2338,7 @@
             }
         ]
     },
-    // --- settings page 33/53 (hypr) ---
+    // --- settings page 31/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur",
@@ -2827,7 +2868,7 @@
             }
         ]
     },
-    // --- settings page 34/53 (hypr) ---
+    // --- settings page 32/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-acrylic",
@@ -2906,7 +2947,7 @@
             }
         ]
     },
-    // --- settings page 35/53 (hypr) ---
+    // --- settings page 33/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-aurora",
@@ -2949,7 +2990,7 @@
             }
         ]
     },
-    // --- settings page 36/53 (hypr) ---
+    // --- settings page 34/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-drops",
@@ -2975,7 +3016,7 @@
             }
         ]
     },
-    // --- settings page 37/53 (hypr) ---
+    // --- settings page 35/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-fluid_jar",
@@ -3086,7 +3127,7 @@
             }
         ]
     },
-    // --- settings page 38/53 (hypr) ---
+    // --- settings page 36/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-glass",
@@ -3148,7 +3189,7 @@
             }
         ]
     },
-    // --- settings page 39/53 (hypr) ---
+    // --- settings page 37/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-haze",
@@ -3191,7 +3232,7 @@
             }
         ]
     },
-    // --- settings page 40/53 (hypr) ---
+    // --- settings page 38/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-heat_shimmer",
@@ -3217,7 +3258,7 @@
             }
         ]
     },
-    // --- settings page 41/53 (hypr) ---
+    // --- settings page 39/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-ripple",
@@ -3298,7 +3339,7 @@
             }
         ]
     },
-    // --- settings page 42/53 (hypr) ---
+    // --- settings page 40/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-water",
@@ -3395,7 +3436,7 @@
             }
         ]
     },
-    // --- settings page 43/53 (hypr) ---
+    // --- settings page 41/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-glow",
@@ -3463,7 +3504,7 @@
             }
         ]
     },
-    // --- settings page 44/53 (hypr) ---
+    // --- settings page 42/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-shadow",
@@ -3571,7 +3612,7 @@
             }
         ]
     },
-    // --- settings page 45/53 (hypr) ---
+    // --- settings page 43/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-decoration",
@@ -3730,7 +3771,7 @@
             }
         ]
     },
-    // --- settings page 46/53 (hypr) ---
+    // --- settings page 44/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-wobble",
@@ -3912,7 +3953,7 @@
             }
         ]
     },
-    // --- settings page 47/53 (hypr) ---
+    // --- settings page 45/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-dim",
@@ -4002,7 +4043,7 @@
             }
         ]
     },
-    // --- settings page 48/53 (hypr) ---
+    // --- settings page 46/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-animations",
@@ -4077,7 +4118,7 @@
             }
         ]
     },
-    // --- settings page 49/53 (hypr) ---
+    // --- settings page 47/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced",
@@ -4249,7 +4290,7 @@
             }
         ]
     },
-    // --- settings page 50/53 (hypr) ---
+    // --- settings page 48/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-cursor",
@@ -4564,9 +4605,32 @@
                     "ctl": "cursor.zoom_disable_aa"
                 }
             }
+        ],
+        "items": [
+            {
+                "type": "group",
+                "id": "cursorToggles",
+                "label": "Additional options",
+                "sub": "Control additional options",
+                "icon": "list",
+                "children": [
+                    "hypr.cursor.warp_back_after_non_mouse_input",
+                    "hypr.cursor.zoom_disable_aa",
+                    "hypr.cursor.sync_gsettings_theme",
+                    "hypr.cursor.zoom_detached_camera",
+                    "hypr.cursor.enable_hyprcursor",
+                    "hypr.cursor.hide_on_key_press",
+                    "hypr.cursor.persistent_warps",
+                    "hypr.cursor.hide_on_tablet",
+                    "hypr.cursor.hide_on_touch",
+                    "hypr.cursor.invisible",
+                    "hypr.cursor.zoom_rigid",
+                    "hypr.cursor.no_warps"
+                ]
+            }
         ]
     },
-    // --- settings page 51/53 (hypr) ---
+    // --- settings page 49/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-scrolling",
@@ -4687,9 +4751,23 @@
                     "ctl": "scrolling.wrap_focus"
                 }
             }
+        ],
+        "items": [
+            {
+                "type": "group",
+                "id": "scrollingToggles",
+                "label": "Additional options",
+                "sub": "Control additional options",
+                "icon": "list",
+                "children": [
+                    "hypr.scrolling.follow_focus",
+                    "hypr.scrolling.wrap_swapcol",
+                    "hypr.scrolling.wrap_focus"
+                ]
+            }
         ]
     },
-    // --- settings page 52/53 (hypr) ---
+    // --- settings page 50/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-dwindle",
@@ -4844,9 +4922,26 @@
                     "ctl": "dwindle.precise_mouse_move"
                 }
             }
+        ],
+        "items": [
+            {
+                "type": "group",
+                "id": "dwindleToggles",
+                "label": "Additional options",
+                "sub": "Control additional options",
+                "icon": "list",
+                "children": [
+                    "hypr.dwindle.use_active_for_splits",
+                    "hypr.dwindle.permanent_direction_override",
+                    "hypr.dwindle.precise_mouse_move",
+                    "hypr.dwindle.preserve_split",
+                    "hypr.dwindle.smart_resizing",
+                    "hypr.dwindle.smart_split"
+                ]
+            }
         ]
     },
-    // --- settings page 53/53 (hypr) ---
+    // --- settings page 51/51 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-master",
@@ -5052,6 +5147,23 @@
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.focus_master_on_close"
                 }
+            }
+        ],
+        "items": [
+            {
+                "type": "group",
+                "id": "masterToggles",
+                "label": "Additional options",
+                "sub": "Control additional options",
+                "icon": "list",
+                "children": [
+                    "hypr.master.focus_master_on_close",
+                    "hypr.master.always_keep_position",
+                    "hypr.master.allow_small_split",
+                    "hypr.master.smart_resizing",
+                    "hypr.master.drop_at_cursor",
+                    "hypr.master.new_on_top"
+                ]
             }
         ]
     }

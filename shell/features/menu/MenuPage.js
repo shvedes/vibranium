@@ -25,7 +25,8 @@ const SELECTABLE = {
   range: true,
   text: true,
   expandable: true,
-  option: true
+  option: true,
+  group: true
 }
 
 function defaultsFor(type) {
@@ -233,6 +234,14 @@ function hayFromItem(item, includeMetadata) {
         }
       }
     }
+    // Group children have no row of their own, so their labels are searchable
+    // through the row that opens them.
+    if (Array.isArray(item.children)) {
+      for (let i = 0; i < item.children.length; i++) {
+        const c = item.children[i]
+        if (c && typeof c === "object" && c.label) parts.push(String(c.label))
+      }
+    }
     // Canonical keys help power users ("RECORDING_FPS" -> FPS row) and make
     // extension ids searchable.
     if (item.var) parts.push(String(item.var))
@@ -255,6 +264,23 @@ function uidKey(rawId, index) {
   const trimmed = rawId.trim()
   if (trimmed === "") return String(index)
   return trimmed.replace(/[#:]/g, "-").replace(/[\x00-\x1f\x7f]/g, "-")
+}
+
+// The child rows of a group row. Each one is a full row record: the group's
+// cursor flips a toggle child through the same store write a page row makes, so
+// it needs the identity that write is keyed by.
+function normalizeChildren(rawChildren, pageId, parentKey) {
+  const list = StoreGuards.asList(rawChildren)
+  const out = []
+  for (let i = 0; i < list.length; i++) {
+    const raw = list[i]
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue
+    const child = normalizeItem(raw, pageId, i)
+    child._uidKey = parentKey + "/" + child._uidKey
+    child.uid = pageId + "#" + child._uidKey
+    out.push(child)
+  }
+  return out
 }
 
 function normalizeItem(raw, pageId, index) {
@@ -309,6 +335,10 @@ function normalizeItem(raw, pageId, index) {
   // positional uids. Internal key rides along for the dedupe pass.
   item._uidKey = uidKey(raw.id, index)
   item.uid = pageId + "#" + item._uidKey
+  // A group row's dropdown holds whole entries, so its children normalize like
+  // rows of the page - same defaults, same selectable verdict - under a uid
+  // keyed from the parent, so a toggle child keeps a runtime slot of its own.
+  if (type === "group") item.children = normalizeChildren(raw.children, pageId, item._uidKey)
   item.selectable = SELECTABLE[type] === true && item.enabled !== false
   item.hay = hayFromItem(item)
   // The "/" quick-filter's visible-only haystack (hayForFilter) is NOT built

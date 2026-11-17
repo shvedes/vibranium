@@ -51,11 +51,12 @@ This badge cycle keeps running even when shell animations are off, so the
 other families stay discoverable; the rest of the shell still honors the
 animation setting.
 
-Each family has its own switch under Menu -> Settings -> App launcher:
-**Show game badges**, **Show chat badges**, **Show browser badges**,
-**Show document badges**, **Show media badges** and **Show system badges**.
-None is nested under the PWA/TUI badge toggle, so any one can be hidden on
-its own.
+Each family has its own switch under Menu -> Settings -> App launcher.
+**Show badges** is a master over the whole cycle: turn it off and no launcher
+badge shows. The **Enabled badges** row beneath it unfolds all seven families,
+**PWA / TUI**, **Document**, **Browser**, **System**, **Media**, **Game** and
+**Chat**, each with its own glyph. The families stay independent of one
+another, so any one can be hidden on its own; only the master hides them all.
 
 !!! tip
     Enable **Show app descriptions** in the settings to render each app's
@@ -316,8 +317,8 @@ copies of the same message.
     `fx` is the only launcher plugin that does. It fetches one rate document
     from a free, key-less endpoint and caches it for ten minutes, so a whole
     session of conversions costs one request. If the fetch fails the row says
-    so rather than showing a stale or invented number. Disable it in
-    Menu -> Settings -> App launcher -> Enabled plugins.
+    so rather than showing a stale or invented number. Disable it from the
+    **Enabled plugins** row in Menu -> Settings -> App launcher.
 
 ## Color
 
@@ -407,8 +408,8 @@ A typed time with a zone reads back in your local zone, so `7:55pm cst`
 is US Central `-0600`, `IST` is India `+0530`); a bare time means today
 in the source zone, and ++enter++ copies the local time.
 
-Each plugin can be toggled independently, from Menu -> Settings -> App
-launcher -> Enabled plugins or from the CLI:
+Each plugin can be toggled independently, from the **Enabled plugins** row in
+Menu -> Settings -> App launcher, or from the CLI:
 
 ```bash
 vb-shell appLauncher plugins             # list plugin configs
@@ -467,9 +468,9 @@ skipped with a warning and never blocks the launcher.
 ## Settings
 
 Configure in **Vibranium Menu** -> **Settings** -> **App Launcher**:
-show icons, show PWA/TUI badges, show game, chat, browser, document, media
-and system badges, show web apps, search engine, sort order, auto-select,
-app description display and focus-first behavior.
+show icons, the badge master and its seven family switches in the **Enabled
+badges** dropdown, show web apps, search engine,
+sort order, auto-select, app description display and focus-first behavior.
 
 **Focus first** focuses an existing window of the app instead of
 spawning a new instance. Window identity is derived from the desktop

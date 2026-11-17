@@ -104,6 +104,10 @@ Singleton {
   readonly property int chevronW: 16
   readonly property int optMarkW: 14
   readonly property int rowIconW: 20
+  // A group child's glyph sits a step down from a row's: the child line is
+  // shorter than an entry and the icon is the only furniture it carries on
+  // the left. GroupRow paints at this size and MenuWidth reserves it.
+  readonly property int childIconW: 16
   readonly property int outerPad: 14
   readonly property int listTopGap: 10
   readonly property int emptyMinH: 140

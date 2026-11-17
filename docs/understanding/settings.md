@@ -92,6 +92,42 @@ inline markup as `desc`.
 }
 ```
 
+### Grouped options
+
+An option may name an `icon` (a shipped SVG stem) for the row that renders it,
+and a page may collect options into one dropdown row instead of drawing them
+one under another. The group is a plain menu item whose `children` name option
+keys; each key keeps its own option record, so a child row validates, seeds and
+persists exactly like the row it replaces. A claimed option is not drawn as a
+row of its own - it appears only inside the group.
+
+A child may also be a whole item instead of an option key. That is how a switch
+the shell resolves through a provider - an app launcher plugin, a bar module -
+embeds the same row its own page used to carry: the id is what the provider
+answers the pill and the flip with, so the dropdown holds one switch, not a
+copy. Such children declare no `icon`, and their page goes away with them.
+
+```jsonc
+{
+  "type": "group",
+  "label": "Enabled badges",
+  "icon": "grid",
+  "after": "shell.launcher.showBadges",
+  "showIf": { "key": "shell.launcher.showBadges", "eq": true },
+  "children": [
+    "shell.launcher.showGameBadge",
+    "shell.launcher.showChatBadge"
+  ]
+}
+```
+
+Child rows render without a sub line - a dropdown lists what can be switched
+on - behind the icon their option declares, at a size one step down from a
+row's own glyph, and a toggle child is flipped in place by Enter or a click.
+A child carrying a `when` guard is left out of the list while the guard says no,
+the way the gated row it replaced was. `after` places the group under the row it belongs
+to; without it the group follows every generated option row on the page.
+
 ### Conditional visibility
 
 Three layers - pick by what the condition depends on.

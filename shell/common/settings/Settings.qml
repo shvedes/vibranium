@@ -643,8 +643,8 @@ Singleton {
     // for the Hyprland store, and misc.* options resolve here too so
     // menuPages can carry MiscSettings' live cursor values into the one
     // menu tree (MiscSettings stays the single writer). The group
-    // is the ownership - including the items-only pages (launcher-enabled,
-    // bar-enabled, bar-modules), which carry no option to infer it from.
+    // is the ownership - including the items-only page (bar-modules), which
+    // carries no option to infer it from.
     const kept = []
     for (let i = 0; i < catalog.sections.length; i++) {
       const pg = catalog.sections[i]

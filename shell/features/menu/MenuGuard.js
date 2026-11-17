@@ -13,41 +13,57 @@
 .import "../../common/text/StringUtils.js" as SU
 
 // One bash script for every when:/checked:/disabled: expression in the
-// bundle, reporting `<uid>:<w|c|d>:<0|1>` per line. The menu opens on the
+// bundle - group children included, since they are rows the menu gates and
+// flips like any other - reporting `<uid>:<w|c|d>:<0|1>` per line. The menu opens on the
 // previous evaluation's answers, so however long this takes is how long a
 // row can contradict the state it describes.
 function buildGuardScript(pages) {
   let script = ""
   for (let p = 0; p < pages.length; p++) {
     const items = pages[p].items
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      // `when` and `requires` are INDEPENDENT conditions on one row, so they
-      // answer as one verdict, and they are emitted as ONE `w` line for the
-      // same uid: the reader collapses a repeated uid last-one-wins, so a
-      // second line would let an OR stand in for an AND, and an extension
-      // that added a `requires` to a row whose own `when` said false would
-      // make the row show. A refused `requires` shape is an unconditional
-      // hide, which is not an expression and so cannot be ANDed; it wins
-      // outright.
-      const rq = requiresExpr(item.requires)
-      const when = typeof item.when === "string" ? item.when.trim() : ""
-      // A `when` that is not a string is a config error, and the two ways of
-      // answering it were a silent drop and a hard hide - the same mistake met
-      // two different fates depending on which field carried it. The drop was
-      // the worse of the two: the row then rendered with no verdict at all,
-      // and a missing verdict reads as VISIBLE, so a typo in a guard unhid the
-      // row it was meant to hide. Same fail-open the reader had on a nonzero
-      // exit, one level down. Refuse it the way a refused `requires` is
-      // refused, and the two fields finally agree.
-      if (rq === null || (item.when !== "" && typeof item.when !== "string"))
-        script += hideLine(item.uid)
-      else if (rq === undefined) script += guardLine(item.uid, "w", when)
-      else script += guardLine(item.uid, "w", when === "" ? rq : when + " && " + rq)
-      script += guardLine(item.uid, "c", item.checked)
-      script += guardLine(item.uid, "d", item.disabled)
-    }
+    for (let i = 0; i < items.length; i++) script += rowGuardLines(items[i])
   }
+  return script
+}
+
+// One row's guards, then the same for the entries a group row carries: a
+// dropdown child is a row too, and a `when` on one has to answer, because a
+// gated row reads as blocked until its verdict arrives.
+function rowGuardLines(item) {
+  if (!item || typeof item !== "object") return ""
+  // `when` and `requires` are INDEPENDENT conditions on one row, so they
+  // answer as one verdict, and they are emitted as ONE `w` line for the
+  // same uid: the reader collapses a repeated uid last-one-wins, so a
+  // second line would let an OR stand in for an AND, and an extension
+  // that added a `requires` to a row whose own `when` said false would
+  // make the row show. A refused `requires` shape is an unconditional
+  // hide, which is not an expression and so cannot be ANDed; it wins
+  // outright.
+  const rq = requiresExpr(item.requires)
+  // A group child can reach this walk before the menu normalizes it, so its
+  // when/checked/disabled may be absent rather than the normalized "", and
+  // reading an absent one as a non-string would hide every child. A null is
+  // still refused: it was DECLARED and is not an expression, which is the
+  // fail-closed answer the malformed shapes get.
+  const rawWhen = item.when === undefined ? "" : item.when
+  const when = typeof rawWhen === "string" ? rawWhen.trim() : ""
+  // A `when` that is not a string is a config error, and the two ways of
+  // answering it were a silent drop and a hard hide - the same mistake met
+  // two different fates depending on which field carried it. The drop was
+  // the worse of the two: the row then rendered with no verdict at all,
+  // and a missing verdict reads as VISIBLE, so a typo in a guard unhid the
+  // row it was meant to hide. Same fail-open the reader had on a nonzero
+  // exit, one level down. Refuse it the way a refused `requires` is
+  // refused, and the two fields finally agree.
+  let script = ""
+  if (rq === null || (rawWhen !== "" && typeof rawWhen !== "string"))
+    script += hideLine(item.uid)
+  else if (rq === undefined) script += guardLine(item.uid, "w", when)
+  else script += guardLine(item.uid, "w", when === "" ? rq : when + " && " + rq)
+  script += guardLine(item.uid, "c", item.checked)
+  script += guardLine(item.uid, "d", item.disabled)
+  const kids = Array.isArray(item.children) ? item.children : []
+  for (let c = 0; c < kids.length; c++) script += rowGuardLines(kids[c])
   return script
 }
 

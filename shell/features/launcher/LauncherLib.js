@@ -226,25 +226,27 @@ function appRow(rec, options) {
   const opt = options || {}
   const showDesc = opt.showDescriptions === true
   const desc = SU.textOf(rec && rec.desc)
-  // Every badge family has its own switch, on par with the PWA/TUI pair
-  // rather than nested under it, so a user can keep one glyph and hide the
-  // rest. Filtering keeps the record's precedence order, so `badges` is the
-  // exact cycle the delegate runs and `badge` stays its first stem. The three
-  // media stems share one toggle, and the legacy single-`badge` record shape
-  // is read as a one-element list.
+  // `showBadges` is a master over the whole cycle; every family - PWA/TUI
+  // included - has its own switch beneath it, so one glyph can be kept and
+  // the rest hidden without the families gating one another. Filtering keeps
+  // the record's precedence order, so `badges` is the exact cycle the delegate
+  // runs and `badge` stays its first stem. The three media stems share one
+  // toggle, and the legacy single-`badge` record shape is a one-element list.
+  const master = opt.showBadges === true
   const src = badgeList(rec)
   const badges = []
   for (let i = 0; i < src.length; i++) {
     const stem = SU.textOf(src[i])
     if (stem === "") continue
-    let on = opt.showBadges === true
-    if (stem === "gamepad") on = opt.showGameBadge === true
-    else if (stem === "chat") on = opt.showChatBadge === true
-    else if (stem === "globe") on = opt.showBrowserBadge === true
-    else if (stem === "file") on = opt.showDocumentBadge === true
-    else if (stem === "settings") on = opt.showSystemBadge === true
+    let on = master
+    if (stem === "webapp" || stem === "tui") on = master && opt.showManagedBadge === true
+    else if (stem === "gamepad") on = master && opt.showGameBadge === true
+    else if (stem === "chat") on = master && opt.showChatBadge === true
+    else if (stem === "globe") on = master && opt.showBrowserBadge === true
+    else if (stem === "file") on = master && opt.showDocumentBadge === true
+    else if (stem === "settings") on = master && opt.showSystemBadge === true
     else if (stem === "headphones" || stem === "clapperboard" || stem === "image")
-      on = opt.showMediaBadge === true
+      on = master && opt.showMediaBadge === true
     if (on) badges.push(stem)
   }
   return {

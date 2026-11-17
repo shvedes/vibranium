@@ -945,7 +945,7 @@ group('appRow maps a record into the row the launcher renders', () => {
   }
   const on = LL.appRow(rec, {
     showDescriptions: true, noDescriptionText: 'No description',
-    showIcons: true, showBadges: true,
+    showIcons: true, showBadges: true, showManagedBadge: true,
   })
   eq('the row kind', on.kind, 'app')
   eq('the identity', on.uid, 'app:x')
@@ -969,62 +969,86 @@ group('appRow maps a record into the row the launcher renders', () => {
   const bare = LL.appRow({ uid: 'app:z', label: 'Z' })
   eq('no options at all reads as every option off', [bare.sub, bare.desc, bare.icon, bare.badge], ['', '', '', ''])
   eq('and the boolean flags default to false', [bare.runInTerminal, bare.removable], [false, false])
-  eq('a non-string badge is stringified when enabled', LL.appRow(rec, { showBadges: true }).badge, 'webapp')
-  // The game badge rides its own switch, so it is neither enabled by the
-  // PWA/TUI one nor hidden by it being off.
+  eq('a non-string badge is stringified when enabled',
+    LL.appRow(rec, { showBadges: true, showManagedBadge: true }).badge, 'webapp')
+  // PWA/TUI is a family under the master, not the master itself.
+  eq('webapp is off under the master alone', LL.appRow(rec, { showBadges: true }).badge, '')
+  eq('and shows under its own switch',
+    LL.appRow(rec, { showBadges: true, showManagedBadge: true }).badge, 'webapp')
+  eq('with the master off even its own switch cannot show it',
+    LL.appRow(rec, { showManagedBadge: true }).badge, '')
+  const tui = { ...rec, badge: 'tui' }
+  eq('TUI rides the same family switch',
+    LL.appRow(tui, { showBadges: true, showManagedBadge: true }).badge, 'tui')
+  eq('and is off without it', LL.appRow(tui, { showBadges: true }).badge, '')
+  // Each family owns a switch beneath the master; no family gates another.
   const game = { ...rec, badge: 'gamepad' }
-  eq('the game badge is off under the PWA/TUI switch alone', LL.appRow(game, { showBadges: true }).badge, '')
-  eq('and shows under its own switch', LL.appRow(game, { showGameBadge: true }).badge, 'gamepad')
-  eq('with the PWA/TUI switch off it still shows', LL.appRow(game, { showBadges: false, showGameBadge: true }).badge, 'gamepad')
-  eq('and the game switch does not gate a webapp', LL.appRow(rec, { showBadges: true, showGameBadge: false }).badge, 'webapp')
-  // Each category family owns a switch, so no family is enabled or hidden by
-  // another family's toggle.
+  eq('the game badge is off under the master alone', LL.appRow(game, { showBadges: true }).badge, '')
+  eq('and shows under its own switch',
+    LL.appRow(game, { showBadges: true, showGameBadge: true }).badge, 'gamepad')
+  eq('with the master off it stays hidden',
+    LL.appRow(game, { showGameBadge: true }).badge, '')
+  eq('and the game switch does not gate a webapp',
+    LL.appRow(rec, { showBadges: true, showManagedBadge: true, showGameBadge: false }).badge, 'webapp')
   const chat = { ...rec, badge: 'chat' }
-  eq('chat is off under the PWA/TUI switch alone', LL.appRow(chat, { showBadges: true }).badge, '')
-  eq('chat shows under its own switch', LL.appRow(chat, { showChatBadge: true }).badge, 'chat')
-  eq('the game switch does not gate chat', LL.appRow(chat, { showGameBadge: true }).badge, '')
+  eq('chat is off under the master alone', LL.appRow(chat, { showBadges: true }).badge, '')
+  eq('chat shows under its own switch',
+    LL.appRow(chat, { showBadges: true, showChatBadge: true }).badge, 'chat')
+  eq('the game switch does not gate chat',
+    LL.appRow(chat, { showBadges: true, showGameBadge: true }).badge, '')
   const browser = { ...rec, badge: 'globe' }
-  eq('a browser is off under the PWA/TUI switch alone', LL.appRow(browser, { showBadges: true }).badge, '')
-  eq('a browser shows under its own switch', LL.appRow(browser, { showBrowserBadge: true }).badge, 'globe')
-  eq('the chat switch does not gate a browser', LL.appRow(browser, { showChatBadge: true }).badge, '')
+  eq('a browser is off under the master alone', LL.appRow(browser, { showBadges: true }).badge, '')
+  eq('a browser shows under its own switch',
+    LL.appRow(browser, { showBadges: true, showBrowserBadge: true }).badge, 'globe')
+  eq('the chat switch does not gate a browser',
+    LL.appRow(browser, { showBadges: true, showChatBadge: true }).badge, '')
   const doc = { ...rec, badge: 'file' }
-  eq('a document is off under the PWA/TUI switch alone', LL.appRow(doc, { showBadges: true }).badge, '')
-  eq('a document shows under its own switch', LL.appRow(doc, { showDocumentBadge: true }).badge, 'file')
+  eq('a document is off under the master alone', LL.appRow(doc, { showBadges: true }).badge, '')
+  eq('a document shows under its own switch',
+    LL.appRow(doc, { showBadges: true, showDocumentBadge: true }).badge, 'file')
   for (const stem of ['headphones', 'clapperboard', 'image']) {
     const media = { ...rec, badge: stem }
-    eq(`${stem} is off under the PWA/TUI switch alone`, LL.appRow(media, { showBadges: true }).badge, '')
-    eq(`${stem} shows under the media switch`, LL.appRow(media, { showMediaBadge: true }).badge, stem)
-    eq(`${stem} is not gated by the document switch`, LL.appRow(media, { showDocumentBadge: true }).badge, '')
+    eq(`${stem} is off under the master alone`, LL.appRow(media, { showBadges: true }).badge, '')
+    eq(`${stem} shows under the media switch`,
+      LL.appRow(media, { showBadges: true, showMediaBadge: true }).badge, stem)
+    eq(`${stem} is not gated by the document switch`,
+      LL.appRow(media, { showBadges: true, showDocumentBadge: true }).badge, '')
   }
   const system = { ...rec, badge: 'settings' }
-  eq('a system badge is off under the PWA/TUI switch alone', LL.appRow(system, { showBadges: true }).badge, '')
-  eq('a system badge shows under its own switch', LL.appRow(system, { showSystemBadge: true }).badge, 'settings')
-  eq('the media switch does not gate system', LL.appRow(system, { showMediaBadge: true }).badge, '')
+  eq('a system badge is off under the master alone', LL.appRow(system, { showBadges: true }).badge, '')
+  eq('a system badge shows under its own switch',
+    LL.appRow(system, { showBadges: true, showSystemBadge: true }).badge, 'settings')
+  eq('the media switch does not gate system',
+    LL.appRow(system, { showBadges: true, showMediaBadge: true }).badge, '')
 
   // A multi-badge record is filtered, not collapsed: the row carries every
   // enabled family in precedence order and `badge` is the first of those.
   const multi = { ...rec, badge: 'gamepad', badges: ['gamepad', 'chat', 'file', 'settings', 'headphones'] }
   const allOn = LL.appRow(multi, {
+    showBadges: true,
     showGameBadge: true, showChatBadge: true, showDocumentBadge: true,
     showSystemBadge: true, showMediaBadge: true,
   })
   eq('the whole cycle', allOn.badges, ['gamepad', 'chat', 'file', 'settings', 'headphones'])
   eq('badge is the first of the cycle', allOn.badge, 'gamepad')
   const noChat = LL.appRow(multi, {
+    showBadges: true,
     showGameBadge: true, showChatBadge: false, showDocumentBadge: true,
     showSystemBadge: true, showMediaBadge: true,
   })
   eq('a disabled family is removed, not reordered', noChat.badges, ['gamepad', 'file', 'settings', 'headphones'])
   eq('and the first remaining stem leads', noChat.badge, 'gamepad')
-  const onlyMedia = LL.appRow(multi, { showMediaBadge: true })
+  const onlyMedia = LL.appRow(multi, { showBadges: true, showMediaBadge: true })
   eq('only the enabled family survives', onlyMedia.badges, ['headphones'])
   eq('and leads the row', onlyMedia.badge, 'headphones')
+  eq('the master alone clears the whole cycle', LL.appRow(multi, { showBadges: true }).badges, [])
   const browserMulti = { ...rec, badge: 'chat', badges: ['chat', 'globe', 'image'] }
   eq('a browser keeps its place in a cycle',
-    LL.appRow(browserMulti, { showChatBadge: true, showBrowserBadge: true, showMediaBadge: true }).badges,
-    ['chat', 'globe', 'image'])
+    LL.appRow(browserMulti, {
+      showBadges: true, showChatBadge: true, showBrowserBadge: true, showMediaBadge: true,
+    }).badges, ['chat', 'globe', 'image'])
   eq('a legacy single-badge record is a one-item cycle',
-    LL.appRow(rec, { showBadges: true }).badges, ['webapp'])
+    LL.appRow(rec, { showBadges: true, showManagedBadge: true }).badges, ['webapp'])
 })
 
 group('fileRow is the openable target the fallback slot offers', () => {

@@ -300,6 +300,9 @@ Item {
           ? Ui.chevronW : 0
       case "option":
         return Ui.optMarkW
+      case "group":
+        // The chevron that unfolds the child list.
+        return Ui.chevronW
       case "progress": {
         if (root.unifiedValueW > 0) return Ui.barW + Ui.barGap + root.unifiedValueW
         measureValue.text = "100 %"
@@ -430,12 +433,61 @@ Item {
     return best
   }
 
+  // The group's child rows. The row set is a projection that may drop a nested
+  // array, so the live page item is the one that holds them.
+  function _groupChildrenOf(itm) {
+    if (!itm) return []
+    if (Array.isArray(itm.children) && itm.children.length > 0) return itm.children
+    const pristine = Menu.itemByUid(itm.uid)
+    return pristine && Array.isArray(pristine.children) ? pristine.children : []
+  }
+
+  // Card-coordinate width a group dropdown needs so no child label elides. A
+  // child paints at fontM behind the icon column it declares and left of its
+  // toggle, so each of those is reserved from the same tokens GroupRow draws
+  // with.
+  function _groupNeedW(itm) {
+    const kids = root._groupChildrenOf(itm)
+    if (kids.length === 0) return 0
+    let maxLabel = 0
+    let hasIcon = false
+    for (let k = 0; k < kids.length; k++) {
+      const kid = kids[k] ?? {}
+      if (typeof kid.icon === "string" && kid.icon !== "") hasIcon = true
+      const label = String(kid.label ?? "")
+      const shaped = root._shape("grp\u0001" + label, () => {
+        measureOptLabel.text = label
+        return measureOptLabel.implicitWidth
+      })
+      if (shaped > maxLabel) maxLabel = shaped
+    }
+    if (maxLabel === 0) return 0
+    return root.rowChromeW() + 2 * Ui.m
+      + (hasIcon ? Ui.childIconW + Ui.s : 0)
+      + Ui.s + Ui.toggleW + maxLabel
+  }
+
+  // Width the open group dropdown needs, or 0 when none is open - the same
+  // rule an open select follows.
+  function _openGroupNeedW() {
+    let best = 0
+    const rows = root.host.rowsModel
+    for (let i = 0; i < rows.length; i++) {
+      const it = rows[i]
+      if (!it || it.type !== "group" || !Menu.isExpanded(it)) continue
+      const need = root._groupNeedW(it)
+      if (need > best) best = need
+    }
+    return best
+  }
+
   // Grow the card for the open dropdown, shrink it back on close. The width
   // binding clamps to the viewport and onWidthChanged arms the settle reveal,
   // so the entries unveil with the growth instead of starting a beat elided -
   // the same treatment a wider page gets.
   function applyDropdownWidth() {
-    root.contentW = Math.max(root._closedContentW, root._openSelectNeedW())
+    root.contentW = Math.max(root._closedContentW,
+      root._openSelectNeedW(), root._openGroupNeedW())
   }
 
   // What Entry's valueMetrics shapes for a numeric row: the widest reading the
