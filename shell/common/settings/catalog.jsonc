@@ -546,49 +546,14 @@
         "options": [],
         "items": [
             {
-                "id": "bar-privacy",
-                "type": "toggle",
-                "label": "Privacy"
-            },
-            {
-                "id": "bar-clock",
-                "type": "toggle",
-                "label": "Clock"
-            },
-            {
                 "id": "bar-keyboardLayout",
                 "type": "toggle",
                 "label": "Keyboard layout"
             },
             {
-                "id": "bar-bluetooth",
-                "type": "toggle",
-                "label": "Bluetooth"
-            },
-            {
-                "id": "bar-network",
-                "type": "toggle",
-                "label": "Network"
-            },
-            {
-                "id": "bar-battery",
-                "type": "toggle",
-                "label": "Battery"
-            },
-            {
-                "id": "bar-volume",
-                "type": "toggle",
-                "label": "Volume"
-            },
-            {
                 "id": "bar-powerProfile",
                 "type": "toggle",
                 "label": "Power profile"
-            },
-            {
-                "id": "bar-session",
-                "type": "toggle",
-                "label": "Power & Tray"
             },
             {
                 "id": "bar-archUpdates",
@@ -601,15 +566,25 @@
                 "label": "Color picker"
             },
             {
+                "id": "bar-session",
+                "type": "toggle",
+                "label": "Power & Tray"
+            },
+            {
                 "id": "bar-nightLight",
                 "type": "toggle",
                 "label": "Night Light",
                 "when": "[[ \"$CHASSIS_TYPE\" != vm ]]"
             },
             {
-                "id": "bar-weather",
+                "id": "bar-nowPlaying",
                 "type": "toggle",
-                "label": "Weather"
+                "label": "Now Playing"
+            },
+            {
+                "id": "bar-bluetooth",
+                "type": "toggle",
+                "label": "Bluetooth"
             },
             {
                 "id": "bar-printers",
@@ -617,9 +592,34 @@
                 "label": "Printers"
             },
             {
-                "id": "bar-nowPlaying",
+                "id": "bar-battery",
                 "type": "toggle",
-                "label": "Now Playing"
+                "label": "Battery"
+            },
+            {
+                "id": "bar-network",
+                "type": "toggle",
+                "label": "Network"
+            },
+            {
+                "id": "bar-privacy",
+                "type": "toggle",
+                "label": "Privacy"
+            },
+            {
+                "id": "bar-weather",
+                "type": "toggle",
+                "label": "Weather"
+            },
+            {
+                "id": "bar-volume",
+                "type": "toggle",
+                "label": "Volume"
+            },
+            {
+                "id": "bar-clock",
+                "type": "toggle",
+                "label": "Clock"
             }
         ]
     },
