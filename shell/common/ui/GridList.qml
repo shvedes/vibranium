@@ -141,13 +141,16 @@ GridView {
 
   // Grid cursor movement. Cells step along the flat sequence; callers
   // step rows via moveRow. Clamps into [0, count-1].
-  function gotoCell(idx) {
+  function gotoCell(idx, snap) {
     const n = root.count
     if (n === 0) return false
     idx = Range.clamp(idx, 0, n - 1)
     if (idx === root.currentIndex) return false
     root.currentIndex = idx
-    root.positionViewAtIndex(idx, GridView.Contain)
+    // A wrap owns the viewport through sweepToEnd. A Contain snap here would
+    // land on the opposite end a polish before the sweep rewinds, painting
+    // one frame at the destination and then jumping back to start the glide.
+    if (snap !== false) root.positionViewAtIndex(idx, GridView.Contain)
     return true
   }
 
@@ -164,7 +167,7 @@ GridView {
     if (cand < 0) cand = root.firstSelectable()
     else if (cand >= n) cand = root.lastSelectable()
     const wrapped = (step > 0 && cand < start) || (step < 0 && cand > start)
-    if (!root.gotoCell(cand)) return false
+    if (!root.gotoCell(cand, !wrapped)) return false
     if (wrapped) root.sweepToEnd(step > 0)
     return true
   }
@@ -185,7 +188,7 @@ GridView {
     if (cand < 0) cand = root.firstSelectable()
     else if (cand >= n) cand = root.lastSelectable()
     const wrapped = (step > 0 && cand < start) || (step < 0 && cand > start)
-    if (!root.gotoCell(cand)) return false
+    if (!root.gotoCell(cand, !wrapped)) return false
     if (wrapped) root.sweepToEnd(step > 0)
     return true
   }
