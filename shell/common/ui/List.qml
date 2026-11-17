@@ -1076,8 +1076,12 @@ ListView {
     return root._sumH + (n - root._countH) * root._avg()
       + root.spacing * (n - 1)
   }
-  function tableMaxY() {
-    return Math.max(0, root.tableTotal() - root.height)
+  function tableMaxY(viewH) {
+    // A restore that knows the viewport's final height must clamp against
+    // that, not the live height of a card still gliding from another page's
+    // size. Every other caller omits viewH and keeps the live answer.
+    const h = viewH > 0 ? viewH : root.height
+    return Math.max(0, root.tableTotal() - h)
   }
   // Height the first `maxRows` rows occupy, clamped to what the viewport
   // can show. Live geometry is the authority; a row the view has not
@@ -1171,11 +1175,17 @@ ListView {
   // the table was just cleared and the live extent belongs to a half-built
   // content. There the live extent is the bound, because it is the only one
   // that grows as the replacement rows measure.
-  function clampY(y) {
+  function clampY(y, viewH) {
     // NaN (never +-Infinity: followCursor queries the bound with
     // +Infinity) degenerates to the top.
     if (Number.isNaN(y)) return 0
-    let maxY = root.tableMaxY()
+    let maxY = root.tableMaxY(viewH)
+    // With an explicit final viewport height, the live contentHeight is
+    // still the outgoing row set's extent on a synchronous page install.
+    // Substituting it would clamp the saved offset to ~0 for the first
+    // frame. The table bound built on viewH is the right one; the deferred
+    // retry re-clamps against the settled live extent.
+    if (viewH > 0) return Range.clamp(y, 0, maxY)
     if (root.contentHeight > 0) {
       const realMaxY = Math.max(0, root.contentHeight - root.height)
       if (root._swapHold) {
@@ -1283,7 +1293,7 @@ ListView {
   // not a full unfold, and pacing one at the full slot duration would
   // crawl. Absent (or not positive) the seat keeps the distance-paced
   // duration.
-  function seatTo(y, animated, tag, paceMs) {
+  function seatTo(y, animated, tag, paceMs, viewH) {
     root._syncIdentitySet()
     // Bumped for a no-op seat too, and deliberately: the epoch is the token a
     // deferred retry compares against to learn that a NEWER seat exists, and
@@ -1292,7 +1302,7 @@ ListView {
     // stale retry fire after the no-op and drag the view off the position
     // the no-op just confirmed.
     root._seatEpoch++
-    const target = root.clampY(y)
+    const target = root.clampY(y, viewH)
     // Claims are released before the no-op return: a seat that lands where
     // the view already stands starts no tween, so it owns nothing, and a
     // stale claim left behind lets pursue() mistake a foreign tween for its
@@ -1683,7 +1693,7 @@ ListView {
   // Exact restore seat: cursor index plus absolute scroll offset, no
   // motion. Out-of-range indices clamp; non-selectable indices scan
   // forward with wrap. A guarded re-apply covers measurement drift.
-  function restoreAt(index, y) {
+  function restoreAt(index, y, viewH) {
     const count = root.count
     if (count <= 0) return
     let i = Range.clamp(index, 0, count - 1)
@@ -1707,7 +1717,7 @@ ListView {
     // the absolute scroll below overwrites the center follow at once, so
     // no frame lands between the two. Observed release re-arms the glide.
     root.seat(i, "land")
-    root.seatTo(y, false, "restore")
+    root.seatTo(y, false, "restore", 0, viewH)
     const e = root._seatEpoch
     Idle.run(() => {
       if (token !== root._restoreToken) return
@@ -1722,7 +1732,7 @@ ListView {
       if (root.currentIndex !== i) {
         return
       }
-      root.seatTo(y, false, "restore-retry")
+      root.seatTo(y, false, "restore-retry", 0, viewH)
     }, 2)
   }
 

@@ -1398,7 +1398,12 @@ Rectangle {
       panel._pendingPlan = null
       panel._rowsPending = false
       if (candidate === null || generation !== panel._pendingGen) return
-      panel._installRows(candidate, install, generation, sameTurn)
+      // Search projections flush in this turn through the `searching` term
+      // below, not through the caller's sameTurn flag. Carry that decision
+      // into the install so a wide ranked set gets the same-turn swap close
+      // and seat as a page swap instead of the multi-turn finalize.
+      const installNow = sameTurn === true || panel.searching || panel.scopedSearching
+      panel._installRows(candidate, install, generation, installNow)
     }
     // A page swap, like a search projection, installs in this turn instead of
     // on the next event-loop hop. recomputeRows has already published
@@ -3253,7 +3258,10 @@ Rectangle {
     // the lib - index plus entrance scroll, no glide, no trailing
     // re-center. settle() would recenter deferred and wipe the scroll.
     const seatScroll = snapRestore && !panel.gridMode && y !== undefined
-    if (seatScroll) list.restoreAt(sel, y)
+    // Pass the final viewport height: on a synchronous page install the live
+    // contentHeight/height still describe the outgoing page, and clamping
+    // against them would paint the parent at the top for a couple of frames.
+    if (seatScroll) list.restoreAt(sel, y, viewH)
     else viewSettle(sel, snapRestore, viewH)
     panel.recordSeat()
     // The place the focused row goes, owed until the page has settled: the
