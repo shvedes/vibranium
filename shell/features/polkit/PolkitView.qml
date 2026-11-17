@@ -29,7 +29,9 @@ import "PolkitTrace.js" as PolkitTrace
 // The vignette over that dim layer is the lockscreen's, at the lockscreen's
 // level and with the lockscreen's fade - the level is fixed here rather
 // than offered as an option, and the dim follows the lockscreen's own dim
-// setting so the two never drift apart.
+// setting so the two never drift apart. A fixed veil sits between the two
+// so the vignette's transparent center stays dimmed for readability even
+// when that setting is low; it is a plain rectangle and takes no input.
 Variants {
   model: Ui.validScreens
 
@@ -44,6 +46,12 @@ Variants {
     // Vignette darkness at the corners: the lockscreen's medium level,
     // fixed rather than configurable.
     readonly property real vignetteK: 0.8
+    // Fixed baseline dim under the vignette. The flat scrim above follows
+    // the lockscreen's dim setting and can sit low enough that the vignette's
+    // fully transparent center leaves the desktop bright: text loses contrast
+    // and movement behind the card pulls the eye. This veil keeps the whole
+    // background dimmed at a floor independent of that setting.
+    readonly property real veilDim: 0.5
     // The vignette's animated factor, 0 -> vignetteK. Its own ramp, the
     // lockscreen's: the darkening settles in over a second rather than
     // arriving with the card.
@@ -256,6 +264,15 @@ Variants {
       anchors.fill: parent
       color: "#000000"
       opacity: win.dim * win.showK
+    }
+
+    // Baseline veil over the scrim and under the vignette: a plain rectangle,
+    // so it stays passthrough and never takes a click away from the refocus
+    // area. It dims the vignette's transparent center as well as the edges.
+    Rectangle {
+      anchors.fill: parent
+      color: "#000000"
+      opacity: win.veilDim * win.showK
     }
 
     // The vignette, over the scrim and under the card. Its level is fixed
