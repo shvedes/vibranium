@@ -294,9 +294,23 @@ BarModule {
     if (job === null) root.toolMissing = false
   }
 
-  // The bar boots before the first island opens, so the answer is already
-  // there when the card is built.
-  Component.onCompleted: root.probeTool()
+  // The probe forks vb-util-download, so firing it from onCompleted contends
+  // with the boot entrance the wallpaper fade, the bar slidefade and the
+  // module flashes share. Hold it until that motion has finished drawing -
+  // the same milestone the launcher index and the menu prewarm wait on. The
+  // island re-probes on every open, so a module built after the milestone
+  // checks on its next turn rather than never.
+  Connections {
+    target: DesktopLayoutState
+
+    function onBootEntrancePlayedChanged() {
+      if (DesktopLayoutState.bootEntrancePlayed) root.probeTool()
+    }
+  }
+
+  Component.onCompleted: {
+    if (DesktopLayoutState.bootEntrancePlayed) Qt.callLater(root.probeTool)
+  }
 
   // What the dispatcher thinks the link is. The island shows the verdict and
   // uses it to decide whether a format table or a file card belongs on screen.
