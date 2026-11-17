@@ -123,6 +123,9 @@ copy. Such children declare no `icon`, and their page goes away with them.
 
 Each child is still a whole row: a `sub` line paints under its label, behind
 the icon the option declares and at a size one step down from a row's own glyph.
+A child can be any page row type - toggle, progress, text, select, number or
+range - drawn by the same Entry at that smaller register. Its editor or option
+dropdown unfolds inside the group with the same push as its description.
 Ctrl-I on the child under the cursor unfolds that child's `desc` or `warning` in
 a nested dropdown inside the group's own dropdown. The slot is an overlay, so
 the card keeps its resting size while the rows around the child shift inside the

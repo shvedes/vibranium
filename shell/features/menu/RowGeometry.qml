@@ -95,6 +95,25 @@ QtObject {
     font.family: Ui.fontFamily
   }
 
+  // The compact register a nested row draws in. A child of a group is the
+  // same row as a page row at a smaller title size, so this is the same rule
+  // over the child's token set - not a second rest-height rule. The sub line
+  // keeps the primary token: both registers already draw it at fontXs.
+  readonly property FontMetrics childLabelMetrics: FontMetrics {
+    font.pixelSize: Ui.fontM
+    font.family: Ui.fontFamily
+  }
+  readonly property real childLabelLineH: Math.ceil(root.childLabelMetrics.height)
+  readonly property var childTokens: ({
+    labelLineH: root.childLabelLineH,
+    subLineH: root.primarySubLineH,
+    swatchH: root.swatchH,
+    sepPadV: root.sepPadV,
+    bareSepH: root.bareSepH,
+    rowMinH: Ui.rowMinH,
+    rowPadV: Ui.rowPadV
+  })
+
   // Fallback shaping samples: the scripts the menu corpus actually contains.
   // TextMetrics shapes the string, so the height it reports is the one the
   // fallback face would lay out, not the primary face's.
@@ -167,6 +186,13 @@ QtObject {
 
   function restSeparatorFor(hasLabel, lineH) {
     return RowRule.restSeparator(hasLabel, root.tokensFor(root.primaryLabelLineH, lineH))
+  }
+
+  // The compact register, asked with the same rule as the page register.
+  function childRestH(kind) { return RowRule.restH(kind, root.childTokens) }
+  function childColH(kind) { return RowRule.colH(kind, root.childTokens) }
+  function childRestSeparator(hasLabel) {
+    return RowRule.restSeparator(hasLabel, root.childTokens)
   }
 
   // A chrome row (the inline editor) is not shaped copy: it rests on the

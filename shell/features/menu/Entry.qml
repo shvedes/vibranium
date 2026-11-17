@@ -126,6 +126,25 @@ Item {
   readonly property bool hasGroup: row.groupChildren.length > 0
   readonly property bool hasEditor: hasStepper || isText
 
+  // A nested row is the same row type drawn one register smaller under a
+  // parent group entry. Every view, state write and animation below is the
+  // page row's; only the register shrinks, and the host owns the push that
+  // reveals the slots instead of the card resizing for them.
+  property bool nested: false
+  readonly property real titleFontPx: nested ? Ui.fontM : Ui.fontL
+  readonly property real valueFontPx: nested ? Ui.fontXs : Ui.fontS
+  readonly property real iconBox: nested ? Ui.childIconW : Ui.rowIconW
+  readonly property real barWidth: nested ? Math.round(Ui.barW * 0.6) : Ui.barW
+  readonly property real barGap: nested ? Ui.s : Ui.barGap
+  readonly property real chevronWidth: nested ? 12 : Ui.chevronW
+  // The host reads this to grow its selection bar and push the neighbours.
+  readonly property real nestedSlotH: descSlot.height + expandSlot.height
+  readonly property real nestedSlotTop: mainLine.y + mainLine.height
+  readonly property real nestedBarH: Math.max(staticRowH, nestedSlotTop + nestedSlotH)
+  readonly property real nestedSettledBarH: Math.max(staticRowH,
+    nestedSlotTop + descSlot.settledH + expandSlot.settledH)
+  signal activated()
+
   // Free-text prompt hosted inside a select row's expansion: picking the
   // dropdown option whose value matches editValue swaps the dropdown for
   // the text editor (prefilled with editText) instead of closing the
@@ -277,6 +296,9 @@ Item {
   // Group dropdown cursor; -1 closed. A group lists its children in one
   // column, so the cursor is the child the arrows and Enter act on.
   property int childIndex: -1
+  // The live group component, while it is loaded. Keys that land on an open
+  // child dropdown are delegated to that child's own row.
+  property var _groupView: null
 
   // A guard landing (or a store write) can remove a child under the cursor;
   // the index then points past the end, so it retreats to the last child.
@@ -393,17 +415,21 @@ Item {
   // compact token; copy that reaches a fallback face takes the taller one.
   // The panel's model-side estimate uses the same rule, so the card and the
   // delegate agree about the row's height.
-  readonly property real labelLineH: row.isSep ? 0 : RowGeometry.labelHFor(row.displayLabel)
+  readonly property real labelLineH: row.isSep ? 0
+    : nested ? RowGeometry.childLabelLineH
+    : RowGeometry.labelHFor(row.displayLabel)
   readonly property real subLineH: row.isSep
     ? RowGeometry.subHFor(row.sepLabel)
     : RowGeometry.subHFor(RowGeometry.subSampleFor(itm, row.subText))
   readonly property real staticRowH: row.isSep ? 0
+    : nested ? RowGeometry.childRestH(row.restKind)
     : RowGeometry.restHFor(row.restKind, row.labelLineH, row.subLineH)
   // The separator's rest height, from the shared row rule (RowGeometry): the
   // breadcrumb's pinned line plus its breathing, or the bare hairline. A
   // newborn delegate reports this before its own Text polishes because the
   // number is the shared line token rather than this row's laid-out text.
   readonly property real sepH: !row.isSep ? 0
+    : nested ? RowGeometry.childRestSeparator(row.sepLabel !== "")
     : RowGeometry.restSeparatorFor(row.sepLabel !== "", row.subLineH)
   readonly property string iconName: itm ? String(itm.icon ?? "") : ""
   // The emoji the row stands for, painted in the icon slot when the row
@@ -515,7 +541,10 @@ Item {
   width: ListView.view ? ListView.view.width : 240
   // Progress bars and range tracks live INLINE in the trail cluster, so
   // every row keeps the same height as its neighbors.
-  height: isSep ? sepH : row.staticRowH + descSlot.height + expandSlot.height
+  // In nested mode the slots are overlays: the host grows its selection bar
+  // and pushes the neighbours, so this box stays at the row's rest height.
+  height: isSep ? sepH : row.nested ? row.staticRowH
+    : row.staticRowH + descSlot.height + expandSlot.height
   // Guard-disabled rows fade (they stay reachable); an unavailable row keeps
   // its contrast and is muted by its mute box instead, so the two hints stay
   // distinguishable.
@@ -640,6 +669,9 @@ Item {
 
   function activate() {
     if (!enabled_) return
+    // The host seats its cursor on the child whose row activated, so a click
+    // and Enter take the same path through the group as through the page.
+    row.activated()
     const _wasFiltered = Menu.scopedActive
     try {
       // Generic staged confirmation (timer, recording, clearHistory and any
@@ -758,28 +790,28 @@ Item {
     }
   }
 
-  // Flip one child entry of a group row through the routes a page row uses, so
-  // a toggle inside a dropdown persists exactly like a toggle on the page.
-  function flipChild(child) {
-    if (!child) return
-    const _wasFiltered = Menu.scopedActive
-    try {
-      const state = !Menu.isToggleOn(child)
-      if (Menu.handleToggle(child, state)) return
-      if (child.var === "" && !child.onToggle) return
-      Menu.setChecked(child, state)
-      if (child.onToggle) Menu.runCommand(child.onToggle, state)
-    } finally {
-      if (_wasFiltered && Menu.scopedActive) Menu.clearScoped()
-    }
-  }
-
   function setExpanded(value) {
     if (!itm || searchResult) return
     Menu.setExpanded(itm, value)
   }
 
+  function _focusedChildRow() {
+    const view = row._groupView
+    const item = view && view.cursorItem
+    return item && item.liveRow ? item.liveRow : null
+  }
+
   function collapse() {
+    // A child's editor or dropdown is a row of its own: folding the group
+    // folds whichever nested one is open with it.
+    const view = row._groupView
+    if (view) {
+      const kids = view.childrenRepeater
+      for (let i = 0; i < kids.count; i++) {
+        const item = kids.itemAt(i)
+        if (item && item.liveRow && item.liveRow.expanded) item.liveRow.collapse()
+      }
+    }
     setExpanded(false)
     optionIndex = -1
     row.childIndex = -1
@@ -842,6 +874,10 @@ Item {
   // Panel-driven dropdown navigation; returns true when consumed.
   function moveOption(direction) {
     if (row.isGroup) {
+      // An open child dropdown owns the arrows, the way a page row's does.
+      const childRow = row._focusedChildRow()
+      if (childRow && childRow.dropdownOpen
+        && childRow.moveOption(direction)) return true
       const kids = row.groupChildren.length
       // A direction of 0 is a page key that has no column to page to: leave it
       // for the row's own step handling.
@@ -866,9 +902,12 @@ Item {
   function pickCurrent() {
     if (!dropdownOpen || !itm) return false
     if (row.isGroup) {
-      const kids = row.groupChildren
-      if (row.childIndex < 0 || row.childIndex >= kids.length) return false
-      row.flipChild(kids[row.childIndex])
+      const childRow = row._focusedChildRow()
+      if (childRow && childRow.dropdownOpen) return childRow.pickCurrent()
+      if (!childRow || row.childIndex < 0) return false
+      // The child's own row owns the activation, so a select opens its
+      // options, a number opens its editor, and a toggle flips in place.
+      childRow.activate()
       return true
     }
     const opts = row.optionList
@@ -1240,7 +1279,9 @@ Item {
     // creation; the Column below remains THE layout - it settles to this same
     // number a frame later, and the panel's model-side estimate is the same
     // rule asked about the row record.
-      readonly property int labelColH: RowGeometry.colHFor(row.restKind, row.labelLineH, row.subLineH)
+      readonly property int labelColH: row.nested
+        ? RowGeometry.childColH(row.restKind)
+        : RowGeometry.colHFor(row.restKind, row.labelLineH, row.subLineH)
 
     height: labelColH
 
@@ -1250,7 +1291,7 @@ Item {
       visible: row.iconName !== ""
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      size: Ui.rowIconW
+      size: row.iconBox
       name: row.iconName
       // The glyph stays in the ordinary foreground so the swatch strip below
       // - painted in the theme's real colours - is the only place colour is
@@ -1274,13 +1315,13 @@ Item {
       visible: row.glyphText !== ""
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      width: Ui.rowIconW
-      height: Ui.rowIconW
+      width: row.iconBox
+      height: row.iconBox
       horizontalAlignment: Text.AlignHCenter
       verticalAlignment: Text.AlignVCenter
       text: row.glyphText
       color: Ui.solid("foreground_0")
-      font.pixelSize: Math.round(Ui.rowIconW * 0.86)
+      font.pixelSize: Math.round(row.iconBox * 0.86)
       font.family: "Noto Color Emoji"
       textFormat: Text.PlainText
       // A flag is several codepoints (the tag sequence) and can outrun the
@@ -1325,7 +1366,7 @@ Item {
           verticalAlignment: Text.AlignVCenter
           text: row.displayLabel
           color: Theme.color("foreground_0")
-          font.pixelSize: Ui.fontL
+          font.pixelSize: row.titleFontPx
           font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
           elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
           clip: row.textReveal < 1
@@ -1470,10 +1511,10 @@ Item {
       id: seekBar
 
       anchors.right: valueText.left
-      anchors.rightMargin: Ui.barGap
+      anchors.rightMargin: row.barGap
       anchors.verticalCenter: parent.verticalCenter
       visible: row.isRange
-      width: Ui.barW
+      width: row.barWidth
       height: Ui.barH
       value: row.ratio * 100
       dimWhenEmpty: false
@@ -1524,10 +1565,10 @@ Item {
       id: progressBar
 
       anchors.right: pctText.left
-      anchors.rightMargin: Ui.barGap
+      anchors.rightMargin: row.barGap
       anchors.verticalCenter: parent.verticalCenter
       visible: row.ptype === "progress"
-      width: Ui.barW
+      width: row.barWidth
       height: Ui.barH
       value: row.ratio * 100
       dimWhenEmpty: false
@@ -1549,7 +1590,7 @@ Item {
       horizontalAlignment: Text.AlignRight
       text: Format.percentInt(row.ratio) + " %"
       color: Ui.tint("foreground_1", 0.75)
-      font.pixelSize: Ui.fontS
+      font.pixelSize: row.valueFontPx
       font.family: Ui.fontFamily
       textFormat: Text.PlainText
       elide: Text.ElideNone
@@ -1559,7 +1600,7 @@ Item {
       TextMetrics {
         id: pctMetrics
 
-        font.pixelSize: Ui.fontS
+        font.pixelSize: row.valueFontPx
         font.family: Ui.fontFamily
         text: "100 %"
       }
@@ -1587,7 +1628,7 @@ Item {
       color: row.valueActive ? Theme.color("accent")
         : row.editorOpen ? Theme.color("accent")
         : Ui.tint("foreground_1", 0.75)
-      font.pixelSize: Ui.fontS
+      font.pixelSize: row.valueFontPx
       font.family: Ui.fontFamily
       font.bold: row.editorOpen || row.valueActive
       elide: Text.ElideNone
@@ -1604,7 +1645,7 @@ Item {
       TextMetrics {
         id: valueMetrics
 
-        font.pixelSize: Ui.fontS
+        font.pixelSize: row.valueFontPx
         font.family: Ui.fontFamily
         text: MenuLib.widestValueString(row.itm) || "888.88"
       }
@@ -1635,7 +1676,7 @@ Item {
       opacity: 0
       color: row.dropdownOpen ? Theme.color("foreground_0")
         : Ui.tint("foreground_1", 0.75)
-      font.pixelSize: Ui.fontS
+      font.pixelSize: row.valueFontPx
       font.family: Ui.fontFamily
       elide: Text.ElideNone
       clip: false
@@ -1647,7 +1688,7 @@ Item {
       TextMetrics {
         id: ghostMetrics
 
-        font.pixelSize: Ui.fontS
+        font.pixelSize: row.valueFontPx
         font.family: Ui.fontFamily
         text: selectGhost.text
       }
@@ -1717,7 +1758,7 @@ Item {
       onTextChanged: row.onSelectValueChanged()
       color: row.dropdownOpen ? Theme.color("foreground_0")
         : Ui.tint("foreground_1", 0.75)
-      font.pixelSize: Ui.fontS
+      font.pixelSize: row.valueFontPx
       font.family: Ui.fontFamily
       elide: Text.ElideNone
       clip: false
@@ -1735,7 +1776,7 @@ Item {
       TextMetrics {
         id: selectMetrics
 
-        font.pixelSize: Ui.fontS
+        font.pixelSize: row.valueFontPx
         font.family: Ui.fontFamily
         text: row.selectLabel
       }
@@ -1764,7 +1805,7 @@ Item {
         return v !== "" ? Theme.color("foreground_1")
           : Ui.tint("foreground_1", 0.35)
       }
-      font.pixelSize: Ui.fontS
+      font.pixelSize: row.valueFontPx
       font.family: Ui.fontFamily
       font.italic: row.st ? String(row.st.value ?? "") === "" : false
       elide: Text.ElideNone
@@ -1781,7 +1822,7 @@ Item {
       TextMetrics {
         id: textMetrics
 
-        font.pixelSize: Ui.fontS
+        font.pixelSize: row.valueFontPx
         font.family: Ui.fontFamily
         text: {
           const v = row.st ? String(row.st.value ?? "") : ""
@@ -1808,7 +1849,7 @@ Item {
 
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      width: visible ? Ui.chevronW : 0
+      width: visible ? row.chevronWidth : 0
       height: 16
       visible: row.isSubmenu || row.searchResult
 
@@ -1832,7 +1873,7 @@ Item {
 
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      width: visible ? Ui.chevronW : 0
+      width: visible ? row.chevronWidth : 0
       height: 16
       visible: (row.isGroup && row.hasGroup)
         || (row.isExpandable && !row.infoOnly && (row.descText !== "" || row.bodyText !== ""))
@@ -1878,6 +1919,10 @@ Item {
   // region at all (see MenuPanel listRegionH).
   DropdownSlot {
     id: descSlot
+
+    // A nested row paints its overlay above the siblings that follow it in
+    // the group's column, the way the group's own cursor bar does.
+    z: nested ? 1 : 0
 
     anchors.left: parent.left
     anchors.right: parent.right
@@ -1929,6 +1974,8 @@ Item {
   // loader's content instantiated while the height eases to zero.
   DropdownSlot {
     id: expandSlot
+
+    z: nested ? 1 : 0
 
     anchors.left: parent.left
     anchors.right: parent.right
@@ -2242,15 +2289,22 @@ Item {
       // inside the clipped box instead of past it with no room left to scroll.
       readonly property real focusSettledExtra: cursorItem ? cursorItem.settledExtra : 0
       onFocusSettledExtraChanged: groupRoot.latchDirection()
+      // Exposed so the owning row can fold an open child editor with the
+      // group and delegate keys to the focused child.
+      property var childrenRepeater: groupRepeater
 
       // Entrance fade, matching the select dropdown: opening reads as an
       // arrival rather than watching the card grow under static copy.
       Component.onCompleted: {
+        row._groupView = groupRoot
         groupRoot.trackCursor()
         if (MotionPolicy.enabled && row.dropdownOpen) {
           groupRoot.opacity = 0
           groupEnter.restart()
         }
+      }
+      Component.onDestruction: {
+        if (row._groupView === groupRoot) row._groupView = null
       }
       NumberAnimation {
         id: groupEnter
@@ -2306,16 +2360,8 @@ Item {
 
           delegate: GroupRow {
             width: groupCol.width
-            cursor: row.childIndex === index
             slideY: index > row.childIndex ? groupRoot.liveExtra : 0
-            checked: {
-              Menu.rev
-              return modelData.type === "toggle" ? Menu.isToggleOn(modelData) : false
-            }
-            onPicked: {
-              row.childIndex = index
-              row.flipChild(modelData)
-            }
+            onPicked: row.childIndex = index
           }
         }
       }

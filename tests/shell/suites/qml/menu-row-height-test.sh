@@ -242,6 +242,24 @@ t_contains "the panel projects the same two registers" \
 t_contains "a chrome row (the inline editor) rests on the primary register" \
   "RowGeometry.primaryRestH(\"line\")" "$(<"$MENU_DIR/InlineEditor.qml")"
 
+# A nested child is the same Entry at the smaller register, not a second row
+# type: one set of views, state writes and animations for both depths.
+t_contains "the delegate has a nested mode" "property bool nested: false" "$ENTRY_SRC"
+t_contains "the nested title uses the child register" \
+  "nested ? Ui.fontM : Ui.fontL" "$ENTRY_SRC"
+t_contains "and the nested value uses the child register" \
+  "nested ? Ui.fontXs : Ui.fontS" "$ENTRY_SRC"
+t_contains "the shared geometry publishes child tokens" \
+  "readonly property var childTokens" "$GEO_SRC"
+t_contains "the child rest height asks the same rule" \
+  "function childRestH(kind)" "$GEO_SRC"
+t_contains "the group child hosts Entry itself" \
+  'Qt.resolvedUrl("Entry.qml")' "$(<"$MENU_DIR/GroupRow.qml")"
+t_contains "and loads it by URL, breaking the type cycle" \
+  "setSource(" "$(<"$MENU_DIR/GroupRow.qml")"
+t_contains "at the compact register" "nested: true" \
+  "$(<"$MENU_DIR/GroupRow.qml")"
+
 # One instance means nobody instantiates one. An Item here would be a second
 # pair of FontMetrics per delegate, which is what the singleton removed.
 t_not_contains "the delegate instantiates no geometry item" "RowGeometry {" "$ENTRY_SRC"

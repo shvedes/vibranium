@@ -1629,6 +1629,27 @@ group('buildBundle: group children keep their sub and description', () => {
   eq('the unclaimed option stays on the page', page.items.some((i) => i.var === 'A_OTHER'), true)
 })
 
+group('buildBundle: a group can hold every page row type as a child', () => {
+  const c = catalog('{"pages":[{"id":"a","label":"A","items":[' +
+    '{"type":"group","id":"g","label":"Group","children":[' +
+    '{"id":"p","type":"progress","label":"Battery","progressValue":42},' +
+    '{"id":"t","type":"text","label":"Name","placeholder":"your name","value":"Hi"},' +
+    '{"id":"s","type":"select","label":"Mode","value":"b","options":[' +
+    '{"label":"A","value":"a"},{"label":"B","value":"b"}]},' +
+    '{"id":"n","type":"number","label":"Minutes","min":1,"max":10,' +
+    '"step":1,"value":5,"unit":"min"}]}]}]}')
+  const sch = SL.buildSchema(c.sections, 0, '')
+  const b = SL.buildBundle(sch, {})
+  const page = b.pages.find((p) => p.id === 'a')
+  const grp = page.items.find((i) => i.type === 'group')
+  eq('all four children survive', grp.children.length, 4)
+  eq('progress keeps its level', grp.children[0].progressValue, 42)
+  eq('text keeps its placeholder', grp.children[1].placeholder, 'your name')
+  eq('select keeps its options', grp.children[2].options.length, 2)
+  eq('number keeps its bounds', [grp.children[3].min, grp.children[3].max], [1, 10])
+  eq('number keeps its unit', grp.children[3].unit, 'min')
+})
+
 // ===========================================================================
 section('HyprlandEditor - typed values and the text primitives')
 // ===========================================================================

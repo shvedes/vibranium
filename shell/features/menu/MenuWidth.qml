@@ -451,7 +451,16 @@ Item {
     if (kids.length === 0) return 0
     let maxLabel = 0
     let maxSub = 0
+    let maxValue = 0
     let hasIcon = false
+    const valueW = (text, key) => {
+      const s = String(text ?? "")
+      if (s === "") return 0
+      return root._shape("grpval\u0001" + key + "\u0001" + s, () => {
+        measureSubStyled.text = s
+        return measureSubStyled.implicitWidth
+      })
+    }
     for (let k = 0; k < kids.length; k++) {
       const kid = kids[k] ?? {}
       if (typeof kid.icon === "string" && kid.icon !== "") hasIcon = true
@@ -472,11 +481,27 @@ Item {
         })
         if (subW > maxSub) maxSub = subW
       }
+      // The value box on the row's right: option labels for a nested select,
+      // the stored value for a number or text child, and the percentage slot
+      // plus its bar for a progress child. Reserve the same copy at the
+      // compact register Entry uses for the child.
+      if (kid.type === "progress") {
+        maxValue = Math.max(maxValue,
+          valueW("100 %", "pct") + Math.round(Ui.barW * 0.6))
+      } else if (Array.isArray(kid.options)) {
+        for (let o = 0; o < kid.options.length; o++) {
+          const opt = kid.options[o] ?? {}
+          maxValue = Math.max(maxValue, valueW(opt.label ?? opt.value, "opt" + o))
+        }
+      } else if (kid.var !== undefined || kid.value !== undefined) {
+        maxValue = Math.max(maxValue, valueW(kid.value, "val"))
+      }
     }
-    if (maxLabel === 0 && maxSub === 0) return 0
+    if (maxLabel === 0 && maxSub === 0 && maxValue === 0) return 0
     return root.rowChromeW() + 2 * Ui.m
       + (hasIcon ? Ui.childIconW + Ui.s : 0)
       + Ui.s + Ui.toggleW + Math.max(maxLabel, maxSub)
+      + (maxValue > 0 ? Ui.s + maxValue : 0)
   }
 
   // Width the open group dropdown needs, or 0 when none is open - the same
