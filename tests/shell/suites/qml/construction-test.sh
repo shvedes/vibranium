@@ -357,7 +357,9 @@ supplied.qs.common.LyricsPane=player: null"
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=258
+# qs.common.BootGate is the shared milestone gate: a QtObject over a
+# Connections watch, declared through an explicit default child list.
+EXPECTED_DECLARED_COUNT=259
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -378,7 +380,10 @@ EXPECTED_DECLARED_COUNT=258
 # radial gradient, with no singleton and no window behind it.
 # qs.common.HiddenWallpapers is clean for the same reason: a FileView and a
 # JsonAdapter over one state file, with no window and no environment.
-EXPECTED_CLEAN_COUNT=122
+# qs.common.BootGate is clean: a QtObject whose only dependency is a
+# Connections watch on the already-constructed DesktopLayoutState singleton,
+# with no window or environment behind it.
+EXPECTED_CLEAN_COUNT=123
 EXPECTED_NEEDS_COUNT=126
 EXPECTED_UNCREATABLE_COUNT=9
 

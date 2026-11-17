@@ -1068,13 +1068,15 @@ Item {
     // AppLauncher._prewarm - so nothing expensive moves onto the module build
     // this phase exists to keep clear.
     boot._startEarly()
-    // Phase order, not a delay: the drain waits for boot construction to
-    // settle, so it cannot overlap the module build the entrance is
-    // choreographed around. It does not wait for the entrance itself: every
-    // resident service would then come up one animation late for frames the
-    // entrance already draws, and the per-turn budget below is what keeps the
-    // drain off those frames anyway.
-    if (!DesktopLayoutState.bootEntranceSettled) {
+    // Phase order, not a delay: the early tier (session, lock, notifications,
+    // the IPC daemons) already came up at half adoption, so the gate here only
+    // holds the entrance and deferred queues - the units that compose pages,
+    // scan directories and build panel trees. A single one of those can spend
+    // far more than frameBudgetMs in one call, so the budget alone cannot keep
+    // them off the frames the entrance is drawing. Wait for the motion's own
+    // end instead, the same milestone the prewarms read, and the drain lands
+    // on the first quiet frame.
+    if (!DesktopLayoutState.bootEntrancePlayed) {
       boot._drainRequested = true
       return
     }
@@ -1585,10 +1587,10 @@ Item {
     function onReadyChanged() { boot._refreshUnit("icons") }
   }
 
-  // The construction milestone owns when the background phases start (see
-  // _beginDrain): the drain request parked there runs on this edge. The two
-  // milestones are also the tail the verdict excludes - the bar's module build
-  // and the entrance motion - so they are logged against the process start.
+  // The construction milestone starts the feature half's compile; the played
+  // milestone releases the drain request parked in _beginDrain. Both milestones
+  // are the tail the verdict excludes - the bar's module build and the entrance
+  // motion - so they are logged against the process start.
   Connections {
     target: DesktopLayoutState
     function onBootEntranceSettledChanged() {
@@ -1597,13 +1599,13 @@ Item {
       // backstop settles this milestone even when no bar reported, so a shell
       // whose bar never latches still loads the half.
       if (DesktopLayoutState.bootEntranceSettled) boot._loadFeaturesHalf()
-      if (boot._drainRequested) boot._beginDrain()
       if (DesktopLayoutState.bootEntranceSettled) {
         Log.debug("boot: entrance settled in " + boot._sinceProcessStart() + "ms")
       }
     }
     function onBootEntrancePlayedChanged() {
       if (DesktopLayoutState.bootEntrancePlayed) {
+        boot._beginDrain()
         Log.debug("boot: entrance played in " + boot._sinceProcessStart() + "ms")
       }
     }
