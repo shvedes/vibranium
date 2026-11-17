@@ -528,7 +528,7 @@ Rectangle {
   // read by any binding, so publishing it costs the install nothing.
   property var _lastSyncPlan: null
 
-  function recomputeRows(intent) {
+  function recomputeRows(intent, sameTurn) {
     // Nothing to render while closed - and skipping keeps killswitch
     // closes free of four-digit row churn. Reopening re-triggers
     // through the stack/query/bundle connections.
@@ -638,7 +638,7 @@ Rectangle {
     // separator. The equality check above still compares against the outgoing
     // set, captured in `prev`.
     panel.rowsModel = candidate
-    if (!panel.syncRowsList(candidate, plan, records)) return
+    if (!panel.syncRowsList(candidate, plan, records, sameTurn)) return
     panel.projectRows(candidate)
     // A close latch belongs to a row this model still lists. `candidate` is
     // the authoritative "what the model will show", so the reconcile needs
@@ -1207,12 +1207,15 @@ Rectangle {
     return MenuRows.cursorSurvives(panel._records, list.currentIndex, records)
   }
 
-  function _installRows(records, plan, generation) {
+  function _installRows(records, plan, generation, sameTurn) {
     if (generation !== panel._pendingGen) return
     // Motionless installs wait for the previous motionless write to land
     // (see _quiesceReady); motion installs proceed as before. Held payloads
     // re-queue through the normal coalescing, so the latest wins.
-    if (!plan.glide && !panel._quiesceReady()) {
+    // A same-turn page install is one wholesale replacement with its own swap
+    // window; holding it for the previous motionless write is what leaves the
+    // outgoing page's rows painted in the new box on back navigation.
+    if (!plan.glide && sameTurn !== true && !panel._quiesceReady()) {
       panel._queueRows(records, plan, true)
       return
     }
@@ -1308,6 +1311,28 @@ Rectangle {
           && panel.expansionNeedH <= 0 && !Menu.slotClosing) panel.fitFromModel()
       }
 
+    // A page swap owns the whole frame: it is one wholesale replacement, so
+    // there is no outgoing highlight to hand off and recomputeRows has already
+    // run the fit in this turn. Closing the swap here (instead of two or three
+    // turns later) is what stops the card from painting a held highlight and
+    // re-fitting itself across several frames. The only thing left for a later
+    // turn is the re-seat safety net, which is invisible when it lands on the
+    // row the same-turn seat already chose.
+    if (sameTurn === true) {
+      if (panel._swapping) {
+        panel._swapping = false
+        panel._swapPendingGen = -1
+        list.endSwap()
+      }
+      if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
+      else {
+        if (typeof list.unpinHighlight === "function") list.unpinHighlight()
+        list._keepCursor = false
+      }
+      Idle.run(() => panel._reseatFrameSel(), 2)
+      return
+    }
+
     Idle.run(() => {
       if (panel._swapGen !== g || panel._pendingGen !== generation) {
         if (panel._swapGen === g) panel._releaseSwap()
@@ -1349,7 +1374,7 @@ Rectangle {
     }, 2)
   }
 
-  function _queueRows(records, plan, defer) {
+  function _queueRows(records, plan, defer, sameTurn) {
     if (records === null) {
       panel._invalidatePendingRows()
       return
@@ -1359,7 +1384,10 @@ Rectangle {
     panel._pendingGen++
     if (panel._swapping && panel._swapPendingGen !== panel._pendingGen)
       panel._releaseSwap()
-    if (panel._rowsPending) return
+    // A page swap takes over a still-queued install: its own flush would land
+    // the new candidate a turn late. The superseded closure returns on the
+    // cleared latch below, so only this turn writes.
+    if (panel._rowsPending && sameTurn !== true) return
     panel._rowsPending = true
     const flush = () => {
       if (!panel._rowsPending) return
@@ -1370,18 +1398,20 @@ Rectangle {
       panel._pendingPlan = null
       panel._rowsPending = false
       if (candidate === null || generation !== panel._pendingGen) return
-      panel._installRows(candidate, install, generation)
+      panel._installRows(candidate, install, generation, sameTurn)
     }
-    // A search projection is installed in this turn instead of on the next
-    // event-loop hop. recomputeRows has already published rowsModel and the
-    // card's new width synchronously, so deferring only the view's model
-    // paints the resized window with no result rows for a frame - visible
-    // with motion off, where no slide fade masks the gap. setQuery is already
-    // a Qt.callLater turn out of the field's text-change signal, so writing
-    // the model here cannot re-enter that signal. A write the quiesce
-    // handshake has not settled still defers, through the forced path in
-    // _installRows, so back-to-back installs cannot strand delegates.
-    if (defer !== true && (panel.searching || panel.scopedSearching)) {
+    // A page swap, like a search projection, installs in this turn instead of
+    // on the next event-loop hop. recomputeRows has already published
+    // rowsModel and resized the card synchronously, so deferring only the
+    // view's model paints the resized window with the outgoing page's rows
+    // for a frame - visible on cold boot (no slide tween) and on back
+    // navigation, where the short submenu's rows sit in the taller card.
+    // Search is already a Qt.callLater turn out of the field's text-change
+    // signal; navigation runs from the page-id handler, and neither writes
+    // the property that triggered it. A write the quiesce handshake has not
+    // settled still defers, through the forced path in _installRows, so
+    // back-to-back installs cannot strand delegates.
+    if (defer !== true && (sameTurn === true || panel.searching || panel.scopedSearching)) {
       flush()
       return
     }
@@ -1395,7 +1425,7 @@ Rectangle {
   // `plan` is rowSyncPlan's answer, handed in by the one entry point that
   // has the intent and the row count (recomputeRows). This function installs
   // it and never re-derives it.
-  function syncRowsList(candidate, plan, records) {
+  function syncRowsList(candidate, plan, records, sameTurn) {
     const keyed = records === undefined ? panel.keyedRows(candidate) : records
     if (keyed === null) {
       panel._invalidatePendingRows()
@@ -1437,7 +1467,7 @@ Rectangle {
       panel._rowsMoving = false
       rowsMotionTimer.stop()
     }
-    panel._queueRows(keyed, plan)
+    panel._queueRows(keyed, plan, false, sameTurn)
     return true
   }
 
@@ -1559,15 +1589,36 @@ Rectangle {
     // deferred reveal/install left over from the leaving page first, so
     // it cannot land on the destination page.
     panel._invalidatePendingRows()
-    panel.recomputeRows("rebuild")
+    // Install the landing row set in this turn, alongside the resize: the
+    // card owns the new box now and a deferred _records would paint the
+    // outgoing page's rows into it for a frame.
+    panel.recomputeRows("rebuild", true)
     if (transitionGen < 0) return
+    // The model reset parks the cursor at the head on its own. With the
+    // install now in this turn, seat the frame's remembered row here too so
+    // the first painted frame already highlights the link we came back to.
+    // The same-turn install closes its own swap before this seat runs, so no
+    // later applyFrameState is left to move the cursor again.
+    panel.applyFrameState()
+    const depth = panel._pendingSlideDepth
+    if (depth < 0) return
+    // A page that will not tween has nothing to hide the swap behind, so
+    // reveal it in this turn too. Deferring the snap left the freshly resized
+    // card empty for a frame (cold boot and motion off); a real slide still
+    // starts a turn later, masked by its own fade.
+    if (listBox.lastDepth === -1 || !MotionPolicy.enabled
+      || depth === listBox.lastDepth) {
+      panel._pendingSlideDepth = -1
+      listBox.slideFor(depth, transitionGen, true)
+      return
+    }
     Qt.callLater(() => {
       if (transitionGen !== panel._transitionGen
         || !Menu.open || !panel._transitionActive) return
-      const depth = panel._pendingSlideDepth
-      if (depth < 0) return
+      if (panel._pendingSlideDepth < 0) return
+      const pendingDepth = panel._pendingSlideDepth
       panel._pendingSlideDepth = -1
-      listBox.slideFor(depth, transitionGen, true)
+      listBox.slideFor(pendingDepth, transitionGen, true)
     })
   }
 
