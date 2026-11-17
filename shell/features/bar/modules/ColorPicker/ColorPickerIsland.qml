@@ -326,11 +326,12 @@ Item {
   // color in the history and close the island; refusals keep it open with the
   // copied flash cleared, so the user's colour is not on the clipboard and the
   // island says so by staying there. A history-row copy only promotes its
-  // existing entry to the front - never re-adds.
+  // existing entry to the front - never re-adds. No island action lights the
+  // bar's code flash: the island's own copied flash is the feedback here.
   function onCopyDone(ok) {
     if (ok === true) {
       if (root.promoteRec !== null && typeof root.promoteRecord === "function") {
-        root.promoteRecord(root.promoteRec)
+        root.promoteRecord(root.promoteRec, false)
       } else {
         root.addPicked()
         root.islandHost.close()
@@ -340,8 +341,9 @@ Item {
     root.copiedKey = ""
   }
 
-  // Add the current picker state to the history without copying, stamped
-  // with the active chip format and a full serialization snapshot.
+  // Land the current picker state in the history, stamped with the active
+  // chip format and a full serialization snapshot. Both callers - Copy and
+  // Add - already show the color here, so neither announces it in the bar.
   function addPicked() {
     const s = Color.hex6(root.picked)
     if (s === "" || typeof root.addRecord !== "function") return
@@ -351,7 +353,7 @@ Item {
     root.addRecord(s, root.picked.a, {
       fmt: root.fmt,
       formats: Color.allFormats(root.picked, root.picked.a)
-    })
+    }, false)
   }
 
   // Delete one history row straight from the list; the module persists.

@@ -410,7 +410,9 @@ BarModule {
   // history entry keeps all its forms including transparency. Dedupe by
   // color+alpha+format and move the repeat to the front, starting from the
   // shared history so an add never drops what another output just stored.
-  function addRecord(colorHex, alpha, meta) {
+  // `fireFlash` defaults on; island actions pass false because they already
+  // show the color, so only a screen pick announces it in the bar.
+  function addRecord(colorHex, alpha, meta, fireFlash) {
     const c = Color.parse(String(colorHex === undefined ? "" : colorHex))
     if (c === null) {
       // A caller handed the store something Color cannot read. The
@@ -439,15 +441,16 @@ BarModule {
       next.push(base[i])
     }
     const ok = root._persist(next)
-    if (ok === true) root._fireCopyFlash(root._recordDisplay(root.records.length > 0 ? root.records[0] : rec))
+    if (ok === true && fireFlash !== false)
+      root._fireCopyFlash(root._recordDisplay(root.records.length > 0 ? root.records[0] : rec))
     return ok
   }
 
   // Move an existing entry to the front without re-adding it - the
   // history-row copy path. Takes the record reference and keys it here,
   // so island and module can never disagree on key format. Returns true
-  // when a row moved.
-  function promoteRecord(rec) {
+  // when a row moved. `fireFlash` defaults on; the island passes false.
+  function promoteRecord(rec, fireFlash) {
     if (!rec || typeof rec !== "object") return false
     const key = root._recKey(rec)
     let moved = null
@@ -465,7 +468,8 @@ BarModule {
     // here is a delete/re-add race rather than a user error.
     if (moved === null) return false
     const ok = root._persist([moved].concat(rest))
-    if (ok === true) root._fireCopyFlash(root._recordDisplay(root.records.length > 0 ? root.records[0] : moved))
+    if (ok === true && fireFlash !== false)
+      root._fireCopyFlash(root._recordDisplay(root.records.length > 0 ? root.records[0] : moved))
     return ok
   }
 
