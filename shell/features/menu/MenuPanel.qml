@@ -100,6 +100,12 @@ Rectangle {
   // another row keeps the native highlight glide while the old slot closes.
   readonly property bool highlightMotion: MotionPolicy.enabled
     && !panel.cursorSlotOpen && !panel._swapping
+    // The first spawn sizes the card and its rows for the first time in the
+    // process. Until that entrance settles, row geometry is provisional and
+    // the bar's Behavior would ease from it to the settled row - the focused
+    // background sliding into place on the first open only. Later opens have
+    // warm geometry, so the gate is spent after the first show.
+    && (panel.shown || panel._everShown)
 
   // Cursor-row slot state (model-level, synchronous): only the focused
   // row's own slot suppresses height animation. A slot left behind on
@@ -2319,13 +2325,17 @@ Rectangle {
   // the card visibly grows on every summon (gap geometry rendering
   // mid-flight). Re-armed per open via onOpenChanged + showGate.
   property bool shown: false
+  property bool _everShown: false
 
   Timer {
     id: showGate
 
     interval: Ui.resizeMs + Ui.fastMs
 
-    onTriggered: panel.shown = true
+    onTriggered: {
+      panel.shown = true
+      panel._everShown = true
+    }
   }
 
   Behavior on width {
