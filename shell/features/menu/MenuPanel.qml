@@ -271,6 +271,7 @@ Rectangle {
     // overriding the new page's size, which is the empty gap under a short
     // submenu.
     panel._releaseSlotRegion()
+    Menu.trace("panel.clear", { site: "pageExit", auto: list.autoRevealIndex })
     list.autoRevealIndex = -1
     list._followIdx = -1
     pageHost.x = 0
@@ -357,6 +358,12 @@ Rectangle {
   // is the one that repeats under the cursor, so it rides the same tween.
   function _startHeightTransition(target, gen) {
     if (gen >= 0 && (gen !== panel._transitionGen || !panel._transitionActive)) return
+    Menu.trace("panel.heightArm", {
+      want: Math.round(target * 10) / 10, gen: gen,
+      cur: Math.round(panel._currentListH() * 10) / 10,
+      claim: Math.round(panel._claimListH * 10) / 10,
+      searching: panel.searching
+    })
     const next = Range.clamp(target, 0, panel.screenMaxListH)
     const current = Math.max(0, panel._currentListH())
     // The show gate, honoured here for the first time. The width Behavior
@@ -374,7 +381,13 @@ Rectangle {
     // the gate window is a real resize the user asked for, not the opening
     // layout, and tweening it is what the card has always done.
     const gateShut = !panel.shown && !panel.searching && !panel.scopedSearching
-    if (!MotionPolicy.enabled || gateShut || current <= 0 || next <= 0
+    // A live slot claim owns the card's size through _slotRegionH, animated
+    // at the slot's own pace. A fit tween to the RESTING size takes precedence
+    // in layoutListH for its whole duration (it prefers _animatedListH over
+    // the region) and shrinks the card under an expanded dropdown. While the
+    // region owns the size, commit the resting fit without tweening.
+    const slotOwns = panel._claimListH > 0 || panel._slotRegionH > 0
+    if (!MotionPolicy.enabled || gateShut || slotOwns || current <= 0 || next <= 0
       || Math.abs(next - current) < 0.5) {
       panel._heightAnimating = false
       panel._heightAnimGen = gen
@@ -398,6 +411,11 @@ Rectangle {
 
   function finishHeightTransition() {
     if (heightAnim.running) return
+    Menu.trace("panel.heightDone", {
+      target: Math.round(panel._heightTargetH * 10) / 10,
+      claim: Math.round(panel._claimListH * 10) / 10,
+      gen: panel._heightAnimGen
+    })
     const gen = panel._heightAnimGen
     const target = panel._heightTargetH
     // A stale generation means a newer transition already owns the card,
@@ -1334,8 +1352,28 @@ Rectangle {
       else {
         if (typeof list.unpinHighlight === "function") list.unpinHighlight()
         list._keepCursor = false
+        // Search restore installs the page's rows through this same-turn
+        // branch. Search entry drops the claim; re-derive it against the
+        // restored rows so the fit reads a claim naming a live row.
+        panel._rearmOpenSlot()
       }
-      Idle.run(() => panel._reseatFrameSel(), 2)
+      const returnIdx = panel._searchReturnIdx
+      const returnY = panel._searchReturnY
+      panel._searchReturnIdx = -1
+      panel._searchReturnY = -1
+      Idle.run(() => {
+        panel._reseatFrameSel()
+        // The frame does not always hold this page's seat. When the row held
+        // at search entry is still expanded, restore the cursor and the scroll
+        // offset: the bar is the slot's only background, and the offset keeps
+        // the unfolded list inside the viewport.
+        if (panel.searching || returnIdx < 0 || returnIdx >= panel.rowsModel.length) return
+        const it = panel.rowsModel[returnIdx]
+        if (it && (Menu.isExpanded(it) || Menu.infoOpen(it))) {
+          if (returnY >= 0) list.restoreAt(returnIdx, returnY)
+          else if (list.currentIndex !== returnIdx) list.seat(returnIdx, "land")
+        }
+      }, 2)
       return
     }
 
@@ -1362,6 +1400,9 @@ Rectangle {
           return
         }
 
+        // The restore install is a separate pass from the rev that cleared
+        // the claim; re-derive it here so the fit reads the restored rows.
+        if (!panel.searching && !panel.scopedSearching) panel._rearmOpenSlot()
         panel.queueFit()
         if (!panel.searching && !panel.scopedSearching) {
           panel.applyFrameState()
@@ -1555,21 +1596,28 @@ Rectangle {
     // wanted the head is over - whether or not the projection ever moves
     // the cursor, which a query with no hits does not.
     panel._summonSeat = false
-    // A search re-projects the row set, so any reveal claim the previous
-    // projection (or an open slot on the page being searched) held no longer
-    // names a row in this one. Leaving it in place made pursuit chase a
-    // ghost index once the model shrank, scrolling the list off into empty
-    // space. Drop it before the rebuild below re-seats anything.
-    list.autoRevealIndex = -1
-    list._followIdx = -1
-    list.contentY = 0
-    // A search re-projects the rows: any slot close in flight on the page
-    // being searched is no longer relevant to this projection.
-    Menu.slotClosing = false
-    // A search re-projects the rows, so any slot-driven region growth from
-    // the page being searched no longer applies to this projection. Release
-    // it so pursuit is not silenced (or mis-sized) by a stale claim.
-    panel._releaseSlotRegion()
+    // Only ENTERING search retires the page's claim. This handler also runs
+    // on the erase edge, when the restore install re-arms the claim for a
+    // still-expanded row. Teardown there drops that claim, leaves the card at
+    // the resting size and strips the region from the open dropdown.
+    if (panel.searching) {
+      panel._searchReturnIdx = list.currentIndex
+      panel._searchReturnY = list.contentY
+      // A search re-projects the row set: a claim from the previous projection
+      // (or an open slot on the page being searched) names no row in this one.
+      // Keeping it sends pursuit after a ghost index when the model is narrow
+      // and scrolls the list into empty space. Drop it at this edge.
+      Menu.trace("panel.clear", { site: "search", auto: list.autoRevealIndex })
+      list.autoRevealIndex = -1
+      list._followIdx = -1
+      list.contentY = 0
+      // Any slot close in flight on the page being searched is no longer
+      // relevant to this projection.
+      Menu.slotClosing = false
+      // The page's slot-driven region growth no longer applies to the search
+      // projection: release it so pursuit is not silenced or mis-sized.
+      panel._releaseSlotRegion()
+    }
     // QoL: picking a search result clears the bar and returns focus to the list.
     // consumePendingResult already does this for keyboard, but mouse via
     // Entry's "result" jumpTo only resets the service query - the field and
@@ -1601,6 +1649,7 @@ Rectangle {
     // left (an open slot, a search projection) no longer names a row here,
     // and a stale out-of-bounds index would make pursuit scroll the new
     // list into empty space. Drop it before the transition/rebuild below.
+    Menu.trace("panel.clear", { site: "pageChange", auto: list.autoRevealIndex })
     list.autoRevealIndex = -1
     list._followIdx = -1
     Menu.slotClosing = false
@@ -1678,6 +1727,45 @@ Rectangle {
     return found
   }
 
+  // Re-derive the open-slot claim from the CURRENT row set. The service rev
+  // handler derives it on state changes; the search restore installs the
+  // original rows in a separate pass. Both paths need this derivation so an
+  // expanded row always has a reveal claim, a grown card and a region.
+  function _rearmOpenSlot() {
+    // A nested close holds the claim clear until its restore has settled;
+    // re-arming sooner chases a shrinking target and moves the view again.
+    if (panel._nestedSeatPending) return
+    let revealIdx = panel._trackedOpenIdx()
+    if (revealIdx === -2) revealIdx = panel._scanOpenSlot()
+    if (Menu.traceEnabled) {
+      let open = []
+      for (let i = 0; i < panel.rowsModel.length; i++) {
+        const it = panel.rowsModel[i]
+        if (it && (Menu.isExpanded(it) || Menu.infoOpen(it)))
+          open.push(i + ":" + String(it.id ?? "") + ":" + String(it.uid ?? ""))
+      }
+      Menu.trace("panel.rearm", {
+        found: revealIdx, count: panel.rowsModel.length,
+        searching: panel.searching, scoped: panel.scopedSearching,
+        auto: list.autoRevealIndex, open: open.join("|")
+      })
+    }
+    if (revealIdx >= 0) {
+      list.autoRevealIndex = revealIdx
+      if (revealIdx === panel.rowsModel.length - 1) list.revealEnd(revealIdx)
+    } else {
+      const cur = list.autoRevealIndex
+      if (cur >= 0) {
+        if (cur >= panel.rowsModel.length) {
+          list.autoRevealIndex = -1
+        } else {
+          const it = panel.rowsModel[cur]
+          if (it && !Menu.infoOpen(it) && !Menu.isExpanded(it)) list.autoRevealIndex = -1
+        }
+      }
+    }
+  }
+
   // One route for every service-side trigger of recompute/refresh/open.
   Connections {
     target: Menu
@@ -1740,6 +1828,7 @@ Rectangle {
       // reused summon must keep the warm ones.
       if (Menu.bundle === panel._seenBundle) return
       panel._seenBundle = Menu.bundle
+      panel._resetNestedSeat()
       metrics.clearShapeCache()
       panel._quiesceDisarm()
       // Different containers mean a different row set outright, and the
@@ -1765,25 +1854,7 @@ Rectangle {
       // Ctrl+I) must be fully revealed. Delegates handle it when
       // instantiated, but last-row slots may be outside viewport cache
       // when toggled, so ensure it generically here — no per-component code.
-      // Tracked row first -> full scan only when the tracked uid is absent.
-      let revealIdx = panel._trackedOpenIdx()
-      if (revealIdx === -2) revealIdx = panel._scanOpenSlot()
-      if (revealIdx >= 0) {
-        list.autoRevealIndex = revealIdx
-        // For last-row, force End to guarantee desc/dropdown not clipped
-        // when contentHeight < view height (no scroll needed otherwise)
-        if (revealIdx === panel.rowsModel.length - 1) list.revealEnd(revealIdx)
-      } else {
-        const cur = list.autoRevealIndex
-        if (cur >= 0) {
-          if (cur >= panel.rowsModel.length) {
-            list.autoRevealIndex = -1
-          } else {
-            const it = panel.rowsModel[cur]
-            if (it && !Menu.infoOpen(it) && !Menu.isExpanded(it)) list.autoRevealIndex = -1
-          }
-        }
-      }
+      panel._rearmOpenSlot()
       // Expand/collapse rides the store rev: grow for the open dropdown,
       // fall back to the closed measure when it shuts. Idempotent -
       // assigning the settled width notifies nothing.
@@ -1797,6 +1868,7 @@ Rectangle {
         // makes it the right place to read the height the card is leaving
         // behind.
         panel.beginPageTransition(true)
+      panel._resetNestedSeat()
         // A launch from closed wants its first entry. Held for as long as the
         // launch keeps installing, not spent on the first seat: the entry page
         // composes before its dead links and guard verdicts resolve, and the
@@ -2095,8 +2167,22 @@ Rectangle {
   // of a fit's own commit.
   onExpansionNeedHChanged: {
     if (panel.expansionNeedH > 0) return
-    if (!panel._transitionActive && !panel._heightAnimating && !panel._fitPending)
-      panel._committedListH = panel.listRegionH
+    Menu.trace("panel.expNeed0", {
+      need: panel.expansionNeedH,
+      regionH: Math.round(panel.listRegionH * 10) / 10,
+      slotRegion: Math.round(panel._slotRegionH * 10) / 10,
+      claim: Math.round(panel._claimListH * 10) / 10,
+      model: Math.round(panel._modelListH() * 10) / 10,
+      resting: Math.round(panel._restingFallbackH() * 10) / 10,
+      committed: Math.round(panel._committedListH * 10) / 10
+    })
+    if (!panel._transitionActive && !panel._heightAnimating && !panel._fitPending) {
+      // listRegionH reads the slot region here: the slot is empty but the
+      // region has not been released. Latching that value would install the
+      // grown size as the resting size and leave an empty band under the last
+      // row. The resting size is the model's answer, not the live region.
+      panel._committedListH = panel._modelListH()
+    }
   }
 
   // Content height as of the last idle moment (no open/closing slot).
@@ -2338,10 +2424,44 @@ Rectangle {
     }
   }
 
-  Behavior on width {
-    enabled: MotionPolicy.enabled
+  // A close driven resize rides the slot's own pace. resizeMs spans about two
+  // slot folds, and a Behavior clone keeps the template's duration, so both
+  // would hold the card in a resize past the fold. The width is tweened
+  // explicitly instead, the same way the card height is.
+  property real _widthNow: Ui.defWidth
+  NumberAnimation {
+    id: widthAnim
+
+    target: panel
+    property: "_widthNow"
+    easing.type: Easing.OutCubic
+  }
+  function _syncWidth() {
+    const target = panel.widthTarget
+    if (Math.abs(target - panel._widthNow) < 0.5) return
+    const animated = MotionPolicy.enabled
       && (panel.shown || panel.searching || panel.scopedSearching)
-    Glide { duration: Ui.resizeMs }
+    // A shrink with a live slot duration latch is a close driven resize: it
+    // lands with the fold. An open or an unrelated resize keeps the normal
+    // pace; those edges have no latch to read.
+    const slotPace = panel._slotMsLatch > 0 ? panel._slotMsLatch
+      : (list.revealSlotMs > 0 ? list.revealSlotMs : 0)
+    const pace = target < panel._widthNow && slotPace > 0
+      ? Math.max(Ui.fastMs, slotPace) : Ui.resizeMs
+    widthAnim.stop()
+    if (animated) {
+      widthAnim.from = panel._widthNow
+      widthAnim.to = target
+      widthAnim.duration = pace
+      Menu.trace("panel.widthArm", {
+        from: Math.round(widthAnim.from * 10) / 10,
+        to: Math.round(target * 10) / 10, ms: pace,
+        closing: Menu.slotClosing, latch: panel._slotMsLatch
+      })
+      widthAnim.restart()
+    } else {
+      panel._widthNow = target
+    }
   }
 
   // The card is between two widths. The rows read this to reveal their copy
@@ -2496,8 +2616,38 @@ Rectangle {
     return provisional > 0 ? provisional : -1
   }
 
+  // While a slot is closing, the reveal claim is held clear and the panel's
+  // latched region can keep the size the open slot had. The row still folds
+  // frame by frame; tie both boxes to that live height for the motion so the
+  // window does not stay grown and then drop after the fold has landed.
+  function _liveSlotRowH() {
+    // The row whose slot is FOLDING, not the row under the cursor. A cursor
+    // step taken during the close moves currentItem to a resting row, and
+    // reading that row here dropped the override for one frame: the card fell
+    // back to its latched region, contentHeight followed in the same frame,
+    // and the list engine clamped contentY - a jump with no seatTo writer
+    // behind it (the same bug _trackCloseSeat was fixed for).
+    const row = panel._closePageMode && panel._closeRow
+      ? panel._closeRow : list.currentItem
+    if (!row || row.height <= row.restHeight + 0.5) return -1
+    const moving = Menu.slotClosing || panel._nestedSeatPending
+      || panel._trackingCloseSeat
+    // Keep following until the latch catches up: dropping the override a
+    // frame before the claim re-latches would pop the card back to the height
+    // the open slot had.
+    const stale = panel._slotRegionH > 0
+      && Math.abs(panel._slotRegionH - row.height) > 1
+    if (!(moving || stale)) return -1
+    // The resting list is taller than a bare row: it carries the outer pad
+    // and filter line. Letting the live row take over below that floor folds
+    // the card past its resting size and pops it back on the terminal edge.
+    const floor = panel._restingFallbackH()
+    return floor > 0 ? Math.max(row.height, floor) : row.height
+  }
+
   readonly property real layoutListH: {
-    // The page transition's own tween outranks the slot region, and outranks
+    const liveSlot = panel._liveSlotRowH()
+    if (liveSlot > 0) return liveSlot    // The page transition's own tween outranks the slot region, and outranks
     // the model too: navigation is the bigger motion and it owns the card for
     // its duration, gliding from the height the user can see.
     if ((panel._transitionActive || panel._heightAnimating)
@@ -2531,6 +2681,8 @@ Rectangle {
   // way: the card and the viewport are one box, and a disagreement between
   // them is a row drawn outside the card or clipped by it.
   readonly property real renderedListH: {
+    const liveSlot = panel._liveSlotRowH()
+    if (liveSlot > 0) return liveSlot
     if ((panel._transitionActive || panel._heightAnimating)
       && panel._animatedListH > 0) return panel._animatedListH
     if (panel._slotRegionH > 0) return panel._slotRegionH
@@ -2565,6 +2717,32 @@ Rectangle {
   //   like inputs.
   property real _claimListH: -1
 
+  property real traceCardW: panel.width
+  onTraceCardWChanged: if (Menu.traceEnabled) Menu.trace("panel.cardW", {
+    w: Math.round(traceCardW * 10) / 10,
+    content: Math.round(panel.contentW * 10) / 10,
+    settling: panel.widthSettling,
+    searching: panel.searching
+  })
+
+  property real traceCardH: panel.height
+  onTraceCardHChanged: if (Menu.traceEnabled) Menu.trace("panel.cardH", {
+    h: Math.round(panel.height * 10) / 10,
+    listH: Math.round(panel.listRegionH * 10) / 10,
+    committed: Math.round(panel._committedListH * 10) / 10,
+    claim: Math.round(panel._claimListH * 10) / 10,
+    region: Math.round(panel._slotRegionH * 10) / 10,
+    animating: panel._heightAnimating,
+    transition: panel._transitionActive,
+    fit: panel._fitPending
+  })
+
+  property real traceRegionH: panel._slotRegionH
+  onTraceRegionHChanged: if (Menu.traceEnabled) Menu.trace("panel.regionV", {
+    h: Math.round(traceRegionH * 10) / 10,
+    claim: Math.round(panel._claimListH * 10) / 10
+  })
+
   NumberAnimation {
     id: slotRegionAnim
     target: panel
@@ -2574,6 +2752,10 @@ Rectangle {
     // The duration is assigned per arm in _armSlotRegion, from the same
     // sources read directly; the binding above is only the idle default.
     onFinished: {
+      Menu.trace("panel.regionDone", {
+        h: Math.round(panel._slotRegionH * 10) / 10,
+        claim: Math.round(panel._claimListH * 10) / 10
+      })
       // A collapse RELEASES when it lands. Parking the region at the resting
       // size instead looks harmless and is not: _slotRegionH outranks the page
       // transition's own tween in the height chain, so a value left there is a
@@ -2611,7 +2793,16 @@ Rectangle {
     const live = list.revealSlotMs
     if (live > panel._slotMsLatch) panel._slotMsLatch = live
     const base = panel._restingFallbackH()
-    const want = panel.growForSlot(base)
+    let want = panel.growForSlot(base)
+    // A nested restore holds the reveal claim clear, which makes growForSlot
+    // answer "fits" while the parent's slot is still folding. The row itself
+    // still publishes its live height on every step; use that so the card's
+    // claim follows the fold down instead of being released and re-armed
+    // after the seat lands.
+    if (want <= base + 0.5 && panel._nestedSlotLive()) {
+      const row = list.currentItem
+      if (row && row.height > row.restHeight + 0.5) want = row.height
+    }
     // Latch a GROWTH or nothing, never the resting size. growForSlot answers
     // "what would the region be", which with no claim is simply the base - and
     // latching that made the latch a second, staler copy of the region: it
@@ -2671,9 +2862,30 @@ Rectangle {
   // So the gate's real question is "is the card still finding its size?", which
   // is the summon transition and its pending fit - both of which are states
   // this panel already tracks.
+  // A nested child's slot feeds its height into the page row frame by frame.
+  // While a nested slot is live, the region follows the claim directly so the
+  // card and the content share the child's own motion.
+  function _nestedSlotLive() {
+    const row = list.currentItem
+    return !!(row && row.nestedSlotLive === true)
+  }
+
   function _syncSlotRegion() {
     const target = panel._claimListH
     const settling = panel._transitionActive || panel._fitPending
+    if (panel._nestedSlotLive()) {
+      // During the close the reveal claim is held clear, so the claim writer
+      // reports no target. The row still publishes its live height; use it so
+      // the card folds with the content instead of dipping to the resting size
+      // and growing back when the seat lands.
+      const row = list.currentItem
+      const live = row && row.height > row.restHeight + 0.5 ? row.height : -1
+      const seat = target > 0 ? target : live
+      if (slotRegionAnim.running) slotRegionAnim.stop()
+      panel._slotRegionH = seat > 0 ? seat : -1
+      if (!(seat > 0)) panel._slotMsLatch = 0
+      return
+    }
     if (!MotionPolicy.enabled || settling) {
       if (slotRegionAnim.running) slotRegionAnim.stop()
       const moved = target > 0 && Math.abs(target - panel._slotRegionH) > 0.5
@@ -2764,6 +2976,10 @@ Rectangle {
     // returned the pre-write value, and the two directions of one motion ran
     // on different clocks.
     slotRegionAnim.duration = panel._slotDurationMs()
+    Menu.trace("panel.regionArm", {
+      from: Math.round(slotRegionAnim.from * 10) / 10,
+      to: Math.round(to * 10) / 10, dur: slotRegionAnim.duration
+    })
     slotRegionAnim.restart()
   }
 
@@ -2786,28 +3002,27 @@ Rectangle {
     function onRevealSlotMsChanged() { panel._latchClaim() }
   }
 
-  width: {
-    // Content decides the width: the widest row this page shows, plus
-    // whatever that row reserves on the right (see recalcWidth) - the
-    // title and the sub line at rest, the open dropdown's entries while
-    // one is expanded (see MenuWidth.applyDropdownWidth).
-    //
-    // One floor, and a small one: never narrower than Ui.cardMinW, so a
-    // page of six short submenus opens as a card rather than a strip. It
-    // is also what an unmeasured card answers with, since with nothing
-    // shaped yet there is no content to size to.
-    //
-    // Everything else that could hold a card open is out: the declared page
-    // width the settings schema names 420 for on every page it
-    // generated, 260 in the pass, 300 on the card, 420 for grids. Each of
-    // them makes the card wider than the text in it, and the excess shows
-    // up as empty gutter down both sides of every row.
-    //
-    // The outer clamp is the viewport, not a sizing rule: a card is
-    // centered on the screen and must not run off either edge.
-    const wanted = Math.max(panel.contentW, Ui.cardMinW)
-    return Math.min(wanted, parent ? parent.width - 64 : Ui.defWidth)
+  // Content decides the width: the widest row this page shows, plus
+  // whatever that row reserves on the right (see recalcWidth) - the
+  // title and the sub line at rest, the open dropdown's entries while
+  // one is expanded (see MenuWidth.applyDropdownWidth).
+  //
+  // One floor, and a small one: never narrower than Ui.cardMinW, so a
+  // page of six short submenus opens as a card rather than a strip. It
+  // is also what an unmeasured card answers with, since with nothing
+  // shaped yet there is no content to size to.
+  //
+  // The outer clamp is the viewport, not a sizing rule: a card is
+  // centered on the screen and must not run off either edge.
+  readonly property real widthTarget: {
+    // The host has no width until its first layout. A zero-width host is
+    // not room for a card: clamping against `0 - 64` yields a negative card
+    // width. Use the default card width as the room until the host has one.
+    const room = parent && parent.width > 0 ? parent.width - 64 : Ui.defWidth
+    return Math.min(Math.max(panel.contentW, Ui.cardMinW), room)
   }
+  onWidthTargetChanged: panel._syncWidth()
+  width: panel._widthNow
 
   // The footer must stay inside the card: the list ceiling accounts for
   // the outer padding too, or the total overshoots and the hints slide
@@ -3366,6 +3581,246 @@ Rectangle {
     return true
   }
 
+  // --- nested row reveal seat ---
+  // A group child's slot is content inside its parent's row. Opening one asks
+  // the list to reveal that row; closing one returns the scroll offset under
+  // the user's view, on the slot's own clock. This lives on the panel because
+  // the panel owns the list - a delegate must not drive List internals itself.
+  property real _nestedSeatY: -1
+  property bool _nestedSeatPending: false
+  // Scroll offset at the FIRST reveal claim on this page. The nested seat
+  // holds the child activation offset, which includes the parent's reveal
+  // shift; the page-level origin is the offset with no reveal at all.
+  property real _revealOriginY: -1
+  function _trackRevealOrigin() {
+    if (list.autoRevealIndex >= 0 && panel._revealOriginY < 0) {
+      panel._revealOriginY = list.contentY
+      Menu.trace("panel.origin", { y: Math.round(list.contentY * 10) / 10 })
+    }
+  }
+  // Restore the reveal shift while the slot folds, not after it. The row
+  // height publishes one value per frame, so driving contentY from the same
+  // value keeps the scroll, the list extent and the card on one clock. A
+  // separate tween would land the height first and scroll afterwards.
+  property bool _closePageMode: false
+  property real _closeStartY: -1
+  property real _closeStartH: -1
+  property real _closeRestH: -1
+  // The row whose slot is folding. Cursor moves during the fold must not
+  // retarget the restore at whichever row the selection lands on next.
+  property var _closeRow: null
+  function _beginPageClose(row) {
+    panel._closeRow = row
+    panel._closePageMode = true
+    panel._closeStartY = list.contentY
+    panel._closeStartH = row.height
+    panel._closeRestH = row.restHeight
+    panel._trackingCloseSeat = true
+    Menu.trace("panel.pageClose", {
+      from: Math.round(panel._closeStartY * 10) / 10,
+      to: Math.round(panel._revealOriginY * 10) / 10,
+      h: Math.round(panel._closeStartH * 10) / 10,
+      rest: Math.round(panel._closeRestH * 10) / 10
+    })
+    panel._trackCloseSeat()
+  }
+  // The close-end rev re-arms the claim, and its pursuit is animated. The
+  // exact pin follows both that tween and the slot close, so a late seat
+  // cannot move the offset again.
+  property int _pinTries: 0
+  property Timer nestedSeatPin: Timer {
+    interval: 260
+    repeat: false
+    onTriggered: {
+      const y = panel._nestedSeatY
+      // A claim chasing a still-shrinking row adds a second leg after the
+      // restore. Hold the re-arm until the close and the tween are quiet, but
+      // a bound count keeps the landing from depending on a foreign flag
+      // clearing on time.
+      if (panel._nestedSeatPending
+        && (list.debugAnimRunning || Menu.slotClosing)
+        && panel._pinTries < 3) {
+        panel._pinTries++
+        restart()
+        return
+      }
+      panel._pinTries = 0
+      Menu.trace("panel.pin", {
+        seat: Math.round(y * 10) / 10, cY: Math.round(list.contentY * 10) / 10,
+        auto: list.autoRevealIndex, anim: list.debugAnimRunning,
+        write: y >= 0 && Math.abs(list.contentY - y) > 0.5
+      })
+      if (y >= 0 && Math.abs(list.contentY - y) > 0.5)
+        list.seatTo(y, false, "nested-pin")
+      panel._nestedSeatY = -1
+      panel._nestedSeatPending = false
+      panel._closeSeatDone()
+      // The parent slot is already open and settled at this edge. Re-arming
+      // its reveal claim leaves a live pursuit that drags the view on the
+      // next cursor step, far from the seat just restored. Drop the claim for
+      // this row; a different row still opening keeps its own.
+      // Re-arm against settled geometry: the parent's pursuit target then
+      // matches the seat and adds no extra motion.
+      if (list.currentIndex >= 0) panel._rearmOpenSlot()
+    }
+  }
+
+  // A page or bundle swap destroys the delegate that held the nested slot,
+  // so its close never lands. Drop the remembered seat at those edges; a
+  // stale offset would be restored into an unrelated page on the next open.
+  function _resetNestedSeat() {
+    _nestedSeatY = -1
+    _pinTries = 0
+    nestedSeatPin.stop()
+    _revealOriginY = -1
+    _closePageMode = false
+    _trackingCloseSeat = false
+    _restoreStartH = -1
+  }
+
+  function beginNestedReveal() {
+    // Each nested slot owns its own reveal origin. A chain of groups reaches
+    // deeper offsets at every level; keeping the first seat would return a
+    // deep slot's close past the position its own open started from.
+    _nestedSeatY = list.contentY
+    _nestedSeatPending = false
+    _trackingCloseSeat = false
+    _restoreStartH = -1
+    _closePageMode = false
+    _closeRow = null
+    _pinTries = 0
+    nestedSeatPin.stop()
+    Menu.trace("panel.reveal", {
+      seat: Math.round(_nestedSeatY * 10) / 10,
+      cY: Math.round(list.contentY * 10) / 10, cur: list.currentIndex,
+      auto: list.autoRevealIndex
+    })
+    // A close leaves the claim cleared. Re-arm it so the list's own pursuit
+    // can seat the child into view before its slot unfolds.
+    if (list.autoRevealIndex < 0 && list.currentIndex >= 0)
+      list.autoRevealIndex = list.currentIndex
+  }
+
+  function beginNestedRestore(paceMs) {
+    Menu.trace("panel.restore", {
+      seat: Math.round(_nestedSeatY * 10) / 10,
+      cY: Math.round(list.contentY * 10) / 10,
+      pace: paceMs, auto: list.autoRevealIndex, anim: list.debugAnimRunning
+    })
+    // Each close owns its own seat. The pin of a previous close clears the
+    // shared seat, so a later close in the same chain would otherwise get no
+    // tracking at all and its row would collapse with the scroll frozen.
+    // Live-bottom tracking needs no seat; only the end pin does.
+    const hadSeat = _nestedSeatY >= 0
+    _nestedSeatPending = hadSeat
+    // Ride the scroll back at the slot's own pace, and suspend pursuit while
+    // the row is still shrinking - its shrinking target would land short.
+    Menu.trace("panel.clear", { site: "nestedRestore", auto: list.autoRevealIndex })
+    list.autoRevealIndex = -1
+    // A separate scroll tween and the row's own fold have different curves:
+    // the row lands first and the rows below flash into view before the tween
+    // catches up. Track the live row bottom instead, one write per geometry
+    // change, so the viewport and the fold are the same motion.
+    _trackingCloseSeat = true
+    _trackTargetY = -1
+    _restoreStartH = list.currentItem ? list.currentItem.height : -1
+    _trackCloseSeat()
+  }
+
+  property bool _trackingCloseSeat: false
+  // Height of the row when a nested close began. A nested slot can fold
+  // entirely inside its group's box (the page row never changes height), and
+  // that case must hold the seat rather than seat to a bottom fit.
+  property real _restoreStartH: -1
+  // -1 tracks the live row bottom (nested child close, parent still open).
+  // A fixed offset holds the page-level seat through a whole page-row close.
+  property real _trackTargetY: -1
+  function _closeSeatDone() {
+    if (!panel._trackingCloseSeat) return
+    panel._trackingCloseSeat = false
+    panel._trackTargetY = -1
+    panel._restoreStartH = -1
+    if (panel._closePageMode) {
+      const y = panel._revealOriginY
+      // The last height change lands the row at rest; put the offset exactly
+      // on its origin so a fractional frame cannot leave it a pixel short.
+      if (y >= 0 && list && Math.abs(list.contentY - y) > 0.05)
+        list.seatTo(y, false, "close-land")
+      Menu.trace("panel.closeLand", {
+        from: Math.round(panel._closeStartY * 10) / 10,
+        to: Math.round(y * 10) / 10,
+        cY: Math.round(list.contentY * 10) / 10
+      })
+      // Nested closes share this page-level origin; only the page row's own
+      // close consumes it. Clearing it at a nested edge would make the last
+      // fold restore to a mid-chain offset instead of the pre-open offset.
+      panel._revealOriginY = -1
+      panel._closePageMode = false
+      panel._closeRow = null
+      panel._closeStartY = -1
+      panel._closeStartH = -1
+      panel._closeRestH = -1
+    }
+  }
+  function _trackCloseSeat() {
+    const row = panel._closePageMode ? panel._closeRow : list.currentItem
+    if (!row || !_trackingCloseSeat) return
+    let target
+    if (panel._closePageMode) {
+      const span = Math.max(1, panel._closeStartH - panel._closeRestH)
+      const p = Range.clamp01((panel._closeStartH - row.height) / span)
+      const origin = panel._revealOriginY >= 0 ? panel._revealOriginY : panel._closeStartY
+      target = panel._closeStartY + (origin - panel._closeStartY) * p
+      Menu.trace("panel.closeUnison", {
+        p: Math.round(p * 100) / 100,
+        h: Math.round(row.height * 10) / 10,
+        target: Math.round(target * 10) / 10,
+        cY: Math.round(list.contentY * 10) / 10
+      })
+    } else {
+      // The live bottom is a FIT for the row, not the offset this close
+      // restores. The two agree only when the row was revealed flush to the
+      // viewport edge. A row that is already fully visible has nothing for
+      // the bottom to follow while its slot folds INSIDE the group box - the
+      // page row's own height does not change at all - and seating to the
+      // fit scrolled the list for no reason: closing a nested editor from
+      // 218 wrote 193, then the pin wrote 218 back, a 25px two-step bounce
+      // with no fold behind it. Follow the bottom once the row is actually
+      // folding; until then the seat is the offset and it is already held.
+      const fit = row.y + row.height + Ui.s - list.height
+      const seat = panel._nestedSeatY
+      const folding = panel._restoreStartH > 0
+        && row.height < panel._restoreStartH - 0.5
+      target = panel._trackTargetY >= 0 ? panel._trackTargetY
+        : (folding || seat < 0 ? fit : seat)
+    }
+    list.seatTo(target, false, "close-track")
+  }
+
+  function nestedSlotFinished() {
+    Menu.trace("panel.finished", {
+      seat: Math.round(_nestedSeatY * 10) / 10,
+      cY: Math.round(list.contentY * 10) / 10,
+      auto: list.autoRevealIndex, anim: list.debugAnimRunning
+    })
+    // A PARENT close that began while this slot was still folding owns the
+    // offset now: its page close rides the fold down and lands on the
+    // pre-open origin by itself. The seat this slot remembers belongs to the
+    // nested OPEN, an offset that close has already scrolled back past -
+    // arming the pin with it writes the old offset back after the restore has
+    // landed, and the engine clamps that write to the bottom of the now
+    // shorter list (measured: land at 134.5, pin writes 241, clamp to 218).
+    if (panel._closePageMode) {
+      panel._nestedSeatPending = false
+      nestedSeatPin.stop()
+      return
+    }
+    // The parent group stays open, so its claim comes back - but only once
+    // the close and the restore tween have settled, from the pin handler.
+    panel._nestedSeatPending = true
+    nestedSeatPin.restart()
+  }
+
   function moveGridCell(step) { grid.moveCell(step) }
 
   function moveGridRow(step) { grid.moveRow(step) }
@@ -3373,18 +3828,40 @@ Rectangle {
   function stepCurrent(direction) {
     if (panel.gridMode) return
     const row = list.currentItem
+    if (row && row.isGroup) {
+      // +/- belongs to the focused child when it is a number or range, just
+      // as it belongs to a page row of that type.
+      const childRow = row._focusedChildRow ? row._focusedChildRow() : null
+      if (childRow && childRow.hasStepper) {
+        childRow.stepBy(direction)
+        return
+      }
+      return
+    }
     if (row && row.hasStepper) row.stepBy(direction)
   }
 
-  function moveSelection(direction) {
+  function moveSelection(direction, autoRepeat) {
     if (panel.gridMode) {
       panel.moveGridCell(direction)
       return
     }
     const prev = panel.currentRow()
+    if (Menu.traceEnabled) {
+      const c = prev && prev._focusedChildRow ? prev._focusedChildRow() : null
+      Menu.trace("key.move", {
+        dir: direction,
+        row: prev ? String(prev.itm?.id ?? "") : "",
+        dropdown: !!(prev && prev.dropdownOpen),
+        expanded: !!(prev && prev.expanded),
+        child: c ? String(c.itm?.id ?? "") : "",
+        childExpanded: !!(c && c.expanded),
+        childDropdown: !!(c && c.dropdownOpen)
+      })
+    }
     // An open dropdown consumes the arrows first.
     if (prev && prev.dropdownOpen && !prev.confirmOpen && prev.moveOption(direction)) return
-    if (!list.move(direction)) return
+    if (!list.move(direction, undefined, autoRepeat === true)) return
     // Leaving a row collapses whatever it had open (info bodies, dropdowns
     // and editors alike) - nothing trails the cursor. The seat tracks
     // live layout while the slots ease shut (follow retarget), so no
@@ -3399,6 +3876,12 @@ Rectangle {
   // deferred out of the ListView's own notification path - mutating
   // service state mid-layout is re-entrancy fuel for escape handling.
   property var _lastCursorItem: null
+  // Cursor index and offset at search entry. Erasing a query returns to the
+  // page rows; when the frame has no seat for this page, an expanded row keeps
+  // its slot and grown card while the selection bar - the slot's only
+  // background - sits on another row. Restore the entry position.
+  property int _searchReturnIdx: -1
+  property real _searchReturnY: -1
 
   function closeTrailingInfo() {
     const idx = list.currentIndex
@@ -3548,27 +4031,79 @@ Rectangle {
       // the arrow walk to the user. groupSearchResults resolves the child once
       // for both display and landing; a hit that names none opens the group on
       // its stored seed, like a select opened on its stored value.
-      const childUid = it.childUid !== undefined && it.childUid !== null
-        ? String(it.childUid) : ""
       const targetUid = it.groupUid !== undefined && it.groupUid !== null
         ? String(it.groupUid) : ""
-      panel.whenSettled((row) => {
-        row.setExpanded(true)
-        if (childUid !== "") Qt.callLater(() => {
-          const r2 = panel.currentRow()
-          if (!r2 || !r2.isGroup || !r2.itm || String(r2.itm.uid) !== targetUid) return
-          // The live children drop gated ones, so the index entry's position
-          // can name a different child. Resolve against what the dropdown
-          // actually lists.
-          const kids = r2.groupChildren
-          for (let i = 0; i < kids.length; i++) {
-            if (kids[i] && String(kids[i].uid) === childUid) {
-              r2.childIndex = i
-              return
-            }
-          }
+      if (targetUid !== "" && list) Qt.callLater(function() {
+        const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
+        Menu.trace("result.seatPage", { idx: idx, uid: targetUid })
+        if (idx >= 0) list.seat(idx, "land")
+      })
+      Menu.trace("result.group", {
+        label: String(it.label ?? ""), type: String(it.type ?? ""),
+        uid: String(it.uid ?? ""), groupUid: String(it.groupUid ?? ""),
+        childUids: Array.isArray(it.childUids) ? it.childUids.join("|") : "",
+        childUid: String(it.childUid ?? "")
+      })
+      const chain = Array.isArray(it.childUids) && it.childUids.length > 0
+        ? it.childUids.slice()
+        : ((it.childUid !== undefined && it.childUid !== null)
+          ? [ String(it.childUid) ] : [])
+      // The restore after clearing the query can pull the cursor back to the
+      // frame's old index. Re-seat the target row until it is really current,
+      // then walk the nested chain by uid.
+      function tryLand(tries) {
+        const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
+        if (idx >= 0 && list && list.currentIndex !== idx) list.seat(idx, "land")
+        const row = panel.currentRow()
+        if (row && row.isGroup && row.itm
+          && String(row.itm.uid) === targetUid) {
+          row.setExpanded(true)
+          if (chain.length === 0) return
+          Qt.callLater(function() { seatLevel(0) })
+          return
+        }
+        if (tries < 30) Qt.callLater(function() { tryLand(tries + 1) })
+      }
+
+      // Seat each level by uid, opening the nested group on the way down.
+      // Gated children drop out of the live dropdown, so resolve against
+      // what each level actually lists.
+      const seatRows = []
+      function seatLevel(n, tries) {
+        if (n === 0) {
+          const pageIdx = Menu.visibleIndexOfUid(it.pageId, targetUid)
+          if (pageIdx >= 0 && list && list.currentIndex !== pageIdx)
+            list.seat(pageIdx, "land")
+          seatRows[0] = panel.currentRow()
+        }
+        const r2 = seatRows[n]
+        const expected = n === 0 ? targetUid : chain[n - 1]
+        Menu.trace("result.seat", {
+          n: n, want: chain[n], expected: expected,
+          row: r2 && r2.itm ? String(r2.itm.uid) : "",
+          isGroup: !!(r2 && r2.isGroup)
         })
-      }, (row) => row.isGroup)
+        if (!r2 || !r2.isGroup || !r2.itm
+          || String(r2.itm.uid) !== expected) {
+          if ((tries || 0) < 20 && n === 0)
+            Qt.callLater(function() { seatLevel(n, (tries || 0) + 1) })
+          return
+        }
+        const kids = r2.groupChildren
+        let found = -1
+        for (let i = 0; i < kids.length; i++) {
+          if (kids[i] && String(kids[i].uid) === chain[n]) { found = i; break }
+        }
+        if (found < 0) return
+        r2.childIndex = found
+        if (n + 1 >= chain.length) return
+        const childRow = r2._focusedChildRow ? r2._focusedChildRow() : null
+        if (!childRow || !childRow.isGroup) return
+        childRow.setExpanded(true)
+        seatRows[n + 1] = childRow
+        Qt.callLater(function() { seatLevel(n + 1, 0) })
+      }
+      Qt.callLater(function() { tryLand(0) })
       return
     }
     if (it.type === "select") {
@@ -3723,6 +4258,39 @@ Rectangle {
       return
     }
     const row = panel.currentRow()
+    // Esc peels from the innermost slot outward. Each nested group owns its
+    // focused child, so walk that chain to its end before touching an outer
+    // row's slot: a group at any depth keeps its own expansion for the next
+    // keystroke.
+    let deep = row
+    const chain = [row ? String(row.itm?.id ?? "") : ""]
+    for (let depth = 0; depth < 4 && deep && deep.isGroup
+      && typeof deep._focusedChildRow === "function"; depth++) {
+      const kid = deep._focusedChildRow()
+      if (!kid) break
+      // Only an open layer is something Esc can peel. Descending into a
+      // focused leaf that has no slot would leave `deep` on a row with
+      // nothing to close and fall through to the toplevel row's collapse.
+      if (!kid.expanded && !Menu.infoOpen(kid.itm)) break
+      deep = kid
+      chain.push(String(kid.itm?.id ?? ""))
+    }
+    Menu.trace("panel.escape", {
+      chain: chain.join(" > "),
+      deep: deep ? String(deep.itm?.id ?? "") : "",
+      deepOpen: !!(deep && (deep.expanded || Menu.infoOpen(deep.itm))),
+      topOpen: !!(row && row.expanded)
+    })
+    if (deep && deep !== row) {
+      if (Menu.infoOpen(deep.itm)) {
+        Menu.setInfo(deep.itm, false)
+        return
+      }
+      if (deep.expanded) {
+        deep.collapse()
+        return
+      }
+    }
     // An open ctrl+i description is the outermost layer on this row -
     // Esc peels it first, before touching expansions or the stack.
     if (row && Menu.infoOpen(row.itm)) {
@@ -3897,7 +4465,16 @@ Rectangle {
       grid: panel.gridMode,
       field: searchField.focused === true,
       text: event.text,
-      get editor() { const r = cur(); return !!r && r.editorOpen === true },
+      // A group's inline editor lives on the focused child, not on the
+      // page row the cursor sits on. Without this the child's caret keys
+      // route as menu navigation and Tab can leave the open editor.
+      get editor() {
+        const r = cur()
+        if (!r) return false
+        if (r.editorOpen === true) return true
+        const c = typeof r._focusedChildRow === "function" ? r._focusedChildRow() : null
+        return !!c && c.editorOpen === true
+      },
       get del() {
         const r = cur()
         return !!r && !!r.itm && typeof r.itm.delCommand === "string"
@@ -3930,6 +4507,14 @@ Rectangle {
       if (panel.searchField.pasteText(Clipboard.history)) focusCtrl.grabFilter()
       event.accepted = true
       return
+    }
+    if (Menu.traceEnabled) {
+      const ctx = panel.keyRouteCtx(event)
+      Menu.trace("key.route", {
+        key: ctx.key, editor: ctx.editor, field: ctx.field, mode: ctx.mode,
+        row: panel.currentRow() ? String(panel.currentRow().itm?.id ?? "") : "",
+        route: (MenuLib.keyRoute(ctx) || {}).name || ""
+      })
     }
     const r = MenuLib.keyRoute(panel.keyRouteCtx(event))
     if (r === null) return
@@ -3970,7 +4555,7 @@ Rectangle {
         panel.activateCurrent(false)
         break
       case "move":
-        panel.moveSelection(arg)
+        panel.moveSelection(arg, event.isAutoRepeat === true)
         break
       case "step":
         panel.stepCurrent(arg)
@@ -4046,6 +4631,19 @@ Rectangle {
   function reassertFocus() {
     if (!Menu.open) return
     const row = list.currentItem
+    const child = row && row._focusedChildRow ? row._focusedChildRow() : null
+    if (Menu.traceEnabled) {
+      Menu.trace("focus.reassert", {
+        rowEditor: !!(row && row.editorOpen),
+        childEditor: !!(child && child.editorOpen),
+        child: child ? String(child.itm?.id ?? "") : "",
+        search: searchField.focused, sink: focusCtrl.keySink.activeFocus
+      })
+    }
+    if (child && child.editorOpen) {
+      child.grabEditorFocus()
+      return
+    }
     if (row && row.editorOpen) {
       row.grabEditorFocus()
       return
@@ -4070,7 +4668,19 @@ Rectangle {
   // cursor move or geometry tick.
   function probeSnapshot() {
     const row = list.currentItem
+    const gv = row && row.isGroup ? row._groupView : null
+    const cr = row && row._focusedChildRow ? row._focusedChildRow() : null
+    const ir = cr && cr._focusedChildRow ? cr._focusedChildRow() : null
+    const dr = ir && ir._focusedChildRow ? ir._focusedChildRow() : null
+    const igv = cr && cr._groupView ? cr._groupView : null
+    const next = list && list.currentIndex >= 0
+      ? list.itemAtIndex(list.currentIndex + 1) : null
+    const opts = cr && cr.optionList ? cr.optionList : []
+    const optVal = cr && cr.st && cr.st.value !== undefined
+      ? String(cr.st.value) : ""
     return JSON.stringify({
+      nextRowY: next ? Math.round(next.y * 10) / 10 : -1,
+      rowBottom: row ? Math.round((row.y + row.height) * 10) / 10 : -1,
       autoRevealIndex: list.autoRevealIndex,
       contentY: list.contentY,
       page: panel.currentPageId,
@@ -4081,6 +4691,9 @@ Rectangle {
       index: panel.gridMode ? grid.currentIndex : list.currentIndex,
       count: panel.gridMode ? grid.count : list.count,
       hlY: !panel.gridMode && list.highlightItem ? Math.round(list.highlightItem.y) : -1,
+      hlH: !panel.gridMode && list.highlightItem ? Math.round(list.highlightItem.height) : -1,
+      hlW: !panel.gridMode && list.highlightItem ? Math.round(list.highlightItem.width) : -1,
+      hlVisible: !panel.gridMode && list.highlightItem ? list.highlightItem.visible : false,
       // Motion-gate ground truth for headless wrap diagnosis: which term
       // of highlightMotion is false, and what the highlight would do.
       hlMoveMs: panel.gridMode ? grid.highlightMoveDuration : list.highlightMoveDuration,
@@ -4168,6 +4781,102 @@ Rectangle {
       tenRowH: panel._tenRowH,
       rowPolicyBound: panel.rowPolicyBound,
       pageMaxHeight: panel.pageMaxHeight,
+      // Nested group child motion, for live glide/settle diagnosis.
+      rowH: row ? Math.round(row.height * 10) / 10 : 0,
+      rowSettledH: row ? Math.round(row.settledHeight * 10) / 10 : 0,
+      rowExpandSlotH: row ? Math.round(row.expandSlotH * 10) / 10 : 0,
+      rowDescSlotH: row ? Math.round(row.descSlotH * 10) / 10 : 0,
+      grpImplicitH: gv ? Math.round(gv.implicitHeight * 10) / 10 : 0,
+      grpHeight: gv ? Math.round(gv.height * 10) / 10 : 0,
+      grpColH: gv && gv.groupCol ? Math.round(gv.groupCol.height * 10) / 10 : 0,
+      grpChildCount: gv && gv.childrenRepeater ? gv.childrenRepeater.count : 0,
+      childIndex: gv ? row.childIndex : -1,
+      childLabel: cr && cr.itm ? String(cr.itm.label ?? "") : "",
+      childLabelW: cr ? Math.round(cr.labelWidth * 10) / 10 : -1,
+      childLabelNeeded: cr ? Math.round(cr.labelNeeded * 10) / 10 : -1,
+      childElided: cr ? cr.textElided : false,
+      childValueW: cr && cr.debugValueText ? Math.round(cr.debugValueText.width * 10) / 10 : -1,
+      childValueTextW: cr && cr.debugValueText
+        ? Math.round(cr.debugValueText.implicitWidth * 10) / 10 : -1,
+      childValueX: cr && cr.debugValueText ? Math.round(cr.debugValueText.x * 10) / 10 : -1,
+      childUnit: cr && cr.itm ? String(cr.itm.unit ?? "") : "",
+      childSlotMs: cr ? cr.slotMotionMs : 0,
+      guardDisabledKeys: Object.keys(Menu.guardDisabled).join("|"),
+      childUid: cr && cr.itm ? String(cr.itm.uid ?? "") : "",
+      childGuardDisabled: cr && cr.itm ? Menu.guardDisabled[String(cr.itm.uid ?? "")] : null,
+      childModelSelectable: cr && cr.itm ? cr.itm.selectable : null,
+      childDisabled: cr && cr.itm ? Menu.isDisabled(cr.itm) : false,
+      childUnavailable: cr && cr.itm ? Menu.isUnavailable(cr.itm) : false,
+      childSelectable: cr ? cr.selectable === true : false,
+      childEnabled: cr ? cr.enabled === true : false,
+      childActive: cr && cr.itm ? String(cr.itm.active ?? "") : "",
+      childType: cr ? cr.ptype : "",
+      childOptionCount: cr ? cr.optionCount : -1,
+      childOptionIndex: cr ? cr.optionIndex : -1,
+      childChosenIndex: cr ? cr.chosenIndex : -1,
+      childOptions: JSON.stringify(opts.map(function(o, i) {
+        return { i: i, label: String((o && o.label) ?? ""),
+          value: String((o && o.value) ?? ""),
+          chosen: String((o && o.value) ?? "") === optVal }
+      })),
+      childExpanded: cr ? cr.expanded === true : false,
+      childIsGroup: cr ? cr.isGroup === true : false,
+      childDropdownOpen: cr ? cr.dropdownOpen === true : false,
+      childIndexInner: cr ? cr.childIndex : -1,
+      childGroupKids: cr && cr.groupChildren ? cr.groupChildren.length : 0,
+      deepIdx: dr ? dr.childIndex : -1,
+      deepLabel: dr && dr.itm ? String(dr.itm.label ?? "") : "",
+      deepExpanded: dr ? dr.expanded === true : false,
+      innerIdx: ir ? ir.childIndex : -1,
+      innerLabel: ir && ir.itm ? String(ir.itm.label ?? "") : "",
+      innerExpanded: ir ? ir.expanded === true : false,
+      innerExpandH: ir ? Math.round(ir.expandSlotH * 10) / 10 : -1,
+      innerSlotY: ir ? Math.round(ir.debugSlotY * 10) / 10 : -1,
+      innerSlotH: ir ? Math.round(ir.debugSlotH * 10) / 10 : -1,
+      innerMainBottom: ir && ir.debugMainLine
+        ? Math.round((ir.debugMainLine.y + ir.debugMainLine.height) * 10) / 10 : -1,
+      innerNestedBarH: ir ? Math.round(ir.nestedBarH * 10) / 10 : -1,
+      innerFocusBarY: igv && igv.focusBar ? Math.round(igv.focusBar.y * 10) / 10 : -1,
+      innerFocusBarH: igv && igv.focusBar ? Math.round(igv.focusBar.height * 10) / 10 : -1,
+      innerGroupH: igv ? Math.round(igv.height * 10) / 10 : -1,
+      innerGroupImplicit: igv ? Math.round(igv.implicitHeight * 10) / 10 : -1,
+      innerColH: igv && igv.groupCol ? Math.round(igv.groupCol.height * 10) / 10 : -1,
+      innerRowY: ir ? Math.round(ir.y * 10) / 10 : -1,
+      innerEditorH: ir ? Math.round(ir.debugEditorH * 10) / 10 : -1,
+      innerSlotMs: ir ? ir.slotMotionMs : 0,
+      innerBarH: igv ? Math.round(igv.focusBarH * 10) / 10 : -1,
+      innerBox: igv ? Math.round(igv.boxNeed * 10) / 10 : -1,
+      childDescH: cr ? Math.round(cr.descSlotH * 10) / 10 : 0,
+      childExpandH: cr ? Math.round(cr.expandSlotH * 10) / 10 : 0,
+      childFlowIdx: cr && cr.isFlow ? cr.flowIndex : -1,
+      childBuilds: cr ? cr.debugExpBuilds : -1,
+      pushProg: gv ? Math.round(gv.pushProgress * 1000) / 1000 : -1,
+      boxTarget: gv ? Math.round(gv.boxTarget * 10) / 10 : -1,
+      curY: list.currentItem ? Math.round(list.currentItem.y * 10) / 10 : -1,
+      curH: list.currentItem ? Math.round(list.currentItem.height * 10) / 10 : -1,
+      childMainBottom: cr && cr.debugMainLine
+        ? Math.round((cr.debugMainLine.y + cr.debugMainLine.height) * 10) / 10 : -1,
+      childSlotY: cr ? Math.round(cr.debugSlotY * 10) / 10 : -1,
+      childSlotH: cr ? Math.round(cr.debugSlotH * 10) / 10 : -1,
+      childEditorH: cr ? Math.round(cr.debugEditorH * 10) / 10 : -1,
+      grpBarY: gv && gv.focusBar ? Math.round(gv.focusBar.y * 10) / 10 : -1,
+      grpBarH: gv && gv.focusBar ? Math.round(gv.focusBar.height * 10) / 10 : -1,
+      grpColY: gv && gv.groupCol ? Math.round(gv.groupCol.y * 10) / 10 : -1,
+      focusRestH: gv ? Math.round(gv.focusRestH * 10) / 10 : 0,
+      focusBarH: gv ? Math.round(gv.focusBarH * 10) / 10 : 0,
+      liveExtra: gv ? Math.round(gv.liveExtra * 10) / 10 : 0,
+      topHalf: gv ? gv.topHalf : false,
+      pushUp: gv ? Math.round(gv.pushUp * 10) / 10 : 0,
+      roomAbove: gv ? Math.round(gv.roomAbove * 10) / 10 : 0,
+      roomBelow: gv ? Math.round(gv.roomBelow * 10) / 10 : 0,
+      overflow: gv ? Math.round(gv.overflow * 10) / 10 : 0,
+      boxNeed: gv ? Math.round(gv.boxNeed * 10) / 10 : 0,
+      animRunning: list.debugAnimRunning,
+      sweepMs: list.debugSweepMs,
+      pursuitIdx: list.debugPursuitIdx,
+      followIdx: list.debugFollowIdx,
+      seatsInstant: list.debugSeatsInstant,
+      hlResizeMs: list.highlightResizeDuration,
       // Spawn verdict for the last summon: whether the card was born at its
       // own size or opened wearing the previous menu's box. `carried` true is
       // the regression this whole record exists to catch.
@@ -4320,6 +5029,7 @@ Rectangle {
       List {
         id: list
 
+        traceDebug: Menu.traceEnabled
         visible: !panel.gridMode
         // Unbound while the grid shows: the grid renders the same row set,
         // so Entry delegates (Texts, TextMetrics, icons, slots) built here
@@ -4431,6 +5141,7 @@ Rectangle {
         // for an unfold; contentY is the other term in the shortfall, and it
         // only moves on a real seat - never per frame, so re-latching here
         // cannot restart the region tween.
+        onAutoRevealIndexChanged: panel._trackRevealOrigin()
         onMotionFinished: {
           panel.track()
           panel._latchClaim()
@@ -4470,8 +5181,31 @@ Rectangle {
             target: rowItem
 
             function onSlotMotionMsChanged() {
-              if (rowItem.slotMotionMs > 0) return
+              const ms = rowItem.slotMotionMs
+              Menu.trace("panel.slotMs", {
+                id: String(rowItem.itm?.id ?? ""), ms: ms,
+                closing: Menu.isSlotClosing(rowItem.itm),
+                slots: panel.expansionNeedH
+              })
+              if (ms > 0) return
+              panel._closeSeatDone()
               Menu.slotCloseFinished(rowItem.itm)
+            }
+
+            function onHeightChanged() {
+              if (panel._trackingCloseSeat) panel._trackCloseSeat()
+            }
+
+            function onSlotCloseStarted() {
+              // This edge is the last fold of a reveal chain: the page row's
+              // slot closes with no nested child open. The scroll returns at
+              // this slot's pace, not on a timer.
+              Menu.trace("panel.closeStart", {
+                id: String(rowItem.itm?.id ?? ""), ms: rowItem.slotMotionMs,
+                expanded: rowItem.expanded, info: rowItem.infoOpen
+              })
+              if (!rowItem.expanded && !rowItem.infoOpen)
+                panel._beginPageClose(rowItem)
             }
           }
         }

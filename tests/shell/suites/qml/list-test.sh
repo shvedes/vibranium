@@ -66,6 +66,10 @@ qp_assert "measureGuard accepts by default" d.measureGuard.default true
 qp_assert "identityRevision starts at 0" d.identityRevision 0
 qp_assert "the height table is bounded at 1024 entries" d.maxKnownH 1024
 qp_assert "the instant-seat gate starts closed" d.seatsInstant false
+qp_assert "a live nested slot is detected" d.nestedLive true
+qp_assert "its highlight resize does not ease" d.nestedResizeMs 0
+qp_assert "nor does its highlight move" d.nestedMoveMs 0
+t_ne "a plain list still eases its highlight resize" "0" "$(qp_get d.plainResizeMs)"
 qp_assert "the sweep override starts at -1, meaning no sweep" d.sweepMs -1
 qp_assert "the sweep ceiling is 420ms" d.sweepMaxMs 420
 qp_assert "the highlight handoff starts closed" d.highlightHandoff false

@@ -747,13 +747,19 @@ function _lookup(table, key) {
 }
 
 function conditionsMet(byKey, values, showIf, seen) {
-  if (!showIf || showIf.length === 0) return true
+  if (!showIf) return true
+  if (!Array.isArray(showIf)) return false
+  if (showIf.length === 0) return true
   seen = seen || {}
   for (let i = 0; i < showIf.length; i++) {
     const cond = showIf[i]
+    // A condition that cannot name a value cannot be satisfied. Malformed
+    // declarations fail closed instead of throwing on the lookup.
+    if (!cond || typeof cond !== "object" || Array.isArray(cond)
+      || typeof cond.var !== "string" || cond.var === "") return false
     const cur = _lookup(values, cond.var)
     let ok
-    if (cond.op === "in") ok = cond.arg.indexOf(cur) >= 0
+    if (cond.op === "in") ok = Array.isArray(cond.arg) && cond.arg.indexOf(cur) >= 0
     else if (cond.op === "neq") ok = cur !== cond.arg
     else ok = cur === cond.arg
 

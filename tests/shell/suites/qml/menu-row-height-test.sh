@@ -201,6 +201,7 @@ GEO_SRC="$(<"$MENU_DIR/RowGeometry.qml")"
 RULE_SRC="$(<"$MENU_DIR/RowRule.js")"
 ENTRY_SRC="$(<"$MENU_DIR/Entry.qml")"
 MENU_SRC="$(<"$MENU_DIR/MenuPanel.qml")"
+SERVICE_SRC="$(<"$MENU_DIR/Menu.qml")"
 MENU_LIB_SRC="$(<"$MENU_DIR/MenuLib.js")"
 PANEL_WIDTH_SRC="$(<"$MENU_DIR/MenuWidth.qml")"
 
@@ -239,8 +240,8 @@ t_contains "and its own sub register" \
   "RowGeometry.subHFor(RowGeometry.subSampleFor(itm, row.subText))" "$ENTRY_SRC"
 t_contains "the panel projects the same two registers" \
   "RowGeometry.labelHFor(String(it.label" "$MENU_SRC"
-t_contains "a chrome row (the inline editor) rests on the primary register" \
-  "RowGeometry.primaryRestH(\"line\")" "$(<"$MENU_DIR/InlineEditor.qml")"
+t_contains "a chrome row (the inline editor) rests on the button height" \
+  "implicitHeight: Ui.buttonHeight" "$(<"$MENU_DIR/InlineEditor.qml")"
 
 # A nested child is the same Entry at the smaller register, not a second row
 # type: one set of views, state writes and animations for both depths.
@@ -259,6 +260,19 @@ t_contains "and loads it by URL, breaking the type cycle" \
   "setSource(" "$(<"$MENU_DIR/GroupRow.qml")"
 t_contains "at the compact register" "nested: true" \
   "$(<"$MENU_DIR/GroupRow.qml")"
+
+# The child delegates through the menu service, never into the panel's list:
+# the panel owns the list seat, and probeSource is the debug alias only.
+t_contains "the service publishes the active panel" \
+  "property var panel: null" "$SERVICE_SRC"
+t_contains "the service exposes the nested reveal verbs" \
+  "function beginNestedReveal()" "$SERVICE_SRC"
+t_contains "and the nested close verb" \
+  "function nestedSlotFinished(item)" "$SERVICE_SRC"
+t_not_contains "the group child never reaches into the debug panel" \
+  "probeSource" "$(<"$MENU_DIR/GroupRow.qml")"
+t_contains "the panel owns the nested seat" \
+  "function beginNestedRestore(paceMs)" "$MENU_SRC"
 
 # One instance means nobody instantiates one. An Item here would be a second
 # pair of FontMetrics per delegate, which is what the singleton removed.

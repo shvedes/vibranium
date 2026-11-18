@@ -196,9 +196,16 @@ Item {
     Qt.callLater(root._writeLanded)
   }
 
+  // Landing swaps to equivalent Binding objects instead of assigning the
+  // properties: an assignment would destroy the live bindings and pin the
+  // slot at its largest height, so nested content that later collapses would
+  // leave the difference as blank space. The Binding writes the same value
+  // through to the destination with the Behaviour disabled, then keeps
+  // tracking contentHost.height for the rest of the unfold.
+  property bool _landedHold: false
+
   function _writeLanded() {
-    height = root.open ? contentHost.height + root.gap : 0
-    opacity = root.open ? 1 : 0
+    root._landedHold = true
   }
 
   // Release the hold, so the NEXT unfold on this slot can ease. The host
@@ -208,6 +215,20 @@ Item {
   function release() {
     root._held = false
     root.settle = false
+    root._landedHold = false
+  }
+
+  Binding {
+    target: root
+    property: "height"
+    when: root._landedHold
+    value: root.open ? root.topGap + contentHost.height + root.gap : 0
+  }
+  Binding {
+    target: root
+    property: "opacity"
+    when: root._landedHold
+    value: root.open ? 1 : 0
   }
 
   // Whether this slot eases. The policy alone decides, narrowed by the hold:
@@ -215,11 +236,30 @@ Item {
   // already where it is going. The two Behaviors below are the only readers,
   // and both are gated rather than shortened, so with the switch off the value
   // is written straight to the target - the same landing, minus the motion.
+  // A slot that hosts nested rows follows their live geometry instead of
+  // easing again: their own slots already animate the same height, and a
+  // second ease restarts at each child step with a shifting endpoint.
+  property bool followNested: false
+  // Read through the slot's OWN `open`, not the bare flag. Following a nested
+  // body is a verdict about an OPEN slot - once the slot is closing, THIS
+  // slot's fold is the motion. `open` is also the first term the height
+  // binding below reads, so by the time a close writes the height the gate
+  // has the same answer the write did; a verdict read from the host can be a
+  // propagation late and leave the Behavior disabled for exactly the write
+  // that starts the fold. Measured with the bare flag: the row snapped
+  // 329->47 in one frame and the close seat, reading that as a finished fold,
+  // restored the whole scroll in a single write.
   readonly property bool motion: MotionPolicy.enabled && !root._held
+    && !(root.followNested && root.open)
 
   Behavior on height {
     enabled: root.motion
-    Glide { duration: root.slotMs; easing.type: Easing.OutCubic }
+    Glide {
+      duration: root.slotMs
+      // OutCubic starts fast; on a tall body that first step reads as a
+      // stutter. The fold uses a gentler curve while the open stays snappy.
+      easing.type: root.closing ? Easing.InOutCubic : Easing.OutCubic
+    }
   }
 
   Behavior on opacity {

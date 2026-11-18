@@ -62,6 +62,21 @@ ListView {
   // Whether keyboard navigation wraps at the ends (menu-style).
   // Launcher stops at the last row instead of looping.
   property bool wrap: true
+  // Diagnostic frame trace, armed by a consumer (menu debugTrace). Off by
+  // default; every emit below is a no-op until it is switched on.
+  property bool traceDebug: false
+  function _trace(tag, fields) {
+    if (!root.traceDebug) return
+    console.log("NTRACE " + tag + " " + JSON.stringify(fields))
+  }
+  // Read-only motion state for the consumer's live probe.
+  readonly property bool debugAnimRunning: scrollAnim.running
+  readonly property int debugSweepMs: root._sweepMs
+  readonly property int debugPursuitIdx: root._pursuitIdx
+  readonly property int debugFollowIdx: root._followIdx
+  readonly property bool debugSeatsInstant: root._seatsInstant
+  readonly property int debugScrollEasing: scrollAnim.easing.type
+
   // Smooth-scroll seat motion when the consumer's animation gate is
   // on; instant otherwise. User-driven motion always wins.
   property bool smoothScroll: false
@@ -276,11 +291,18 @@ ListView {
   readonly property real _currentSlotMotionMs:
     root.currentItem && typeof root.currentItem.slotMotionMs === "number"
       ? root.currentItem.slotMotionMs : 0
-  highlightMoveDuration: root._seatsInstant
+  // A group row's own slot can be still while a child unfolds inside it. The
+  // row then grows in the child's frame, and an eased bar would trail the
+  // content it borders - the dropdown looks finished before its edge catches
+  // up. Follow live geometry on both axes while a nested slot is open.
+  readonly property bool _nestedSlotLive:
+    root.currentItem && root.currentItem.nestedSlotLive === true
+  highlightMoveDuration: root._seatsInstant || root._nestedSlotLive
     ? 0
     : (root.highlightMotion && root.selectionHighlight
       ? (root._sweepMs >= 0 ? root._sweepMs : Ui.fastMs) : 0)
   highlightResizeDuration: root._seatsInstant || root._currentSlotMotionMs > 0
+    || root._nestedSlotLive
     ? 0
     : (root.highlightMotion && root.selectionHighlight
       ? (root._sweepMs >= 0 ? root._sweepMs : Ui.fastMs) : 0)
@@ -500,8 +522,17 @@ ListView {
     id: scrollAnim
     target: root
     property: "contentY"
-    easing.type: Easing.OutCubic
+    // A reveal seat crosses a large distance and a slow-starting curve keeps
+    // its first frames gentle. A follow seat is restarted on every key repeat;
+    // a slow start there spends each leg catching up, so the cursor drifts
+    // below the centre and snaps back when the hold ends. seatTo picks the
+    // curve per seat; this is the reveal default.
+    easing.type: Easing.InOutCubic
     onFinished: {
+      if (root.traceDebug) root._trace("list.finish", {
+        tag: root._lastWriteTag, y: Math.round(root.contentY * 10) / 10,
+        pursuit: root._pursuitIdx, follow: root._followIdx, sweep: root._sweepMs
+      })
       if (!root._highlightHandoff) root._sweepMs = -1
       root._followIdx = -1
       // A landed pursuit is not tracking anything, so a later reveal for
@@ -1307,6 +1338,11 @@ ListView {
     // stale retry fire after the no-op and drag the view off the position
     // the no-op just confirmed.
     root._seatEpoch++
+    if (root.traceDebug) root._trace("list.seatIn", {
+      tag: tag || "seat", from: Math.round(root.contentY * 10) / 10,
+      want: Math.round(y * 10) / 10, animated: animated === true,
+      pace: paceMs || 0, running: scrollAnim.running
+    })
     const target = root.clampY(y, viewH)
     // Claims are released before the no-op return: a seat that lands where
     // the view already stands starts no tween, so it owns nothing, and a
@@ -1325,6 +1361,22 @@ ListView {
     // hold below has to be able to tell a no-op from a landed seat.
     root._seatWrites++
     root._lastWriteTag = owner
+    // A held key re-arms this seat faster than any ease can advance: every
+    // restart begins at zero velocity, so the view stays one leg behind and
+    // only catches up after the key is released. Land repeat follow seats
+    // directly; the bar lands with them so the cursor stays dead centre.
+    if (owner === "follow" && root._repeatFollow) {
+      scrollAnim.stop()
+      root.contentY = target
+      root._followIdx = -1
+      root._repeatFollow = false
+      root._sweepMs = 0
+      root._highlightHandoff = false
+      if (root.traceDebug) root._trace("list.followSnap", {
+        tag: owner, y: Math.round(root.contentY * 10) / 10
+      })
+      return target
+    }
     if (animated === true) {
       let distanceMs = root.stepMs(Math.abs(target - root.contentY))
       if (paceMs > 0) {
@@ -1334,6 +1386,11 @@ ListView {
       const handoffMs = root._highlightHandoff && root._sweepMs >= 0
         ? root._sweepMs : 0
       scrollAnim.duration = Math.max(distanceMs, handoffMs)
+      // A follow seat must answer the very next repeat, so it uses the bar's
+      // fast-start curve; a reveal seat keeps the gentle one. Matching the
+      // bar on follow also lands the row and the bar on the same centre.
+      scrollAnim.easing.type = owner === "follow"
+        ? Easing.OutCubic : Easing.InOutCubic
       scrollAnim.to = target
       // Re-aiming a running tween by moving `to` alone does NOT work in
       // this engine: the endpoints are captured when the animation
@@ -1342,6 +1399,11 @@ ListView {
       // ease from zero velocity, which is what a stutter looks like.
 
       scrollAnim.restart()
+      if (root.traceDebug) root._trace("list.seatGo", {
+        tag: owner, from: Math.round(scrollAnim.from * 10) / 10,
+        to: Math.round(target * 10) / 10, ms: scrollAnim.duration,
+        sweep: root._sweepMs
+      })
       // Bar/content sync: the highlight tween runs the same duration on
       // the same curve (see _sweepMs), so both land together with no
       // end-of-glide wobble. Assigned after restart: a synchronously
@@ -1401,6 +1463,9 @@ ListView {
   // Index of the in-flight follow seat for the layout-shift retarget
   // below; -1 outside follow seats.
   property int _followIdx: -1
+  // Armed by move() only: a follow seat that is another step of a held key.
+  // Direct followCursor callers (landings, probe drivers) still ease.
+  property bool _repeatFollow: false
   // Index of the row whose open-slot pursuit put the contentY tween now in
   // flight, or -1 when the running seat is anything else. seatTo clears it
   // on every seat that is not a pursuit, so it describes the tween in
@@ -1495,7 +1560,7 @@ ListView {
   // (menu) it cycles - last to first glides through the step tween
   // when smoothScroll is on; with wrap:false it clamps at the ends.
   // Returns true when the current index changed.
-  function move(dir, highlightMs) {
+  function move(dir, highlightMs, repeat) {
     const count = root.count
     if (count === 0) return false
     if (dir === 0) return false
@@ -1540,8 +1605,15 @@ ListView {
         const handoff = fromSlotMs > 0
           || (typeof highlightMs === "number" && highlightMs > 0)
         root._highlightHandoff = handoff
-        root._sweepMs = focusMs > 0 ? focusMs
-          : (ft < 0 ? Ui.fastMs : root.stepMs(Math.abs(ft - root.contentY)))
+        // A held key is still armed in the content tween: its next seat lands
+        // directly (see seatTo). The bar must land with it, and its tween
+        // launches on the index write below - so the zero has to be armed
+        // here, before the write, not in seatTo afterwards.
+        const repeating = repeat === true && scrollAnim.running && root._followIdx >= 0
+        root._repeatFollow = repeating
+        root._sweepMs = repeating ? 0
+          : (focusMs > 0 ? focusMs
+            : (ft < 0 ? Ui.fastMs : root.stepMs(Math.abs(ft - root.contentY))))
         root.seat(i, "step")
         // No seat started (hold/no-op/instant) - release the pre-arm so
         // the bar keeps its default glide instead of a stale sweep.
@@ -2246,6 +2318,12 @@ ListView {
     // row has published its settled height and there is nothing to wait
     // for; after the flush the view's bounds and the measured extent
     // agree, and the clamp has nothing left to do.
+    if (root.traceDebug) root._trace("list.pursue", {
+      idx: index, ry: Math.round(ry * 10) / 10,
+      settledH: Math.round(rh * 10) / 10, owed: Math.round(owed * 10) / 10,
+      target: Math.round(target * 10) / 10, claim: Math.round(claim * 10) / 10,
+      mine: mine, pace: root.revealSlotMs
+    })
     const settledTotal = root.settledTotal()
     if (settledTotal > 0 && root.contentHeight < settledTotal - 0.5) {
       root.forceLayout()
@@ -2261,7 +2339,10 @@ ListView {
   }
 
   onAutoRevealIndexChanged: {
-
+    if (root.traceDebug) root._trace("list.auto", {
+      idx: root.autoRevealIndex, count: root.count,
+      cY: Math.round(root.contentY * 10) / 10
+    })
     // A released claim leaves no seat ownership behind. _pursuitIdx is
     // ownership of the tween in flight by the row that put it there, and a
     // claim that is gone owns nothing - the row closed its slot, so the
@@ -2345,7 +2426,12 @@ ListView {
       // wanted the view anyway; a row still short of that keeps its claim,
       // because a slot that is still unfolding cannot re-establish one and
       // would otherwise grow out of view for the rest of its life.
-      if (root._rowRevealed()) root.autoRevealIndex = -1
+      if (root._rowRevealed()) {
+        if (root.traceDebug) root._trace("list.grabClear", {
+          idx: root.autoRevealIndex, count: root.count
+        })
+        root.autoRevealIndex = -1
+      }
       // A grab is user motion: pre-empt any held landing lease.
       root._stillPreempt()
     }
@@ -2354,6 +2440,11 @@ ListView {
   // --- reconciliation ---
 
   onContentYChanged: {
+    if (root.traceDebug) root._trace("list.contentY", {
+      y: Math.round(root.contentY * 10) / 10,
+      total: Math.round(root.contentHeight * 10) / 10,
+      anim: scrollAnim.running
+    })
     // A held swap offset answers its own writes and the engine's clamps
     // alike, and answers them in the turn they happen - a clamp that lands
     // after the content has stopped measuring is still the same event, and
@@ -2376,6 +2467,11 @@ ListView {
       // drops under the current position - which is what a CLOSING slot
       // does frame by frame as the content it displaced shrinks back, so
       // it can walk the view down in instant steps.
+      if (root.traceDebug) root._trace("list.clamp", {
+        tag: root._lastWriteTag, from: Math.round(root.contentY * 10) / 10,
+        to: Math.round(root.clampY(root.contentY) * 10) / 10,
+        contentH: Math.round(root.contentHeight * 10) / 10
+      })
       scrollAnim.stop()
       root.contentY = root.clampY(root.contentY)
     }

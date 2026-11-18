@@ -65,7 +65,10 @@ Variants {
           hardMaxHeight: ceiling.hardMaxHeight
 
           Component.onCompleted: {
-            if (win.primary) Menu.probeSource = panel
+            if (win.primary) {
+              Menu.panel = panel
+              Menu.probeSource = panel
+            }
           }
         }
       }

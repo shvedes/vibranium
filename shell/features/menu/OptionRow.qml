@@ -58,7 +58,12 @@ Rectangle {
         id: optLabel
 
         width: parent.width
-        text: opt.modelData.label
+        // An option with no label still has a value to show; otherwise the
+        // row disappears from the list and reads as a gap between accents.
+        text: String(opt.modelData.label ?? "") !== ""
+          ? opt.modelData.label
+          : (String(opt.modelData.value ?? "") !== ""
+            ? opt.modelData.value : "(unnamed)")
         // Chosen is the stored value, so it is the one option already
         // applied - the same claim the entry row above makes with the
         // accent, which is why the cursor alone must not look like it.

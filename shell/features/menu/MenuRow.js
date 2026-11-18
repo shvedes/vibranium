@@ -103,7 +103,8 @@ function stageText(expanded, step, key) {
 // unitSuffix, above.)
 //
 // The same rule as unitSuffix once a stage does declare one: an empty unit
-// renders nothing, not a lone space, and null declares nothing at all.
+// renders nothing, not a lone space. Undefined is the decline that keeps the
+// row's fallback; a null is stringified like any other declared value.
 function stageUnitSuffix(stageUnit, fallback) {
   if (stageUnit === undefined) return fallback
   const u = String(stageUnit).trim()
@@ -205,11 +206,11 @@ function optionCellRow(index, count) {
 // null, and the caller restores the real value rather than committing
 // garbage. Callers clamp and quantize the result themselves.
 //
-// A leading dot (".5") and a plus sign are numbers too, and the typographic
-// minus sign (U+2212, what a phone keyboard offers) reads as the minus: each
-// of them reads as a number rather than as "not a number".
+// A leading dot and a plus sign are declines: they name no number here. The
+// typographic minus sign (U+2212, what a phone keyboard offers) reads as the
+// ASCII minus.
 function leadingNumber(text) {
-  const m = /^\s*([-\\u2212]?(?:\d+(?:[.,]\d+)?))/.exec(String(text))
+  const m = /^\s*([-\u2212]?(?:\d+(?:[.,]\d+)?))/.exec(String(text))
   return m === null ? null : Number(m[1].replace("\u2212", "-").replace(",", "."))
 }
 

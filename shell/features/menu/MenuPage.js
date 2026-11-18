@@ -208,6 +208,28 @@ function stripForHay(s) {
   return out
 }
 
+// A group's children are rows of their own, at every depth. Their copy joins
+// the parent row's haystack so a search reaches a nested-nested entry through
+// the one index entry the page owns.
+function hayChildParts(child, parts) {
+  if (!child || typeof child !== "object" || Array.isArray(child)) return
+  if (child.label) parts.push(String(child.label))
+  if (child.sub) parts.push(stripForHay(child.sub))
+  if (child.desc) parts.push(stripForHay(child.desc))
+  if (child.warning) parts.push(stripForHay(child.warning))
+  if (child.placeholder) parts.push(String(child.placeholder))
+  if (child.unit) parts.push(String(child.unit))
+  if (child.value !== undefined && child.value !== null) {
+    const value = String(child.value).trim()
+    if (value !== "") parts.push(value)
+  }
+  if (child.var) parts.push(String(child.var))
+  if (Array.isArray(child.children)) {
+    for (let i = 0; i < child.children.length; i++)
+      hayChildParts(child.children[i], parts)
+  }
+}
+
 function hayFromItem(item, includeMetadata) {
   const parts = SL.titleParts(item)
   if (item.desc) parts.push(stripForHay(item.desc))
@@ -240,15 +262,8 @@ function hayFromItem(item, includeMetadata) {
     // lands on the matching option: one index entry per listed row, and the
     // sub-target resolved from the query (MenuLib.bestChildIndex).
     if (Array.isArray(item.children)) {
-      for (let i = 0; i < item.children.length; i++) {
-        const c = item.children[i]
-        if (!c || typeof c !== "object") continue
-        if (c.label) parts.push(String(c.label))
-        if (c.sub) parts.push(stripForHay(c.sub))
-        if (c.desc) parts.push(stripForHay(c.desc))
-        if (c.warning) parts.push(stripForHay(c.warning))
-        if (c.var) parts.push(String(c.var))
-      }
+      for (let i = 0; i < item.children.length; i++)
+        hayChildParts(item.children[i], parts)
     }
     // Canonical keys help power users ("RECORDING_FPS" -> FPS row) and make
     // extension ids searchable.
@@ -280,18 +295,28 @@ function uidKey(rawId, index) {
 function normalizeChildren(rawChildren, pageId, parentKey) {
   const list = StoreGuards.asList(rawChildren)
   const out = []
+  // Sibling children share the uid space with the page. Suffix repeated ids
+  // the way buildPage does for top-level rows, or two branches each holding a
+  // group with the same child id would claim one runtime slot.
+  const seenUid = Object.create(null)
   for (let i = 0; i < list.length; i++) {
     const raw = list[i]
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue
-    const child = normalizeItem(raw, pageId, i)
-    child._uidKey = parentKey + "/" + child._uidKey
-    child.uid = pageId + "#" + child._uidKey
+    const child = normalizeItem(raw, pageId, i, parentKey)
+    if (seenUid[child.uid] !== undefined) {
+      let n = 2
+      const base = pageId + "#" + child._uidKey
+      while (seenUid[base + "~" + n] !== undefined) n++
+      child._uidKey += "~" + n
+      child.uid = base + "~" + n
+    }
+    seenUid[child.uid] = true
     out.push(child)
   }
   return out
 }
 
-function normalizeItem(raw, pageId, index) {
+function normalizeItem(raw, pageId, index, parentKey) {
   const type = typeof raw.type === "string" ? raw.type : "action"
   const item = defaultsFor(type)
   for (const key in item) {
@@ -302,9 +327,22 @@ function normalizeItem(raw, pageId, index) {
     // cleared.
     if (raw[key] !== undefined && key !== "type") item[key] = raw[key]
   }
+  // Option readers assume an object with a value. A stray scalar in a bundle
+  // would throw while shaping the row or building its options page; drop it
+  // here, the same way a non-object row is dropped from a page.
+  if (Array.isArray(item.options)) {
+    for (let i = item.options.length - 1; i >= 0; i--) {
+      const o = item.options[i]
+      if (o === null || typeof o !== "object" || Array.isArray(o))
+        item.options.splice(i, 1)
+    }
+  }
   // `checked` names the guard expression; the boolean seed lives in the
   // state store, so remap the JSON bool under a reserved key.
   if (typeof raw.checked === "boolean") item.checked_ = raw.checked === true
+  // The active marker is a boolean verdict, not a truthy string from a file.
+  if (item.active !== undefined && typeof item.active !== "boolean")
+    item.active = false
   // A submenu's target is the OTHER side of the page-id pair, and normalizePage
   // sanitizes the page id - so the reference has to be sanitized the same way
   // or a page id carrying a control character resolves to nothing and the link
@@ -339,9 +377,10 @@ function normalizeItem(raw, pageId, index) {
   // Stable identity: explicit ids pin the uid across inserts, removals and
   // reorders (dynamic pages rebuild wholesale - positional uids would hand
   // one row's runtime state, guard answers and list identity to another
-  // row). Sanitized; buildPage dedupes collisions. Anonymous rows keep
-  // positional uids. Internal key rides along for the dedupe pass.
-  item._uidKey = uidKey(raw.id, index)
+  // row). Sanitized; buildPage and normalizeChildren dedupe collisions.
+  // Anonymous rows keep positional uids. The ancestor prefix is applied here,
+  // before recursion, so a nested group's children inherit the full key.
+  item._uidKey = (parentKey ? parentKey + "/" : "") + uidKey(raw.id, index)
   item.uid = pageId + "#" + item._uidKey
   // A group row's dropdown holds whole entries, so its children normalize like
   // rows of the page - same defaults, same selectable verdict - under a uid
@@ -529,7 +568,13 @@ function parseBundle(text) {
   // menu always reads `menus` from it, while the settings stores read
   // `pages` through SettingsLib.parseUnifiedCatalog.
   if (raw === null) throw new Error("bundle is null")
-  const rawPages = Array.isArray(raw) ? raw : (Array.isArray(raw.menus) ? raw.menus : (Array.isArray(raw.pages) ? raw.pages : [raw]))
+  const menus = Array.isArray(raw.menus) ? raw.menus : null
+  const pages = Array.isArray(raw.pages) ? raw.pages : null
+  // A unified catalog may declare an empty `menus` array while its `pages`
+  // carry ordinary menu rows. Prefer a non-empty `menus`, then `pages`.
+  const rawPages = Array.isArray(raw) ? raw
+    : (menus && menus.length ? menus
+      : (pages && pages.length ? pages : (menus || pages || [raw])))
   return bundleFromPages(rawPages)
 }
 

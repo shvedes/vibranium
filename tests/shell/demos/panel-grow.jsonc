@@ -1,0 +1,92 @@
+{
+  "title": "Grow test",
+  "menus": [
+    {
+      "id": "grow-demo",
+      "label": "Grow test",
+      "items": [
+        {
+          "type": "action",
+          "id": "filler",
+          "label": "Filler"
+        },
+        {
+          "type": "group",
+          "id": "g-top",
+          "label": "Top group",
+          "sub": "four plus nested",
+          "children": [
+            {
+              "type": "toggle",
+              "id": "g-1",
+              "label": "Child 1",
+              "sub": "line"
+            },
+            {
+              "type": "toggle",
+              "id": "g-2",
+              "label": "Child 2",
+              "sub": "line"
+            },
+            {
+              "type": "toggle",
+              "id": "g-3",
+              "label": "Child 3",
+              "sub": "line"
+            },
+            {
+              "type": "toggle",
+              "id": "g-4",
+              "label": "Child 4",
+              "sub": "line"
+            },
+            {
+              "type": "group",
+              "id": "g-nest",
+              "label": "Nested group",
+              "sub": "six deep",
+              "children": [
+                {
+                  "type": "toggle",
+                  "id": "gn-1",
+                  "label": "Deep 1",
+                  "sub": "line"
+                },
+                {
+                  "type": "toggle",
+                  "id": "gn-2",
+                  "label": "Deep 2",
+                  "sub": "line"
+                },
+                {
+                  "type": "toggle",
+                  "id": "gn-3",
+                  "label": "Deep 3",
+                  "sub": "line"
+                },
+                {
+                  "type": "toggle",
+                  "id": "gn-4",
+                  "label": "Deep 4",
+                  "sub": "line"
+                },
+                {
+                  "type": "toggle",
+                  "id": "gn-5",
+                  "label": "Deep 5",
+                  "sub": "line"
+                },
+                {
+                  "type": "toggle",
+                  "id": "gn-6",
+                  "label": "Deep 6",
+                  "sub": "line"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

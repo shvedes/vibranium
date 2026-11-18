@@ -1,0 +1,516 @@
+// Nested-row stress bundle for the running Vibranium shell.
+//
+// This fixture exercises the menu parser, projections and renderer with
+// messy, partially invalid and deeply nested data. Everything is stored in
+// the menu's runtime state: no setting is read or written, and the few
+// command fields are deliberately inert. Safe to open and poke repeatedly.
+//
+//   bash tests/shell/demos/nested-rows-showcase.sh
+//   qs -p "$VIBRANIUM/shell" ipc call menu close
+{
+  "title": "Nested rows",
+  "menus": [
+    {
+      "id": "nested-showcase",
+      "label": "Nested rows",
+      "items": [
+        {
+          "type": "action",
+          "id": "guide",
+          "label": "Driving the fixture",
+          "sub": "Arrows move the cursor; Enter opens a child",
+          "desc": "Some rows carry values outside their declared range, duplicate identities or malformed fields. That is deliberate: the menu should keep rendering and navigating without losing its scroll position or its dropdown background."
+        },
+
+        // Non-object entries and unknown types between ordinary rows.
+        null,
+        17,
+        [ "stray", "array", "row" ],
+        "",
+        {
+          "type": "unrecognised-type",
+          "id": "odd-type",
+          "label": "Unrecognised type",
+          "sub": "Falls back to the default row shape"
+        },
+        { "type": "separator", "label": "" },
+        {
+          "type": "toggle",
+          "id": "duplicate-id",
+          "label": "Shared identity",
+          "sub": "The next row declares the same id",
+          "checked": true
+        },
+        {
+          "type": "toggle",
+          "id": "duplicate-id",
+          "label": "Shared identity, second copy",
+          "sub": "State and selection must stay distinct"
+        },
+        { "type": "separator" },
+
+        {
+          "id": "grm-devices",
+          "label": "Devices",
+          "sub": "Mixed readouts and editable values",
+          "icon": "grid",
+          "type": "group",
+          "children": [
+            {
+              "id": "dev-charge",
+              "type": "progress",
+              "label": "Battery charge",
+              "sub": "Normal readout",
+              "progressValue": 42
+            },
+            {
+              "id": "dev-signal",
+              "type": "progress",
+              "label": "Signal strength",
+              "sub": "Seeded above its display range",
+              "desc": "The fill is clamped while the readout keeps its source value.",
+              "progressValue": 184
+            },
+            {
+              "id": "dev-temperature",
+              "type": "progress",
+              "label": "Temperature",
+              "sub": "Negative seed",
+              "warning": "No description; the warning still needs a hairline.",
+              "progressValue": -9
+            },
+            {
+              "id": "dev-interval",
+              "type": "number",
+              "label": "Refresh interval",
+              "sub": "Minimum is above maximum",
+              "min": 90,
+              "max": 10,
+              "step": 15,
+              "value": 45,
+              "unit": "s"
+            },
+            {
+              "id": "dev-offset",
+              "type": "range",
+              "label": "Fine offset",
+              "sub": "Two decimals, tight limits",
+              "desc": "The unit is longer than the value column.",
+              "min": -1.5,
+              "max": 1.5,
+              "step": 0.05,
+              "decimals": 2,
+              "value": 0.35,
+              "unit": "units of display offset"
+            },
+            {
+              "id": "dev-hidden-value",
+              "type": "number",
+              "label": "Raw counter",
+              "hideValue": true,
+              "min": 0,
+              "max": 999,
+              "value": 17
+            },
+            null,
+            "not a row",
+            {
+              "id": "dev-broken-step",
+              "type": "number",
+              "label": "Step without span",
+              "sub": "Zero step and identical limits",
+              "min": 7,
+              "max": 7,
+              "step": 0,
+              "value": 7
+            }
+          ]
+        },
+
+        {
+          "id": "grm-names",
+          "label": "Names and text",
+          "sub": "Long, short and unusual strings",
+          "icon": "file",
+          "type": "group",
+          "children": [
+            {
+              "id": "nam-plain",
+              "type": "text",
+              "label": "Plain field",
+              "placeholder": "short"
+            },
+            {
+              "id": "nam-empty",
+              "type": "text",
+              "label": "No placeholder"
+            },
+            {
+              "id": "nam-seeded",
+              "type": "text",
+              "label": "Stored note",
+              "sub": "Seeded from runtime state",
+              "desc": "Copy under the editor.",
+              "warning": "A second note under the first.",
+              "value": "remembered text",
+              "placeholder": "replace the note"
+            },
+            {
+              "id": "nam-wide",
+              "type": "text",
+              "label": "Field with a long placeholder",
+              "placeholder": "this stretch of text decides how wide the card becomes when the editor is open"
+            },
+            {
+              "id": "nam-scripts",
+              "type": "toggle",
+              "glyph": "言",
+              "label": "语言 / العربية / émoji 🧪",
+              "sub": "Several writing systems in one row"
+            },
+            {
+              "id": "nam-lead",
+              "type": "toggle",
+              "label": "Command hint",
+              "subLead": "cmd",
+              "sub": "waiting for input",
+              "subAccent": "active"
+            },
+            {
+              "id": "nam-null-copy",
+              "type": "text",
+              "label": "Null copy fields",
+              "sub": null,
+              "desc": null,
+              "warning": null,
+              "placeholder": null,
+              "value": null
+            },
+            {
+              "id": "nam-array-copy",
+              "type": "text",
+              "label": "Array copy fields",
+              "sub": [ "one", "two" ],
+              "placeholder": [ 1, 2, 3 ],
+              "value": { "unexpected": "object" }
+            }
+          ]
+        },
+
+        {
+          "id": "grm-choices",
+          "label": "Choices",
+          "sub": "Option lists and staged input",
+          "icon": "settings",
+          "type": "group",
+          "children": [
+            {
+              "id": "cho-colour",
+              "type": "select",
+              "label": "Colour",
+              "sub": "Three ordinary options",
+              "value": "green",
+              "options": [
+                { "label": "Red", "value": "red" },
+                { "label": "Green", "value": "green" },
+                { "label": "Blue", "value": "blue" }
+              ]
+            },
+            {
+              "id": "cho-missing",
+              "type": "select",
+              "label": "Theme",
+              "sub": "Stored value is absent from the list",
+              "value": "retired",
+              "options": [
+                { "label": "Light", "value": "light" },
+                { "label": "Dark", "value": "dark" }
+              ]
+            },
+            {
+              "id": "cho-duplicates",
+              "type": "select",
+              "label": "Profile",
+              "sub": "Repeated values and empty labels",
+              "value": "a",
+              "options": [
+                { "label": "First", "value": "a" },
+                { "label": "", "value": "a" },
+                { "label": "Third", "value": "a" },
+                null,
+                "garbage option",
+                { "label": null, "value": null }
+              ]
+            },
+            {
+              "id": "cho-action",
+              "type": "select",
+              "label": "Temporary action",
+              "sub": "No persistent marker",
+              "marker": false,
+              "keepOpen": true,
+              "value": "first",
+              "options": [
+                { "label": "First", "value": "first" },
+                { "label": "Second", "value": "second" }
+              ]
+            },
+            {
+              "id": "cho-prompt",
+              "type": "select",
+              "label": "Custom value",
+              "sub": "One option swaps in a text field",
+              "value": "preset",
+              "editValue": "custom",
+              "editText": "typed value",
+              "options": [
+                { "label": "Preset", "value": "preset" },
+                { "label": "Type a value", "value": "custom" }
+              ]
+            },
+            {
+              "id": "cho-flow",
+              "type": "select",
+              "label": "Staged setup",
+              "sub": "Flow overrides a plain option list",
+              "value": "start",
+              "options": [
+                { "label": "Legacy option", "value": "legacy" }
+              ],
+              "flow": [
+                { "kind": "select", "label": "Mode", "options": [ { "label": "One", "value": "1" }, { "label": "Two", "value": "2" } ], "value": "1" },
+                { "kind": "text", "label": "Label", "placeholder": "name it" },
+                { "kind": "number", "label": "Count", "min": 0, "max": 10, "step": 2, "value": 4 },
+                { "kind": "nonsense", "label": "Discarded stage" },
+                null
+              ]
+            }
+          ]
+        },
+
+        {
+          "id": "grm-expanded",
+          "label": "Bodies",
+          "sub": "Expandable rows and separators",
+          "icon": "file-code",
+          "type": "group",
+          "children": [
+            {
+              "id": "bod-article",
+              "type": "expandable",
+              "label": "Release notes",
+              "sub": "A body long enough to wrap at any width",
+              "desc": "Description above the body.",
+              "warning": "Warning below the body.",
+              "body": "This paragraph exists to produce a body whose height follows the card width. Repeated clauses make the measurement change when the dropdown widens and narrows.\n\nA second paragraph continues the same block."
+            },
+            {
+              "id": "bod-reference",
+              "type": "expandable",
+              "label": "Reference copy",
+              "desc": "Ctrl-I is the only reveal for this kind of row.",
+              "infoOnly": true
+            },
+            {
+              "id": "bod-empty",
+              "type": "expandable",
+              "label": "No body content"
+            },
+            {
+              "id": "bod-action",
+              "type": "action",
+              "label": "Ordinary action between body rows",
+              "sub": "No command is attached"
+            },
+            { "type": "separator", "label": "Section break" },
+            {
+              "id": "bod-after",
+              "type": "toggle",
+              "label": "After the break"
+            }
+          ]
+        },
+
+        {
+          "id": "grm-branches",
+          "label": "Branches",
+          "sub": "Groups several levels deep",
+          "icon": "layers",
+          "type": "group",
+          "children": [
+            {
+              "id": "br-a",
+              "type": "group",
+              "label": "First branch",
+              "sub": "Its own children and cursor",
+              "children": [
+                {
+                  "id": "br-a1",
+                  "type": "group",
+                  "label": "Second branch",
+                  "sub": "Another level of dropdown",
+                  "children": [
+                    {
+                      "id": "br-a1a",
+                      "type": "group",
+                      "label": "Third branch",
+                      "sub": "Depth four from the page",
+                      "children": [
+                        {
+                          "id": "br-a1a1",
+                          "type": "text",
+                          "label": "Deep field",
+                          "placeholder": "type at the deepest level",
+                          "warning": "A warning at depth four."
+                        },
+                        {
+                          "id": "br-a1a2",
+                          "type": "toggle",
+                          "label": "Deep switch",
+                          "sub": "Short sub line"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "br-a1b",
+                      "type": "progress",
+                      "label": "Branch readout",
+                      "progressValue": 77
+                    },
+                    null
+                  ]
+                },
+                {
+                  "id": "br-a2",
+                  "type": "toggle",
+                  "label": "Sibling of the second branch",
+                  "desc": "Its copy shares the bar with the nested group."
+                }
+              ]
+            },
+            {
+              "id": "br-b",
+              "type": "select",
+              "label": "Branch selector",
+              "sub": "An ordinary child beside a nested group",
+              "value": "first",
+              "options": [
+                { "label": "First", "value": "first" },
+                { "label": "Second", "value": "second" }
+              ]
+            },
+            {
+              "id": "br-c",
+              "type": "text",
+              "label": "Long sibling",
+              "placeholder": "a placeholder designed to be wider than the card can grow"
+            }
+          ]
+        },
+
+        {
+          "id": "grm-guards",
+          "label": "Conditions",
+          "sub": "Guards and ignored metadata",
+          "icon": "eye",
+          "type": "group",
+          "children": [
+            {
+              "id": "gd-always",
+              "type": "toggle",
+              "label": "Always available",
+              "sub": "Empty guard expressions"
+            },
+            {
+              "id": "gd-hidden",
+              "type": "toggle",
+              "label": "Hidden by guard",
+              "sub": "Filtered out of the child list",
+              "when": "false"
+            },
+            {
+              "id": "gd-garbage-guard",
+              "type": "toggle",
+              "label": "Unparseable guard",
+              "sub": "Guard text with no valid syntax",
+              "when": "@@@ || ???"
+            },
+            {
+              "id": "gd-disabled",
+              "type": "toggle",
+              "label": "Disabled but listed",
+              "sub": "Skipped by the child cursor",
+              "disabled": "true"
+            },
+            {
+              "id": "gd-strings",
+              "type": "toggle",
+              "label": "Wrong guard types",
+              "sub": "Numbers instead of expressions",
+              "when": 12,
+              "disabled": [ "no" ],
+              "checked": "false"
+            },
+            {
+              "id": "gd-meta",
+              "type": "toggle",
+              "label": "Ignored metadata",
+              "sub": "Unknown fields and malformed palette",
+              "unknownField": "carried through normalization",
+              "palette": [ "#abc", 7, null ],
+              "previewFontFamily": 42,
+              "active": "yes",
+              "showIf": [ null, "bad", 9 ]
+            },
+            {
+              "id": "gd-dead-link",
+              "type": "submenu",
+              "label": "Missing target page",
+              "sub": "Page id does not resolve",
+              "page": "no-such-page"
+            }
+          ]
+        },
+
+        { "type": "separator", "label": "End of the list" },
+        {
+          "type": "action",
+          "id": "tail",
+          "label": "Tail row",
+          "sub": "Bottom children push the rows above"
+        },
+        {
+          "id": "grm-tail",
+          "label": "Bottom group",
+          "sub": "Last children and scroll position",
+          "type": "group",
+          "children": [
+            {
+              "id": "tl-one",
+              "type": "toggle",
+              "label": "First child",
+              "sub": "Open the one below to move me"
+            },
+            {
+              "id": "tl-two",
+              "type": "text",
+              "label": "Second child",
+              "desc": "A description near the end of the page."
+            },
+            {
+              "id": "tl-three",
+              "type": "select",
+              "label": "Third child",
+              "sub": "Expands past the viewport edge",
+              "value": "one",
+              "options": [
+                { "label": "One", "value": "one" },
+                { "label": "Two", "value": "two" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

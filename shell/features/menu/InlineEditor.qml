@@ -24,6 +24,9 @@ Item {
   property string placeholder: ""
   // Seed applied once at creation; later edits flow through signals.
   property string initialText: ""
+  // Holds the engaged border while the hosting slot folds: the field drops
+  // keyboard focus on collapse, but its accent must not blink out mid-close.
+  property bool keepFocusAccent: false
   property real numericValue: 0
   property int decimals: 0
   property real minimum: 0
@@ -41,9 +44,16 @@ Item {
   // while the editor is open.
   signal stepped(real value)
 
-  // Both editors sit at the height of a one-line menu row, so the field
-  // reads as the same surface as the entry it opened under.
-  implicitHeight: Math.max(RowGeometry.primaryRestH("line"), okButton.height)
+  // The field and the commit button are one control strip: both take the
+  // shared button height, so neither edge overhangs the other.
+  implicitHeight: Ui.buttonHeight
+
+  // Enter routed through the panel (rather than straight into the field)
+  // still commits the value the user sees, so a key hold or a click on the
+  // row never folds the editor as if Escape had been pressed.
+  function commitNow() {
+    root.commit(root.isText ? editorField.text : picker.text)
+  }
 
   function takeFocus() {
     if (root.isText) {
@@ -64,8 +74,21 @@ Item {
     anchors.leftMargin: Ui.m
     anchors.rightMargin: Ui.s
     anchors.verticalCenter: parent.verticalCenter
-    height: RowGeometry.primaryRestH("line")
+    height: Ui.buttonHeight
     placeholder: root.placeholder
+    // Tab and the caret keys are accepted here. With navigation left to Qt,
+    // Tab moves focus to the menu's search field and the editor stays open
+    // but unreachable by arrow or Enter.
+    forwardNavigation: true
+    engaged: root.keepFocusAccent
+    onFocusedChanged: if (Menu.traceEnabled) Menu.trace("editor.focus", {
+      focused: editorField.focused, engaged: editorField.engaged,
+      keep: root.keepFocusAccent
+    })
+    onEngagedChanged: if (Menu.traceEnabled) Menu.trace("editor.engaged", {
+      focused: editorField.focused, engaged: editorField.engaged,
+      keep: root.keepFocusAccent
+    })
 
     Component.onCompleted: {
       if (!root.isText || root.initialText === "") return
@@ -84,7 +107,7 @@ Item {
     anchors.leftMargin: Ui.m
     anchors.rightMargin: Ui.s
     anchors.verticalCenter: parent.verticalCenter
-    height: RowGeometry.primaryRestH("line")
+    height: Ui.buttonHeight
     value: root.numericValue
     decimals: root.decimals
     minimum: root.minimum
@@ -112,6 +135,7 @@ Item {
     anchors.right: parent.right
     anchors.rightMargin: Ui.m
     anchors.verticalCenter: parent.verticalCenter
+    height: Ui.buttonHeight
     variant: "primary"
     label: "OK"
     onClicked: root.commit(root.isText ? editorField.text : picker.text)

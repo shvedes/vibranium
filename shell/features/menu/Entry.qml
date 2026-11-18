@@ -89,16 +89,43 @@ Item {
   // library derives from the option count; a single-column dropdown has
   // no stride (0 = key falls through).
   readonly property int optionCount: row.optionList.length
+  // Repeated option values share one stored value, but only the first row is
+  // the choice. Marking every twin paints several accents for one selection.
+  readonly property int chosenIndex: {
+    if (itm && itm.marker === false) return -1
+    if (!st || st.value === undefined || st.value === null) return -1
+    const value = String(st.value)
+    for (let i = 0; i < optionList.length; i++) {
+      const opt = optionList[i]
+      if (opt && String(opt.value ?? "") === value) return i
+    }
+    return -1
+  }
   readonly property int optionColumnStride: MenuLib.optionColumnStride(optionCount)
+  // Two ownership chains meet at a group row. It owns its children and their
+  // nested dropdowns recursively, each with its own cursor and bar. The list
+  // owns only the page row: one reveal claim and one card resize, fed by this
+  // row's settled height. A child's background is drawn by its parent group's
+  // bar, which tracks the child's live geometry.
   // Child rows of a group row. The row set is a projection that converts role
   // payloads and can drop a nested array, so the live page item is resolved by
   // uid the way a flow row's stages are - uids always survive the mirror.
   readonly property var groupSource: {
     Menu.rev
-    if (!row.isGroup || searchResult || !itm || !itm.uid) return null
-    const pristine = Menu.itemByUid(itm.uid)
-    return pristine && pristine.type === "group" && Array.isArray(pristine.children)
-      ? pristine : null
+    if (!row.isGroup || searchResult || !itm) return null
+    if (Menu.traceEnabled && nested) Menu.trace("grp.source", {
+      id: String(itm.id ?? ""), uid: String(itm.uid ?? ""), nested: nested,
+      kids: Array.isArray(itm.children) ? itm.children.length : -1,
+      type: String(itm.type ?? "")
+    })
+    if (itm.uid) {
+      const pristine = Menu.itemByUid(itm.uid)
+      if (pristine && pristine.type === "group" && Array.isArray(pristine.children))
+        return pristine
+    }
+    // A group nested inside another group is not a page row, so itemByUid
+    // cannot resolve it. Its own normalized record carries children.
+    return itm.type === "group" && Array.isArray(itm.children) ? itm : null
   }
   // The children the dropdown lists. A child carrying its own `when` (a bar
   // module that does not exist on this chassis) is a gated row like any other,
@@ -124,6 +151,19 @@ Item {
     return out
   }
   readonly property bool hasGroup: row.groupChildren.length > 0
+  // A group's own slot hosts the children's rows. While any child slot is
+  // live, the group's height follows that geometry without a second ease.
+  readonly property bool nestedSlotLive: {
+    const view = row._groupView
+    const rep = view && view.childrenRepeater
+    if (!rep) return false
+    for (let i = 0; i < rep.count; i++) {
+      const item = rep.itemAt(i)
+      const kid = item && item.liveRow
+      if (kid && (kid.expanded || kid.infoOpen || kid.slotMotionMs > 0)) return true
+    }
+    return false
+  }
   readonly property bool hasEditor: hasStepper || isText
 
   // A nested row is the same row type drawn one register smaller under a
@@ -139,11 +179,36 @@ Item {
   readonly property real chevronWidth: nested ? 12 : Ui.chevronW
   // The host reads this to grow its selection bar and push the neighbours.
   readonly property real nestedSlotH: descSlot.height + expandSlot.height
-  readonly property real nestedSlotTop: mainLine.y + mainLine.height
-  readonly property real nestedBarH: Math.max(staticRowH, nestedSlotTop + nestedSlotH)
-  readonly property real nestedSettledBarH: Math.max(staticRowH,
-    nestedSlotTop + descSlot.settledH + expandSlot.settledH)
+  onHeightChanged: if (Menu.traceEnabled)
+    Menu.trace("entry.rowH", {
+      id: String(itm?.id ?? ""), h: Math.round(height * 10) / 10,
+      y: Math.round(y * 10) / 10, closing: row._shellClosing
+    })
+  // The bar grows by the slots' OWN height from the row's rest height. A
+  // slot's y is its anchor below mainLine and carries a Ui.m margin the
+  // compact row does not; including that margin in the bar height puts the
+  // bar above its seat while the slot closes. Height stays continuous to
+  // zero and covers the copy: the slot's bottom gap counts toward it.
+  readonly property real nestedBarH: {
+    let bottom = staticRowH
+    if (descSlot.height > 0) bottom = Math.max(bottom, staticRowH + descSlot.height)
+    if (expandSlot.height > 0) bottom = Math.max(bottom, staticRowH + expandSlot.height)
+    return bottom
+  }
+  readonly property real nestedSettledBarH: {
+    let bottom = staticRowH
+    if (descSlot.settledH > 0) bottom = Math.max(bottom, staticRowH + descSlot.settledH)
+    if (expandSlot.settledH > 0) bottom = Math.max(bottom, staticRowH + expandSlot.settledH)
+    return bottom
+  }
+  readonly property int nestedSlotMs: Math.max(descSlot.slotMs, expandSlot.slotMs)
   signal activated()
+  // Emitted when this row's slots come to rest, including at the end of a close.
+  // A host uses it to release the service's per-row close latch.
+  signal slotMotionEnded()
+  // Emitted at the start of a slot fold. The panel rides the list's scroll
+  // back to the reveal origin on this edge so the two motions land together.
+  signal slotCloseStarted()
 
   // Free-text prompt hosted inside a select row's expansion: picking the
   // dropdown option whose value matches editValue swaps the dropdown for
@@ -299,12 +364,60 @@ Item {
   // The live group component, while it is loaded. Keys that land on an open
   // child dropdown are delegated to that child's own row.
   property var _groupView: null
+  property int _prevChildIndex: -1
+  // The expansion shell survives the close ease. The slot's closing flag is
+  // set from its own change handler, so a latch at row level keeps the loader
+  // alive across that turn and keeps the last view key when the host rebuilds.
+  readonly property bool _shellClosing: descSlot.closing || expandSlot.closing
+  // `expanded` drops before the slot publishes `closing`, so `active` built
+  // from those two alone goes false for one turn at the close edge. The loader
+  // then tears down and rebuilds its view: the options flash empty and fade in
+  // again while the card is folding. Keep it alive from the first open until
+  // the slot's own terminal edge instead.
+  property bool _expLoaderKeep: false
+  // One shell build per open. A second build at the close edge is the flash
+  // the loader latch exists to prevent.
+  property int debugExpBuilds: 0
+  Connections {
+    target: expLoader
+    function onItemChanged() { if (expLoader.item) row.debugExpBuilds++ }
+  }
+  Connections {
+    target: expandSlot
+    function onCloseFinished() { row._expLoaderKeep = false }
+  }
+  property int _lastStageKey: -1
+  // Full height of the expansion copy while it is open. The fade keeps this
+  // denominator through the close, when the copy unloads and the live height
+  // collapses to the editor alone.
+  property real _shellContentH: 0
+  // Geometry published for the frame probe: the row's line stack and the
+  // expansion slot it unfolds under, for gap and bar coverage checks.
+  property alias debugMainLine: mainLine
+  // A nested row's line stack is centred in its compact rest height, so the
+  // rest box ends ABOVE where a Ui.m anchor margin would put a slot. Split
+  // that margin: anchor at the rest box, carry the remainder as the slot's
+  // top gap. The slot then starts and ends inside the row's rest-height
+  // claim, leaving equal space above the copy and below it.
+  readonly property real nestedSlotLead: Math.max(0,
+    staticRowH - mainLine.y - mainLine.height)
+  readonly property real nestedSlotTopGap: Math.max(0, Ui.m - nestedSlotLead)
+  readonly property real debugSlotY: expandSlot.y
+  readonly property real debugSlotH: expandSlot.height
+  readonly property real debugEditorH: expLoader.item && expLoader.item.debugEditorHost
+    ? expLoader.item.debugEditorHost.height : 0
 
   // A guard landing (or a store write) can remove a child under the cursor;
   // the index then points past the end, so it retreats to the last child.
   onGroupChildrenChanged: {
     const kids = row.groupChildren.length
-    if (row.childIndex >= kids) row.childIndex = kids > 0 ? kids - 1 : -1
+    if (row.childIndex >= kids) {
+      let seat = -1
+      for (let i = kids - 1; i >= 0; i--) {
+        if (_childSeatOk(i)) { seat = i; break }
+      }
+      row.childIndex = seat
+    }
   }
 
   // A nested description belongs to the child under the cursor, not to the
@@ -312,12 +425,47 @@ Item {
   // click on another child, or collapsing the group have to fold any child
   // slot left open themselves. Keyed on childIndex so every path is covered.
   onChildIndexChanged: {
-    const kids = row.groupChildren
-    for (let i = 0; i < kids.length; i++) {
-      if (i === row.childIndex) continue
-      const kid = kids[i]
-      if (kid && Menu.infoOpen(kid)) Menu.setInfo(kid, false)
+    const target = row.childIndex
+    const outgoing = row._prevChildIndex
+    row._prevChildIndex = target
+    Menu.trace("grp.child", {
+      idx: target, outgoing: outgoing,
+      extra: row._groupView ? Math.round(row._groupView.liveExtra * 10) / 10 : 0,
+      slotMs: row.slotMotionMs
+    })
+    // The outgoing child is folded in THIS turn. The deferred sweep below
+    // talks to the model and cannot run inside the rev that changed the
+    // cursor; its delegate is a fixed index, so reading it does not
+    // re-evaluate groupChildren. A deferred fold paints the outgoing
+    // description over the row the cursor holds.
+    if (outgoing >= 0 && outgoing !== target) {
+      const rep = row._groupView ? row._groupView.childrenRepeater : null
+      const prev = rep ? rep.itemAt(outgoing) : null
+      const kid = prev && prev.liveRow ? prev.liveRow.itm : null
+      Menu.trace("grp.outgoing", {
+        idx: outgoing, rep: !!rep, prev: !!prev, kid: !!kid,
+        info: !!kid && Menu.infoOpen(kid), expanded: !!kid && Menu.isExpanded(kid)
+      })
+      if (kid) {
+        if (Menu.infoOpen(kid)) Menu.setInfo(kid, false)
+        if (Menu.isExpanded(kid)) Menu.setExpanded(kid, false)
+      }
     }
+    // Deferred: this handler can fire while groupChildren is re-evaluating off
+    // rev, and a synchronous state write there closes the loop back onto it.
+    Qt.callLater(function() {
+      if (row.childIndex !== target) return
+      const kids = row.groupChildren
+      for (let i = 0; i < kids.length; i++) {
+        if (i === target) continue
+        const kid = kids[i]
+        if (kid && Menu.infoOpen(kid)) Menu.setInfo(kid, false)
+        // A nested editor or dropdown is modal for its own child: leaving that
+        // child folds it, so re-seating it later opens a fresh row, not a state
+        // remembered from the last visit.
+        if (kid && Menu.isExpanded(kid)) Menu.setExpanded(kid, false)
+      }
+    })
   }
 
   // The value the dropdown cursor should open on. Flow rows seed from the
@@ -333,10 +481,34 @@ Item {
     return row.st ? row.st.value : undefined
   }
 
+  // The group cursor only seats on children a keyboard user may act on: a
+  // guarded-disabled or unavailable child stays listed but is skipped, the
+  // same way List.move skips non-selectable page rows.
+  function _childSeatOk(index) {
+    const kids = row.groupChildren
+    if (index < 0 || index >= kids.length) return false
+    const kid = kids[index]
+    return !!kid && kid.selectable === true && kid.enabled !== false
+      && !Menu.isDisabled(kid) && !Menu.isUnavailable(kid)
+  }
+  function _firstChildSeat() {
+    const kids = row.groupChildren.length
+    for (let i = 0; i < kids; i++) if (_childSeatOk(i)) return i
+    return -1
+  }
+  function _nextChildSeat(from, direction) {
+    const kids = row.groupChildren.length
+    for (let n = 1; n <= kids; n++) {
+      const idx = ((from + direction * n) % kids + kids) % kids
+      if (_childSeatOk(idx)) return idx
+    }
+    return from
+  }
+
   onDropdownOpenChanged: {
     if (!dropdownOpen) return
     if (row.isGroup) {
-      row.childIndex = row.groupChildren.length > 0 ? 0 : -1
+      row.childIndex = _firstChildSeat()
       return
     }
     const optList = row.optionList
@@ -545,12 +717,13 @@ Item {
   // and pushes the neighbours, so this box stays at the row's rest height.
   height: isSep ? sepH : row.nested ? row.staticRowH
     : row.staticRowH + descSlot.height + expandSlot.height
-  // Guard-disabled rows fade (they stay reachable); an unavailable row keeps
-  // its contrast and is muted by its mute box instead, so the two hints stay
-  // distinguishable.
-  opacity: itm && !searchResult && (itm.enabled === false || Menu.isDisabled(itm))
-    ? 0.4 : 1
+  // Guard-disabled rows and types the menu cannot act on fade alike; an
+  // unavailable row keeps its contrast and is muted by its mute box instead.
+  opacity: itm && !searchResult && (Menu.isDisabled(itm)
+    || row.unavailable_ || itm.enabled === false) ? 0.4 : 1
   readonly property real labelWidth: labelCol.width
+  property alias debugValueText: valueText
+  property alias debugLabelCol: labelCol
   // What this row's own left side needs: the label, or the sub line when it
   // is the wider of the two (with its lead and tail beside it). Compared
   // against labelWidth this is the elision verdict for the row - the card
@@ -599,7 +772,9 @@ Item {
   // thing that can make it smaller is the content going away - which is the
   // end of the motion, not a new one.
   property int _slotMsLatch: 0
-  readonly property int slotMotionMs: _slotMsLatch
+  readonly property int slotMotionMs: Math.max(_slotMsLatch,
+    row.isGroup && row._focusedChildRow()
+      ? row._focusedChildRow().nestedSlotMs : 0)
 
   // Called from the slots' open/closing transitions. Re-samples every time a
   // slot starts or stops, and takes the max, so the latch is the largest
@@ -607,8 +782,17 @@ Item {
   function _latchSlotMs() {
     const live = descSlot.open || descSlot.closing
       || expandSlot.open || expandSlot.closing
+    Menu.trace("entry.latch", {
+      id: String(itm?.id ?? ""), nested: nested, live: live,
+      dOpen: descSlot.open, dClosing: descSlot.closing,
+      eOpen: expandSlot.open, eClosing: expandSlot.closing,
+      dH: Math.round(descSlot.height * 10) / 10,
+      eH: Math.round(expandSlot.height * 10) / 10,
+      ms: Math.max(descSlot.slotMs, expandSlot.slotMs)
+    })
     if (!live) {
       row._slotMsLatch = 0
+      row.slotMotionEnded()
       // The held verdict belongs to the unfold that is over. Releasing here
       // rather than on the next open is what lets a dropdown that does NOT
       // resize the region animate normally on the next keystroke: the hold is
@@ -669,6 +853,10 @@ Item {
 
   function activate() {
     if (!enabled_) return
+    // An open editor owns activation: Enter or a click commits its value.
+    // Falling through to the type switch would call openEditor() again and
+    // toggle the slot shut, reading as an Escape the user never pressed.
+    if (editorOpen && commitOpenEditor()) return
     // The host seats its cursor on the child whose row activated, so a click
     // and Enter take the same path through the group as through the page.
     row.activated()
@@ -812,6 +1000,7 @@ Item {
         if (item && item.liveRow && item.liveRow.expanded) item.liveRow.collapse()
       }
     }
+    Menu.clearDescendantState(itm)
     setExpanded(false)
     optionIndex = -1
     row.childIndex = -1
@@ -874,16 +1063,21 @@ Item {
   // Panel-driven dropdown navigation; returns true when consumed.
   function moveOption(direction) {
     if (row.isGroup) {
-      // An open child dropdown owns the arrows, the way a page row's does.
+      // An open child slot owns the arrows, the way a page row's own dropdown
+      // does: moving to a neighbour while one is open would close it mid-move
+      // and leave a stale bar. A child dropdown takes the arrow into its own
+      // option cursor; an editor keeps the key for its field.
       const childRow = row._focusedChildRow()
-      if (childRow && childRow.dropdownOpen
-        && childRow.moveOption(direction)) return true
+      if (childRow && childRow.expanded) {
+        if (childRow.dropdownOpen && childRow.moveOption(direction)) return true
+        return true
+      }
       const kids = row.groupChildren.length
       // A direction of 0 is a page key that has no column to page to: leave it
       // for the row's own step handling.
       if (!row.dropdownOpen || kids === 0 || direction === 0) return false
       const base = row.childIndex < 0 ? (direction > 0 ? -1 : kids) : row.childIndex
-      row.childIndex = ((base + direction) % kids + kids) % kids
+      row.childIndex = _nextChildSeat(base, direction)
       return true
     }
     const opts = row.optionList
@@ -897,6 +1091,16 @@ Item {
     if (base < 0) base = direction > 0 ? -1 : opts.length
     optionIndex = ((base + direction) % opts.length + opts.length) % opts.length
     return true
+  }
+
+  function commitOpenEditor() {
+    if (!editorOpen) return false
+    const shell = expLoader.item
+    if (shell && typeof shell.commitNow === "function") {
+      shell.commitNow()
+      return true
+    }
+    return false
   }
 
   function pickCurrent() {
@@ -1111,9 +1315,14 @@ Item {
         collapse()
         return
       }
-      // Empty means "no value": clear quietly and leave.
-      Menu.setValue(itm, "")
-      if (t !== "") Menu.runCommand(itm.onSubmit, t)
+      // An action text row with no command has nothing to run: the typed text
+      // is the value, so keep it in state instead of clearing it on commit.
+      if (itm && itm.onSubmit) {
+        Menu.setValue(itm, "")
+        Menu.runCommand(itm.onSubmit, t)
+      } else {
+        Menu.setValue(itm, t)
+      }
       collapse()
       return
     }
@@ -1270,7 +1479,12 @@ Item {
     anchors.leftMargin: Ui.m
     anchors.rightMargin: Ui.m
     anchors.top: parent.top
-    anchors.topMargin: Ui.rowPadV
+    // A compact row rests at rowMinH, whose slack is larger than the line
+    // stack's padding: a fixed top margin would seat the title high. Centre
+    // the stack in the rest height at that register; the page register keeps
+    // its pinned padding.
+    anchors.topMargin: row.nested
+      ? Math.max(0, Math.round((row.staticRowH - labelColH) / 2)) : Ui.rowPadV
     // Synchronous line-stack height. ListView displaces neighbors during
     // incremental inserts using creation-time geometry, but a Column only
     // reports its height after its first polish pass - one frame late,
@@ -1631,8 +1845,11 @@ Item {
       font.pixelSize: row.valueFontPx
       font.family: Ui.fontFamily
       font.bold: row.editorOpen || row.valueActive
-      elide: Text.ElideNone
-      clip: false
+      // A normal readout fits its slot and never elides. A pathological unit
+      // can exceed even the reserved cap; then shortening the value is the
+      // only alternative to painting it over the title.
+      elide: Text.ElideRight
+      clip: true
       wrapMode: Text.NoWrap
       textFormat: Text.PlainText
 
@@ -1930,15 +2147,33 @@ Item {
     // One gap value everywhere around the hairline: row-to-line,
     // line-to-text and text-to-next-row all read Ui.m, so the separator
     // sits centered between entry and description by construction.
-    anchors.topMargin: Ui.m
+    // A nested slot anchors at the row's rest bottom and carries the rest of
+    // its top padding inside topGap, so the slot ends where the bar ends.
+    anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
+    topGap: nested ? row.nestedSlotTopGap : 0
     open: row.descInSlot
     onOpenChanged: row._latchSlotMs()
     onClosingChanged: row._latchSlotMs()
+    onHeightChanged: if (Menu.traceEnabled) Menu.trace("entry.descH", {
+      id: String(itm?.id ?? ""), nested: nested,
+      h: Math.round(descSlot.height * 10) / 10,
+      settled: Math.round(descSlot.settledH * 10) / 10,
+      op: Math.round(descCol.opacity * 100) / 100,
+      barH: Math.round(nestedBarH * 10) / 10, stat: Math.round(staticRowH * 10) / 10,
+      dy: Math.round(descSlot.y * 10) / 10, ms: descSlot.slotMs,
+      held: descSlot._held
+    })
 
     Column {
+      id: descCol
+
       x: Ui.m
       width: parent.width - 2 * Ui.m
       spacing: Ui.m
+      // A nested copy rides the bar's reveal: the text cannot appear before
+      // the background that backs it, nor outlive it on the way back.
+      opacity: nested ? Range.clamp01(
+        descSlot.height / Math.max(1, descCol.implicitHeight + Ui.m)) : 1
 
       Divider {
         width: parent.width
@@ -1983,25 +2218,61 @@ Item {
     // Same hairline rhythm as the ctrl+i slot: one gap value everywhere
     // (row-to-line, line-to-content, content-to-next-row), so an opened
     // editor or dropdown breathes identically to a description.
-    anchors.topMargin: Ui.m
+    // Same split as the description slot: anchor at the rest bottom, carry
+    // the remaining top padding inside the slot.
+    anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
+    topGap: nested ? row.nestedSlotTopGap : 0
     open: row.expanded
+    // Only while the group is OPEN. A live nested child's geometry is the
+    // motion an open group rides; once the group itself folds, THIS slot's
+    // close is the motion. Following a child's closing tail there switched
+    // the Behavior off (motion = !followNested), so the row snapped to its
+    // rest height in one frame - and the close seat read that as a finished
+    // fold and restored the whole scroll in one write.
+    followNested: row.isGroup && row.expanded && row.nestedSlotLive
     onOpenChanged: row._latchSlotMs()
     onClosingChanged: row._latchSlotMs()
+    onHeightChanged: if (Menu.traceEnabled) Menu.trace("entry.expandH", {
+      id: String(itm?.id ?? ""), nested: nested,
+      h: Math.round(expandSlot.height * 10) / 10,
+      settled: Math.round(expandSlot.settledH * 10) / 10,
+      active: expLoader.active, item: !!expLoader.item,
+      loaderH: Math.round(expLoader.height * 10) / 10,
+      op: Math.round(expLoader.opacity * 100) / 100,
+      barH: Math.round(nestedBarH * 10) / 10, ms: expandSlot.slotMs,
+      held: expandSlot._held
+    })
 
     Loader {
       id: expLoader
 
-      active: row.expanded || expandSlot.closing
+      active: row.expanded || row._shellClosing || row._expLoaderKeep
+      onHeightChanged: if (row.expanded && !row._shellClosing && height > 0)
+        row._shellContentH = height
+      height: row._shellClosing && row._shellContentH > 0
+        ? row._shellContentH : (item ? item.implicitHeight : 0)
       width: parent.width
-      // Continuous binding: adopt-once would freeze the height before
-      // content finished laying out.
-      height: item ? item.implicitHeight : 0
+      opacity: nested ? Range.clamp01(
+        expandSlot.height / Math.max(1,
+          (expanded && expLoader.height > 0 ? expLoader.height : row._shellContentH) + Ui.m)) : 1
       sourceComponent: expansionComp
     }
   }
 
   onExpandedChanged: {
+    if (expanded) row._expLoaderKeep = true
+    if (Menu.traceEnabled) Menu.trace("entry.exp", {
+      id: String(itm?.id ?? ""), expanded: expanded, index: index,
+      auto: row.ListView.view ? row.ListView.view.autoRevealIndex : -99
+    })
     if (expanded) {
+      // Re-arm the nested-follow verdict for THIS unfold. The close edge
+      // below clears the flag outright, and an unfold is the only place it
+      // has an answer to give, so the binding is re-established per open
+      // rather than left to survive a close that wrote over it.
+      if (row.isGroup) expandSlot.followNested = Qt.binding(function() {
+        return row.expanded && row.nestedSlotLive
+      })
       const view = row.ListView.view
       // A standing pin freezes the highlight bar on the geometry of a row
       // the cursor has already left (the search projection's origin). An
@@ -2015,8 +2286,26 @@ Item {
         view.autoRevealIndex = index
       }
     } else {
+      // Drop the nested follow at the close edge. The verdict is about the
+      // child's fold inside an OPEN group; kept across the close it disables
+      // this slot's height Behavior, and the row then reaches its rest height
+      // in the same frame the close starts - which the close seat reads as a
+      // finished fold and answers with a one-frame write to the origin.
+      if (row.isGroup) expandSlot.followNested = false
+      // The close edge sits at the state write; the panel paces the resize
+      // from it:
+      // a close driven resize has to be paced by the fold that caused it.
+      row.slotCloseStarted()
       const view = row.ListView.view
-      if (view && view.autoRevealIndex === index) view.autoRevealIndex = -1
+      if (view && view.autoRevealIndex === index) {
+        const panel = Menu.panel
+        const it = panel && panel.rowsModel && panel.rowsModel[index]
+        Menu.trace("entry.expClear", {
+          id: String(itm?.id ?? ""), index: index,
+          modelOpen: !!(it && (Menu.isExpanded(it) || Menu.infoOpen(it)))
+        })
+        view.autoRevealIndex = -1
+      }
       row.confirmStage = 0
       row.promptOpen = false
     }
@@ -2049,14 +2338,38 @@ Item {
           view.revealEnd(index)
       }
     } else {
+      row.slotCloseStarted()
       const view = row.ListView.view
-      if (view && view.autoRevealIndex === index) view.autoRevealIndex = -1
+      if (view && view.autoRevealIndex === index) {
+        const panel = Menu.panel
+        const it = panel && panel.rowsModel && panel.rowsModel[index]
+        Menu.trace("entry.infoClear", {
+          id: String(itm?.id ?? ""), index: index,
+          modelOpen: !!(it && (Menu.isExpanded(it) || Menu.infoOpen(it)))
+        })
+        view.autoRevealIndex = -1
+      }
     }
   }
 
   Component.onDestruction: {
     const view = row.ListView.view
-    if (view && view.autoRevealIndex === index) view.autoRevealIndex = -1
+    if (!view || view.autoRevealIndex !== index) return
+    // A wholesale row swap destroys delegates and recreates them at the same
+    // indices. A direct clear lets a stale result row at this index retire a
+    // claim held by the new open row. The MODEL row that owns the index is the
+    // authority for the verdict.
+    Qt.callLater(function() {
+      if (view.autoRevealIndex !== index) return
+      const panel = Menu.panel
+      const it = panel && panel.rowsModel && panel.rowsModel[index]
+      Menu.trace("entry.destroyClear", {
+        id: String(itm?.id ?? ""), index: index,
+        modelOpen: !!(it && (Menu.isExpanded(it) || Menu.infoOpen(it)))
+      })
+      if (it && (Menu.isExpanded(it) || Menu.infoOpen(it))) return
+      view.autoRevealIndex = -1
+    })
   }
 
   // Expansion shell: the editor or the body text, plus - when the item
@@ -2068,9 +2381,16 @@ Item {
     Column {
       id: wrapCol
 
+      property alias debugEditorHost: stageHost
+
       function takeFocus() {
         const inner = innerLoader.item
         if (inner && inner.takeFocus) inner.takeFocus()
+      }
+
+      function commitNow() {
+        const inner = innerLoader.item
+        if (inner && inner.commitNow) inner.commitNow()
       }
 
       width: parent.width
@@ -2078,13 +2398,18 @@ Item {
 
       readonly property bool editorView: row.editorOpen
       readonly property bool confirmView: row.confirmOpen
-      readonly property bool showDesc: row.descInShell
+      readonly property bool showDesc: (row.descInShell || row._shellClosing)
         && row.descText !== ""
       // Warning rides the same expansion shell, always BELOW the
       // description under the block's single hairline - which stays in
       // place even when no description precedes the warning.
-      readonly property bool showWarn: row.descInShell
+      readonly property bool showWarn: (row.descInShell || row._shellClosing)
         && row.warnText !== ""
+      onShowWarnChanged: if (Menu.traceEnabled && row.isText)
+        Menu.trace("shell.warn", {
+          id: String(itm?.id ?? ""), visible: showWarn,
+          closing: row._shellClosing
+        })
       // Staged-flow slide: the incoming stage glides in from the right
       // (24px -> 0, 0 -> 1 opacity, Ui.fastMs OutCubic) while the slot's
       // own height still eases on the shared Glide curve. Animations off
@@ -2105,8 +2430,32 @@ Item {
           : row.dropdownOpen ? 1001 : row.editorOpen ? 1002
           : row.confirmOpen ? 1003 : 1000
         property int _prevStageKey: -1
+        // The loader creates this host only after the row is already open, so
+        // `stageKey` is born at its first view and no change handler runs for
+        // it. Seed the previous key here, or the first real swap would see an
+        // unset predecessor and cut instead of gliding.
+        Component.onCompleted: {
+          if (stageKey !== -1) stageHost._prevStageKey = stageKey
+        }
+        // The close drops expanded/editorOpen in the same turn the slot
+        // starts folding. Hold the last view until the loader is released so
+        // its height - and the content's fade - ride the fold out.
+        readonly property int liveStageKey: stageKey !== -1
+          ? stageKey : row._lastStageKey
+        onLiveStageKeyChanged: if (Menu.traceEnabled)
+          Menu.trace("stage.key", {
+            id: String(itm?.id ?? ""), key: liveStageKey,
+            stage: stageKey, last: _lastStageKey,
+            item: !!innerLoader.item, ih: innerLoader.item
+              ? Math.round(innerLoader.item.implicitHeight * 10) / 10 : -1
+          })
 
         onStageKeyChanged: {
+          if (Menu.traceEnabled) Menu.trace("stage.changed", {
+            id: String(itm?.id ?? ""), from: stageHost._prevStageKey,
+            to: stageKey, expanded: row.expanded, editor: row.editorOpen
+          })
+          if (stageKey !== -1) row._lastStageKey = stageKey
           const swap = stageHost._prevStageKey !== -1 && stageHost.stageKey !== -1
           stageHost._prevStageKey = stageHost.stageKey
           if (swap && MotionPolicy.enabled) { stageSlide.restart(); stageFade.restart() }
@@ -2118,11 +2467,23 @@ Item {
 
           width: parent.width
           height: item ? item.implicitHeight : 0
-          sourceComponent: wrapCol.confirmView ? confirmComp
-            : row.isGroup ? groupComp
-            : wrapCol.dropdownView ? optionsComp
-            : wrapCol.editorView ? editorComp
-            : row.expanded ? bodyComp : null
+          sourceComponent: {
+            const key = stageHost.liveStageKey
+            if (key < 0) return null
+            // Flow stages use their index as the key, not the fixed view keys.
+            // Their kind names the view and stays stable through the close.
+            if (row.isFlow) {
+              if (row.flowKind === "select") return optionsComp
+              if (row.flowKind === "text" || row.flowKind === "number"
+                || row.flowKind === "range") return editorComp
+              return bodyComp
+            }
+            if (key === 1004) return groupComp
+            if (key === 1003) return confirmComp
+            if (key === 1001) return optionsComp
+            if (key === 1002) return editorComp
+            return bodyComp
+          }
         }
 
         NumberAnimation {
@@ -2233,10 +2594,15 @@ Item {
     Item {
       id: groupRoot
 
+      property alias focusBar: focusBar
+      property alias groupCol: groupCol
+
       width: parent.width
       // The nested slot is an overlay, excluded from this box, so opening it
       // cannot resize the card. Rows below slide inside the clipped box.
-      implicitHeight: groupCol.height
+      // The box grows only by the shortfall the child could not push into.
+      // A group that still fits the card viewport keeps the window size.
+      implicitHeight: groupCol.height + groupRoot.boxNeed
       clip: true
 
       readonly property real focusRestH: cursorItem ? cursorItem.restH : 0
@@ -2245,17 +2611,60 @@ Item {
       // growth; every push motion below is a pure function of it, so the
       // column, the rows and the bar share one clock. A Behavior on any of
       // them re-eases the value a frame late and desynchronises the reveal.
-      readonly property real liveExtra: Math.max(0, focusBarH - focusRestH)
-      readonly property real focusRoom: Math.max(0,
-        groupRoot.height - (cursorItem ? cursorItem.y : 0) - focusRestH)
+      // Read the cursor row once: focusBarH and focusRestH are separate
+      // bindings and can straddle a cursor change, reporting one row's bar
+      // against the previous row's rest. That phantom extra moves the column
+      // for a frame and leaves the bar a second glide back to its seat.
+      readonly property real liveExtra: {
+        const it = groupRoot.cursorItem
+        return it ? Math.max(0, it.barH - it.restH) : 0
+      }
+      // The destination extra, held through the close: settledH drops to zero
+      // the instant `open` flips, so reading it live would collapse the
+      // progress to zero in one frame and snap the card shut.
+      readonly property real settledExtra: {
+        const it = groupRoot.cursorItem
+        return it ? Math.max(0, it.settledBarH - it.restH) : 0
+      }
+      property real _settledExtraLatch: 0
+      onSettledExtraChanged: if (settledExtra > 0) _settledExtraLatch = settledExtra
+      // One progress for the whole push: the neighbour slide, the column
+      // shift and the box growth all read this fraction of their destination,
+      // so they start and land together with the expand or fold.
+      readonly property real pushProgress: _settledExtraLatch > 0
+        ? Math.min(1, Math.max(0, liveExtra / _settledExtraLatch)) : 0
 
-      // The push has two independent parts: rows below the focused child slide
-      // down to clear the overlay, and the column slides up when the box has no
-      // room left underneath. The up verdict comes from the DESTINATION extra,
-      // held for the unfold so it cannot flip with the live bar.
-      property bool revealedPushUp: false
-      readonly property real overflow: revealedPushUp
-        ? Math.max(0, liveExtra - focusRoom) : 0
+      // The group column is split at its middle. A child in the top half
+      // pushes the rows BELOW it down; there is no reason to drag the column
+      // up as well when room below can absorb the slot. A child in the bottom
+      // half has no room worth pushing into below, so it slides the column up
+      // and only the remaining shortfall grows the box. Both derive from the
+      // same live frame as the bar.
+      readonly property bool topHalf: row.childIndex < (
+        groupRoot.childrenRepeater ? groupRoot.childrenRepeater.count / 2 : 0)
+      readonly property real roomAbove: cursorItem ? cursorItem.y : 0
+      readonly property real roomBelow: Math.max(0,
+        groupCol.height - roomAbove - focusRestH)
+      readonly property real pushUp: topHalf ? 0 : roomAbove
+      // Destinations of the three pushes, all scaled by pushProgress.
+      readonly property real overflowTarget: Math.min(_settledExtraLatch, pushUp)
+      readonly property real boxTarget: Math.max(0,
+        _settledExtraLatch - pushUp - roomBelow)
+      readonly property real overflow: pushProgress * overflowTarget
+      readonly property real boxNeed: pushProgress * boxTarget
+
+      onFocusBarHChanged: if (Menu.traceEnabled) Menu.trace("grp.barH", {
+        id: String(itm?.id ?? ""), idx: row.childIndex,
+        y: Math.round(focusBar.y * 10) / 10,
+        colY: Math.round(groupCol.y * 10) / 10,
+        barH: Math.round(focusBarH * 10) / 10,
+        rest: Math.round(focusRestH * 10) / 10,
+        extra: Math.round(liveExtra * 10) / 10,
+        box: Math.round(boxNeed * 10) / 10,
+        overflow: Math.round(overflow * 10) / 10
+      })
+
+
 
       // A child can carry its own sub line or ctrl+i slot, so rows have no
       // shared fixed height. The cursor follows the live delegate. Holding the
@@ -2278,19 +2687,9 @@ Item {
         function onItemAdded(index, item) { groupRoot.trackCursor() }
         function onItemRemoved(index, item) { groupRoot.trackCursor() }
       }
-      function latchDirection() {
-        if (!groupRoot.cursorItem || !(groupRoot.focusSettledExtra > 0)) return
-        groupRoot.revealedPushUp = groupRoot.focusSettledExtra > groupRoot.focusRoom
-      }
-      onCursorItemChanged: groupRoot.latchDirection()
-      onFocusRoomChanged: groupRoot.latchDirection()
-      // The destination extra belongs to the slot, not to the cursor seat, so
-      // the up verdict is sampled here as well. It keeps a bottom child's desc
-      // inside the clipped box instead of past it with no room left to scroll.
-      readonly property real focusSettledExtra: cursorItem ? cursorItem.settledExtra : 0
-      onFocusSettledExtraChanged: groupRoot.latchDirection()
       // Exposed so the owning row can fold an open child editor with the
-      // group and delegate keys to the focused child.
+      // group, delegate keys to it, and publish its need-based growth to the
+      // card's slot claim.
       property var childrenRepeater: groupRepeater
 
       // Entrance fade, matching the select dropdown: opening reads as an
@@ -2317,6 +2716,7 @@ Item {
       }
 
       Rectangle {
+        id: focusBar
 
         visible: row.dropdownOpen && row.childIndex >= 0 && groupRoot.cursorItem !== null
         color: Ui.tint("background_2", 0.7)
@@ -2328,7 +2728,13 @@ Item {
         width: groupRoot.width - 2 * Ui.m
         // The focused row and its nested description share one continuous
         // background: the bar grows by exactly the overlay's height.
-        height: groupRoot.focusBarH
+        // While the dropdown unfolds the bar is already at its final row, so
+        // its bottom can reach the slot's lower edge before the slot has grown
+        // past it and the bar paints over the dropdown's border. Cap it to the
+        // live slot: the bar reveals top-down with the unfold and is whole
+        // once the slot has settled.
+        height: Math.max(0, Math.min(groupRoot.focusBarH,
+          row.expandSlotH - y - Ui.m))
 
         // Glide only between children at rest. During a reveal y follows
         // groupCol directly; a second glide on top of the bar's own tween
@@ -2336,8 +2742,20 @@ Item {
         Behavior on y {
           enabled: MotionPolicy.enabled && !groupEnter.running
             && groupRoot.liveExtra <= 0
-          NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+          NumberAnimation {
+            duration: Ui.fastMs
+            easing.type: Easing.OutCubic
+            onFinished: Menu.trace("grp.barDone", {
+              y: Math.round(focusBar.y * 10) / 10,
+              idx: row.childIndex, liveExtra: groupRoot.liveExtra
+            })
+          }
         }
+        onYChanged: if (Menu.traceEnabled) Menu.trace("grp.barY", {
+          y: Math.round(focusBar.y * 10) / 10, idx: row.childIndex,
+          liveExtra: Math.round(groupRoot.liveExtra * 10) / 10,
+          glide: groupRoot.liveExtra <= 0
+        })
         // Height and y track the delegate directly at reveal time: the child's
         // slot is the one animation, so the bar must not carry a second curve.
       }
@@ -2349,9 +2767,7 @@ Item {
         width: parent.width - 2 * Ui.m
         y: -groupRoot.overflow
 
-        // No Behavior: overflow carries the same slot growth the bar.height
-        // reads. A glide here would re-ease that value and leave the column a
-        // frame behind the bar it follows.
+        // No Behavior: overflow is the same frame's slot growth the bar reads.
 
         Repeater {
           id: groupRepeater
@@ -2360,7 +2776,10 @@ Item {
 
           delegate: GroupRow {
             width: groupCol.width
-            slideY: index > row.childIndex ? groupRoot.liveExtra : 0
+            // The slot's growth plus the room below the focused child carry
+            // the following rows past the box edge.
+            slideY: index > row.childIndex && groupRoot.liveExtra > 0
+              ? groupRoot.liveExtra : 0
             onPicked: row.childIndex = index
           }
         }
@@ -2500,7 +2919,7 @@ Item {
             // reveals its copy with the growth, like normal rows do.
             settling: row.cardSettling
             cursor: row.optionIndex === index
-            chosen: (row.itm && row.itm.marker === false) ? false : (row.st ? String(row.st.value) === String(modelData.value) : false)
+            chosen: index === row.chosenIndex
             onPicked: value => row.pick(value)
           }
         }
@@ -2513,6 +2932,7 @@ Item {
 
     InlineEditor {
       width: parent.width
+      keepFocusAccent: row.expanded || row._shellClosing
       isText: row.isFlow ? row.flowKind === "text"
         : (row.isText || row.promptOpen)
       placeholder: String((row.isFlow && row.flowStep && row.flowStep.placeholder)
@@ -2604,6 +3024,9 @@ Item {
   Rectangle {
     id: muteBox
 
+    // A nested unavailable row is dimmed by its own opacity; a fill here would
+    // read as a stray box inside the parent's dropdown.
+    visible: !nested
     anchors.fill: parent
     color: Ui.solid("background_0")
     opacity: 0

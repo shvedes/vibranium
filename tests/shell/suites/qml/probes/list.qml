@@ -120,6 +120,22 @@ Item {
     delegate: Component { Item { width: ListView.view.width; height: Ui.rowMinH } }
   }
 
+  // A group row whose own slot is still while a child unfolds: the highlight
+  // must follow live geometry on both axes or its border trails the content.
+  List {
+    id: nestedLive
+    width: 300
+    height: 200
+    model: root.rows8
+    delegate: Component {
+      Item {
+        width: ListView.view.width
+        height: Ui.rowMinH
+        property bool nestedSlotLive: true
+      }
+    }
+  }
+
   // A hole in the middle of the predicate.
   List {
     id: skipper
@@ -592,6 +608,10 @@ Item {
     kv("d.identityRevision", base.identityRevision)
     kv("d.maxKnownH", base.maxKnownH)
     kv("d.seatsInstant", base._seatsInstant)
+    kv("d.nestedLive", nestedLive._nestedSlotLive)
+    kv("d.nestedResizeMs", nestedLive.highlightResizeDuration)
+    kv("d.nestedMoveMs", nestedLive.highlightMoveDuration)
+    kv("d.plainResizeMs", base.highlightResizeDuration)
     kv("d.sweepMs", base._sweepMs)
     kv("d.sweepMaxMs", base._sweepMaxMs)
     kv("d.highlightHandoff", base._highlightHandoff)

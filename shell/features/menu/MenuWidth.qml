@@ -453,6 +453,7 @@ Item {
     let maxSub = 0
     let maxValue = 0
     let hasIcon = false
+    let hasToggle = false
     const valueW = (text, key) => {
       const s = String(text ?? "")
       if (s === "") return 0
@@ -464,6 +465,7 @@ Item {
     for (let k = 0; k < kids.length; k++) {
       const kid = kids[k] ?? {}
       if (typeof kid.icon === "string" && kid.icon !== "") hasIcon = true
+      if (kid.type === "toggle") hasToggle = true
       const label = String(kid.label ?? "")
       const shaped = root._shape("grp\u0001" + label, () => {
         measureOptLabel.text = label
@@ -488,19 +490,34 @@ Item {
       if (kid.type === "progress") {
         maxValue = Math.max(maxValue,
           valueW("100 %", "pct") + Math.round(Ui.barW * 0.6))
+      } else if (kid.type === "text") {
+        // The field is measured at the value register, and it shares its row
+        // with a clear button and the OK button. Reserving only the text
+        // leaves a long placeholder clipped when the nested editor is open.
+        maxValue = Math.max(maxValue,
+          Math.max(valueW(kid.placeholder, "ph"), valueW(kid.value, "val"))
+            + Ui.childIconW + Ui.toggleW)
       } else if (Array.isArray(kid.options)) {
         for (let o = 0; o < kid.options.length; o++) {
           const opt = kid.options[o] ?? {}
           maxValue = Math.max(maxValue, valueW(opt.label ?? opt.value, "opt" + o))
         }
-      } else if (kid.var !== undefined || kid.value !== undefined) {
+      } else if (kid.type === "number" || kid.type === "range") {
+        // The readout includes the unit suffix, and its widest possible
+        // reading comes from the range bounds, not the current value. A unit
+        // omitted here overflows the value slot into the title instead of
+        // eliding the title.
+        maxValue = Math.max(maxValue,
+          valueW(MenuLib.widestValueString(kid), "num"))
+      } else if (kid.type !== "toggle"
+        && (kid.var !== undefined || kid.value !== undefined)) {
         maxValue = Math.max(maxValue, valueW(kid.value, "val"))
       }
     }
     if (maxLabel === 0 && maxSub === 0 && maxValue === 0) return 0
     return root.rowChromeW() + 2 * Ui.m
       + (hasIcon ? Ui.childIconW + Ui.s : 0)
-      + Ui.s + Ui.toggleW + Math.max(maxLabel, maxSub)
+      + Ui.s + (hasToggle ? Ui.toggleW : 0) + Math.max(maxLabel, maxSub)
       + (maxValue > 0 ? Ui.s + maxValue : 0)
   }
 

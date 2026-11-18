@@ -165,6 +165,13 @@ Rectangle {
     // +/- never reach the validator as text - use them to step.
     Keys.onPressed: event => {
       switch (event.key) {
+        case Qt.Key_Tab:
+        case Qt.Key_Backtab:
+          // Keep focus on the value while the editor is open: an unaccepted
+          // Tab becomes Qt focus navigation and lands on the menu's search
+          // field, stranding the open picker.
+          event.accepted = true
+          return
         case Qt.Key_Plus:
         case Qt.Key_Equal:
           event.accepted = true
@@ -205,6 +212,13 @@ Rectangle {
 
   Text {
     id: suffixText
+
+    // A pathological unit may be wider than the whole picker. The unit is
+    // chrome, so it gives way to the digits: cap it to a share of the box and
+    // elide instead of being placed before the input's x and painting over
+    // the number and the stepper.
+    width: Math.min(implicitWidth, Math.max(0, root.width * 0.45))
+    elide: Text.ElideRight
 
     // Placed, not anchored: where the unit lands is the number's own left
     // edge plus its width, and the input's own centring is what puts the

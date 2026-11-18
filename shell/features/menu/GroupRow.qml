@@ -20,6 +20,10 @@ Rectangle {
   // one of its slots is open. A transform, not y: the Column owns y. It reads
   // the bar's own frame, so it carries no second animation of its own.
   property real slideY: 0
+  onSlideYChanged: if (Menu.traceEnabled) Menu.trace("child.slide", {
+    id: String(child.modelData?.id ?? ""), index: child.index,
+    y: Math.round(slideY * 10) / 10
+  })
   transform: Translate { y: child.slideY }
 
   readonly property string kind: child.modelData
@@ -30,7 +34,6 @@ Rectangle {
   readonly property var liveRow: rowLoader.item
   readonly property real barH: liveRow ? liveRow.nestedBarH : restH
   readonly property real settledBarH: liveRow ? liveRow.nestedSettledBarH : restH
-  readonly property real settledExtra: Math.max(0, settledBarH - restH)
 
   // Seats the group cursor on this child. The hosted row owns the state write.
   signal picked()
@@ -56,7 +59,39 @@ Rectangle {
     Connections {
       target: rowLoader.item
 
-      function onActivated() { child.picked() }
+      // Activation precedes the slot opening and the list's reveal seat, so
+      // the panel reads the offset under the user's view.
+      function onActivated() {
+        Menu.trace("child.activate", { id: String(child.modelData?.id ?? "") })
+        Menu.beginNestedReveal()
+        child.picked()
+      }
+      function onExpandedChanged() {
+        const row = child.liveRow
+        if (!row) return
+        Menu.trace("child.expanded", {
+          id: String(child.modelData?.id ?? ""), open: row.expanded,
+          ms: row.slotMotionMs,
+          dH: Math.round(row.descSlotH * 10) / 10,
+          eH: Math.round(row.expandSlotH * 10) / 10
+        })
+        if (row.expanded) {
+          Menu.beginNestedReveal()
+        } else {
+          // The slot still publishes its close duration here: the panel rides
+          // the seat back at that same pace.
+          Menu.beginNestedRestore(row.slotMotionMs)
+        }
+      }
+      // The panel wires this for page rows. A nested child needs the same
+      // close latch released, or the panel keeps treating its collapsed slot
+      // as mid-close and never returns the region it grew for it.
+      function onSlotMotionEnded() {
+        Menu.trace("child.slotEnd", {
+          id: String(child.modelData?.id ?? ""), ms: child.liveRow ? child.liveRow.slotMotionMs : -1
+        })
+        Menu.nestedSlotFinished(child.modelData)
+      }
     }
   }
   Binding {

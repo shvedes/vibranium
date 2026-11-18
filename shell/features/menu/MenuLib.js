@@ -796,9 +796,50 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     // jumps to is still the parent, keyed by pageId + row. A query that names
     // no child - the group's own name, matching every child equally - leaves
     // the parent row as the result.
-    const childIndex = item && Array.isArray(item.children)
-      ? bestChildIndex(item.children, q, item.label) : -1
-    const kid = childIndex >= 0 ? item.children[childIndex] : null
+    // Walk the group chain one level at a time. Each level's hay carries its
+    // descendants, so the child that best matches the query at one level leads
+    // to the next; the deepest match is the entry the user searched for.
+    // Deep group landing stays local to this resolver. A child's hay carries
+    // every descendant, so a query can name a grandchild that no child label
+    // contains; score each query word before the tie rule hides the match.
+    function deepChildIndex(children, query, family) {
+      const exact = bestChildIndex(children, query, family)
+      if (exact >= 0) return exact
+      // A query that names the group itself leaves the group row on the
+      // result; its family word reaches every child hay through bestChildIndex.
+      if (String(family).toLowerCase().indexOf(String(query)) >= 0) return -1
+      const tokens = String(query).split(" ").filter(function(w) { return w !== "" })
+      const list = StoreGuards.asList(children)
+      let found = -1
+      let best = 0
+      for (let c = 0; c < list.length; c++) {
+        const kid = list[c] || {}
+        const hay = typeof kid.hay === "string" ? kid.hay : ""
+        if (hay === "") continue
+        const words = hay.split(" ")
+        let score = 0
+        let matched = true
+        for (let t = 0; t < tokens.length; t++) {
+          const s = fuzzyScore(hay, words, tokens[t])
+          if (s <= 0) { matched = false; break }
+          score += s
+        }
+        if (matched && score > best) { best = score; found = c }
+      }
+      return found
+    }
+    const chain = []
+    let level = item
+    while (level && Array.isArray(level.children)) {
+      const idx = deepChildIndex(level.children, q, level.label)
+      if (idx < 0) break
+      const child = level.children[idx]
+      if (!child || typeof child !== "object") break
+      chain.push({ index: idx, uid: child.uid })
+      level = child
+    }
+    const childIndex = chain.length > 0 ? chain[0].index : -1
+    const kid = chain.length > 0 ? level : null
     const row = Object.assign({}, kid || item || {}, {
       label: hit.label,
       hay: hit.hay,
@@ -813,6 +854,12 @@ function groupSearchResults(hits, lookup, isVisible, query) {
       // the uid against the visible children rather than trusting this index.
       row.childUid = kid.uid
       row.groupUid = item.uid
+      const uids = []
+      for (let c = 0; c < chain.length; c++) {
+        if (chain[c].uid !== undefined && chain[c].uid !== null)
+          uids.push(String(chain[c].uid))
+      }
+      row.childUids = uids
       // The child's uid is unique across children and stable across reorders;
       // carrying it through the copy above keeps child hits distinct in the
       // keyed model without inventing a positional key.

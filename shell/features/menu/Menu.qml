@@ -755,6 +755,11 @@ Singleton {
   // An empty query needs no special case here: _applyQuery publishes it and
   // drops the ranked window, which is what clearing the bar means.
   function setQuery(q) {
+    // Retire deferred index-provider callbacks from the previous query. A
+    // scan completing against an erased query re-applies the old text,
+    // re-enters search and drops the restored page's reveal claim, leaving
+    // its expanded dropdown with no region or background.
+    root._pendingQueryGen++
     if (root.frame && root.hasDynamicPage(root.frame.id)) {
       if (!root.scopedActive) root.beginScoped()
       root.setScopedQuery(q)
@@ -766,6 +771,9 @@ Singleton {
   // Publish one query: the applied text, its ranked window, and any provider
   // that wants the scan deferred until its rows exist.
   function _applyQuery(q) {
+    Menu.trace("menu.query", {
+      q: q, gen: root._pendingQueryGen, frame: root.frame ? root.frame.id : ""
+    })
     root.query = q
     root.results = q !== "" ? MenuLib.search(root.searchIndex, q) : []
     const provider = root._indexProviderFor(q)
@@ -847,8 +855,18 @@ Singleton {
   property int condRev: 0
   property var _condVars: ({})
 
-  // Primary panel publishes itself here for `probe` and the debug verbs.
+  // The active menu panel. Published by MenuView; production consumers use
+  // this handle. `probeSource` stays as the debug/introspection alias.
+  property var panel: null
   property var probeSource: null
+
+  // Frame trace for live diagnosis, armed over IPC. Every call site is a
+  // no-op until a verb turns this on, so a normal session emits nothing.
+  property bool traceEnabled: false
+  function trace(tag, fields) {
+    if (!root.traceEnabled) return
+    console.log("NTRACE " + tag + " " + JSON.stringify(fields))
+  }
 
   // One store write, three stores. `deep` names the stores whose option can
   // gate a row's `requires:` expression, so only they re-resolve dead links;
@@ -928,6 +946,7 @@ Singleton {
 
   // Search state resets together everywhere: navigation, close, reload.
   function resetSearch() {
+    root._pendingQueryGen++
     root.clearScoped()
     root.query = ""
     root.results = []
@@ -1255,6 +1274,18 @@ Singleton {
     return root.guardChecked[item.uid] === true
   }
 
+  // Guard verdicts are read for group children as well as page rows. Uid
+  // walks have to reach them too, or a child verdict is parsed and then
+  // dropped by the merge because no top-level row claims that uid.
+  function _forEachRowUid(items, fn) {
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      if (!it || typeof it !== "object" || Array.isArray(it)) continue
+      if (it.uid) fn(it.uid)
+      if (Array.isArray(it.children)) root._forEachRowUid(it.children, fn)
+    }
+  }
+
   function isDisabled(item) {
     if (!item) return false
     return root.guardDisabled[item.uid] === true
@@ -1288,14 +1319,11 @@ Singleton {
         const keepChecked = Object.assign({}, root.guardChecked)
         const keepDisabled = Object.assign({}, root.guardDisabled)
         for (let p = 0; p < root.bundle.pages.length; p++) {
-          const items = root.bundle.pages[p].items
-          for (let i = 0; i < items.length; i++) {
-            const uid = items[i] ? items[i].uid : ""
-            if (!uid) continue
+          root._forEachRowUid(root.bundle.pages[p].items, function(uid) {
             if (keepWhen[uid] !== undefined) delete keepWhen[uid]
             if (keepChecked[uid] !== undefined) delete keepChecked[uid]
             if (keepDisabled[uid] !== undefined) delete keepDisabled[uid]
-          }
+          })
         }
         root.guardWhen = keepWhen
         root.guardChecked = keepChecked
@@ -1357,16 +1385,14 @@ Singleton {
         if (root.bundle) {
           for (let p = 0; p < root.bundle.pages.length; p++) {
             const items = root.bundle.pages[p].items
-            for (let i = 0; i < items.length; i++) {
-              const uid = items[i] ? items[i].uid : ""
-              if (!uid) continue
+            root._forEachRowUid(items, function(uid) {
               if (nextWhen[uid] !== undefined) mergedWhen[uid] = nextWhen[uid]
               else delete mergedWhen[uid]
               if (nextChecked[uid] !== undefined) mergedChecked[uid] = nextChecked[uid]
               else delete mergedChecked[uid]
               if (nextDisabled[uid] !== undefined) mergedDisabled[uid] = nextDisabled[uid]
               else delete mergedDisabled[uid]
-            }
+            })
           }
           // Dynamic/option pages share the maps but not the bundle walk above;
           // their verdicts arrive in the same batch and must land too.
@@ -1710,11 +1736,22 @@ Singleton {
       const direct = items[index]
       if (direct && direct.uid === uid) return direct
     }
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i]
-      if (it && it.uid === uid) return it
+    // A group nested in another group is a normalized row with a uid of its
+    // own, but it is not in page.items. Walk the children too, or a nested
+    // group cannot resolve its own source and unfolds to an empty slot.
+    function findIn(list, depth) {
+      for (let i = 0; i < list.length; i++) {
+        const it = list[i]
+        if (!it) continue
+        if (it.uid === uid) return it
+        if (depth > 0 && Array.isArray(it.children)) {
+          const nested = findIn(it.children, depth - 1)
+          if (nested) return nested
+        }
+      }
+      return null
     }
-    return null
+    return findIn(items, 4)
   }
 
   function hasPage(id) {
@@ -2053,6 +2090,34 @@ Singleton {
     }
   }
 
+  // Folding a group folds every slot it contains, including descendants whose
+  // delegates are not loaded at this instant. Their state lives on the model;
+  // a grandchild left expanded would reappear under a collapsed chevron on the
+  // next open. Loaded delegates are handled by Entry.collapse(); this reaches
+  // the rest.
+  function clearDescendantState(item) {
+    if (!item || !Array.isArray(item.children)) return false
+    let changed = false
+    const walk = function(kids) {
+      for (let i = 0; i < kids.length; i++) {
+        const kid = kids[i]
+        if (!kid || !kid.uid) continue
+        const st = root._states[kid.uid]
+        if (st && (st.expanded === true || st.info === true)) {
+          st.expanded = false
+          st.info = false
+          root._setSlotClose(kid.uid, false)
+          changed = true
+          root.trace("menu.descClear", { id: String(kid.id ?? kid.uid) })
+        }
+        if (Array.isArray(kid.children)) walk(kid.children)
+      }
+    }
+    walk(item.children)
+    if (changed) root.rev++
+    return changed
+  }
+
   function infoOpen(item) {
     if (!item || !item.uid) return false
     const st = root._states[item.uid]
@@ -2076,10 +2141,27 @@ Singleton {
   // The row reports its slot motion at rest: the close landed, drop the
   // latch. A reopen inside the grace window never goes still, so the
   // latch just re-arms instead.
+  // The row reports its slot motion at rest: the close landed, drop the
+  // latch. The delegate never touches the panel's list here.
   function slotCloseFinished(item) {
     if (!item || !item.uid) return
     const next = MenuState.withoutSlotClose(root._slotCloses, item.uid)
     if (next !== root._slotCloses) root._slotCloses = next
+  }
+
+  // A child's nested slot opens inside its parent's row: the panel owns the
+  // list seat, so these verbs only forward. The delegate never touches List.
+  function beginNestedReveal() {
+    if (root.panel && root.panel.beginNestedReveal) root.panel.beginNestedReveal()
+  }
+  function beginNestedRestore(paceMs) {
+    if (root.panel && root.panel.beginNestedRestore)
+      root.panel.beginNestedRestore(paceMs)
+  }
+  function nestedSlotFinished(item) {
+    slotCloseFinished(item)
+    root.rev++
+    if (root.panel && root.panel.nestedSlotFinished) root.panel.nestedSlotFinished()
   }
 
   // A close latch belongs to a row the model still lists. `candidate` is
@@ -2190,6 +2272,73 @@ Singleton {
 
     function back(): string {
       return root.back() ? "ok" : "error"
+    }
+
+    function debugResetFlow(): string {
+      root._flow = ({})
+      root.rev++
+      return "reset"
+    }
+
+    function debugTrace(on: string): string {
+      root.traceEnabled = on === "on" || on === "1" || on === "true"
+      return root.traceEnabled ? "on" : "off"
+    }
+
+    function debugAutoMove(dir: int): string {
+      const panel = root.panel
+      if (!panel || typeof panel.moveSelection !== "function") return "no panel"
+      panel.moveSelection(dir, true)
+      return "moved " + dir
+    }
+
+    function debugChildMove(dir: int): string {
+      const panel = root.panel
+      if (!panel || typeof panel.moveSelection !== "function") return "no panel"
+      panel.moveSelection(dir)
+      return "moved " + dir
+    }
+
+    function debugActivatePanel(): string {
+      const panel = root.panel
+      if (!panel || typeof panel.activateCurrent !== "function") return "no panel"
+      panel.activateCurrent()
+      return "ok"
+    }
+
+    function debugEscape(): string {
+      const panel = root.panel
+      if (!panel || typeof panel.escapeChain !== "function") return "no panel"
+      panel.escapeChain()
+      return "ok"
+    }
+
+    function debugType(text: string): string {
+      const panel = root.panel
+      if (!panel) return "no panel"
+      panel.searchField.text = text
+      panel.onFieldEdited(text)
+      return "typed " + JSON.stringify(text)
+    }
+
+    function debugSetQuery(q: string): string {
+      root.setQuery(q)
+      return "query=" + root.query
+    }
+
+    function debugInfo(): string {
+      const panel = root.panel
+      if (!panel || typeof panel.toggleInfoCurrent !== "function") return "no panel"
+      panel.toggleInfoCurrent()
+      return "ok"
+    }
+
+    function debugKey(name: string): string {
+      const panel = root.panel
+      if (!panel || !panel._keyCodes || panel._keyCodes[name] === undefined) return "no key"
+      const event = { key: panel._keyCodes[name], modifiers: 0, text: "", accepted: false }
+      panel.handleKey(event)
+      return name + " -> " + (event.accepted ? "accepted" : "passed")
     }
 
     function debugSetCurrentIdx(idx: int): string {
