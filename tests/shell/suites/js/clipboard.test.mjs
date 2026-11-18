@@ -182,7 +182,7 @@ function tableKeys(name) {
   return m[1].split(',').map((s) => s.trim().split(':')[0].trim().replace(/^["']|["']$/g, '')).filter((s) => s !== '')
 }
 
-suite('clipboard', 'ClipboardLib.js (94 fns)')
+suite('clipboard', 'ClipboardLib.js (105 fns)')
 
 if (!CL || typeof CL.detectType !== 'function') {
   blocked('ClipboardLib.js did not load')
@@ -1472,6 +1472,24 @@ group('parseTypeList - wl-paste --list-types', () => {
   eq('the types array keeps the duplicates', CL.parseTypeList('text/plain\ntext/plain').types, ['text/plain', 'text/plain'])
 })
 
+group('hasFileCopyMime - file manager cut/copy marker', () => {
+  const THUNAR = ['text/plain', 'text/uri-list', 'x-special/gnome-copied-files']
+  eq('a Thunar cut offer', CL.hasFileCopyMime(THUNAR), true)
+  eq('Nautilus, with the portal mimes too', CL.hasFileCopyMime(['text/uri-list', 'application/vnd.portal.files', 'x-special/gnome-copied-files']), true)
+  eq('Caja', CL.hasFileCopyMime(['text/uri-list', 'x-special/mate-copied-files']), true)
+  eq('Dolphin', CL.hasFileCopyMime(['text/uri-list', 'application/x-kde-cutselection']), true)
+  eq('the match is case-insensitive', CL.hasFileCopyMime(['X-SPECIAL/GNOME-COPIED-FILES']), true)
+  eq('a mime parameter does not hide it', CL.hasFileCopyMime(['x-special/gnome-copied-files;charset=utf-8']), true)
+  eq('a marker amid unrelated mimes', CL.hasFileCopyMime(['text/plain', 'image/png', 'x-special/gnome-copied-files']), true)
+  eq('a plain URI list is not a cut', CL.hasFileCopyMime(['text/uri-list']), false)
+  eq('text/plain is not a cut', CL.hasFileCopyMime(['text/plain']), false)
+  eq('an empty list', CL.hasFileCopyMime([]), false)
+  eq('null', CL.hasFileCopyMime(null), false)
+  eq('undefined', CL.hasFileCopyMime(undefined), false)
+  eq('a non-string entry is stringified', CL.hasFileCopyMime([null]), false)
+  eq('text/uri-list alone from a browser is not a cut', CL.hasFileCopyMime(['text/plain', 'text/uri-list', 'text/html']), false)
+})
+
 group('parseSnapshotOutput - "<size>\\n<sha>  <path>"', () => {
   eq('a real snapshot line pair', CL.parseSnapshotOutput('1234\nda39a3ee5e6b4b0d3255bfef95601890afd80709  /tmp/x.png'), { size: 1234, sha: 'da39a3ee5e6b4b0d3255bfef95601890afd80709' })
   eq('the sha is the first whitespace-delimited field', CL.parseSnapshotOutput('1\nabc   /p\n').sha, 'abc')
@@ -2682,7 +2700,7 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 104 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 104)
+  eq('a fresh load of the clipboard lib has 105 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 105)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })

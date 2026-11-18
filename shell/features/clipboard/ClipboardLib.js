@@ -1555,6 +1555,28 @@ function parseTypeList(text) {
   return { types, hasUri, hasImage: imageType !== "", imageType }
 }
 
+// File managers mark a cut/copy on the selection with a dedicated mime type
+// whose payload is the action ("cut" or "copy") followed by the URI list.
+// wl-copy serves one payload under every mime it offers, so a re-serve as a
+// plain URI list cannot carry that marker: the file manager drops the cut and
+// stops recognising its own paste offer.
+const FILE_COPY_MIMES = [
+  "x-special/gnome-copied-files", // GTK: Nautilus, Thunar, Nemo
+  "x-special/mate-copied-files", // Caja
+  "application/x-kde-cutselection", // KDE: Dolphin
+]
+
+// Whether the offered mime list carries a file manager's cut/copy marker.
+function hasFileCopyMime(types) {
+  const list = types || []
+  for (let i = 0; i < list.length; i++) {
+    const t = String(list[i]).toLowerCase()
+    for (let j = 0; j < FILE_COPY_MIMES.length; j++)
+      if (t.indexOf(FILE_COPY_MIMES[j]) >= 0) return true
+  }
+  return false
+}
+
 // Image snapshot stdout: "<size>\n<sha>  <path>". The EMPTY marker and the
 // child's own failure are the controller's to notice; a non-positive size or
 // a missing digest means there is no snapshot to offer. A size that is not a

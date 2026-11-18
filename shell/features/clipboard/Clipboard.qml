@@ -1052,6 +1052,10 @@ Singleton {
   property int _clearGeneration: -1
   property var _pendingSnapshotEntries: []
   property var _pendingCopyPaths: []
+  // Refreshed from the list-types read for the capture in flight. A file
+  // manager's cut/copy marker cannot be re-served by wl-copy (one payload for
+  // every mime it offers), so such a source keeps ownership of its selection.
+  property bool _captureHasFileCopyMime: false
   // Slow safety net behind the watcher's event signal: parked while
   // the watcher is healthy (running:false), one poll per minute when it
   // is down. The signal does the work; the timer only catches a dead
@@ -1167,6 +1171,7 @@ Singleton {
     const offer = CL.parseTypeList(text)
     const types = offer.types
     uriProc._types = types
+    root._captureHasFileCopyMime = CL.hasFileCopyMime(types)
     if (offer.hasUri) {
       uriProc.command = CL.buildPasteUriListCmd()
       uriProc.running = true
@@ -1257,8 +1262,11 @@ Singleton {
     // Take ownership of the fresh capture so the content stays pasteable
     // after the source app closes. Wayland drops the selection with its
     // owner; without this the shell only stored the bytes and the user had
-    // to re-select the row manually to paste again.
-    if (live) Qt.callLater(() => root._takeOwnership(live.id))
+    // to re-select the row manually to paste again. A file manager's cut is
+    // the exception: re-serving its URI list as text/uri-list drops the
+    // x-special/gnome-copied-files marker and cancels the cut, so the source
+    // keeps its own selection until the paste.
+    if (live && !root._captureHasFileCopyMime) Qt.callLater(() => root._takeOwnership(live.id))
   }
 
   function _onReadText(text, types) {
