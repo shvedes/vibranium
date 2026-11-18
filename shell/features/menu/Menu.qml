@@ -88,6 +88,12 @@ Singleton {
   property bool scopedActive: false
   property string scopedQuery: ""
   property var scopedRows: []
+  // The filter's tree scope: every uid kept at any depth, and the groups whose
+  // child lists are narrowed to that set. Entry.groupChildren reads these so a
+  // group under a filter shows only the branches that matched, at its own
+  // register, with its own dropdown bar and background.
+  property var scopedVisibleUids: ({})
+  property var scopedTrimmedGroups: ({})
   readonly property bool scopedSearching: root.scopedActive && root.scopedQuery !== ""
 
   // Per-row state, keyed by normalized stable uid.
@@ -1930,18 +1936,64 @@ Singleton {
     root.scopedActive = true
   }
 
+  // Filter scope is the current menu - the page on screen and the groups
+  // nested in it - trimmed in place, never flattened. A group that holds a
+  // match stays where it is; only the branches under it that matched survive,
+  // so opening it shows its children in their own dropdown, with that
+  // dropdown's own bar and background. Flattening a deep hit to a top-level
+  // row instead produced a naked option sitting between page rows: no
+  // dropdown, no bar geometry, and a card sized for a row that was never a
+  // page row.
+  //
+  // `visible` names every row kept at any depth. `trimmed` names the groups
+  // whose children must be narrowed to that set - a group whose OWN label
+  // matched keeps its whole subtree, because the user asked for that group
+  // and everything under it is in scope.
+  function _scopedTree(pg, text) {
+    const state = {
+      rows: [],
+      visible: Object.create(null),
+      trimmed: Object.create(null)
+    }
+    if (!pg || !Array.isArray(pg.items)) return state
+    const q = String(text ?? "").toLowerCase().trim()
+    const tokens = q === "" ? [] : q.split(/\s+/).filter(t => t !== "")
+    const matches = (it) => {
+      const hay = MenuLib.hayForFilter(it)
+      for (let t = 0; t < tokens.length; t++)
+        if (hay.indexOf(tokens[t]) < 0) return false
+      return true
+    }
+    const walk = (list, depth) => {
+      const rows = []
+      for (let i = 0; i < list.length; i++) {
+        const it = list[i]
+        if (!root.isListed(it)) continue
+        const kids = depth > 0 && Array.isArray(it.children) ? it.children : null
+        const kidRows = kids ? walk(kids, depth - 1) : []
+        const selfMatch = tokens.length === 0 || matches(it)
+        if (selfMatch || kidRows.length > 0) {
+          rows.push(it)
+          if (it.uid !== undefined && it.uid !== null) state.visible[String(it.uid)] = true
+          if (kids && !selfMatch && it.uid !== undefined && it.uid !== null)
+            state.trimmed[String(it.uid)] = true
+        }
+      }
+      return rows
+    }
+    state.rows = walk(pg.items, 6)
+    return state
+  }
+
   function setScopedQuery(q) {
     const text = String(q ?? "")
-    // Scope is what's actually on screen: the current page's LISTED items,
-    // matched through the lib across label/sub/desc/options. Muted rows stay
-    // in scope so the filter trims the page the user is looking at.
     const pg = root.pageById(root.frame ? root.frame.id : "")
-    const visible = pg ? pg.items.filter(root.isListed) : []
+    const tree = _scopedTree(pg, text)
     // Small scopes install instantly like before; only giant ones ride
     // the debounce (see scopedTimer). Empty queries always apply at once.
-    if (text === "" || visible.length <= Ui.listFullRows) {
+    if (text === "" || tree.rows.length <= Ui.listFullRows) {
       scopedTimer.stop()
-      root._applyScopedQuery(text, visible)
+      root._applyScopedQuery(text, tree)
       return
     }
     root._scopedPending = text
@@ -1951,12 +2003,13 @@ Singleton {
   function _applyScopedQuery(q, pre) {
     root._scopedPending = ""
     root.scopedQuery = q
-    let visible = pre
-    if (!Array.isArray(visible)) {
-      const pg = root.pageById(root.frame ? root.frame.id : "")
-      visible = pg ? pg.items.filter(root.isListed) : []
+    let tree = pre
+    if (!tree || !Array.isArray(tree.rows)) {
+      tree = _scopedTree(root.pageById(root.frame ? root.frame.id : ""), q)
     }
-    root.scopedRows = MenuLib.scopedFilter(visible, q)
+    root.scopedRows = tree.rows
+    root.scopedVisibleUids = tree.visible
+    root.scopedTrimmedGroups = tree.trimmed
   }
 
   // Apply a debounced query now. True when one was pending, so callers
@@ -1971,10 +2024,13 @@ Singleton {
   function clearScoped() {
     scopedTimer.stop()
     root._scopedPending = ""
-    if (!root.scopedActive && root.scopedQuery === "" && root.scopedRows.length === 0) return
+    if (!root.scopedActive && root.scopedQuery === "" && root.scopedRows.length === 0
+      && Object.keys(root.scopedTrimmedGroups).length === 0) return
     root.scopedActive = false
     root.scopedQuery = ""
     root.scopedRows = []
+    root.scopedVisibleUids = ({})
+    root.scopedTrimmedGroups = ({})
   }
 
   // --- item state ---
@@ -2229,6 +2285,7 @@ Singleton {
         { name: "back", help: "go back one page" },
         { name: "close", help: "close the menu" },
         { name: "debugActivate", help: "activate the current row" },
+        { name: "debugBeginScoped", help: "arm the in-page \"/\" filter" },
         { name: "debugMove", help: "(dir) move the cursor" },
         { name: "debugMoveOption", help: "(dir) move the current row option" },
         { name: "debugRows", help: "current page rows as JSON" },
@@ -2319,6 +2376,13 @@ Singleton {
       panel.searchField.text = text
       panel.onFieldEdited(text)
       return "typed " + JSON.stringify(text)
+    }
+
+    function debugBeginScoped(): string {
+      root.beginScoped()
+      const panel = root.panel
+      if (panel) panel.searchField.text = ""
+      return "scoped"
     }
 
     function debugSetQuery(q: string): string {

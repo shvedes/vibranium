@@ -136,10 +136,20 @@ Item {
     const src = row.groupSource
     if (!src || !Array.isArray(src.children)) return []
     const kids = src.children
+    // Under the "/" filter the group stays on the page when one of its
+    // descendants matched. Narrow the child list to the branches that matched
+    // instead of flattening them into page rows: the child is then drawn by
+    // this dropdown, on its own bar and background. A group whose OWN label
+    // matched keeps its whole subtree (it is not in `trimmed`).
+    const scoped = Menu.scopedActive
+    const trimmed = scoped
+      && Menu.scopedTrimmedGroups[String(src.uid ?? "")] === true
+    const visible = scoped ? Menu.scopedVisibleUids : null
     const out = []
     for (let i = 0; i < kids.length; i++) {
       const kid = kids[i]
       if (!kid) continue
+      if (trimmed && visible[String(kid.uid ?? "")] !== true) continue
       // Only a child with a guard of its own is asked: an ungated child is
       // always usable, and a provider's `visible` predicate describes a page
       // row, not a switch inside a dropdown.
@@ -411,6 +421,17 @@ Item {
   // the index then points past the end, so it retreats to the last child.
   onGroupChildrenChanged: {
     const kids = row.groupChildren.length
+    const trimmed = Menu.scopedActive && row.isGroup
+      && Menu.scopedTrimmedGroups[String(groupSource?.uid ?? "")] === true
+    if (trimmed && row.dropdownOpen) {
+      // The filter narrowed this group's children to the matching branches.
+      // Seed the cursor on one of those children: otherwise the group is open
+      // with a stale -1 cursor, no child delegate and no focus bar, and the
+      // trim reads as a naked list of options with no dropdown behind it.
+      let seat = -1
+      for (let i = 0; i < kids; i++) if (_childSeatOk(i)) { seat = i; break }
+      if (seat >= 0) { row.childIndex = seat; return }
+    }
     if (row.childIndex >= kids) {
       let seat = -1
       for (let i = kids - 1; i >= 0; i--) {
@@ -939,7 +960,10 @@ Item {
           break
       }
     } finally {
-      if (_wasFiltered && Menu.scopedActive) Menu.clearScoped()
+      if (_wasFiltered && Menu.scopedActive) {
+        if (Menu.panel) Menu.panel._scopedClearByAction = true
+        Menu.clearScoped()
+      }
     }
   }
 
@@ -974,7 +998,10 @@ Item {
         if (itm.onToggle) Menu.runCommand(itm.onToggle, state)
       }
     } finally {
-      if (_wasFiltered && Menu.scopedActive) Menu.clearScoped()
+      if (_wasFiltered && Menu.scopedActive) {
+        if (Menu.panel) Menu.panel._scopedClearByAction = true
+        Menu.clearScoped()
+      }
     }
   }
 
@@ -1231,7 +1258,10 @@ Item {
         else Menu.runCommand(itm.onSelect, value)
       }
     } finally {
-      if (_wasFiltered && Menu.scopedActive) Menu.clearScoped()
+      if (_wasFiltered && Menu.scopedActive) {
+        if (Menu.panel) Menu.panel._scopedClearByAction = true
+        Menu.clearScoped()
+      }
     }
   }
 
@@ -2152,6 +2182,7 @@ Item {
     anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
     topGap: nested ? row.nestedSlotTopGap : 0
     open: row.descInSlot
+    background: true
     onOpenChanged: row._latchSlotMs()
     onClosingChanged: row._latchSlotMs()
     onHeightChanged: if (Menu.traceEnabled) Menu.trace("entry.descH", {
@@ -2223,6 +2254,7 @@ Item {
     anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
     topGap: nested ? row.nestedSlotTopGap : 0
     open: row.expanded
+    background: true
     // Only while the group is OPEN. A live nested child's geometry is the
     // motion an open group rides; once the group itself folds, THIS slot's
     // close is the motion. Following a child's closing tail there switched

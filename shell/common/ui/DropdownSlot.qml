@@ -142,6 +142,32 @@ Item {
   clip: true
   opacity: root.open ? 1 : 0
 
+  // The dropdown's BODY background. The slot owns it, so every surface that
+  // unfolds through this primitive gets the same fill behind its content: a
+  // host never has to remember to draw a separate rectangle, and the fill is
+  // present no matter which path opened the slot (a key, a click, a deep
+  // search landing or a filtered child). It follows `open || closing` and the
+  // slot's own height, so the reveal and the fold animate with the body.
+  // The cursor bars (List's selection bar, a group's focusBar, an option cell)
+  // sit on top of this and remain the focus indicator.
+  property bool background: false
+  property color backgroundColor: Ui.tint("background_1", 0.45)
+  property color backgroundBorder: Ui.tint("background_3", 0.5)
+
+  Rectangle {
+    id: slotBackground
+    parent: root
+    z: -1
+    anchors.fill: parent
+    visible: root.background && (root.open || root.closing)
+    color: root.backgroundColor
+    radius: RoundingPolicy.radius
+    // No border: the dropdown already carries its own hairline (the divider at
+    // the slot head), and a second one on the fill reads as a doubled line
+    // under the subtext at the row/dropdown joint.
+    border.width: 0
+  }
+
   // The height this slot is heading for, readable the instant it opens:
   // contentHost has already measured the content, and the Behavior below
   // is only the journey from 0 to this. Consumers that must place

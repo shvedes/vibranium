@@ -1260,6 +1260,10 @@ Rectangle {
       // anchor to. Anchoring while scrolled is what leaves an origin gap
       // (originY) above row 0 - the empty space a re-ranked search opens
       // over, with the head row pushed down by the offset it remembered.
+      // Both projections seat the head on every keystroke. A filter is a trim,
+      // so the cursor stays on the top result while the rows under it shrink
+      // away - the conventional filter behaviour. The row held at arm time is
+      // remembered separately (see _scopedReturn*) and given back on clear.
       if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
       if (!panel._sameRecords(records)) {
         panel._writeRecords(records,
@@ -1272,10 +1276,8 @@ Rectangle {
       // the current ITEM and only shifts its index, so a cursor parked on a
       // hit that survived the re-rank followed it down the ranking - often
       // past the fold, leaving the selection bar nowhere near the row the
-      // user just typed. Both search modes seat the head here instead,
-      // where the new order is already installed - which is why the write
-      // above does not ask the view to keep the cursor's row either: the
-      // two answers are opposites, and the head is the one this path wants.
+      // user just typed. Both projections seat the head here, where the new
+      // order is already installed.
       if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
       // A launch still settling. The launch wants the head of the row set as
       // it stands, and the head is what a re-seat names - a dead link coming
@@ -1794,12 +1796,28 @@ Rectangle {
       // wanted the head of the untrimmed page is over - same reason as the
       // query above.
       panel._summonSeat = false
+      const leaving = !Menu.scopedActive
+      if (!leaving) {
+        // Arming: remember where on the page the user stood. A nested hit is
+        // rendered at the top register while the filter is up and the group
+        // row underneath it is unmounted, so this is the only copy of the seat
+        // that survives until the page comes back.
+        panel._scopedReturnIdx = list.currentIndex
+        panel._scopedReturnY = list.contentY
+        const it = list.currentIndex >= 0 && list.currentIndex < panel.rowsModel.length
+          ? panel.rowsModel[list.currentIndex] : null
+        panel._scopedReturnUid = it && it.uid !== undefined ? String(it.uid) : ""
+        panel._scopedReturnPage = Menu.frame ? Menu.frame.id : ""
+        const rowItem = list.currentItem
+        panel._scopedReturnChild = rowItem && rowItem.isGroup
+          ? rowItem.childIndex : -1
+      }
       // QoL: picking a filtered entry clears the filter bar and returns focus to the list.
       // Defer outside the activation event for the same reason as onSearchingChanged:
       // grabbing list focus synchronously while the Enter that triggered the
       // submenu push is still in flight would deliver that same Enter to the
       // new page (Settings push -> General).
-      if (!Menu.scopedActive && Menu.open) {
+      if (leaving && Menu.open) {
         Qt.callLater(() => {
           if (!Menu.scopedActive && Menu.open) {
             if (searchField.text !== "") searchField.text = ""
@@ -1811,7 +1829,50 @@ Rectangle {
       // page's rows: rows leave and come back in place, so this is a
       // reveal like any other. Clearing also restores the full page box in
       // this turn, so the restored rows have to land in it this turn too.
-      panel.recomputeRows("reveal", !Menu.scopedActive)
+      panel.recomputeRows("reveal", leaving)
+      if (!leaving) return
+      // Seat the captured row back after the page's rows are installed. The
+      // uid names the row, not the number it had in the trim; the scroll goes
+      // back with it so an expanded group's slot is still inside the viewport.
+      Idle.run(() => {
+        const idx = panel._scopedReturnIdx
+        const y = panel._scopedReturnY
+        const uid = panel._scopedReturnUid
+        const child = panel._scopedReturnChild
+        const samePage = Menu.frame && Menu.frame.id === panel._scopedReturnPage
+        panel._scopedReturnIdx = -1
+        panel._scopedReturnY = -1
+        panel._scopedReturnUid = ""
+        panel._scopedReturnPage = ""
+        panel._scopedReturnChild = -1
+        if (panel._scopedClearByAction) {
+          panel._scopedClearByAction = false
+          return
+        }
+        if (Menu.scopedActive || !Menu.open || !samePage) return
+        let at = uid !== "" ? panel.indexOfUid(uid) : -1
+        if (at < 0) at = idx
+        if (at >= 0 && at < panel.rowsModel.length) {
+          // A filter that narrowed this group to a non-seatable child left its
+          // child cursor at -1. Restore it BEFORE the scroll seat: the group's
+          // bar and push are derived from the focused child, so seating the
+          // scroll first would be chased by a second offset once the cursor
+          // lands on that child again.
+          const rowItem = panel.gridMode ? grid.currentItem : list.itemAtIndex(at)
+          if (child >= 0 && rowItem && rowItem.isGroup
+            && typeof rowItem.childIndex === "number") {
+            const kids = rowItem.groupChildren.length
+            rowItem.childIndex = Range.clamp(child, 0, Math.max(0, kids - 1))
+          }
+          if (y >= 0) list.restoreAt(at, y, panel._modelListH())
+          else if (list.currentIndex !== at) list.seat(at, "land")
+          panel.recordSeat()
+        }
+        // The row the cursor came back to may still own an open slot. The
+        // filter projection dropped its reveal claim; re-derive it against the
+        // restored rows so the card, region and bar grow back together.
+        panel._rearmOpenSlot()
+      }, 2)
     }
 
     function onScopedRowsChanged() {
@@ -3882,6 +3943,20 @@ Rectangle {
   // background - sits on another row. Restore the entry position.
   property int _searchReturnIdx: -1
   property real _searchReturnY: -1
+  // Same contract for the "/" filter. Its projection is a trim of the current
+  // page, so a hit that is not on the page (a nested child shown at the top
+  // register) destroys the delegate the cursor was on. Capture the page seat
+  // at arm time and give it back on clear, or the page returns with the bar
+  // on row 0 and a scroll offset no page row owns.
+  property int _scopedReturnIdx: -1
+  property real _scopedReturnY: -1
+  property string _scopedReturnUid: ""
+  property string _scopedReturnPage: ""
+  property int _scopedReturnChild: -1
+  // Set by a row that cleared the filter by ACTING on a result. That row is
+  // now open (or its command ran), so the arm-time seat belongs to a different
+  // intent and must not pull the cursor back off it.
+  property bool _scopedClearByAction: false
 
   function closeTrailingInfo() {
     const idx = list.currentIndex
@@ -4103,7 +4178,15 @@ Rectangle {
         seatRows[n + 1] = childRow
         Qt.callLater(function() { seatLevel(n + 1, 0) })
       }
-      Qt.callLater(function() { tryLand(0) })
+      // Opening the group is a slot claim against the row's own geometry. Do
+      // it on the same settled gate the select and editor landings use: jumping
+      // here arrives mid page-transition/fit, and expanding into that window
+      // makes the slot land (snap) instead of easing, which both stiffens the
+      // resize and leaves the slot held so its later close snaps too.
+      panel.whenSettled(function() { tryLand(0) }, function(row) {
+        return row && row.isGroup && row.itm
+          && String(row.itm.uid) === targetUid
+      })
       return
     }
     if (it.type === "select") {

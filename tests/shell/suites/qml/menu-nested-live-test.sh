@@ -269,4 +269,55 @@ sleep 1.0
 t_eq "a step during the fold lands on the pre-open offset" "$origin" \
   "$(probe_field 'd["contentY"]')"
 
+# --- 9. the "/" filter reaches nested children and restores the open group --
+
+t_section "scoped filter over nested rows"
+open_fixture
+p debugSetCurrentIdx 6 >/dev/null 2>&1
+sleep 0.3
+p debugActivatePanel >/dev/null 2>&1
+sleep 0.8
+open_child="$(probe_field 'd["childLabel"]')"
+
+# "Signal strength" lives inside the Devices group, not on the page's own row
+# set. A page-only filter answers "No matches"; a tree-aware one keeps the
+# group and narrows its child list to the matching branch.
+p debugBeginScoped >/dev/null 2>&1
+sleep 0.3
+p debugType signal >/dev/null 2>&1
+sleep 0.7
+t_eq "a child label is filterable" "1" "$(probe_field 'd["count"]')"
+t_eq "the group is the result, not a detached child" "group" \
+  "$(probe_field 'd["rowType"]')"
+t_eq "the cursor stays on the top result" "0" "$(probe_field 'd["index"]')"
+t_eq "the group's children are narrowed" "1" "$(probe_field 'd["grpChildCount"]')"
+t_eq "the filter's bar matches the result row" "True" \
+  "$(python3 -c "print(abs($(probe_field 'd["hlH"]') - $(probe_field 'd["curH"]')) < 1)")"
+
+# Clearing the trim must give back the page seat: the group, its scroll
+# offset, its focused child and the bar that is the slot's background.
+p debugEscape >/dev/null 2>&1
+sleep 1.0
+t_eq "the group is still open" "True" "$(probe_field 'd["dropdownOpen"]')"
+t_eq "its expansion survives the filter" "True" "$(probe_field 'd["expanded"]')"
+t_eq "the focused child is restored" "$open_child" "$(probe_field 'd["childLabel"]')"
+t_eq "the whole child list is restored" "7" "$(probe_field 'd["grpChildCount"]')"
+t_eq "the reveal claim is restored" "6" "$(probe_field 'd["autoRevealIndex"]')"
+exit_y="$(probe_field 'd["contentY"]')"
+t_eq "the restored row is on screen" "True" \
+  "$(python3 -c "print(0 <= $(probe_field 'd["hlY"]') < $(probe_field 'd["geom"]["listH"]'))")"
+t_eq "the selection bar is visible" "True" "$(probe_field 'd["hlVisible"]')"
+t_eq "the bar covers the expanded group" "True" \
+  "$(python3 -c "print(abs($(probe_field 'd["hlH"]') - $(probe_field 'd["curH"]')) < 1)")"
+
+# And the restored view still navigates: a step moves the nested child without
+# collapsing the group or dragging the viewport.
+p debugChildMove 1 >/dev/null 2>&1
+sleep 0.4
+t_ne "the nested cursor moves after the restore" "$open_child" \
+  "$(probe_field 'd["childLabel"]')"
+t_eq "the group stays open through the step" "True" \
+  "$(probe_field 'd["dropdownOpen"]')"
+t_eq "the scroll holds through the step" "$exit_y" "$(probe_field 'd["contentY"]')"
+
 t_summary
