@@ -4,12 +4,18 @@ Exhaustive, headless tests for the Quickshell shell in `shell/`. Every suite
 runs without a compositor, a display, or a network.
 
 ```sh
-bash tests/shell/run-all.sh                    # everything, classified
+bash tests/shell/run-all.sh                    # CLI suites, classified
+bash tests/shell/run-all.sh --ui               # also the live-UI suites
 bash tests/shell/run-all.sh --list             # the suites and what they cover
 bash tests/shell/run-all.sh --only menu,unitgate -v
 bash tests/shell/run-all.sh --baseline         # recorded pre-existing failures
 bash tests/shell/suites/js/menu.test.mjs       # one suite, directly
 ```
+
+The default run is CLI-only: suites that drive the running shell over IPC and
+read back what the user sees (`menu-nested-live`) are left out. Pass `--ui` to
+include them; they block when `vibranium-shell.service` is not active. An
+explicit `--only <that-suite>` runs it even without `--ui`.
 
 Current state: **63 suites, 32,532 assertions**, in 12-15 seconds on a 16-core
 machine - the wall clock is set by the lint suite's whole-tree runs, and

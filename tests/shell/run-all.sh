@@ -1,7 +1,8 @@
 #!/bin/bash
 # The shell test suite runner.
 #
-#   bash tests/shell/run-all.sh                 run everything, classified
+#   bash tests/shell/run-all.sh                 run the CLI suites, classified
+#   bash tests/shell/run-all.sh --ui            also run the live-UI suites
 #   bash tests/shell/run-all.sh --list          the suites and what they cover
 #   bash tests/shell/run-all.sh --only menu     run matching suites
 #   bash tests/shell/run-all.sh --only js -v    run a group, full output
@@ -46,6 +47,7 @@ VERBOSE=0
 QUIET=0
 JOBS="$(nproc)"
 ONLY=""
+WANT_UI=0
 WANT_BASELINE=0
 WANT_LIST=0
 
@@ -63,6 +65,8 @@ Usage: run-all.sh [options]
                      recorded, in discovery order, not in completion order.
                      4 is about 3x faster on this tree. Watch the memory -
                      the JS suites each hold a loaded library set.
+  --ui               include live-UI suites (they drive the running shell).
+                     Default is CLI-only: those suites are not run.
   --baseline         print the recorded pre-existing failures, with the
                      reason each was recorded, then exit
   --list             list the suites and what each one covers
@@ -78,6 +82,7 @@ while (($#)); do
   --quiet) QUIET=1; shift ;;
   --jobs) JOBS="${2:-1}"; shift 2 ;;
   --jobs=*) JOBS="${1#*=}"; shift ;;
+  --ui) WANT_UI=1; shift ;;
   --baseline) WANT_BASELINE=1; shift ;;
   --list) WANT_LIST=1; shift ;;
   -h | --help) usage; exit 0 ;;
@@ -136,6 +141,23 @@ discover() {
 }
 
 discover
+
+# --- live-UI suites ---------------------------------------------------------
+#
+# These drive the running shell over IPC and read back the geometry the user
+# sees, so they need a live vibranium-shell and spend seconds per step. The
+# default run is CLI-only; --ui opts in. An explicit --only still runs a named
+# UI suite, since naming one is already an explicit request for it.
+declare -A UI_SUITE=(["menu-nested-live"]=1)
+
+ui_suite() {
+  [[ -n ${UI_SUITE[$1]:-} ]]
+}
+
+UI_COUNT=0
+for _name in "${SUITE_NAME[@]}"; do
+  ui_suite "$_name" && UI_COUNT=$((UI_COUNT + 1))
+done
 
 # The widest suite name, measured once at discovery. The live progress lines
 # and the final table share it: a hardcoded width lets a long name push its
@@ -208,7 +230,11 @@ if ((WANT_LIST)); then
       group_last="${SUITE_GROUP[$i]}"
       printf '\n%s%s%s\n' "$C_BOLD" "$group_last" "$C_OFF"
     fi
-    printf '  %-24s %s\n' "${SUITE_NAME[$i]}" "$(describe "${SUITE_NAME[$i]}")"
+    desc="$(describe "${SUITE_NAME[$i]}")"
+    if ui_suite "${SUITE_NAME[$i]}"; then
+      desc="$desc  (live UI, --ui)"
+    fi
+    printf '  %-24s %s\n' "${SUITE_NAME[$i]}" "$desc"
   done
   printf '\n'
   exit 0
@@ -281,6 +307,7 @@ N_BLOCKED=0
 N_REGRESSION=0
 N_RESOLVED=0
 N_SKIPPED=0
+N_UI_FILTERED=0
 N_EMPTY=0
 
 WORKROOT="$(mktemp -d "${TMPDIR:-/tmp}/vb-shell-run.XXXXXX")"
@@ -376,6 +403,14 @@ if [[ -n $ONLY ]]; then
     SELECTED=("${_uniq[@]}")
   fi
 fi
+# Without --only, the default run leaves the live-UI suites out. --only wins:
+# naming a suite explicitly is already a request to run it.
+if [[ -z $ONLY ]] && ((!WANT_UI)); then
+  for i in "${!SUITE_NAME[@]}"; do
+    ui_suite "${SUITE_NAME[$i]}" && continue
+    SELECTED+=("$i")
+  done
+fi
 RUN_TOTAL="${#SELECTED[@]}"
 ((RUN_TOTAL == 0)) && RUN_TOTAL="${#SUITE_NAME[@]}"
 
@@ -384,6 +419,8 @@ if ((!QUIET)); then
     printf '%sshell test suite%s  %s(%d discovered' "$C_BOLD" "$C_OFF" "$C_DIM" "${#SUITE_NAME[@]}"
     if [[ -n $ONLY ]]; then
       printf ', %d selected by --only %s' "$RUN_TOTAL" "$ONLY"
+    elif ((!WANT_UI)); then
+      printf ', %d CLI; %d live-UI skipped (--ui)' "$RUN_TOTAL" "$UI_COUNT"
     fi
     printf ')%s\n' "$C_OFF"
     printf '%sprogress goes to stderr; the report goes to stdout.%s\n\n' "$C_DIM" "$C_OFF"
@@ -462,6 +499,10 @@ for i in "${!SUITE_NAME[@]}"; do
   name="${SUITE_NAME[$i]}"
   status_override=""
 
+  if [[ -z $ONLY ]] && ((!WANT_UI)) && ui_suite "$name"; then
+    N_UI_FILTERED=$((N_UI_FILTERED + 1))
+    continue
+  fi
   if ((${#SELECTED[@]} > 0)) && [[ " ${SELECTED[*]} " != *" $i "* ]]; then
     N_SKIPPED=$((N_SKIPPED + 1))
     continue
@@ -667,6 +708,7 @@ printf '  %s%2d PASS%s' "$C_PASS" "$N_PASS" "$C_OFF"
 ((N_BLOCKED > 0)) && printf '   %s%2d BLOCKED%s' "$C_BLOC" "$N_BLOCKED" "$C_OFF"
 ((N_EMPTY > 0)) && printf '   %s%2d NO-ASSERTIONS%s' "$C_REG" "$N_EMPTY" "$C_OFF"
 ((N_REGRESSION > 0)) && printf '   %s%2d REGRESSION%s' "$C_REG" "$N_REGRESSION" "$C_OFF"
+((N_UI_FILTERED > 0)) && printf '   %s%2d live-UI skipped%s' "$C_DIM" "$N_UI_FILTERED" "$C_OFF"
 ((N_SKIPPED > 0)) && printf '   %s%2d filtered out%s' "$C_DIM" "$N_SKIPPED" "$C_OFF"
 printf '\n'
 printf '  %s%d assertions passed, %d failed, %d skipped, %d notes%s\n' \
