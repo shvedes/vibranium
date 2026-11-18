@@ -15,6 +15,7 @@ Rectangle {
 
   required property var modelData
   required property int index
+  property int nestedDepth: 0
 
   // Rows below a focused child slide down inside the clipped dropdown while
   // one of its slots is open. A transform, not y: the Column owns y. It reads
@@ -54,6 +55,7 @@ Rectangle {
       index: child.index,
       itm: child.modelData,
       nested: true,
+      nestedDepth: child.nestedDepth + 1,
       width: child.width
     })
     Connections {

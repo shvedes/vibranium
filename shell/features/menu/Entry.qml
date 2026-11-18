@@ -181,6 +181,9 @@ Item {
   // page row's; only the register shrinks, and the host owns the push that
   // reveals the slots instead of the card resizing for them.
   property bool nested: false
+  // Page rows are depth 0; each group's children load one level deeper. The
+  // cursor fill alternates on this parity so nested levels read apart.
+  property int nestedDepth: 0
   readonly property real titleFontPx: nested ? Ui.fontM : Ui.fontL
   readonly property real valueFontPx: nested ? Ui.fontXs : Ui.fontS
   readonly property real iconBox: nested ? Ui.childIconW : Ui.rowIconW
@@ -2749,10 +2752,23 @@ Item {
         id: focusBar
 
         visible: row.dropdownOpen && row.childIndex >= 0 && groupRoot.cursorItem !== null
-        // The same solid shade and hairline as List's selection bar, so a
-        // child's whole dropdown is one continuous fill with one border,
-        // the way an open page row is. No plate sits over this one.
-        color: Theme.color("background_1")
+        // The fill stays the plain two-shade step; only the left edge borrows
+        // a palette colour directly, one per depth. No mixing, no alpha.
+        // Cool and warm alternate so no two neighbouring levels sit in the
+        // same part of the spectrum; the brightest hue lands at the deepest
+        // level as a finishing cue.
+        readonly property var levelHues: [
+          "blue", "orange", "cyan", "yellow", "green", "red", "purple", "pink"
+        ]
+        property string hueKey: focusBar.levelHues[
+          row.nestedDepth % focusBar.levelHues.length]
+        property color barFill: row.nestedDepth % 2 === 0
+          ? Theme.color("background_1") : Theme.color("background_2")
+        gradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 0; color: Theme.color(focusBar.hueKey) }
+          GradientStop { position: 0.0045; color: focusBar.barFill }
+        }
         radius: RoundingPolicy.radius
         border.width: 1
         border.color: Ui.solid("background_3")
