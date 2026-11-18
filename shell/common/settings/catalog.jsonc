@@ -151,6 +151,22 @@
                 ]
             },
             {
+                "key": "shell.time.format",
+                "type": "string",
+                "default": "24",
+                "label": "Time format",
+                "sub": "12h or 24h clock",
+                "desc": "How clocks across the shell display the time.\n24h shows 21:30, 12h shows 09:30 PM.",
+                "values": [
+                    "12",
+                    "24"
+                ],
+                "valueLabels": {
+                    "12": "12h",
+                    "24": "24h"
+                }
+            },
+            {
                 "key": "misc.cursorTheme",
                 "type": "string",
                 "default": "Adwaita",
@@ -943,22 +959,6 @@
                         "eq": true
                     }
                 ]
-            },
-            {
-                "key": "shell.statusbar.clockFormat",
-                "type": "string",
-                "default": "24",
-                "label": "Time format",
-                "sub": "12- or 24-hour clock",
-                "desc": "How the bar clock displays the time.\n24-hour shows 21:30, 12-hour shows 09:30 PM.",
-                "values": [
-                    "12",
-                    "24"
-                ],
-                "valueLabels": {
-                    "12": "12-hour (AM/PM)",
-                    "24": "24-hour"
-                }
             },
             {
                 "key": "shell.statusbar.clockFullDate",
