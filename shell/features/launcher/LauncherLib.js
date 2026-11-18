@@ -1057,15 +1057,21 @@ function isSynthKind(kind) {
 // reads. It has to be every row rather than the first one: an engine can
 // answer with several rows of its own kind now, and "one synthetic row hides
 // the counter" would otherwise start reporting "6/214 apps" over a list of six
-// conversions. An empty set is not an all-synthetic set - a fruitless search
-// still shows "0/214".
+// conversions. Dividers between answer rows are ignored; a set of dividers
+// alone is not an answer. An empty set is not an all-synthetic set - a
+// fruitless search still shows "0/214".
 function allSynthKinds(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return false
+  let seen = false
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i]
+    // A divider between answer rows is part of the answer, not an app pool:
+    // the calc row above a size's conversions uses one, as do sticky answers.
+    if (r && r.kind === "separator") continue
     if (!r || !isSynthKind(r.kind)) return false
+    seen = true
   }
-  return true
+  return seen
 }
 
 // --- sticky answers -------------------------------------------------------

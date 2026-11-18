@@ -1,8 +1,8 @@
 // Unit converter engine for AppLauncher: natural-language
 // "<value><unit> [in|into|to|as|->|= <unit>]" plus bare "<value><unit>"
 // with a per-unit default target. Two measurements joined by "by" answer
-// each side on its own ("12\" by 15\"" is a size, not a sum). Pure-JS,
-// no Qt imports.
+// each side on its own ("12\" by 15\"" is a size, not a sum); two lengths
+// also lead with their area in every readable unit. Pure-JS, no Qt imports.
 //
 // Four stages, always in this order:
 //
@@ -26,9 +26,12 @@
 //               is still readable (see pickTargets and readable).
 //   check       Dimensions, the absolute-zero floor, the result range.
 //
-// A "by" query is split before those stages. Each side is a quantity with its
-// own value, unit and list of targets, tagged with its 0-based position so two
-// sides that convert to the same target still get distinct row identities.
+// A "by" query is split before those stages. A size of one dimension mirrors
+// itself: one row per shared target carries both readings, "38.1 cm by 76.2
+// cm", rather than a row per side. Two positive lengths also multiply into an
+// area row per readable unit, each marked `calc`, which lead the answer so a
+// plugin can set them off from the conversions with a divider. Different
+// dimensions keep a list per side, tagged with its 0-based position.
 //
 // A unit spelling is normalized before the alias table is consulted, and a
 // number may carry thousands grouping ("1,000 km") in the same form the
@@ -40,11 +43,11 @@
 //        UnitLib.tryConvert(query) -> null | result
 //        UnitLib.tryAll(query) -> null | result[]
 //   ok:   { ok: true, value, from, to, out, formatted, copy, phrase,
-//           label, inputText[, dim] }
+//           label, inputText[, dim][, calc] }
 //   hint: { ok: false, error: "incomplete"|"unknown-target"|
 //           "incompatible"|"unphysical"|"out-of-range", expr, label, sub[, dim] }
 // null means "not a unit query" - caller falls through to apps.
-// `dim` is present only on a row of a "by" query: the side it came from.
+// `dim` marks a conversion's side in a "by" query; `calc` marks its area row.
 //
 // The two entries share one parse and one set of checks: tryConvert answers
 // with a single conversion, which is what an explicit "in <unit>" asks for and
@@ -496,6 +499,12 @@ var UNITS = [
 // reads as km/h. One direction only - a length source with a
 // speed target stays incompatible.
 var SPEED_LEN = { "km": "km/h", "mi": "mph", "m": "m/s", "ft": "ft/s", "nmi": "kn" };
+
+// The square of a length unit, for the area of "15\" by 30\"". Only lengths
+// with a shipped area twin get a calculation; every other pair, and every
+// pair that is not two positive lengths, keeps just its conversion lists.
+var LEN_AREA = { mm: "mm2", cm: "cm2", m: "m2", km: "km2",
+  in: "in2", ft: "ft2", yd: "yd2", mi: "mi2" };
 
 // A bare query answers with a NEIGHBOUR unit, and which neighbour depends on
 // the dimension's shape. time's steps are irregular (60, 24, 7, 365), so the
@@ -1857,10 +1866,98 @@ function answerQuery(q) {
   return out;
 }
 
-// Each side of a size keeps its own list, with the side's index stamped on
-// every row so a plugin can mint a distinct identity for each reading.
+// Two lengths make an area. The second side is read into the first side's
+// unit before the multiply, so "5 m by 20 cm" is 1 m2 rather than 100 m2.
+// The product is shown in its own unit first, then in the readable ones of
+// the area dimension: each row is the same multiplication in a different
+// unit, marked `calc` so the plugin groups them above a divider, ahead of
+// the mirrored conversions.
+function dimensionAreas(queries) {
+  if (queries.length !== 2) return null;
+  let a = queries[0];
+  let b = queries[1];
+  if (a.from.dim !== "length" || b.from.dim !== "length") return null;
+  if (a.from.recip === true || b.from.recip === true) return null;
+  if (!(a.value > 0) || !(b.value > 0)) return null;
+  let sym = LEN_AREA[a.from.sym];
+  if (sym === undefined) return null;
+  let unit = symLookup(sym);
+  if (unit === null || unit.dim !== "area") return null;
+  let value = a.value * convertValue(b.value, b.from, a.from);
+  if (!isFinite(value)) return null;
+  let inputText = a.inputText + " × " + b.inputText;
+  let source = formatNumber(a.value) + " " + unitWord(a.from.sym, a.value)
+    + " by " + formatNumber(b.value) + " " + unitWord(b.from.sym, b.value);
+  let targets = [sym];
+  let shortlist = pickTargets(value, unit);
+  for (let i = 0; i < shortlist.length && targets.length < MAX_TARGETS; i++) {
+    if (shortlist[i] !== sym) targets.push(shortlist[i]);
+  }
+  let out = [];
+  for (let i = 0; i < targets.length; i++) {
+    let to = symLookup(targets[i]);
+    if (to === null) continue;
+    let result = convertValue(value, unit, to);
+    if (!isFinite(result)) continue;
+    let formatted = formatNumber(result);
+    let copy = formatted + " " + displaySym(to.sym, result);
+    out.push({ ok: true, value: value, from: sym, to: to.sym, out: result,
+      formatted: formatted, copy: copy, label: inputText + " = " + copy,
+      phrase: source + " is " + formatted + " " + unitWord(to.sym, result),
+      inputText: inputText, calc: true });
+  }
+  return out.length > 0 ? out : null;
+}
+
+// A size of one dimension answers with ONE row per target, carrying both
+// sides at once: "38.1 cm by 76.2 cm" rather than a row for each side. The
+// targets are the ones both sides can read, in the first side's order; a
+// named target on either side applies to the pair. Two different dimensions
+// cannot share a reading, so they keep the per-side lists below.
+function mirroredAnswers(queries) {
+  if (queries.length !== 2) return null;
+  let a = queries[0];
+  let b = queries[1];
+  if (a.from.dim !== b.from.dim) return null;
+  let named = a.bare === false ? a.toSpec : (b.bare === false ? b.toSpec : null);
+  let syms = [];
+  if (named !== null) {
+    syms.push(named);
+  } else {
+    let ta = pickTargets(a.value, a.from);
+    let tb = pickTargets(b.value, b.from);
+    for (let i = 0; i < ta.length; i++) {
+      if (tb.indexOf(ta[i]) >= 0) syms.push(ta[i]);
+    }
+  }
+  let out = [];
+  for (let i = 0; i < syms.length && out.length < MAX_TARGETS; i++) {
+    let ra = renderTarget(a, syms[i]);
+    let rb = renderTarget(b, syms[i]);
+    if (ra.ok !== true || rb.ok !== true) continue;
+    let copy = ra.copy + " by " + rb.copy;
+    out.push({ ok: true, value: a.value, from: a.from.sym, to: ra.to,
+      out: ra.out, formatted: ra.formatted, copy: copy, label: copy,
+      phrase: formatNumber(a.value) + " " + unitWord(a.from.sym, a.value)
+        + " by " + formatNumber(b.value) + " " + unitWord(b.from.sym, b.value)
+        + " is " + formatNumber(ra.out) + " " + unitWord(ra.to, ra.out)
+        + " by " + formatNumber(rb.out) + " " + unitWord(rb.to, rb.out),
+      inputText: a.inputText + " by " + b.inputText });
+  }
+  return out.length > 0 ? out : null;
+}
+
+// A two-length size leads with its area in each readable unit, the first of
+// which is also what tryConvert answers. A same-dimension size then mirrors
+// itself in each shared target; only a pair of different dimensions falls
+// back to one list per side, tagged with the side's index so a plugin can
+// keep the readings apart.
 function taggedAnswers(queries) {
   let out = [];
+  let areas = dimensionAreas(queries);
+  if (areas !== null) out = out.concat(areas);
+  let mirrored = mirroredAnswers(queries);
+  if (mirrored !== null) return out.concat(mirrored);
   for (let i = 0; i < queries.length; i++) {
     let rows = answerQuery(queries[i]);
     for (let j = 0; j < rows.length; j++) {
@@ -1873,12 +1970,12 @@ function taggedAnswers(queries) {
 
 // Main entry, see header for the return contract. Never throws:
 // unparseable input is null (caller falls through to app search). A size
-// answers with its first side's first conversion, which is the head of the
-// list tryAll would show.
+// answers with the head of the list tryAll would show, which is its area
+// when both sides are lengths.
 function tryConvert(query) {
   let dims = splitDimensions(query);
   if (dims !== null) {
-    let rows = taggedAnswers([dims[0]]);
+    let rows = taggedAnswers(dims);
     return rows === null ? null : rows[0];
   }
   let q = parseQuery(query);
@@ -1887,7 +1984,8 @@ function tryConvert(query) {
 }
 
 // The multi-answer half: a plain query gets answerQuery's list, and a size
-// concatenates one list per side in the order the sides were typed.
+// mirrors its sides in every shared target, or falls back to one list per
+// side when the dimensions differ.
 function tryAll(query) {
   let dims = splitDimensions(query);
   if (dims !== null) return taggedAnswers(dims);
@@ -1895,9 +1993,9 @@ function tryAll(query) {
 }
 
 // Unit converter engine plugin: natural language conversion, one row per
-// reading (per target, per side of a "by" size). UnitLib source (pure JS,
-// no imports) is concatenated above this
-// contract; the IIFE below only adapts it to VibraniumPlugin.
+// reading (per target, per side of a "by" size), led by the area of two
+// lengths in each readable unit. UnitLib source (pure JS, no imports) is
+// concatenated above this contract; the IIFE below only adapts it.
 (function() {
   let api = null
   VibraniumPlugin = {
@@ -1919,8 +2017,32 @@ function tryAll(query) {
       if (results[0].error === "unknown-target") return []
       const icon = api.setting("shell.launcher.showIcons") !== false ? "accessories-calculator" : ""
       const rows = []
+      let divided = false
       for (let i = 0; i < results.length; i++) {
         const r = results[i]
+        // Two lengths lead with their area in each unit, one calc row each.
+        // One divider sets them off from the readings below: the panel keys a
+        // set on one divider only, so it is pushed once, before the first
+        // mirrored conversion.
+        if (r.calc === true) {
+          rows.push({
+            kind: "calc",
+            uid: "unit:calc:" + r.to,
+            label: r.label,
+            sub: r.phrase,
+            desc: "",
+            icon: icon,
+            calcValue: r.copy,
+            calcExpr: r.inputText,
+            incomplete: false,
+            item: { copyValue: r.copy }
+          })
+          continue
+        }
+        if (!divided && rows.length > 0 && rows[0].kind === "calc") {
+          rows.push({ kind: "separator" })
+          divided = true
+        }
         // The uid names the READING, not the engine: rowsEqual keys on it and
         // a launcher card renders several of these at once. A "by" query adds
         // the side's index, because two sides can reach the same target.

@@ -4802,19 +4802,33 @@ group('unit: a bare quantity answers with a row per reading, capped and same-dim
   }), true)
 })
 
-group('unit: a size is one row per reading of each side', () => {
+group('unit: a size leads with its area in each unit, a divider, then mirrored readings', () => {
   const { api } = shippedApi()
   const impl = loadPlugin(path.join(PLUGIN_ROOT, 'unit', 'main.js'), api)
   const rows = impl.items('12" by 15"')
-  eq('both sides are shown', rows.length, 8)
-  eq('the first side leads', rows[0].label, '12 in = 30.48 cm')
-  eq('the second side follows', rows[4].label, '15 in = 38.1 cm')
-  eq('each reading keeps its own identity', new Set(rows.map((r) => r.uid)).size, 8)
-  eq('the side index keeps two same-target rows apart', rows.map((r) => r.uid), [
-    'unit:0:cm', 'unit:0:ft', 'unit:0:mm', 'unit:0:yd',
-    'unit:1:cm', 'unit:1:ft', 'unit:1:mm', 'unit:1:yd',
+  eq('the calculation is the first row', rows[0], {
+    kind: 'calc', uid: 'unit:calc:in2', label: '12 in × 15 in = 180 in2',
+    sub: '12 inches by 15 inches is 180 square inches', desc: '',
+    icon: 'accessories-calculator', calcValue: '180 in2', calcExpr: '12 in × 15 in',
+    incomplete: false, item: { copyValue: '180 in2' },
+  })
+  eq('the same multiplication is repeated in each area unit', rows.slice(0, 5).map((r) => r.label), [
+    '12 in × 15 in = 180 in2', '12 in × 15 in = 1161.29 cm2',
+    '12 in × 15 in = 0.116129 m2', '12 in × 15 in = 1.25 ft2',
+    '12 in × 15 in = 0.138889 yd2',
   ])
-  eq('each row copies its own value', rows[4].item.copyValue, '38.1 cm')
+  eq('each calc row keeps its own identity', rows.slice(0, 5).map((r) => r.uid),
+    ['unit:calc:in2', 'unit:calc:cm2', 'unit:calc:m2', 'unit:calc:ft2', 'unit:calc:yd2'])
+  eq('one divider follows them', rows[5].kind, 'separator')
+  eq('and one mirrored reading per shared unit comes after', rows.length, 10)
+  eq('the first reading carries both sides', rows[6].label, '30.48 cm by 38.1 cm')
+  eq('and copies both sides', rows[6].item.copyValue, '30.48 cm by 38.1 cm')
+  eq('each reading keeps its own identity', new Set(rows.filter((r) => r.uid).map((r) => r.uid)).size, 9)
+  eq('a reading is identified by its unit, not by a side', rows.slice(6).map((r) => r.uid),
+    ['unit:cm', 'unit:ft', 'unit:mm', 'unit:yd'])
+  eq('each row sub mirrors the query in that unit', rows[6].sub,
+    '12 inches by 15 inches is 30.48 centimetres by 38.1 centimetres')
+  eq('the divider does not bring back the app counter', LL.allSynthKinds(rows), true)
   eq('a hint on one side keeps that side distinct',
     impl.items('12" by -300C').map((r) => r.uid),
     ['unit:0:cm', 'unit:0:ft', 'unit:0:mm', 'unit:0:yd', 'unit:1:hint'])
@@ -5056,13 +5070,14 @@ group('sticky answers: the last engine answer survives the keystroke that leaves
   eq('a query with no fallback row still gets its answer',
     LL.stickyAttach(state, 'raptor 3 th', []).map((r) => r.uid),
     ['constants:raptor3:tf', 'constants:raptor3:kN'])
-  // The counter reads both gates: a sticky row is a real engine kind, so
-  // allSynthKinds alone would print "0/214 apps" over a constants answer.
+  // anySticky still records that the carried rows belong to the previous
+  // keystroke, while the divider between them is now part of the answer and
+  // no longer turns an all-synthetic set into an app pool.
   eq('a sticky set is detected', LL.anySticky(rows), true)
   eq('a plain engine set is not', LL.anySticky(eng), false)
   eq('and neither is a plain app row', LL.anySticky([{ kind: 'app', uid: 'app:1' }]), false)
   eq('a non-array carries nothing', LL.anySticky(null), false)
-  eq('a sticky set is not all-synthetic', LL.allSynthKinds(rows), false)
+  eq('a sticky set is all-synthetic, divider and all', LL.allSynthKinds(rows), true)
   is('so the counter gate asks the sticky question too',
     /anySticky\(root\.results\)/.test(fs.readFileSync(path.join(LAUNCHER, 'AppLauncher.qml'), 'utf8')),
     (v) => v === true, 'a sticky-aware counter gate')
@@ -5340,7 +5355,8 @@ group('fx: it claims only currency queries, and the other four engines keep thei
   eq('but one app row among them is not', LL.allSynthKinds([{ kind: 'fx' }, { kind: 'app' }]), false)
   eq('a mixed engine set is not either',
     LL.allSynthKinds([{ kind: 'unit' }, { kind: 'calc' }]), true)
-  eq('and a separator row is not synthetic', LL.allSynthKinds([{ kind: 'fx' }, { kind: 'separator' }]), false)
+  eq('a divider inside an answer is part of the answer', LL.allSynthKinds([{ kind: 'fx' }, { kind: 'separator' }]), true)
+  eq('but a set of only dividers is not an answer', LL.allSynthKinds([{ kind: 'separator' }]), false)
   eq('an empty set is not an all-synthetic set, so a fruitless search still counts',
     LL.allSynthKinds([]), false)
   eq('a nullish set is not one either', LL.allSynthKinds(null), false)
@@ -6759,7 +6775,7 @@ group('the shared function names are the same set on both sides', () => {
   // gate, mid-typing gate and tryColor. A count that falls means a function
   // left one of the two copies.
   eq('color shares thirty-seven functions', TWINNED.find((p) => p.name === 'color').sharedFns.length, 37)
-  eq('unit shares thirty-seven', TWINNED.find((p) => p.name === 'unit').sharedFns.length, 37)
+  eq('unit shares thirty-nine', TWINNED.find((p) => p.name === 'unit').sharedFns.length, 39)
   eq('time shares nine', TWINNED.find((p) => p.name === 'time').sharedFns.length, 9)
   eq('fx shares twenty-four', TWINNED.find((p) => p.name === 'fx').sharedFns.length, 24)
 })

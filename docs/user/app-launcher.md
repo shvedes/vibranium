@@ -88,9 +88,12 @@ Type a measurement to convert it inline - no prefix needed:
 12" by 15"
 ```
 
-Two measurements joined by `by` describe a size: `12" by 15"` answers each
-side with its own list of conversions, first side first. Both sides need their
-unit.
+Two measurements joined by `by` describe a size: `12" by 15"` leads with the
+area as a calculation in each readable unit (`12 in × 15 in = 180 in2`, then
+centimetres, metres, feet and yards), then a separator, then one row per
+shared unit that mirrors the query - `30.48 cm by 38.1 cm`, `1 ft by 1.25 ft`,
+and so on - instead of a row per side. A named target applies to both sides.
+Both sides need their unit, and only two positive lengths produce an area.
 
 Use `in`, `to`, `as`, `->` or `=` between the units (`5m in cm`,
 `1kg to lb`). A bare value answers with a row per reading - the default
