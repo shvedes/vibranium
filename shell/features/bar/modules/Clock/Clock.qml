@@ -30,7 +30,7 @@ BarModule {
   // read these sibling readonly flags would cache stale/sticky values when
   // the format toggles. Functions always reflect the current flags.
   function dayPart() {
-    if (root.fullDate) return Qt.formatDateTime(clock.date, "ddd, MMM d ")
+    if (root.fullDate) return Qt.formatDateTime(clock.date, "ddd, MMM d")
     return ""
   }
   function timePart(withSeconds) {
@@ -67,11 +67,14 @@ BarModule {
 
   // Refresh the time.
   function refreshLabel() {
-    dayText.text = root.dayPart()
+    const day = root.dayPart()
+    dayText.text = day
     timeText.text = root.timePart(root.showSeconds && !root.showSecondsInTooltip)
     suffixText.text = root.suffixPart()
+    // The bar's gap lives in the separator, so the tooltip joins its own two
+    // parts and only inserts a space when a date is actually present.
     tipText = root.showSeconds && root.showSecondsInTooltip
-      ? root.dayPart() + root.timePart(root.showSecondsInTooltip) + root.suffixPart()
+      ? (day !== "" ? day + " " : "") + root.timePart(root.showSecondsInTooltip) + root.suffixPart()
       : ""
   }
 
@@ -148,6 +151,39 @@ BarModule {
       NumberAnimation {
         id: dayFade
         target: dayText
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: Ui.fastMs
+        easing.type: Easing.OutCubic
+      }
+    }
+
+    // Faint hairline between the date and the time, present only while the
+    // date is shown. Its holder carries the air on both sides and glides open
+    // with the date segment, so toggling "Show full date" slides the rule in
+    // with the text instead of snapping it into place.
+    Item {
+      readonly property int ruleGap: 10
+      property bool shown: root.fullDate
+      clip: true
+      implicitWidth: width
+      width: shown ? ruleGap + rule.width + ruleGap : 0
+      height: timeText.height
+      Behavior on width { enabled: root.animOn; Glide { duration: Ui.fastMs } }
+      onShownChanged: if (shown && root.animOn) ruleFade.restart()
+
+      Rectangle {
+        id: rule
+        anchors.centerIn: parent
+        width: 1
+        height: Math.round(timeText.height * 0.7)
+        color: Ui.tint("foreground_1", 0.45)
+      }
+
+      NumberAnimation {
+        id: ruleFade
+        target: rule
         property: "opacity"
         from: 0
         to: 1

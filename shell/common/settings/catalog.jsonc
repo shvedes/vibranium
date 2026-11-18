@@ -966,7 +966,7 @@
                 "default": false,
                 "label": "Show full date",
                 "sub": "Date before time",
-                "desc": "Show full date before time.\nMon, Sep 21 21:30."
+                "desc": "Show full date before time.\nMon, Sep 21 | 21:30."
             },
             {
                 "key": "shell.statusbar.clockRightClick",
