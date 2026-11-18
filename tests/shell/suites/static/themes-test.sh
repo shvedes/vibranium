@@ -53,6 +53,7 @@ THEME_ROOTS="$SHELL_DIR/features/pickers/theme/ThemeRoots.qml"
 # invisible to the other.
 THEME_SCAN="$SHELL_DIR/features/pickers/theme/ThemeScan.js"
 IMAGE_EXTS="$SHELL_DIR/common/text/ImageExts.js"
+IMAGEVIEWER_META="$SHELL_DIR/features/apps/imageViewer/ImageViewerMeta.js"
 THEME_SET="$VIBRANIUM_DIR/bin/vb-theme-set"
 THEME_TEMPLATES="$VIBRANIUM_DIR/bin/vb-theme-set-templates"
 THEME_DOC="$VIBRANIUM_DIR/docs/understanding/making-your-own-theme.md"
@@ -565,18 +566,18 @@ t_eq "no theme is missing a colour the shell reads" "" "$MISSING_COLOUR"
 t_section "the shell's own palette readers, cross-checked against the set"
 QS_KEYS="$(grep -o '"[a-z_0-9]*": "{{' "$THEMED_DIR/qs.json.tpl" |
   sed 's/": "{{//;s/"//' | sed 's/_lower$//' | LC_ALL=C sort -u)"
-t_eq "qs.json.tpl - the palette the shell reads - carries 14 keys" "14" \
+t_eq "qs.json.tpl - the palette the shell reads - carries 16 keys" "16" \
   "$(printf '%s\n' "$QS_KEYS" | grep -c .)"
 ADAPTER_KEYS="$(sed -n '/id: paletteAdapter/,/^    }/p' "$THEME_QML" |
   sed -n 's/^      property string \([A-Za-z0-9_]*\):.*/\1/p' | LC_ALL=C sort -u)"
-t_eq "Theme.qml's JsonAdapter declares the same 14" \
+t_eq "Theme.qml's JsonAdapter declares the same 16" \
   "$QS_KEYS" "$ADAPTER_KEYS"
 FALLBACK_KEYS="$(sed -n '/property var fallbacks/,/^  })/p' "$THEME_QML" |
   sed -n 's/^ *\([A-Za-z0-9_]*\):.*/\1/p' | LC_ALL=C sort -u)"
-t_eq "and the color() fallbacks are the same 14 again" "$QS_KEYS" "$FALLBACK_KEYS"
+t_eq "and the color() fallbacks are the same 16 again" "$QS_KEYS" "$FALLBACK_KEYS"
 t_contains "which is why a missing key is a bug to surface" \
   'a missing key is a bug to surface' "$(<"$THEME_QML")"
-# The 14 names above are the shell's own, not the palette's: background_1 and
+# The 16 names above are the shell's own, not the palette's: background_1 and
 # foreground_1 are ramp levels the shell binds by name, so what has to resolve
 # is the value expression behind each name rather than the name itself.
 QS_SOURCES="$(grep -oE '"[a-z_0-9]+": "\{\{[[:space:]]*[^}]+\}\}"' "$THEMED_DIR/qs.json.tpl" |
@@ -587,11 +588,24 @@ t_eq "every value qs.json.tpl renders resolves to a palette key" "" \
     [[ -n $src ]] || continue
     resolve_key "$src" >/dev/null || printf '%s ' "$src"
   done <<<"$QS_SOURCES")"
-t_count "and the shell's 14 outputs come from 10 palette keys" "10" \
+t_count "and the shell's 16 outputs come from 12 palette keys" "12" \
   "$(printf '%s\n' "$QS_SOURCES" | while read -r src; do
     resolve_key "$src"; printf '\n'
   done | LC_ALL=C sort -u | grep -c .)"
-t_note "4 of the 14 are background_1/2/3 and foreground_1, which no palette declares: they are ramp levels off background and foreground, and Theme.qml binds them by that name regardless of which theme is active. That is why the ramp has to be a template operation rather than a palette key - the shell's key set cannot move with the palette"
+t_note "4 of the 16 are background_1/2/3 and foreground_1, which no palette declares: they are ramp levels off background and foreground, and Theme.qml binds them by that name regardless of which theme is active. That is why the ramp has to be a template operation rather than a palette key - the shell's key set cannot move with the palette"
+# The status dot reads its colour through Ui.solid(key). A key the shell does
+# not bind resolves to the black fallback, which looks like an unreserved dot
+# rather than a missing palette entry, so keep the viewer's keys inside QS_KEYS.
+IV_KEYS="$(grep -oE 'key: *"[a-z_0-9]+"' "$IMAGEVIEWER_META" |
+  sed 's/.*"\(.*\)"/\1/' | LC_ALL=C sort -u)"
+t_ne "the image viewer names at least one status-dot key" "0" \
+  "$(printf '%s\n' "$IV_KEYS" | grep -c .)"
+t_eq "every image-viewer status-dot key is a shell palette key" "" \
+  "$(while read -r key; do
+    [[ -n $key ]] || continue
+    printf '%s\n' "$QS_KEYS" | grep -qxF -- "$key" || printf '%s ' "$key"
+  done <<<"$IV_KEYS")"
+t_note "Ui.solid answers an unknown key with #000000 (Theme.qml's fallback), so a format whose dot key is absent from qs.json.tpl paints black instead of its reserved hue"
 SWATCH_KEYS="$(grep -m1 '^const PALETTE_KEYS' "$THEME_SCAN" |
   grep -o '"[a-z]*"' | tr -d '"' | LC_ALL=C sort -u)"
 t_eq "the shared palette reader takes 7 swatch colours" "7" \

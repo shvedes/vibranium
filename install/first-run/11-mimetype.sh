@@ -13,6 +13,7 @@ declare -A mime_apps=(
 
   [image/jpeg]=image-viewer.desktop
   [image/png]=image-viewer.desktop
+  [image/tiff]=image-viewer.desktop
   [image/webp]=image-viewer.desktop
   [image/gif]=image-viewer.desktop
   [image/avif]=image-viewer.desktop

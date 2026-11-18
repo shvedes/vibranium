@@ -40,7 +40,9 @@ Singleton {
     blue: paletteAdapter.blue,
     cyan: paletteAdapter.cyan,
     orange: paletteAdapter.orange,
-    purple: paletteAdapter.purple
+    purple: paletteAdapter.purple,
+    pink: paletteAdapter.pink,
+    white: paletteAdapter.white
   })
   readonly property string tag: "theme"
 
@@ -63,7 +65,9 @@ Singleton {
     blue: "#728391",
     cyan: "#728b8d",
     orange: "#8f7d70",
-    purple: "#7d7691"
+    purple: "#7d7691",
+    pink: "#c46e8f",
+    white: "#e1cdb7"
   })
 
   function color(key) {
@@ -105,6 +109,8 @@ Singleton {
       property string cyan: "#728b8d"
       property string orange: "#8f7d70"
       property string purple: "#7d7691"
+      property string pink: "#c46e8f"
+      property string white: "#e1cdb7"
     }
   }
 }

@@ -12,5 +12,7 @@
   "blue": "{{ blue_lower }}",
   "cyan": "{{ cyan_lower }}",
   "orange": "{{ orange_lower }}",
-  "purple": "{{ purple_lower }}"
+  "purple": "{{ purple_lower }}",
+  "pink": "{{ pink_lower }}",
+  "white": "{{ white_lower }}"
 }
