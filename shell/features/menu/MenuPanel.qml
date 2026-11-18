@@ -3736,7 +3736,6 @@ Rectangle {
     _revealOriginY = -1
     _closePageMode = false
     _trackingCloseSeat = false
-    _restoreStartH = -1
   }
 
   function beginNestedReveal() {
@@ -3746,7 +3745,6 @@ Rectangle {
     _nestedSeatY = list.contentY
     _nestedSeatPending = false
     _trackingCloseSeat = false
-    _restoreStartH = -1
     _closePageMode = false
     _closeRow = null
     _pinTries = 0
@@ -3771,36 +3769,26 @@ Rectangle {
     // Each close owns its own seat. The pin of a previous close clears the
     // shared seat, so a later close in the same chain would otherwise get no
     // tracking at all and its row would collapse with the scroll frozen.
-    // Live-bottom tracking needs no seat; only the end pin does.
     const hadSeat = _nestedSeatY >= 0
     _nestedSeatPending = hadSeat
-    // Ride the scroll back at the slot's own pace, and suspend pursuit while
-    // the row is still shrinking - its shrinking target would land short.
+    // Suspend the page-level pursuit while the child folds; its target is the
+    // parent's settled bottom, which is still below the view here.
     Menu.trace("panel.clear", { site: "nestedRestore", auto: list.autoRevealIndex })
     list.autoRevealIndex = -1
-    // A separate scroll tween and the row's own fold have different curves:
-    // the row lands first and the rows below flash into view before the tween
-    // catches up. Track the live row bottom instead, one write per geometry
-    // change, so the viewport and the fold are the same motion.
     _trackingCloseSeat = true
-    _trackTargetY = -1
-    _restoreStartH = list.currentItem ? list.currentItem.height : -1
-    _trackCloseSeat()
+    // One paced ride back to the nested seat, on the slot's own clock. The
+    // page row's bottom is NOT a safe target here: the card folds with the
+    // child, so the bottom lands short of the seat, and the end pin then wrote
+    // the remainder in a single frame - a visible teleport. Holding the seat
+    // through the fold leaves the pin nothing to write.
+    if (hadSeat && Math.abs(list.contentY - _nestedSeatY) > 0.5)
+      list.seatTo(_nestedSeatY, true, "nested-restore", paceMs)
   }
 
   property bool _trackingCloseSeat: false
-  // Height of the row when a nested close began. A nested slot can fold
-  // entirely inside its group's box (the page row never changes height), and
-  // that case must hold the seat rather than seat to a bottom fit.
-  property real _restoreStartH: -1
-  // -1 tracks the live row bottom (nested child close, parent still open).
-  // A fixed offset holds the page-level seat through a whole page-row close.
-  property real _trackTargetY: -1
   function _closeSeatDone() {
     if (!panel._trackingCloseSeat) return
     panel._trackingCloseSeat = false
-    panel._trackTargetY = -1
-    panel._restoreStartH = -1
     if (panel._closePageMode) {
       const y = panel._revealOriginY
       // The last height change lands the row at rest; put the offset exactly
@@ -3839,21 +3827,14 @@ Rectangle {
         cY: Math.round(list.contentY * 10) / 10
       })
     } else {
-      // The live bottom is a FIT for the row, not the offset this close
-      // restores. The two agree only when the row was revealed flush to the
-      // viewport edge. A row that is already fully visible has nothing for
-      // the bottom to follow while its slot folds INSIDE the group box - the
-      // page row's own height does not change at all - and seating to the
-      // fit scrolled the list for no reason: closing a nested editor from
-      // 218 wrote 193, then the pin wrote 218 back, a 25px two-step bounce
-      // with no fold behind it. Follow the bottom once the row is actually
-      // folding; until then the seat is the offset and it is already held.
-      const fit = row.y + row.height + Ui.s - list.height
-      const seat = panel._nestedSeatY
-      const folding = panel._restoreStartH > 0
-        && row.height < panel._restoreStartH - 0.5
-      target = panel._trackTargetY >= 0 ? panel._trackTargetY
-        : (folding || seat < 0 ? fit : seat)
+      // The nested seat is the only offset this close owes. The page row's
+      // live bottom is a moving FIT - the card folds together with the child,
+      // so it lands short of the seat and the end pin writes the remainder in
+      // one frame. The close edge armed one paced ride to the seat; hold it
+      // here and never cut that ride short with a second instant writer.
+      if (list.debugAnimRunning) return
+      target = panel._nestedSeatY >= 0 ? panel._nestedSeatY : list.contentY
+      if (Math.abs(target - list.contentY) < 0.5) return
     }
     list.seatTo(target, false, "close-track")
   }
