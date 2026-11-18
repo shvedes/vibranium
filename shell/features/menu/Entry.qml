@@ -2182,7 +2182,6 @@ Item {
     anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
     topGap: nested ? row.nestedSlotTopGap : 0
     open: row.descInSlot
-    background: true
     onOpenChanged: row._latchSlotMs()
     onClosingChanged: row._latchSlotMs()
     onHeightChanged: if (Menu.traceEnabled) Menu.trace("entry.descH", {
@@ -2254,7 +2253,6 @@ Item {
     anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
     topGap: nested ? row.nestedSlotTopGap : 0
     open: row.expanded
-    background: true
     // Only while the group is OPEN. A live nested child's geometry is the
     // motion an open group rides; once the group itself folds, THIS slot's
     // close is the motion. Following a child's closing tail there switched
@@ -2751,7 +2749,10 @@ Item {
         id: focusBar
 
         visible: row.dropdownOpen && row.childIndex >= 0 && groupRoot.cursorItem !== null
-        color: Ui.tint("background_2", 0.7)
+        // The same solid shade and hairline as List's selection bar, so a
+        // child's whole dropdown is one continuous fill with one border,
+        // the way an open page row is. No plate sits over this one.
+        color: Theme.color("background_1")
         radius: RoundingPolicy.radius
         border.width: 1
         border.color: Ui.solid("background_3")
