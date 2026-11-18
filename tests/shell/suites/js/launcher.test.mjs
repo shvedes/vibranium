@@ -4802,6 +4802,25 @@ group('unit: a bare quantity answers with a row per reading, capped and same-dim
   }), true)
 })
 
+group('unit: a size is one row per reading of each side', () => {
+  const { api } = shippedApi()
+  const impl = loadPlugin(path.join(PLUGIN_ROOT, 'unit', 'main.js'), api)
+  const rows = impl.items('12" by 15"')
+  eq('both sides are shown', rows.length, 8)
+  eq('the first side leads', rows[0].label, '12 in = 30.48 cm')
+  eq('the second side follows', rows[4].label, '15 in = 38.1 cm')
+  eq('each reading keeps its own identity', new Set(rows.map((r) => r.uid)).size, 8)
+  eq('the side index keeps two same-target rows apart', rows.map((r) => r.uid), [
+    'unit:0:cm', 'unit:0:ft', 'unit:0:mm', 'unit:0:yd',
+    'unit:1:cm', 'unit:1:ft', 'unit:1:mm', 'unit:1:yd',
+  ])
+  eq('each row copies its own value', rows[4].item.copyValue, '38.1 cm')
+  eq('a hint on one side keeps that side distinct',
+    impl.items('12" by -300C').map((r) => r.uid),
+    ['unit:0:cm', 'unit:0:ft', 'unit:0:mm', 'unit:0:yd', 'unit:1:hint'])
+  eq('a plain query keeps the untagged identity', impl.items('5m in cm')[0].uid, 'unit:cm')
+})
+
 group('constants: a name answers with the readings it is said in', () => {
   const { api } = shippedApi()
   const impl = loadPlugin(path.join(PLUGIN_ROOT, 'constants', 'main.js'), api)
@@ -6740,7 +6759,7 @@ group('the shared function names are the same set on both sides', () => {
   // gate, mid-typing gate and tryColor. A count that falls means a function
   // left one of the two copies.
   eq('color shares thirty-seven functions', TWINNED.find((p) => p.name === 'color').sharedFns.length, 37)
-  eq('unit shares thirty-four', TWINNED.find((p) => p.name === 'unit').sharedFns.length, 34)
+  eq('unit shares thirty-seven', TWINNED.find((p) => p.name === 'unit').sharedFns.length, 37)
   eq('time shares nine', TWINNED.find((p) => p.name === 'time').sharedFns.length, 9)
   eq('fx shares twenty-four', TWINNED.find((p) => p.name === 'fx').sharedFns.length, 24)
 })

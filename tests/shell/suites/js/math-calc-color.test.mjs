@@ -4176,6 +4176,49 @@ group('a bare query with no ladder uses the per-unit def instead', () => {
 })
 
 // ---------------------------------------------------------------------------
+section('UnitLib - two measurements joined by "by"')
+
+group('a size answers each side with its usual list, in order', () => {
+  const rows = UL.tryAll('12" by 15"')
+  eq('both sides answer', rows.length, 8)
+  eq('the head is the first side default', rows[0].label, '12 in = 30.48 cm')
+  eq('the second side starts where the first ends', rows[4].label, '15 in = 38.1 cm')
+  eq('the copy string is the converted number and unit', rows[0].copy, '30.48 cm')
+  eq('the sentence names the side it belongs to', rows[4].phrase, '15 inches is 38.1 centimetres')
+  eq('the first side is tagged 0', rows.filter((r) => r.dim === 0).length, 4)
+  eq('the second side is tagged 1', rows.filter((r) => r.dim === 1).length, 4)
+  eq('a plain query has no tag', cvOk('12"').dim, undefined)
+  eq('and keeps its ten-field record', Object.keys(cvOk('5m in cm')).sort(),
+    ['copy', 'formatted', 'from', 'inputText', 'label', 'ok', 'out', 'phrase', 'to', 'value'])
+  eq('tryConvert answers with the head of the first side', cvOk('12" by 15"').label, '12 in = 30.48 cm')
+  eq('the single answer is tagged too', cvOk('12" by 15"').dim, 0)
+})
+
+group('the split is a standalone keyword between two quantities', () => {
+  eq('the per-keystroke gate accepts a size', UL.isPotentialUnit('12" by 15"'), true)
+  eq('case does not matter', UL.tryAll('12" BY 15"').length, 8)
+  eq('a tab separates', UL.tryAll('12"\tby\t15"').length, 8)
+  eq('a leading filler is stripped first', UL.tryAll('convert 12" by 15"').length, 8)
+  eq('three sides keep three positions', [...new Set(UL.tryAll('1m by 2m by 3m').map((r) => r.dim))], [0, 1, 2])
+  eq('a unitless side is a fall-through', UL.tryAll('12" by 15'), null)
+  eq('an unknown side is a fall-through', UL.tryAll('12" by foo'), null)
+  eq('a half-typed target on a side is a fall-through', UL.tryAll('12" by 15" in'), null)
+  eq('a trailing keyword has no second side', UL.tryAll('12" by'), null)
+  eq('a leading keyword has no first side', UL.tryAll('by 15"'), null)
+})
+
+group('each side is independent, and keeps its own target', () => {
+  const rows = UL.tryAll('12" by 15" in cm')
+  eq('the first side keeps its whole list', rows.filter((r) => r.dim === 0).length, 4)
+  eq('the second side answers only the named target', rows.filter((r) => r.dim === 1).length, 1)
+  eq('and that target is cm', rows[4].label, '15 in = 38.1 cm')
+  eq('different dimensions are not added', UL.tryAll('5m by 2kg')[0].label, '5 m = 16.4042 ft')
+  const hinted = UL.tryAll('12" by -300C')
+  eq('a check refused on one side keeps its hint', hinted[4].error, 'unphysical')
+  eq('with that side tagged', hinted[4].dim, 1)
+})
+
+// ---------------------------------------------------------------------------
 section('UnitLib - the hint records')
 
 group('a hint record carries exactly the five documented fields', () => {

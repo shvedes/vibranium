@@ -85,7 +85,12 @@ Type a measurement to convert it inline - no prefix needed:
 5m in cm
 20cm
 100C in F
+12" by 15"
 ```
+
+Two measurements joined by `by` describe a size: `12" by 15"` answers each
+side with its own list of conversions, first side first. Both sides need their
+unit.
 
 Use `in`, `to`, `as`, `->` or `=` between the units (`5m in cm`,
 `1kg to lb`). A bare value answers with a row per reading - the default

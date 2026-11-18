@@ -1,6 +1,8 @@
 // Unit converter engine for AppLauncher: natural-language
 // "<value><unit> [in|into|to|as|->|= <unit>]" plus bare "<value><unit>"
-// with a per-unit default target. Pure-JS, no Qt imports.
+// with a per-unit default target. Two measurements joined by "by" answer
+// each side on its own ("12\" by 15\"" is a size, not a sum). Pure-JS,
+// no Qt imports.
 //
 // Four stages, always in this order:
 //
@@ -24,6 +26,10 @@
 //               is still readable (see pickTargets and readable).
 //   check       Dimensions, the absolute-zero floor, the result range.
 //
+// A "by" query is split before those stages. Each side is a quantity with its
+// own value, unit and list of targets, tagged with its 0-based position so two
+// sides that convert to the same target still get distinct row identities.
+//
 // A unit spelling is normalized before the alias table is consulted, and a
 // number may carry thousands grouping ("1,000 km") in the same form the
 // currency engine accepts. A decimal comma is not accepted: "1,5" is the
@@ -34,10 +40,11 @@
 //        UnitLib.tryConvert(query) -> null | result
 //        UnitLib.tryAll(query) -> null | result[]
 //   ok:   { ok: true, value, from, to, out, formatted, copy, phrase,
-//           label, inputText }
+//           label, inputText[, dim] }
 //   hint: { ok: false, error: "incomplete"|"unknown-target"|
-//           "incompatible"|"unphysical"|"out-of-range", expr, label, sub }
+//           "incompatible"|"unphysical"|"out-of-range", expr, label, sub[, dim] }
 // null means "not a unit query" - caller falls through to apps.
+// `dim` is present only on a row of a "by" query: the side it came from.
 //
 // The two entries share one parse and one set of checks: tryConvert answers
 // with a single conversion, which is what an explicit "in <unit>" asks for and
@@ -1751,6 +1758,24 @@ function parseQuery(query, depth) {
     implicit: terms.length === 1 && terms[0].implicit === true };
 }
 
+// A size written as "12\" by 15\"" is two measurements, not a sum: the sides
+// keep their own values and units and ask for their own conversion lists. The
+// word has to stand alone and both sides have to read as quantities, so an
+// incomplete or unitless side is a fall-through rather than a half answer.
+var RE_BY = /\s+by\s+/i;
+
+function splitDimensions(query) {
+  let parts = String(query === undefined || query === null ? "" : query).split(RE_BY);
+  if (parts.length < 2) return null;
+  let out = [];
+  for (let i = 0; i < parts.length; i++) {
+    let q = parseQuery(parts[i]);
+    if (q === null || q.ok === false) return null;
+    out.push(q);
+  }
+  return out;
+}
+
 // One parsed source against one target spec. Everything a conversion can be
 // refused for lives here, so the single answer and the list reach the same
 // verdicts by construction.
@@ -1809,22 +1834,13 @@ function renderTarget(q, toSpec) {
     inputText: inputText };
 }
 
-// Main entry, see header for the return contract. Never throws:
-// unparseable input is null (caller falls through to app search).
-function tryConvert(query) {
-  let q = parseQuery(query);
-  if (q === null || q.ok === false) return q;
-  return renderTarget(q, q.bare ? symLookup(pickDefault(q.value, q.from)) : q.toSpec);
-}
-
-// The multi-answer half: a bare query answers with the list pickTargets picks
-// out of the same dimension, an explicit target still answers with exactly the
-// one conversion it asked for. A hint is one row in both shapes, and the
-// target that produced it is the default - the head of the list - so a bare
-// query the checks refuse stops there instead of repeating itself once per
-// candidate.
-function tryAll(query) {
-  let q = parseQuery(query);
+// One parsed query's whole answer list. A bare query answers with the list
+// pickTargets picks out of the same dimension, an explicit target still answers
+// with exactly the one conversion it asked for. A hint is one row in both
+// shapes, and the target that produced it is the default - the head of the
+// list - so a bare query the checks refuse stops there instead of repeating
+// itself once per candidate.
+function answerQuery(q) {
   if (q === null) return null;
   if (q.ok === false) return [q];
   if (q.bare === false) return [renderTarget(q, q.toSpec)];
@@ -1841,8 +1857,46 @@ function tryAll(query) {
   return out;
 }
 
+// Each side of a size keeps its own list, with the side's index stamped on
+// every row so a plugin can mint a distinct identity for each reading.
+function taggedAnswers(queries) {
+  let out = [];
+  for (let i = 0; i < queries.length; i++) {
+    let rows = answerQuery(queries[i]);
+    for (let j = 0; j < rows.length; j++) {
+      rows[j].dim = i;
+      out.push(rows[j]);
+    }
+  }
+  return out.length > 0 ? out : null;
+}
+
+// Main entry, see header for the return contract. Never throws:
+// unparseable input is null (caller falls through to app search). A size
+// answers with its first side's first conversion, which is the head of the
+// list tryAll would show.
+function tryConvert(query) {
+  let dims = splitDimensions(query);
+  if (dims !== null) {
+    let rows = taggedAnswers([dims[0]]);
+    return rows === null ? null : rows[0];
+  }
+  let q = parseQuery(query);
+  if (q === null || q.ok === false) return q;
+  return renderTarget(q, q.bare ? symLookup(pickDefault(q.value, q.from)) : q.toSpec);
+}
+
+// The multi-answer half: a plain query gets answerQuery's list, and a size
+// concatenates one list per side in the order the sides were typed.
+function tryAll(query) {
+  let dims = splitDimensions(query);
+  if (dims !== null) return taggedAnswers(dims);
+  return answerQuery(parseQuery(query));
+}
+
 // Unit converter engine plugin: natural language conversion, one row per
-// target. UnitLib source (pure JS, no imports) is concatenated above this
+// reading (per target, per side of a "by" size). UnitLib source (pure JS,
+// no imports) is concatenated above this
 // contract; the IIFE below only adapts it to VibraniumPlugin.
 (function() {
   let api = null
@@ -1867,13 +1921,14 @@ function tryAll(query) {
       const rows = []
       for (let i = 0; i < results.length; i++) {
         const r = results[i]
-        // The uid names the TARGET, not the engine: rowsEqual keys on it and
-        // a launcher card renders several of these at once, so one uid for the
-        // whole set would collapse them into one identity.
+        // The uid names the READING, not the engine: rowsEqual keys on it and
+        // a launcher card renders several of these at once. A "by" query adds
+        // the side's index, because two sides can reach the same target.
+        const tag = r.dim === undefined ? "" : r.dim + ":"
         if (!r.ok) {
           rows.push({
             kind: "unit",
-            uid: "unit:hint",
+            uid: "unit:" + tag + "hint",
             label: r.label,
             sub: r.sub,
             desc: "",
@@ -1887,7 +1942,7 @@ function tryAll(query) {
         }
         rows.push({
           kind: "unit",
-          uid: "unit:" + r.to,
+          uid: "unit:" + tag + r.to,
           label: r.label,
           // The conversion again, as a sentence: the label is the compact form
           // to scan and this is the one to read. The row names no key press,
