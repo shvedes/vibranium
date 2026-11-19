@@ -3780,46 +3780,29 @@ Rectangle {
         : ((it.childUid !== undefined && it.childUid !== null)
           ? [ String(it.childUid) ] : [])
       // The restore after clearing the query can pull the cursor back to the
-      // frame's old index. Re-seat the target row until it is really current,
-      // then walk the nested chain by uid.
-      function tryLand(tries) {
-        const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
-        if (idx >= 0 && list && list.currentIndex !== idx) list.seat(idx, "land")
-        const row = panel.currentRow()
-        if (row && row.isGroup && row.itm
-          && String(row.itm.uid) === targetUid) {
-          row.setExpanded(true)
-          if (chain.length === 0) return
-          Qt.callLater(function() { seatLevel(0) })
-          return
-        }
-        if (tries < 30) Qt.callLater(function() { tryLand(tries + 1) })
+      // frame's old index. Re-seat the target row on the settled edge, then
+      // walk the nested chain by uid. Each level waits for its own group row
+      // to arrive and settle instead of retrying a fixed number of turns - a
+      // slow install simply holds the waiter until the row is really there.
+      function groupUidMatches(row, uid) {
+        return !!row && row.isGroup === true && !!row.itm
+          && String(row.itm.uid) === uid
       }
 
       // Seat each level by uid, opening the nested group on the way down.
       // Gated children drop out of the live dropdown, so resolve against
-      // what each level actually lists.
+      // what each level actually lists. `rows` holds the group rows already
+      // arrived; the next level queues a settled waiter when it is expanded.
       const seatRows = []
-      function seatLevel(n, tries) {
-        if (n === 0) {
-          const pageIdx = Menu.visibleIndexOfUid(it.pageId, targetUid)
-          if (pageIdx >= 0 && list && list.currentIndex !== pageIdx)
-            list.seat(pageIdx, "land")
-          seatRows[0] = panel.currentRow()
-        }
-        const r2 = seatRows[n]
+      function seatLevel(n, rows) {
+        const r2 = rows[n]
         const expected = n === 0 ? targetUid : chain[n - 1]
         Menu.trace("result.seat", {
           n: n, want: chain[n], expected: expected,
           row: r2 && r2.itm ? String(r2.itm.uid) : "",
           isGroup: !!(r2 && r2.isGroup)
         })
-        if (!r2 || !r2.isGroup || !r2.itm
-          || String(r2.itm.uid) !== expected) {
-          if ((tries || 0) < 20 && n === 0)
-            Qt.callLater(function() { seatLevel(n, (tries || 0) + 1) })
-          return
-        }
+        if (!groupUidMatches(r2, expected)) return
         const kids = r2.groupChildren
         let found = -1
         for (let i = 0; i < kids.length; i++) {
@@ -3831,18 +3814,30 @@ Rectangle {
         const childRow = r2._focusedChildRow ? r2._focusedChildRow() : null
         if (!childRow || !childRow.isGroup) return
         childRow.setExpanded(true)
-        seatRows[n + 1] = childRow
-        Qt.callLater(function() { seatLevel(n + 1, 0) })
+        panel.whenSettled(function(next) {
+          rows[n + 1] = next
+          seatLevel(n + 1, rows)
+        }, function(next) { return groupUidMatches(next, chain[n]) })
       }
       // Opening the group is a slot claim against the row's own geometry. Do
       // it on the same settled gate the select and editor landings use: jumping
       // here arrives mid page-transition/fit, and expanding into that window
       // makes the slot land (snap) instead of easing, which both stiffens the
       // resize and leaves the slot held so its later close snaps too.
-      panel.whenSettled(function() { tryLand(0) }, function(row) {
-        return row && row.isGroup && row.itm
-          && String(row.itm.uid) === targetUid
-      })
+      panel.whenSettled(function() {
+        const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
+        if (idx >= 0 && list && list.currentIndex !== idx) list.seat(idx, "land")
+        seatRows[0] = panel.currentRow()
+        if (!groupUidMatches(seatRows[0], targetUid)) return
+        seatRows[0].setExpanded(true)
+        if (chain.length === 0) return
+        // The row may have been pulled back while the query cleared; wait for
+        // it to be current again before walking the chain.
+        panel.whenSettled(function(r2) {
+          seatRows[0] = r2
+          seatLevel(0, seatRows)
+        }, function(r2) { return groupUidMatches(r2, targetUid) })
+      }, function(row) { return groupUidMatches(row, targetUid) })
       return
     }
     if (it.type === "select") {
