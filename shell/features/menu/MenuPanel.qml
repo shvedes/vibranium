@@ -3759,83 +3759,59 @@ Rectangle {
   // Deferred search-result consumption (see activateCurrent).
   property var pendingResult: null
 
-  // Upper bound on the MOTION half of whenSettled's wait, in wall-clock ms.
-  // It is the sum of the longest of each term `quiet` reads - the fit's own
-  // retry budget (24 * fitRetryTimer.interval), Menu's slot-close bound
-  // (Ui.slowMs + 60), the scroll sweep List caps at List._sweepMaxMs, the
-  // height tween (Ui.resizeMs) and the page slide (Ui.fastMs + 20) - plus the
-  // install latency in front of them. Only reached when the panel never
-  // comes to rest; a normal jump fires as soon as it does, and a jump that
-  // does reach this runs its request late rather than dropping it.
-  readonly property int _settleWaitMs: 2000
+  // Search-result landings operate on the target row only after the teleport
+  // and every panel motion have come to rest. The wait used to be a two-turn
+  // Idle poll with a structural attempt cap and a wall-clock motion deadline:
+  // it could catch a momentarily quiet gap, or run late against a panel still
+  // moving. Quiet is now one derivation of the live signals, and the target
+  // row is read inside that binding, so QML re-evaluates it on every motion
+  // edge and on the row's arrival (including guard properties that settle a
+  // frame after install). A waiter runs exactly once, on the first frame
+  // where both hold - no attempts, no deadline, no snapshots.
+  property var _settledWaiters: []
 
-  // Settle-gated expand: runs `fn` once the teleport has landed and
-  // every animation finished.
-  // Conditions match what the issue requires: full menu shown and
-  // all motion done.
-  //
-  // The two halves of the predicate are bounded differently because they are
-  // different kinds of wait. `rowOk` is structural - the target delegate has
-  // to exist and be under the cursor - and the install that creates it is a
-  // pair of idle hops behind the call that asked for it, so a dozen attempts
-  // covers it and a longer budget would only poll a loop with nothing left
-  // to do. `quiet` is the panel's own motion, and every term in it is a tween
-  // of known length: a jump to a row far down the list runs List's scroll
-  // sweep behind the height tween the fit arms, which together outlast a
-  // dozen attempts, so a callback bounded by attempt count alone would
-  // expire mid-scroll and be dropped -
-  // on precisely the long jumps that needed it. That half is bounded in
-  // wall-clock time instead, and the two bounds are not interchangeable: only
-  // the motion one can be overrun and still delivered, because only it is
-  // reached with a row in hand.
-  //
-  // Neither bound drops a request that could still run. The motion deadline
-  // runs `fn` late rather than discarding it, and the structural bound has
-  // nothing to run - no delegate means no target. The one remaining exit is
-  // the menu closing, where the panel the request was aimed at is gone.
+  function _settledRowOk() {
+    if (panel._settledWaiters.length === 0) return false
+    const row = panel.currentRow()
+    if (!row) return false
+    const w = panel._settledWaiters[0]
+    return !w.guard || !!w.guard(row)
+  }
+
+  readonly property bool _settledReady: Menu.open
+    && !panel._swapping && !Menu.slotClosing
+    && !panel._fitPending && !panel._transitionActive
+    && !panel._heightAnimating && !slideAnim.running
+    && list._sweeping !== true && list.moving !== true
+    && Menu.pendingSel < 0
+    && panel._settledRowOk()
+
+  on_SettledReadyChanged: if (panel._settledReady) panel._drainSettled()
+
+  function _drainSettled() {
+    if (!panel._settledReady) return
+    const w = panel._settledWaiters[0]
+    // Dropping the waiter first so the binding cannot re-enter on the same
+    // frame; the row is captured before any callback can change the cursor.
+    panel._settledWaiters = panel._settledWaiters.slice(1)
+    const row = panel.currentRow()
+    if (w && row) w.fn(row)
+  }
+
   function whenSettled(fn, guard) {
-    const deadline = Date.now() + panel._settleWaitMs
-    let tries = 0
-    const tick = () => {
-      tries++
-      const row = panel.currentRow()
-      if (row && (guard ? guard(row) : true)) {
-        const quiet = !panel._swapping && !Menu.slotClosing
-          && !panel._fitPending && !panel._transitionActive
-          && !panel._heightAnimating && !slideAnim.running
-          && list._sweeping !== true && list.moving !== true
-          && Menu.pendingSel < 0
-        if (quiet) {
-          fn(row)
-          return
-        }
-        // The deadline is a LATENCY cap, not a drop threshold. The row is
-        // here and the guard passed, so the work is well-defined; running it
-        // late against a panel that has not quite finished moving is a
-        // visible-but-recoverable state, whereas dropping it is an action the
-        // user asked for and never gets, with nothing on screen to say why.
-        // A tween that outlives the budget is the panel's problem to fix,
-        // not the request's to lose.
-        if (Date.now() >= deadline) {
-          fn(row)
-          return
-        }
-      } else if (tries > 12) {
-        // The other bound, and it is not the same kind of thing: there is no
-        // row to operate on, so there is nothing to run late. The delegate
-        // the jump was aiming at never materialised - a page that went away,
-        // or a guard still false - and the request has no target.
-        return
-      }
-      if (!Menu.open) return
-      // Two turns per attempt, not one, because the install that creates the
-      // target delegate is a pair of idle hops behind the call that asked for
-      // it. Re-polling on every single turn spent the structural budget
-      // before the row could arrive; Idle.run also coalesces, so several
-      // waiters share one flush instead of each holding the loop open.
-      Idle.run(tick, 2)
+    panel._settledWaiters = panel._settledWaiters.concat([{ fn: fn, guard: guard }])
+    panel._drainSettled()
+  }
+
+  Connections {
+    target: Menu
+
+    // A request aimed at a panel that is gone has no target. Clearing here
+    // also releases waiters whose row never arrived because that page went
+    // away, so they cannot fire on an unrelated row of a later open.
+    function onOpenChanged() {
+      if (!Menu.open) panel._settledWaiters = []
     }
-    tick()
   }
 
   function consumePendingResult() {
