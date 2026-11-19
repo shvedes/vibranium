@@ -2831,37 +2831,19 @@ Item {
       // is a separate piece; inset by the corner radius to stay inside the
       // rounded outline instead of squaring off its ends.
       //
-      // The strip used to arrive whole in one frame and vanish the same way on
-      // a fold. A fraction now scales its live height: it climbs top-down after
-      // the dropdown it marks, then retracts when that dropdown closes. The
-      // held `wanted` verdict drives the two directions, and the strip keeps
-      // painting while the fraction is still above zero - `visible` cannot
-      // read only `wanted`, or it would blink out on the very frame the child
-      // closes, before the retract tween has had a single frame to run.
+      // The strip scales its live height by the focused child's own slot
+      // progress - the same fraction the bar and the neighbour push ride. It
+      // climbs and retracts on that slot's clock, so it can neither finish
+      // ahead of the unfold nor linger after the fold. `visible` keeps it
+      // painting while the fraction is still above zero: it must not blink
+      // out on the frame the child closes, before the fold has run.
       readonly property bool depthStripWanted: focusBar.visible && cursorOpensGroup()
-      property real depthReveal: 0
+      readonly property real depthReveal: groupRoot.pushProgress
 
-      onDepthStripWantedChanged: {
-        depthStripDelay.stop()
-        depthStripOpen.stop()
-        depthStripClose.stop()
-        if (depthStripWanted) {
-          if (MotionPolicy.enabled) {
-            depthReveal = 0
-            depthStripDelay.restart()
-          } else {
-            depthReveal = 1
-          }
-        } else if (MotionPolicy.enabled && depthReveal > 0) {
-          depthStripClose.restart()
-        } else {
-          depthReveal = 0
-        }
-        if (Menu.traceEnabled) Menu.trace("grp.depthStrip", {
-          id: String(row.itm?.id ?? ""), wanted: depthStripWanted,
-          reveal: Math.round(depthReveal * 100) / 100
-        })
-      }
+      onDepthStripWantedChanged: if (Menu.traceEnabled) Menu.trace("grp.depthStrip", {
+        id: String(row.itm?.id ?? ""), wanted: depthStripWanted,
+        reveal: Math.round(depthReveal * 100) / 100
+      })
 
       Rectangle {
         id: depthStrip
@@ -2873,48 +2855,6 @@ Item {
         height: Math.max(0, focusBar.height
           - 2 * Math.min(RoundingPolicy.radius, focusBar.height / 2)) * depthReveal
         color: Theme.color(focusBar.hueKey)
-
-        // A restored group can already hold an open child at construction;
-        // there is no activation to animate there, so seat the hue outright.
-        // No `from` on the open tween means this can never flash back to zero.
-        Component.onCompleted: if (depthStripWanted) {
-          depthStripDelay.stop()
-          depthReveal = 1
-        }
-      }
-
-      // The unfold gets a short head start before the hue starts climbing;
-      // this is the "catch up" gap, not a second reveal of its own.
-      Timer {
-        id: depthStripDelay
-
-        interval: Ui.fastMs / 2
-        repeat: false
-        onTriggered: depthStripOpen.restart()
-      }
-
-      NumberAnimation {
-        id: depthStripOpen
-
-        target: groupRoot
-        property: "depthReveal"
-        to: 1
-        // Slots run 120-260ms (Ui.slotVpx clamped by fastMs/slowMs). Sitting a
-        // beat behind and finishing past the slowest one keeps this trailing.
-        duration: Ui.slowMs + Ui.fastMs / 2
-        easing.type: Easing.OutCubic
-      }
-
-      NumberAnimation {
-        id: depthStripClose
-
-        target: groupRoot
-        property: "depthReveal"
-        to: 0
-        // The fold carries the strip back; no head start here - it retracts
-        // with the dropdown rather than after a second, separate beat.
-        duration: Ui.normalMs
-        easing.type: Easing.OutCubic
       }
 
       Column {
