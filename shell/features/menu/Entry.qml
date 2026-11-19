@@ -2581,6 +2581,12 @@ Item {
             ? ghostModel.map(o => o.label).join("|") : ""
           swapAnim.stop()
           stageHost._swapping = true
+          // The outgoing body survives the fade, so it would keep keyboard
+          // focus: an Enter after an Esc-back would commit through the hidden
+          // editor and close the flow. Disabling it releases focus to the
+          // list; the incoming layer takes focus when its stage asks for it.
+          incoming.enabled = true
+          outgoing.enabled = false
           const opts = currentOptions()
           if (_frontA) {
             stageHost._compBFrozen = opts
@@ -2613,6 +2619,8 @@ Item {
           stageHost._swapping = false
           const incoming = _frontA ? layerB : layerA
           const outgoing = _frontA ? layerA : layerB
+          incoming.enabled = true
+          outgoing.enabled = false
           const opts = currentOptions()
           if (_frontA) {
             stageHost._compBFrozen = opts
@@ -2641,6 +2649,7 @@ Item {
             swapAnim.stop()
             stageHost._swapping = false
             const front = _frontA ? layerA : layerB
+            front.enabled = true
             front.x = -Ui.m
             front.opacity = 1
             return
@@ -3241,6 +3250,8 @@ Item {
     id: editorComp
 
     InlineEditor {
+      id: stageEditor
+
       width: parent.width
       keepFocusAccent: row.expanded || row._shellClosing
       isText: row.isFlow ? row.flowKind === "text"
@@ -3275,10 +3286,19 @@ Item {
       unitSuffix: MenuLib.stageUnitSuffix(
         row.flowStep ? row.flowStep.unit : undefined, row.unitSuffix)
 
-      onCommit: text => row.commitEditor(text)
+      // A swap keeps the outgoing editor alive as a ghost. Its field can have
+      // a deferred accepted()/escaped() still queued, which lands after the
+      // panel has already advanced the flow; acting on it would commit the
+      // next stage and close the row. Only the front layer owns the row's
+      // commit and escape verbs.
+      function ownsRow() {
+        const host = expLoader.item && expLoader.item.debugEditorHost
+        return !host || host.frontItem === stageEditor
+      }
+      onCommit: text => { if (stageEditor.ownsRow()) row.commitEditor(text) }
       onInvalid: msg => row.showEditorError(msg)
       onRecovered: row.clearEditorError()
-      onEscaped: { if (!row.backFlow()) row.collapse() }
+      onEscaped: { if (stageEditor.ownsRow() && !row.backFlow()) row.collapse() }
     }
   }
 
