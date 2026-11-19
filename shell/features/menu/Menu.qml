@@ -830,8 +830,6 @@ Singleton {
   // width so little bars form a perfect column. 0 = per-item sizing.
   property int unifiedBarValueW: 0
 
-  // Slots the global close easing is still holding (see slotClosing).
-
   // Blow-by-blow latch for per-row slot closes, uid -> true. Armed at the
   // collapse choke point (setExpanded/setInfo with value !== true, where
   // no DropdownSlot is in scope) and cleared by the row itself when its
@@ -840,15 +838,12 @@ Singleton {
   // latch never outlives its row.
   property var _slotCloses: ({})
 
-  // True while a dropdown/expansion slot is still easing shut - the full
-  // close animation plus its grace window (mirrors DropdownSlot.closing).
-  property bool slotClosing: false
-
-  property Qml.Timer slotCloseTimer: Qml.Timer {
-    interval: Ui.normalMs + 40
-
-    onTriggered: root.slotClosing = false
-  }
+  // True while any row's slot is still easing shut. Derived from the row
+  // latches instead of a wall-clock guess: the verdict ends when the slot
+  // itself reports still, so it cannot clear before a slow slot lands or
+  // outlive a fast one that has already settled. A reopen drops its row's
+  // latch at the same choke point, releasing the verdict in that turn.
+  readonly property bool slotClosing: Object.values(_slotCloses).some(v => v)
 
   // Staged-flow cursor per row uid: {index, values}. Flow rows (an item
   // with a `flow` stage array, see MenuLib.isFlow) render one stage at a
@@ -2120,10 +2115,9 @@ Singleton {
     root._rawState(item).expanded = value === true
     root.rev++
     if (value !== true) {
-      root.slotClosing = true
-      root.slotCloseTimer.restart()
-      // The row's own close latch: cleared when its slot motion reaches
-      // zero (see slotCloseFinished), reconciled on every model install.
+      // The row's own close latch is the close verdict: cleared when its
+      // slot motion reaches zero (see slotCloseFinished), reconciled on
+      // every model install. slotClosing derives from it.
       if (item && item.uid) {
         root._setSlotClose(item.uid, true)
       }
@@ -2136,8 +2130,6 @@ Singleton {
     root._rawState(item).info = value === true
     root.rev++
     if (value !== true) {
-      root.slotClosing = true
-      root.slotCloseTimer.restart()
       if (item && item.uid) {
         root._setSlotClose(item.uid, true)
       }

@@ -1613,9 +1613,6 @@ Rectangle {
       list.autoRevealIndex = -1
       list._followIdx = -1
       list.contentY = 0
-      // Any slot close in flight on the page being searched is no longer
-      // relevant to this projection.
-      Menu.slotClosing = false
       // The page's slot-driven region growth no longer applies to the search
       // projection: release it so pursuit is not silenced or mis-sized.
       panel._releaseSlotRegion()
@@ -1654,7 +1651,6 @@ Rectangle {
     Menu.trace("panel.clear", { site: "pageChange", auto: list.autoRevealIndex })
     list.autoRevealIndex = -1
     list._followIdx = -1
-    Menu.slotClosing = false
     list.contentY = 0
     let transitionGen = -1
     if (Menu.open) transitionGen = panel.beginPageTransition(false)
