@@ -25,6 +25,10 @@ Singleton {
   // Spacing scale.
   readonly property int s: 8
   readonly property int m: 12
+  // A page row's selection bar runs to the row's full bottom, while nested
+  // cursor bars stop at their slot's bottom. Reserve this much extra below
+  // an open page slot so both kinds of bar leave the same breathing.
+  readonly property int dropdownBarPad: s
   readonly property int l: 16
   readonly property int xl: 20
 

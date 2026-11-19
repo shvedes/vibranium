@@ -750,6 +750,12 @@ Item {
   // and pushes the neighbours, so this box stays at the row's rest height.
   height: isSep ? sepH : row.nested ? row.staticRowH
     : row.staticRowH + descSlot.height + expandSlot.height
+      // A page group's dropdown is drawn by the list's selection bar, which
+      // runs to the row's full bottom. Nested dropdowns stop Ui.m short of
+      // their slot's bottom, so reserve the same visual breathing below the
+      // slot here: otherwise the parent box hugs its last child while every
+      // nested box has a clear gap, and the even ramp breaks at the top.
+      + (descSlot.open || expandSlot.open ? Ui.dropdownBarPad : 0)
   // Guard-disabled rows and types the menu cannot act on fade alike; an
   // unavailable row keeps its contrast and is muted by its mute box instead.
   opacity: itm && !searchResult && (Menu.isDisabled(itm)
@@ -2805,7 +2811,7 @@ Item {
         // live slot: the bar reveals top-down with the unfold and is whole
         // once the slot has settled.
         height: Math.max(0, Math.min(groupRoot.focusBarH,
-          row.expandSlotH - y - Ui.m))
+          row.expandSlotH - y - expandSlot.gap))
 
         // Glide only between children at rest. During a reveal y follows
         // groupCol directly; a second glide on top of the bar's own tween
