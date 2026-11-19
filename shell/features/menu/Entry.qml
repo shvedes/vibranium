@@ -2790,11 +2790,7 @@ Item {
         // take the menu's default cursor wash. The two alternate by depth.
         property color barFill: row.nestedDepth % 2 === 0
           ? Theme.color("background_1") : Ui.tint("background_2", 0.7)
-        gradient: Gradient {
-          orientation: Gradient.Horizontal
-          GradientStop { position: 0; color: Theme.color(focusBar.hueKey) }
-          GradientStop { position: 0.0045; color: focusBar.barFill }
-        }
+        color: focusBar.barFill
         radius: RoundingPolicy.radius
         border.width: 1
         border.color: Ui.solid("background_3")
@@ -2833,6 +2829,19 @@ Item {
         })
         // Height and y track the delegate directly at reveal time: the child's
         // slot is the one animation, so the bar must not carry a second curve.
+      }
+
+      // The raw palette hue as a solid strip over the bar's own left border.
+      // QML Rectangle borders apply to all four sides, so the one-sided case
+      // is a separate piece; inset by the corner radius to stay inside the
+      // rounded outline instead of squaring off its ends.
+      Rectangle {
+        visible: focusBar.visible
+        x: focusBar.x
+        y: focusBar.y + Math.min(RoundingPolicy.radius, focusBar.height / 2)
+        width: 3
+        height: Math.max(0, focusBar.height - 2 * Math.min(RoundingPolicy.radius, focusBar.height / 2))
+        color: Theme.color(focusBar.hueKey)
       }
 
       Column {
