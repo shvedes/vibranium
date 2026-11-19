@@ -123,82 +123,24 @@ ListView {
   // bar motion can never race or drift the scroll position (nothing writes
   // contentY from an estimate of where the cursor is).
   highlightFollowsCurrentItem: false
-  // Stillness gate: zero highlight duration while a landing lease holds,
-  // re-armed by observed release or user motion.
-  property bool _seatsInstant: false
-  // Stillness lease: acquired on "land" seats, released when displaced
-  // motion quiesces (no displaced transition running and layout settled),
-  // or pre-empted by a "step"/"click" seat, whichever lands first.
-  property int _stillLease: 0
-  property int _stillSeq: 0
-  property string _stillFp: ""
-  property int _stillStable: 0
-  property double _stillAt: 0
-  function _stillFingerprint() {
-    var y = -1, h = -1
-    var it = root.currentItem
-    if (it) {
-      y = it.y
-      h = it.height
-    }
-    return root.count + "|" + Math.round(root.contentHeight) + "|"
-      + root.currentIndex + "|" + y + "|" + h + "|"
-      + (root.rowMotion ? "1" : "0")
-  }
-  // Acquire the stillness lease and schedule observed release. The gate
-  // stays armed across turns until the layout fingerprint holds steady
-  // with no tween in flight; a later land re-arms with a new token and
-  // retires the older watch.
+  // Stillness gate: zero the bar's tween across a landing and while any live
+  // window owns the view. The hold is released by the live edges that end a
+  // landing - a user step or click, a swap window closing, a restore sweep
+  // ending - never by polling the layout or guessing at when a flight landed.
+  // It survives until one of those edges, so a consumer that pins the bar a
+  // few turns after the seat still reads a bar that has not glided away.
+  property bool _landHold: false
+  readonly property int _stillLease: root._landHold ? 1 : 0
+  readonly property bool _seatsInstant: root._landHold
+    || root._inSwap || root._sweeping
+    || scrollAnim.running || root.moving
   function _stillAcquire() {
-    root._stillSeq++
-    root._stillLease = root._stillSeq
-    root._seatsInstant = true
-    root._stillFp = root._stillFingerprint()
-    root._stillStable = 0
-    root._stillAt = Date.now()
-    var lease = root._stillLease
-    Idle.run(function() { root._stillObserve(lease) }, 2)
+    root._landHold = true
   }
-  // Observed release: hold while the swap/restore window owns the view,
-  // while a content tween runs, or while the fingerprint still shifts;
-  // release after it holds steady across turns, and never before one
-  // displaced flight could have landed. Turns drain inside a single
-  // frame, so stability across turns alone releases pre-flight.
-  function _stillObserve(lease) {
-    if (lease !== root._stillLease) return
-    if (root._inSwap || root._sweeping) {
-      Idle.run(function() { root._stillObserve(lease) }, 2)
-      return
-    }
-    if (scrollAnim.running || root.moving) {
-      Idle.run(function() { root._stillObserve(lease) }, 2)
-      return
-    }
-    if (Date.now() - root._stillAt < MotionPolicy.duration(Ui.fastMs) + 20) {
-      Idle.run(function() { root._stillObserve(lease) }, 2)
-      return
-    }
-    var fp = root._stillFingerprint()
-    if (fp !== root._stillFp) {
-      root._stillFp = fp
-      root._stillStable = 0
-      Idle.run(function() { root._stillObserve(lease) }, 2)
-      return
-    }
-    root._stillStable++
-    if (root._stillStable < 2) {
-      Idle.run(function() { root._stillObserve(lease) }, 2)
-      return
-    }
-    if (lease !== root._stillLease) return
-    root._stillLease = 0
-    root._seatsInstant = false
-  }
-  // User motion pre-empts a held landing lease, so a step taken
-  // mid-rearrange still glides.
+  // User motion pre-empts a held landing, so a step taken mid-rearrange
+  // still glides. Swap/sweep closes call this too (see endSwap, _endSweep).
   function _stillPreempt() {
-    root._stillLease = 0
-    root._seatsInstant = false
+    root._landHold = false
   }
   // cause: "step" (user) | "land" (filter/swap/restore seat) |
   //        "click" (user, delegate-direct today)
@@ -1948,6 +1890,9 @@ ListView {
   function endSwap() {
     root._inSwap = false
     root._swapEndMs = Date.now()
+    // The swap window was the live edge holding the bar still; closing it
+    // releases the landing hold so the next seat glides.
+    root._stillPreempt()
   }
   // Where the captured offset sits against the content as it stands NOW.
   // -1 when there is no content to bound it, which is the one frame of a

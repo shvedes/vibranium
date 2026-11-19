@@ -1542,9 +1542,9 @@ Item {
     kv("st.followTargetOutOfRange", wall.followTarget(9999))
   }
 
-  // The hold spans wall time, not turns: arm a land seat here, read it
-  // several pump turns later in seatHoldEarly (still inside the floor),
-  // and read its release in final() (floor long elapsed).
+  // A land seat holds the bar until a live edge ends the landing: read it
+  // still held several pump turns later in seatHoldEarly, then release it
+  // with that edge in final().
   function seatHold() {
     holdback.seat(2, "land", true)
     kv("lh.leaseArmed", holdback._stillLease !== 0)
@@ -2182,7 +2182,7 @@ Item {
     kv("is.siblingIndex", sibling.currentIndex)
     kv("is.indicesDiffer", base.currentIndex !== sibling.currentIndex)
     base._sweepMs = 300
-    base._seatsInstant = true
+    base._landHold = true
     base._highlightHandoff = true
     base._knownH = { "poison": 999 }
     base._sumH = 999
@@ -2254,8 +2254,9 @@ Item {
     kv("fin.sweeperSweep", sweeper._sweepMs)
     kv("fin.sweeperFollow", sweeper._followIdx)
     kv("fin.sweeperPursuit", sweeper._pursuitIdx)
-    // The hold-span seat from seatHold: wall floor elapsed an age ago,
-    // so the lease has observed-released and durations are re-armed.
+    // The hold-span seat from seatHold: the gesture that ends it now releases
+    // the hold directly, so durations re-arm on that edge rather than a floor.
+    holdback._stillPreempt()
     kv("fin.holdReleased", holdback._stillLease === 0)
     kv("fin.holdDurRearmed", holdback.highlightMoveDuration !== 0)
     kv("fin.probeThrew", root.threw)

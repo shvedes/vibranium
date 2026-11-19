@@ -951,7 +951,7 @@ qp_assert "its table is still readable" fin.wallTableTotalPositive true
 qp_assert "the animated traversal's sweep is released" fin.sweeperSweep -1
 qp_assert "its follow claim is released" fin.sweeperFollow -1
 qp_assert "its pursuit claim is released" fin.sweeperPursuit -1
-qp_assert "the hold-span seat released after the wall floor" fin.holdReleased true
+qp_assert "the hold-span seat releases on its ending edge" fin.holdReleased true
 qp_assert "and its durations re-armed" fin.holdDurRearmed true
 qp_assert "the empty list is still empty" fin.emptyCount 0
 qp_assert "the one-row list still has its row" fin.soloCount 1
