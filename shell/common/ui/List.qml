@@ -546,13 +546,11 @@ ListView {
       // would seat geometrically.
       root._pursuitIdx = -1
       root.contentY = root.clampY(root.contentY)
-      // A pursuit that landed short of a target which kept moving has a
-      // remainder, and nothing else re-arms it: the row has stopped
-      // changing, so its height handler is quiet. Re-run the chase, so the
-      // last few pixels arrive as one more eased leg - a smooth push, not a
-      // snap, and not a leftover gap under the dropdown. With nothing left
-      // to do the target is unchanged and seatTo returns without arming, so
-      // this cannot loop.
+      // A running pursuit already bends to a destination that moves under it
+      // (see pursue), so this is only a safety net for a destination that
+      // changes on the landing edge itself. With nothing left to do the
+      // target equals the current position and seatTo returns without
+      // arming, so this cannot loop.
       if (root.autoRevealIndex >= 0) root.pursue()
       root.motionFinished()
     }
@@ -2316,10 +2314,16 @@ ListView {
     // result is a crawl: the dropdown finishes opening and the list is still
     // catching up a beat later, which is the delay a bottom entry shows and
     // a row with room to grow never does - a row with room never scrolls.
-    // Seat once and let the tween run its full course; the landing re-arms
-    // for whatever it did not reach (see scrollAnim.onFinished), so the
-    // reveal arrives as whole eased legs rather than a stalled chase.
-    if (scrollAnim.running && root._pursuitIdx === index) return
+    // Bending the running tween instead is not a re-arm: the ease keeps its
+    // clock and velocity and simply heads for the current destination. A
+    // slot publishes its height before its deferred body has measured, so
+    // the destination can grow a few pixels after the seat was armed; the
+    // tween now follows that growth and lands on it in one motion, leaving
+    // no remainder for the landing edge to snap.
+    if (scrollAnim.running && root._pursuitIdx === index) {
+      if (Math.abs(target - scrollAnim.to) >= 0.05) scrollAnim.to = target
+      return
+    }
     root._pursuitIdx = index
     // Make the view's own extent honest before writing a position inside
     // it. Qt applies a resized delegate to the rows BELOW it on its own

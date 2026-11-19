@@ -200,6 +200,15 @@ Item {
   readonly property real chevronWidth: nested ? 12 : Ui.chevronW
   // The host reads this to grow its selection bar and push the neighbours.
   readonly property real nestedSlotH: descSlot.height + expandSlot.height
+  // Breathing room below an open slot, scaled by the slot's live height. The
+  // full pad is owed once the slot has grown past it and retracts with the
+  // fold, so the row's height stays continuous across both edges. Reading
+  // `open` here wrote the whole pad in one frame at unfold and removed it in
+  // one frame at fold while the slot was still at full height; every scroll
+  // consumer of the row, chiefly the close-seat tracking, read that step as
+  // motion and answered it with its own one-frame seat.
+  readonly property real dropdownPad: Ui.dropdownBarPad * Range.clamp01(
+    Math.max(descSlot.height, expandSlot.height) / Ui.dropdownBarPad)
   onHeightChanged: if (Menu.traceEnabled)
     Menu.trace("entry.rowH", {
       id: String(itm?.id ?? ""), h: Math.round(height * 10) / 10,
@@ -754,7 +763,8 @@ Item {
       // their slot's bottom, so reserve the same visual breathing below the
       // slot here: otherwise the parent box hugs its last child while every
       // nested box has a clear gap, and the even ramp breaks at the top.
-      + (descSlot.open || expandSlot.open ? Ui.dropdownBarPad : 0)
+      // dropdownPad carries that breathing on the slot's own clock.
+      + dropdownPad
   // Guard-disabled rows and types the menu cannot act on fade alike; an
   // unavailable row keeps its contrast and is muted by its mute box instead.
   opacity: itm && !searchResult && (Menu.isDisabled(itm)
