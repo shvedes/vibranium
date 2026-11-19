@@ -285,12 +285,15 @@ _update() {
   fi
 
   # Detached reloads keep update completion independent of service startup
-  # latency and deliberately do not wait for either command to exit.
-  setsid -f vb-cmd-reload --quiet
+  # latency and deliberately do not wait for either command to exit. Their
+  # stdio is redirected because they inherit the updater's terminal, so a
+  # service restart or theme setter writing to stdout/stderr would otherwise
+  # print into that terminal after the exit prompt.
+  setsid -f vb-cmd-reload --quiet </dev/null &> /dev/null
 
   _upd_theme=""
   IFS= read -r _upd_theme < "$VIBRANIUM_STATE/theme.name" || [[ -n $_upd_theme ]]
-  setsid -f vb-theme-set --force "$_upd_theme"
+  setsid -f vb-theme-set --force "$_upd_theme" </dev/null &> /dev/null
 
   _pause
 }
