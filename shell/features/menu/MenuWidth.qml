@@ -754,10 +754,9 @@ Item {
     }
     // The rows are installed and laid out at the card's CURRENT width before
     // this write lands, so a page whose content measures wider opens with its
-    // longest copy already clipped. Arm the settle flag HERE, at the decision,
-    // rather than on the first width change a turn later: the rows then reveal
-    // with the growth instead of starting a beat elided.
-    if (Math.abs(maxRow - root.host.width) > 0.5) root.host._armWidthSettle()
+    // longest copy already clipped. The settle itself follows the width tween
+    // the write below starts (MenuPanel.widthSettling reads widthAnim.running),
+    // so no caller-side flag has to be armed here.
     root._closedContentW = Math.max(declared, maxRow)
     root.applyDropdownWidth()
   }

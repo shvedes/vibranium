@@ -2425,45 +2425,15 @@ Rectangle {
 
   // The card is between two widths. The rows read this to reveal their copy
   // along with the growth instead of eliding it away and snapping it back
-  // (see Entry.textReveal).
-  //
-  // Debounced off the card's own width, not read off the animation: Qt runs
-  // a CLONE of a declared Behavior animation, so the declared Glide never
-  // receives a target and its `running` is false forever (see Glide.qml).
-  // Every frame of the glide re-arms the timer, so it fires one beat after
-  // the LAST width change, and a flag that outlives its motion by that much
-  // is inert anyway - a row whose copy fits is at reveal 1 either way.
-  property bool _widthSettling: false
-
-  function _armWidthSettle() {
-    // Nothing to unveil before the card is on screen. The settle exists so a
-    // width the user is WATCHING grow unveils its rows instead of clipping them
-    // (Entry.textReveal), and a cold frame has no earlier width to unveil from:
-    // the card is being sized for the first time, from the floor to its measure,
-    // before it has ever been painted. Arming it there faded every row in - and
-    // blinked the selection bar for a frame - on exactly the first open of a
-    // picker in a process, while every later open already had its width.
-    if (!panel.shown) return
-    // A width that snaps has no glide to unveil against. Arming the settle on
-    // one holds a freshly installed result row's copy at textReveal ~ 0 until
-    // its column lays out, which reads as a blank row for that frame.
-    if (!MotionPolicy.enabled) return
-    panel._widthSettling = true
-    widthSettle.restart()
-  }
-
-  onWidthChanged: panel._armWidthSettle()
-  readonly property bool widthSettling: panel._widthSettling
-
-  Timer {
-    id: widthSettle
-
-    // Long enough that a dropped frame cannot clear the flag mid-glide
-    // (seven frames at the shell's rate), short enough that the card is read
-    // as settled about a beat after the motion that took it there.
-    interval: Ui.fastMs
-    onTriggered: panel._widthSettling = false
-  }
+  // (see Entry.textReveal). This is the explicit width tween above, not a
+  // declared Behavior clone (whose `running` never sees a target, Glide.qml):
+  // `widthAnim` is restarted by _syncWidth, so its running state IS the glide.
+  // Reading it live keeps the verdict from outliving the motion: a row whose
+  // copy already fits rests at reveal 1 either way. A cold frame has nothing
+  // to unveil from and a snapped width has no glide to unveil against, so
+  // both are excluded here.
+  readonly property bool widthSettling: panel.shown
+    && MotionPolicy.enabled && widthAnim.running
 
   // No Behavior on height: the slot-driven region is written straight from
   // the row's own unfold in _followSlotRow, and the card reads the SAME number
