@@ -2938,7 +2938,12 @@ Item {
         return y
       }
 
+      // Same elevation as the group and entry cursors, so every selector
+      // reads at the same depth. Declared before the cursor to paint behind.
+      SoftShadow { host: optCursor }
+
       Rectangle {
+        id: optCursor
 
         visible: row.dropdownOpen
         // One step ABOVE the surface this sits on, the way the list bar is one
