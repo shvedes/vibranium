@@ -184,17 +184,20 @@ Rectangle {
           return
       }
     }
+    // Commit/cancel are emitted off the key event, like InputField's
+    // accepted()/escaped(): the consumer folds this picker, and a field torn
+    // down mid-delivery lets the same key re-fire on whatever takes focus.
     Keys.onReturnPressed: event => {
       event.accepted = true
-      root.commit()
+      Qt.callLater(() => root.commit())
     }
     Keys.onEnterPressed: event => {
       event.accepted = true
-      root.commit()
+      Qt.callLater(() => root.commit())
     }
     Keys.onEscapePressed: event => {
       event.accepted = true
-      root.escaped()
+      Qt.callLater(() => root.escaped())
     }
   }
 

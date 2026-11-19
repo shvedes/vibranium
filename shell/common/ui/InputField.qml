@@ -163,6 +163,12 @@ Rectangle {
   readonly property bool _ghostShown: input.text === "" && input.preeditText === ""
     && (root.ghostWhileFocused || !input.activeFocus)
 
+  // Accepted is emitted OUTSIDE the key event that produced it. Consumers
+  // routinely commit by tearing down whatever owns this field (a dropdown, a
+  // dialog, a whole page); closing it during delivery makes Qt re-fire the
+  // same Return on whichever item takes focus next - a second commit, or an
+  // activation of the row underneath. Deferring once here is a property of
+  // the control, so every consumer gets it without having to remember.
   signal accepted(string text)
   signal edited(string text)
   // CapsLock pressed. Wayland key events carry no absolute lock state, so a
@@ -171,7 +177,9 @@ Rectangle {
   signal capsToggled()
   signal navigationRequested(int key, int modifiers)
   // Escape is consumed here and handed to the consumer as a signal so
-  // focus position never decides who handles it.
+  // focus position never decides who handles it. Like accepted(), it fires
+  // on the next turn: an Esc that closes this field must not re-fire on the
+  // item revealed underneath it.
   signal escaped()
   signal prefixEntered(string prefix, string payload)
   signal backspaceEmpty()
@@ -546,7 +554,7 @@ Rectangle {
 
       Keys.onEscapePressed: event => {
         event.accepted = true
-        root.escaped()
+        Qt.callLater(() => root.escaped())
       }
 
       // BeforeItem: the native control accepts Delete/Ctrl-D as editing keys and
@@ -621,7 +629,7 @@ Rectangle {
         }
       }
 
-      onAccepted: root.accepted(text)
+      onAccepted: text => Qt.callLater(() => root.accepted(text))
       onTextEdited: root.type(input.text)
     }
 

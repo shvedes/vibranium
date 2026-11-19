@@ -100,6 +100,9 @@ Item {
       if (!root.isText || root.initialText === "") return
       text = root.initialText
     }
+    // InputField emits accepted()/escaped() on the next turn, so this commit
+    // never folds the slot while Enter/Escape is still being delivered (which
+    // would re-fire the key on the list and re-open the row just committed).
     onAccepted: text => root.commit(text)
     onEscaped: root.escaped()
   }
@@ -128,6 +131,7 @@ Item {
       // whose text it already refuses, which is the whole numeric filter.
       text = Format.fixed(root.numericValue, root.decimals)
     }
+    // NumberPicker defers its own key signals; see NumberPicker.qml.
     onAccepted: value => root.commit(String(value))
     onInvalid: msg => root.invalid(msg)
     onRecovered: root.recovered()

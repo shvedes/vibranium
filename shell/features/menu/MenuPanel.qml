@@ -2690,7 +2690,19 @@ Rectangle {
     // behind it (the same bug _trackCloseSeat was fixed for).
     const row = panel._closePageMode && panel._closeRow
       ? panel._closeRow : list.currentItem
-    if (!row || row.height <= row.restHeight + 0.5) return -1
+    if (!row || row.height <= row.restHeight + 0.5) {
+      if (Menu.traceEnabled && (panel._slotRegionH > 0 || Menu.slotClosing
+        || panel._nestedSeatPending || panel._trackingCloseSeat
+        || panel._closePageMode)) Menu.trace("frame.liveSlotDrop", {
+        id: row && row.itm ? String(row.itm.id ?? "") : "",
+        h: row ? Math.round(row.height * 10) / 10 : -1,
+        rest: row ? Math.round(row.restHeight * 10) / 10 : -1,
+        reg: Math.round(panel._slotRegionH * 10) / 10,
+        slot: Menu.slotClosing, nest: panel._nestedSeatPending,
+        track: panel._trackingCloseSeat, cY: Math.round(list.contentY * 10) / 10
+      })
+      return -1
+    }
     const moving = Menu.slotClosing || panel._nestedSeatPending
       || panel._trackingCloseSeat
     // Keep following until the latch catches up: dropping the override a
@@ -3742,7 +3754,15 @@ Rectangle {
     // Each nested slot owns its own reveal origin. A chain of groups reaches
     // deeper offsets at every level; keeping the first seat would return a
     // deep slot's close past the position its own open started from.
-    _nestedSeatY = list.contentY
+    //
+    // A close restore can still be in flight when this reveal arrives (a
+    // re-open on the tail of the key that just committed the row). Its target
+    // is the real pre-open seat; the live contentY is mid-tween, and taking
+    // that as the seat leaves the top-level rows shifted by one slot after
+    // the next commit.
+    const hadPendingSeat = panel._nestedSeatPending && panel._nestedSeatY >= 0
+    const seat = hadPendingSeat ? panel._nestedSeatY : list.contentY
+    _nestedSeatY = seat
     _nestedSeatPending = false
     _trackingCloseSeat = false
     _closePageMode = false
@@ -3750,7 +3770,7 @@ Rectangle {
     _pinTries = 0
     nestedSeatPin.stop()
     Menu.trace("panel.reveal", {
-      seat: Math.round(_nestedSeatY * 10) / 10,
+      seat: Math.round(_nestedSeatY * 10) / 10, pending: hadPendingSeat,
       cY: Math.round(list.contentY * 10) / 10, cur: list.currentIndex,
       auto: list.autoRevealIndex
     })
@@ -5362,6 +5382,51 @@ Rectangle {
     z: 10000
     acceptedButtons: Qt.AllButtons
   }
+
+  // --- DIAGNOSTIC frame sync (armed only by `debugTrace on`) ---
+  // One compact geometry record per display frame while a trace is on. A
+  // one-frame jump of the top-level entries shows up here as a single row
+  // where cY/cardY/curY/hlY change far more than their neighbours, together
+  // with the one-shot flags that were live at that instant.
+  Timer {
+    interval: 16
+    repeat: true
+    running: Menu.traceEnabled && Menu.open
+    onTriggered: {
+      const it = list.currentItem
+      const hl = list.highlightItem
+      Menu.trace("frame.sync", {
+        t: Date.now() % 100000,
+        cY: Math.round(list.contentY * 10) / 10,
+        cH: Math.round(list.contentHeight * 10) / 10,
+        vH: Math.round(list.height * 10) / 10,
+        cardH: Math.round(panel.height * 10) / 10,
+        cardY: Math.round(panel.y * 10) / 10,
+        hlY: hl ? Math.round(hl.y * 10) / 10 : -1,
+        hlH: hl ? Math.round(hl.height * 10) / 10 : -1,
+        curY: it ? Math.round(it.y * 10) / 10 : -1,
+        curH: it ? Math.round(it.height * 10) / 10 : -1,
+        reg: Math.round(panel._slotRegionH * 10) / 10,
+        claim: Math.round(panel._claimListH * 10) / 10,
+        live: Math.round(panel._liveSlotRowH() * 10) / 10,
+        slot: Menu.slotClosing, nest: panel._nestedSeatPending,
+        track: panel._trackingCloseSeat, pg: panel._closePageMode,
+        anim: list.debugAnimRunning, auto: list.autoRevealIndex,
+        seatN: Math.round(panel._nestedSeatY * 10) / 10,
+        seatO: Math.round(panel._revealOriginY * 10) / 10
+      })
+    }
+  }
+
+  onHeightChanged: if (Menu.traceEnabled) Menu.trace("frame.cardH", {
+    h: Math.round(panel.height * 10) / 10, y: Math.round(panel.y * 10) / 10,
+    live: Math.round(panel._liveSlotRowH() * 10) / 10,
+    reg: Math.round(panel._slotRegionH * 10) / 10,
+    slot: Menu.slotClosing, nest: panel._nestedSeatPending
+  })
+  onYChanged: if (Menu.traceEnabled) Menu.trace("frame.cardY", {
+    y: Math.round(panel.y * 10) / 10, h: Math.round(panel.height * 10) / 10
+  })
 
   // keySink now lives inside PanelFocus (focusCtrl.keySink) so
   // panel.keySink alias above stays compatible with tests.

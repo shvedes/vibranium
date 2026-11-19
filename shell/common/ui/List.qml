@@ -256,6 +256,11 @@ ListView {
       if (snap === true) {
         const probe = index
         Qt.callLater(function() {
+          if (root.traceDebug) root._trace("list.deferredFollow", {
+            idx: probe, cur: root.currentIndex,
+            cY: Math.round(root.contentY * 10) / 10,
+            swept: root._inSwap || root._sweeping
+          })
           // The cursor left the row this seat put it on: a gesture took
           // over, and the row it names is the one that matters.
           if (root.currentIndex !== probe) return
@@ -1807,6 +1812,10 @@ ListView {
     root.seatTo(y, false, "restore", 0, viewH)
     const e = root._seatEpoch
     Idle.run(() => {
+      if (root.traceDebug) root._trace("list.restoreRetry", {
+        token: token === root._restoreToken, epoch: e === root._seatEpoch,
+        y: Math.round(y * 10) / 10, cY: Math.round(root.contentY * 10) / 10
+      })
       if (token !== root._restoreToken) return
       if (e !== root._seatEpoch) {
         root._sweeping = false
@@ -2353,6 +2362,11 @@ ListView {
   }
   onAutoRevealEnabledChanged: root.pursue()
   onHeightChanged: {
+    if (root.traceDebug) root._trace("list.viewH", {
+      h: Math.round(root.height * 10) / 10,
+      cY: Math.round(root.contentY * 10) / 10,
+      auto: root.autoRevealIndex
+    })
     if (root.autoRevealIndex < 0) return
 
     root.pursue()
