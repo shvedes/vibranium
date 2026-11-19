@@ -2825,12 +2825,19 @@ Item {
         // slot is the one animation, so the bar must not carry a second curve.
       }
 
+      // The hue marks a descent into another dropdown, not merely a focus.
+      // A cursor resting on a toggle or any other leaf keeps the plain bar.
+      function cursorOpensGroup() {
+        const kid = groupRoot.cursorItem && groupRoot.cursorItem.liveRow
+        return !!(kid && kid.isGroup && kid.dropdownOpen)
+      }
+
       // The raw palette hue as a solid strip over the bar's own left border.
       // QML Rectangle borders apply to all four sides, so the one-sided case
       // is a separate piece; inset by the corner radius to stay inside the
       // rounded outline instead of squaring off its ends.
       Rectangle {
-        visible: focusBar.visible
+        visible: focusBar.visible && cursorOpensGroup()
         x: focusBar.x
         y: focusBar.y + Math.min(RoundingPolicy.radius, focusBar.height / 2)
         width: 3
