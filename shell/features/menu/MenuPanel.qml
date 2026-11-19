@@ -6,7 +6,6 @@ import Quickshell
 import qs.common
 import qs.features.clipboard
 import qs.features.menu
-import "MenuFit.js" as MenuFit
 import "MenuLib.js" as MenuLib
 import "MenuLayout.js" as MenuLayout
 import "MenuRows.js" as MenuRows
@@ -191,7 +190,10 @@ Rectangle {
   property var rowsModel: []
   property real _latchedListH: -1
   property bool _fitPending: false
-  property int _fitAttempts: 0
+  // The page transition that owned the fit when it was armed. _resolveFit
+  // refuses a fit whose transition generation has moved on; the fit is now
+  // committed from a reactive edge rather than a closure that captured this.
+  property int _fitTransGen: -1
   property int _fitGen: 0
   property int _transitionGen: 0
   property bool _transitionActive: false
@@ -241,7 +243,6 @@ Rectangle {
     panel._transitionGen++
     panel._fitGen++
     panel._fitPending = false
-    panel._fitAttempts = 0
     panel._quiesceDisarm()
     panel._heightAnimating = false
     panel._heightTargetH = -1
@@ -252,8 +253,6 @@ Rectangle {
     // on the next summon.
     panel._rowsMoving = false
     rowsMotionTimer.stop()
-    fitRetryTimer.stop()
-    fitRetryTimer.fitCallback = null
     panel._pendingSlideDepth = -1
     panel._animatedListH = -1
     // The resting size this surface was showing when it closed, and the
@@ -293,7 +292,6 @@ Rectangle {
     if (summon === true) panel._armSpawnProbe()
     panel._fitGen++
     panel._fitPending = false
-    panel._fitAttempts = 0
     // Freeze at the size the card is actually showing. The read has to
     // come before the animating flag is dropped, because _currentListH
     // answers from the last committed resting size once it is - a
@@ -311,8 +309,6 @@ Rectangle {
     panel._heightAnimating = false
     panel._heightTargetH = -1
     panel._heightAnimGen = -1
-    fitRetryTimer.stop()
-    fitRetryTimer.fitCallback = null
     heightAnim.stop()
     slideAnim.stop()
     panel._animatedListH = held
@@ -717,159 +713,87 @@ Rectangle {
     return false
   }
 
+  // The model height is final: publish it without waiting for delegates.
+  // The latch is left to _resolveFit, which arms the height before publishing
+  // it; a write here would invalidate the region binding a turn early.
+  function _fitModelFromPending() {
+    panel._latchedListH = -1
+    panel._fitPending = false
+    panel._resolveFit(-1, panel._fitGen, panel._fitTransGen)
+  }
+
+  // A pending fit can commit a measurement only once every motion that would
+  // move a delegate has stopped and the view can actually measure. Those are
+  // live states, so the answer is a derivation rather than the outcome of a
+  // bounded poll: a tween that outlasts a retry budget used to leave the card
+  // sized from the fit it was waiting to replace. The predicate reads the
+  // delegate scan and the count inside the binding, so QML re-arms it on the
+  // row, slot and install edges that change the answer. Geometry and count
+  // get explicit re-arms too (see the list Connections below) for the case
+  // where a measurement fails while this verdict stays true.
+  readonly property bool _fitSettled: !list._inSwap && !Menu.slotClosing
+    && panel.expansionNeedH <= 0 && !panel._anyRowMoving()
+    && list.count === (panel.rowsModel || []).length
+    && panel.availListH > 0 && list.width > 0 && list.height > 0
+
+  on_FitSettledChanged: if (panel._fitSettled) panel._tryFit()
+
+  function _tryFit() {
+    if (!panel._fitPending || !panel._fitSettled) return
+    const rows = panel.rowsModel || []
+    if (panel.gridMode || rows.length === 0 || panel._rowsMoving
+      || !panel._anyRowOpen(rows)) {
+      // The resting height cannot be measured yet, but the card does not
+      // have to wait for the slide to finish before following it: the model
+      // knows how tall the row set is and reads no delegate geometry.
+      panel._fitModelFromPending()
+      return
+    }
+    const fit = list.fitHeight(panel.availListH, Math.min(10, rows.length))
+    // A fit that cannot be measured sizes the card from the model (see
+    // _resolveFit). A later edge that makes the delegates measurable queues
+    // a new fit and corrects it; nothing waits on a budget here.
+    if (fit < 0) {
+      panel._fitModelFromPending()
+      return
+    }
+    panel._latchedListH = fit
+    panel._fitPending = false
+    panel._resolveFit(fit, panel._fitGen, panel._fitTransGen)
+  }
+
   function queueFit() {
     const rows = panel.rowsModel || []
     if (panel._fitPending) {
-      panel._fitAttempts = 0
-      if (fitRetryTimer.fitCallback !== null) fitRetryTimer.restart()
+      panel._tryFit()
       return
     }
-    fitRetryTimer.stop()
-    fitRetryTimer.fitCallback = null
     const fitGen = ++panel._fitGen
-    const transitionGen = panel._transitionGen
-    // The model height is final: publish it without waiting for delegates.
-    const fitModel = () => {
+    panel._fitTransGen = panel._transitionGen
+    if (panel.gridMode || rows.length === 0) {
       panel._latchedListH = -1
       panel._fitPending = false
-      panel._fitAttempts = 0
-      panel._resolveFit(-1, fitGen, transitionGen)
-    }
-    if (panel.gridMode || rows.length === 0) {
-      fitModel()
+      panel._resolveFit(-1, fitGen, panel._fitTransGen)
       return
     }
-    // Without motion the measured fit cannot be absorbed, so it is not run.
-    // It needs two event-loop turns plus 16ms retries before the delegates
-    // it reads exist, and every one of those is a real frame once no tween
-    // covers it: the card would hold the provisional height, render the row
-    // build inside it, then re-snap to the delegate measurement. That is the
-    // staged resize, not an instant one.
-    //
-    // The model height is a measurement, not an estimate - rowRestHeight
-    // drives real Text probes and caches per string - so it is committed as
-    // final here. The latch is left to _resolveFit, which arms the height
-    // before publishing it; a write above that would invalidate the region
-    // binding a turn early.
+    // Without motion the measured fit cannot be absorbed, so it is not run:
+    // its two event-loop turns would each be a real frame and the card would
+    // show the row build before snapping to the measurement. The model height
+    // is a measurement of its own (rowRestHeight drives real Text probes), so
+    // it is final here.
     if (!MotionPolicy.enabled) {
+      panel._fitPending = false
       panel._resolveFit(
         panel.snappedListH(panel.availListH, Math.min(10, rows.length)),
-        fitGen, transitionGen)
+        fitGen, panel._fitTransGen)
       return
     }
-    // Motion is on, but there is nothing for it to absorb: with no slot open,
-    // closing or moving, the model height IS the final height, so commit it
-    // now instead of parking _fitPending and spending two event-loop turns
-    // plus up to eight 16ms retries waiting for delegates to confirm
-    // arithmetic. This is the common keystroke: a search projection has no
-    // slots to measure.
     if (panel._restFitReady()) {
-      fitModel()
+      panel._fitModelFromPending()
       return
     }
     panel._fitPending = true
-    panel._fitAttempts = 0
-    const fail = () => {
-      if (fitGen !== panel._fitGen) return
-      fitRetryTimer.stop()
-      fitRetryTimer.fitCallback = null
-      fitModel()
-    }
-    function retryFit(reason) {
-      if (fitGen !== panel._fitGen || !panel._fitPending) return
-      const next = MenuFit.retry(panel._fitAttempts, MenuFit.FIT_RETRY_BUDGET)
-      if (next >= 0) {
-        panel._fitAttempts = next
-        fitRetryTimer.fitCallback = tryFit
-        fitRetryTimer.restart()
-        return
-      }
-      fail()
-    }
-    function retrySettle() {
-      if (fitGen !== panel._fitGen || !panel._fitPending) return
-      // The longer of the two waits, on purpose: a swap settles within a
-      // few event-loop turns, while a slot outlives its own height tween
-      // by the close grace DropdownSlot holds it for, so the geometry
-      // budget gives up mid-motion. Bounded anyway: a wait that re-posts
-      // itself with Qt.callLater never reaches fail(), for it rescans every
-      // live delegate once per event-loop turn for as
-      // long as the condition holds, competing with the row transitions it
-      // was waiting for, and when the condition does clear late the card
-      // is still sized from the fit it was waiting to replace.
-      const next = MenuFit.retry(panel._fitAttempts, MenuFit.SETTLE_RETRY_BUDGET)
-      if (next >= 0) {
-        panel._fitAttempts = next
-        fitRetryTimer.fitCallback = tryFit
-        fitRetryTimer.restart()
-        return
-      }
-      fail()
-    }
-    function tryFit() {
-      if (fitGen !== panel._fitGen || !panel._fitPending) {
-        return
-      }
-      fitRetryTimer.stop()
-      fitRetryTimer.fitCallback = null
-      const current = panel.rowsModel || []
-      if (panel.gridMode || current.length === 0) {
-        fitModel()
-        return
-      }
-      const expanding = panel.expansionNeedH > 0 || panel._anyRowMoving()
-      if (list._inSwap || Menu.slotClosing || expanding) {
-        retrySettle()
-        return
-      }
-      if (panel._rowsMoving) {
-        // The resting height cannot be measured yet, but the card does not
-        // have to wait for the slide to finish before following it: the
-        // MODEL already knows how tall the new row set is, and the model
-        // path reads no delegate geometry, so it is immune to exactly the
-        // transition the measurement is being held off for. Size from it
-        // so the two motions run together, and let the latch re-queue
-        // correct the estimate once the rows rest. The estimate runs a
-        // couple of pixels per row under the real delegates, so the
-        // correction is a glide too small to read.
-        fitModel()
-        return
-      }
-      // Rest-state shortcut: no row open, closing, or holding info
-      // anywhere in the installed set, so every row is at its model
-      // height and waiting for delegates only chains event-loop turns
-      // behind filtering. Live delegates are covered by the expanding
-      // scan above; the store covers rows no delegate shows yet. Pages
-      // with an open slot keep the measured path below.
-      if (!panel._anyRowOpen(current)) {
-        fitModel()
-        return
-      }
-      if (list.count !== current.length) {
-        retryFit("count-mismatch")
-        return
-      }
-      if (panel.availListH <= 0 || list.width <= 0 || list.height <= 0) {
-        retryFit("geometry-unresolved")
-        return
-      }
-      const fit = list.fitHeight(panel.availListH, Math.min(10, current.length))
-      if (fit < 0 && current.length > 0) {
-        retryFit("fit-failed")
-        return
-      }
-      if (fitGen !== panel._fitGen) {
-        return
-      }
-      panel._latchedListH = fit
-      panel._fitPending = false
-      panel._fitAttempts = 0
-      panel._resolveFit(fit, fitGen, transitionGen)
-    }
-    Qt.callLater(() => {
-      if (fitGen !== panel._fitGen) return
-      Qt.callLater(tryFit)
-    })
+    panel._tryFit()
   }
 
   // The rows' own height, with no delegate read. Final - not an estimate - for
@@ -880,24 +804,17 @@ Rectangle {
     panel._fitGen++
     panel._latchedListH = -1
     panel._fitPending = false
-    panel._fitAttempts = 0
     panel._resolveFit(-1, panel._fitGen, panel._transitionGen)
   }
 
-  // Fit retry beat, named (one frame): re-runs a fit that landed
-  // mid-settle on the next frame rather than spinning.
-  readonly property int fitRetryMs: 16
-  Timer {
-    id: fitRetryTimer
+  Connections {
+    target: list
 
-    property var fitCallback: null
-    interval: panel.fitRetryMs
-    repeat: false
-    onTriggered: {
-      const retry = fitRetryTimer.fitCallback
-      fitRetryTimer.fitCallback = null
-      if (typeof retry === "function") retry()
-    }
+    // A failed measurement can recover on an edge that leaves _fitSettled
+    // true (a delegate finally lays out, a count heals, a swap releases).
+    function onCountChanged() { panel._tryFit() }
+    function onContentHeightChanged() { panel._tryFit() }
+    function on_InSwapChanged() { panel._tryFit() }
   }
 
   // The one thing the add/remove transitions read (see the transition
@@ -5034,6 +4951,10 @@ Rectangle {
                 closing: Menu.isSlotClosing(rowItem.itm),
                 slots: panel.expansionNeedH
               })
+              // The row's motion is one of the signals the fit's settle gate
+              // reads; re-check the pending fit on both the open and the
+              // landing edge, not only when the row goes still.
+              panel._tryFit()
               if (ms > 0) return
               panel._closeSeatDone()
               // The collapse has landed: the width pace may drop its slot
