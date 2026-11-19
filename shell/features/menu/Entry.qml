@@ -1461,29 +1461,32 @@ Item {
     color: "transparent"
   }
 
+  // A labeled separator breaks the hairline around its text instead of
+  // covering a full-width line with an opaque chip. The text then sits on
+  // whatever the surface behind it is - card or dropdown - with no fill of
+  // its own, so it cannot read as a dimmer patch inside the dropdown.
+  // The chip starts half a spacing unit left of the entries' own edge,
+  // putting the text flush with entry labels; the line fills the rest.
   Divider {
     anchors.verticalCenter: parent.verticalCenter
-    anchors.left: parent.left
+    // Labeled: the line starts only after the text, so nothing paints under
+    // the label. Unlabeled: the bare full-bleed line from the original.
+    anchors.left: row.sepLabel !== "" ? sepChip.right : parent.left
     anchors.right: parent.right
-    anchors.leftMargin: Ui.m + 2
+    anchors.leftMargin: row.sepLabel !== "" ? 0 : Ui.m + 2
     anchors.rightMargin: Ui.m + 2
     visible: row.isSep
   }
 
-  // Labeled group separator: the breadcrumb text sits on a chip of the
-  // card background occluding the hairline behind it, so the path takes
-  // whatever width it needs and the line fills the rest. The chip starts
-  // half a spacing unit left of the entries' own edge, putting the text
-  // flush with entry labels; the divider keeps its own insets behind.
-  // Unlabeled separators keep the bare full-bleed line above.
-  Rectangle {
+  Item {
+    id: sepChip
+
     visible: row.isSep && row.sepLabel !== ""
     anchors.left: parent.left
     anchors.leftMargin: Ui.m - Ui.s / 2
     anchors.verticalCenter: parent.verticalCenter
     width: sepText.width + Ui.s
     height: sepText.height
-    color: Ui.solid("background_0")
 
     Text {
       id: sepText
