@@ -2780,10 +2780,14 @@ Item {
         ]
         property string hueKey: focusBar.levelHues[
           row.nestedDepth % focusBar.levelHues.length]
-        // Even levels keep the parent's allocated solid shade; odd levels
-        // take the menu's default cursor wash. The two alternate by depth.
+        // The ramp starts one step ABOVE the page cursor's background_1 bar,
+        // the way the option cursor sits a step above the row it unfolds in.
+        // Starting on background_1 instead painted the first dropdown's bar
+        // on its parent's identical shade, leaving only its edge and halo.
+        // From there the two tones alternate, so no neighbouring level sits
+        // in the same shade - even levels take the wash, odd ones the solid.
         property color barFill: row.nestedDepth % 2 === 0
-          ? Theme.color("background_1") : Ui.tint("background_2", 0.7)
+          ? Ui.tint("background_2", 0.7) : Theme.color("background_1")
         color: focusBar.barFill
         radius: RoundingPolicy.radius
         border.width: 1
