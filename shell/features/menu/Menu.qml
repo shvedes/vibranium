@@ -2111,31 +2111,27 @@ Singleton {
     root._slotCloses = MenuState.withSlotClose(root._slotCloses, uid, closing)
   }
 
+  // Arm the close latch BEFORE the state write and its rev. The claim
+  // handlers react to that rev and release the slot's growth claim; the
+  // panel's region guard reads slotClosing to decide whether to hold the
+  // card. Arming afterwards let the claim release with no close in flight,
+  // clearing the region for one frame - the card dropped to its resting
+  // height and was restored before the fold started. The latch is cleared
+  // by slotCloseFinished when the slot actually reaches rest.
   function setExpanded(item, value) {
+    if (value !== true && item && item.uid) root._setSlotClose(item.uid, true)
     root._rawState(item).expanded = value === true
     root.rev++
-    if (value !== true) {
-      // The row's own close latch is the close verdict: cleared when its
-      // slot motion reaches zero (see slotCloseFinished), reconciled on
-      // every model install. slotClosing derives from it.
-      if (item && item.uid) {
-        root._setSlotClose(item.uid, true)
-      }
-    } else if (item && item.uid && root._slotCloses[item.uid] !== undefined) {
+    if (value === true && item && item.uid && root._slotCloses[item.uid] !== undefined)
       root._setSlotClose(item.uid, false)
-    }
   }
 
   function setInfo(item, value) {
+    if (value !== true && item && item.uid) root._setSlotClose(item.uid, true)
     root._rawState(item).info = value === true
     root.rev++
-    if (value !== true) {
-      if (item && item.uid) {
-        root._setSlotClose(item.uid, true)
-      }
-    } else if (item && item.uid && root._slotCloses[item.uid] !== undefined) {
+    if (value === true && item && item.uid && root._slotCloses[item.uid] !== undefined)
       root._setSlotClose(item.uid, false)
-    }
   }
 
   // Folding a group folds every slot it contains, including descendants whose
