@@ -174,6 +174,11 @@ Item {
   // something against a row mid-unfold (the list's reveal, see
   // List.rowSettledHeight) need the destination, not the current frame.
   readonly property real settledH: root.open ? root.topGap + contentHost.height + root.gap : 0
+  // The destination held through the close. settledH drops to zero the
+  // instant `open` flips, so a consumer measuring its fade or progress
+  // against the live value would jump to the end of the curve mid-fold.
+  property real _settledHLatch: 0
+  onSettledHChanged: if (settledH > 0) _settledHLatch = settledH
 
   // Unfold pacing: constant velocity (Ui.slotVpx) between the shared
   // duration floor and cap, derived from the unfolded height - top gap,

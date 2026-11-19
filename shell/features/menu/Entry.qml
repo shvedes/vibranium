@@ -854,8 +854,14 @@ Item {
   // runs alongside the slot's own, instead of being chased frame by frame
   // - chasing it decelerates to a stop at each handover and lurches on.
   readonly property real restHeight: isSep ? sepH : row.staticRowH
+  // The open slot's bottom gap is counted in its own height, but the row's
+  // rendered box also carries the list's row gap below it: the live row ends
+  // one Ui.s past the sum of its parts. Leaving that out made every open row
+  // publish a settled height 8px short of its own live height, so the list
+  // seated to the short value and made a visible second scroll to catch up.
   readonly property real settledHeight: isSep ? sepH
     : restHeight + descSlot.settledH + expandSlot.settledH
+      + ((descSlot.settledH + expandSlot.settledH > 0) ? Ui.s : 0)
 
   // --- uniform API used by the panel ---
 
@@ -2280,9 +2286,12 @@ Item {
       height: row._shellClosing && row._shellContentH > 0
         ? row._shellContentH : (item ? item.implicitHeight : 0)
       width: parent.width
+      // Fade against the slot's destination, held through the close. The
+      // old denominator (content + Ui.m) missed the nested top gap, so the
+      // content reached full opacity while the slot - and the neighbour
+      // push driven by its live height - still had several pixels to travel.
       opacity: nested ? Range.clamp01(
-        expandSlot.height / Math.max(1,
-          (expanded && expLoader.height > 0 ? expLoader.height : row._shellContentH) + Ui.m)) : 1
+        expandSlot.height / Math.max(1, expandSlot._settledHLatch)) : 1
       sourceComponent: expansionComp
     }
   }

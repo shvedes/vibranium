@@ -1383,18 +1383,28 @@ ListView {
       return target
     }
     if (animated === true) {
-      let distanceMs = root.stepMs(Math.abs(target - root.contentY))
+      const distance = Math.abs(target - root.contentY)
+      let distanceMs = root.stepMs(distance)
+      // A reveal paced by its slot rides the slot's WHOLE clock, with its
+      // fast-start curve: the slot's height eases over that same duration.
+      // Capping it at the distance pace landed a 140px scroll in 120ms while
+      // a 316px slot grew for 260ms - the rows below were shoved past the
+      // viewport before the dropdown finished, a staged "open, then scroll".
+      // Small remainders are handled by pursue() itself, so they need no
+      // minimum here.
+      const pacedReveal = owner === "pursuit" && paceMs > 0
+        && distance > Ui.s * 2
       if (paceMs > 0) {
-        distanceMs = Math.min(distanceMs,
-          Range.clamp(Math.round(paceMs), Ui.fastMs, root._sweepMaxMs))
+        const paced = Range.clamp(Math.round(paceMs), Ui.fastMs, root._sweepMaxMs)
+        distanceMs = pacedReveal ? paced : Math.min(distanceMs, paced)
       }
       const handoffMs = root._highlightHandoff && root._sweepMs >= 0
         ? root._sweepMs : 0
       scrollAnim.duration = Math.max(distanceMs, handoffMs)
       // A follow seat must answer the very next repeat, so it uses the bar's
-      // fast-start curve; a reveal seat keeps the gentle one. Matching the
-      // bar on follow also lands the row and the bar on the same centre.
-      scrollAnim.easing.type = owner === "follow"
+      // fast-start curve; a paced reveal matches the slot's open curve for
+      // the same reason. Other seats keep the gentle one.
+      scrollAnim.easing.type = owner === "follow" || pacedReveal
         ? Easing.OutCubic : Easing.InOutCubic
       scrollAnim.to = target
       // Re-aiming a running tween by moving `to` alone does NOT work in
@@ -2344,7 +2354,14 @@ ListView {
     // crawls at a full unfold's duration). A claim with no published pace
     // (or none at all) keeps the distance pace.
     const paceMs = root.revealSlotMs > 0 ? root.revealSlotMs : -1
-    root.seatTo(target, root.pursuitAnimated && MotionPolicy.enabled, "pursuit", paceMs)
+    // A late remainder (the settled height measuring in a few pixels after
+    // the slot landed) is not a new reveal. Tweening it at the distance
+    // floor was a visible second scroll after the dropdown had finished;
+    // apply it on the landing edge instead.
+    if (Math.abs(target - root.contentY) <= Ui.s * 2)
+      root.seatTo(target, false, "pursuit-settle")
+    else
+      root.seatTo(target, root.pursuitAnimated && MotionPolicy.enabled, "pursuit", paceMs)
   }
 
   onAutoRevealIndexChanged: {
