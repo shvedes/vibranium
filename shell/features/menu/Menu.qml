@@ -347,9 +347,6 @@ Singleton {
   property string _lastPath: ""
   property var _bundleCache: ({})
   property bool _prewarmed: false
-  // A prewarm that arrived before the boot entrance finished drawing; the
-  // milestone's change runs it (see _maybePrewarm).
-  property bool _prewarmPending: false
 
   // Icon raster prewarm, fed from the warm bundles in _maybePrewarm. The
   // panel's IconWarmer decodes each (glyph, tone) into Qt's shared pixmap
@@ -361,13 +358,17 @@ Singleton {
   // decode in one turn puts ~180 jobs on Qt's image thread during boot and the
   // resulting contention can stretch a bar module's own state transition - a
   // glyph painted in the colour of an intermediate state instead of the settled
-  // one. A delay past the boot milestone plus small batches keep the warm off
-  // that window; the menu cannot be summoned that early in any case.
+  // one. The boot milestone already holds the warm off that window (the menu
+  // cannot be summoned earlier), and the panel's adoption is the live signal
+  // that the warmer exists - no delay timer and no turn budget.
   property var _iconWarmRequests: []
   property int _iconWarmIdx: 0
-  property int _iconWarmTries: 0
   readonly property int iconWarmBatch: 16
-  readonly property int iconWarmDelayMs: 1000
+  readonly property bool _iconWarmReady: root._iconWarmRequests.length > 0
+    && root._iconWarmIdx < root._iconWarmRequests.length
+    && DesktopLayoutState.bootEntrancePlayed
+    && !!root.probeSource
+    && typeof root.probeSource.prewarmIcons === "function"
 
   function _collectIconRequests(bundles) {
     const out = []
@@ -405,38 +406,19 @@ Singleton {
   function _startIconPrewarm(bundles) {
     root._iconWarmRequests = root._collectIconRequests(bundles)
     root._iconWarmIdx = 0
-    root._iconWarmTries = 0
-    iconWarmDelay.restart()
-  }
-
-  property Qml.Timer iconWarmDelay: Qml.Timer {
-    interval: root.iconWarmDelayMs
-    repeat: false
-    onTriggered: Qt.callLater(root._pumpIconPrewarm)
+    root._pumpIconPrewarm()
   }
 
   function _pumpIconPrewarm() {
+    if (!root._iconWarmReady) return
     const panel = root.probeSource
-    if (!panel || typeof panel.prewarmIcons !== "function") {
-      // The panel is created by MenuView on the primary screen; a summon can
-      // land before it is adopted on a slow boot, so retry a bounded number of
-      // turns rather than dropping the warm set.
-      if (root._iconWarmTries++ < 20) Qt.callLater(root._pumpIconPrewarm)
-      return
-    }
     const end = Math.min(root._iconWarmIdx + root.iconWarmBatch, root._iconWarmRequests.length)
     if (end <= root._iconWarmIdx) return
     panel.prewarmIcons(root._iconWarmRequests.slice(root._iconWarmIdx, end))
     root._iconWarmIdx = end
     if (root._iconWarmIdx < root._iconWarmRequests.length) Qt.callLater(root._pumpIconPrewarm)
   }
-
-  Connections {
-    target: DesktopLayoutState
-    function onBootEntrancePlayedChanged() {
-      if (root._prewarmPending) root._maybePrewarm()
-    }
-  }
+  on_IconWarmReadyChanged: if (root._iconWarmReady) root._pumpIconPrewarm()
 
   // Boot-time prewarm for the two most-opened bundles (see onCompleted).
   // Builds each container into the repeat-summon cache and runs its guard
@@ -445,30 +427,27 @@ Singleton {
   // runner: the first batch runs for the first bundle, the second call parks
   // `_guardsPending` and re-runs for the second once the first lands - with
   // the merge below both verdict sets survive. Never disturbs a live menu:
-  // `_buildFromFile` restores the active containers when open, and the
-  // prewarm simply retries later in that case.
+  // the readiness gate below waits for the boot milestone, a closed menu and
+  // ready settings, and re-fires on those live edges instead of polling.
+  readonly property bool _prewarmCanRun: !root._prewarmed
+    && DesktopLayoutState.bootEntrancePlayed
+    && !root.open
+    && Settings.ready === true && HyprlandSettings.ready === true
+    && MiscSettings.ready === true
+  on_PrewarmCanRunChanged: if (root._prewarmCanRun) root._maybePrewarm()
+
   function _maybePrewarm() {
     if (root._prewarmed) return
     // The two bundle builds, their guard batches and the index rebuild are
     // tens of milliseconds on the GUI thread, and the boot entrance is drawing
     // through it - measured as a 100ms frame in the middle of the entrance
-    // (see DesktopLayoutState.bootEntrancePlayed). A summon before the
-    // milestone builds the bundle it needs on its own, so nothing waits on
-    // this prewarm.
-    if (!DesktopLayoutState.bootEntrancePlayed) {
-      root._prewarmPending = true
-      return
-    }
-    root._prewarmPending = false
-    if (root.open) {
-      prewarmRetry.restart()
-      return
-    }
+    // (see DesktopLayoutState.bootEntrancePlayed). The readiness gate re-fires
+    // on the milestone; a summon before it builds the bundle it needs on its
+    // own, so nothing waits on this prewarm.
+    if (!DesktopLayoutState.bootEntrancePlayed) return
+    if (root.open) return
     if (Settings.ready !== true || HyprlandSettings.ready !== true
-      || MiscSettings.ready !== true) {
-      prewarmRetry.restart()
-      return
-    }
+      || MiscSettings.ready !== true) return
     // A build installs its containers as the active bundle, and the warm set
     // ends on the utilities entry - a menu page, not a settings page. The
     // menu is closed while this runs, so that container is not the surface in
@@ -501,17 +480,10 @@ Singleton {
     root._builtinIndex = prevIndex
     root._settingsFamily = prevFamily
     root._rebuildSearchIndex()
-    if (interrupted) {
-      prewarmRetry.restart()
-      return
-    }
+    // A summon mid-build leaves the work undone; the readiness gate re-fires
+    // when the menu closes and the stores are still ready.
+    if (interrupted) return
     root._prewarmed = true
-  }
-
-  property Qml.Timer prewarmRetry: Qml.Timer {
-    interval: 500
-    repeat: false
-    onTriggered: root._maybePrewarm()
   }
 
   function openJson(text) {
