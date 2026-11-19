@@ -1490,28 +1490,41 @@ ListView {
       if (d) root.noteMeasured(i, d.height)
     }
   }
+  // A follow that had to seat from the table before its delegate existed.
+  // The row's arrival (contentItem children changed) re-derives the seat from
+  // the measured height; a newer seat retires it by epoch. No turn poll.
+  property var _trackPending: null
+  function _drainTrackPending() {
+    const p = root._trackPending
+    if (!p) return
+    if (p.epoch !== root._seatEpoch || root.currentIndex !== p.index) {
+      root._trackPending = null
+      return
+    }
+    const live = root.itemAtIndex(p.index)
+    if (!live || live.height <= 0) return
+    root.noteMeasured(p.index, live.height)
+    root._trackPending = null
+    root.followCursor(p.index, p.animated, p.viewH)
+  }
   function trackCursor(index, animated, viewH) {
     if (index < 0 || index >= root.count) return
     root.learnLive()
     const first = root.itemAtIndex(index)
-    if (first) {
+    if (first && first.height > 0) {
       root.noteMeasured(index, first.height)
+      root._trackPending = null
       root.followCursor(index, animated, viewH)
       return
     }
-    const e = root._seatEpoch
-    const retry = (n) => {
-      if (e !== root._seatEpoch || root.currentIndex !== index) return
-      const live = root.itemAtIndex(index)
-      if (live) {
-        root.noteMeasured(index, live.height)
-        root.followCursor(index, animated, viewH)
-        return
-      }
-      if (n < 8) Idle.run(() => retry(n + 1), 2)
-      else root.followCursor(index, animated, viewH)
+    // The row is off screen or still instantiating. Seat now from the measured
+    // table (followCursor already prefers live geometry and falls back to the
+    // table) so the view never waits on a delegate that may never be built,
+    // and re-derive on the live edge that actually creates it.
+    root._trackPending = {
+      index: index, animated: animated, viewH: viewH, epoch: root._seatEpoch
     }
-    retry(0)
+    root.followCursor(index, animated, viewH)
   }
 
   // --- keyboard navigation ---
@@ -2360,6 +2373,7 @@ ListView {
     target: root.contentItem
 
     function onChildrenChanged() {
+      root._drainTrackPending()
       root.bindAutoRevealItem()
       root.pursue()
     }
