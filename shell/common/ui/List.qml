@@ -828,6 +828,7 @@ ListView {
     return removed
   }
   onCountChanged: {
+    root._drainSettlePending()
     root._syncIdentitySet()
     // A row added or removed ABOVE the cursor moves the cursor's row to a new
     // index while leaving the index itself untouched: neither
@@ -1644,6 +1645,21 @@ ListView {
     return true
   }
 
+  // A snap seat parked while the model had no rows. The count edge runs it
+  // once the row set lands; a newer seat retires it by epoch.
+  property var _settlePending: null
+  function _drainSettlePending() {
+    const p = root._settlePending
+    if (!p) return
+    if (p.epoch !== root._seatEpoch) {
+      root._settlePending = null
+      return
+    }
+    if (root.count === 0) return
+    root._settlePending = null
+    root.settle(p.index, p.snap, p.viewH)
+  }
+
   // Land on the nearest selectable index at or after `index`. snap
   // forces an instant seat (restores never ease); steps follow the
   // center policy.
@@ -1654,27 +1670,14 @@ ListView {
     const count = root.count
     if (count === 0) {
       // Transient reset gap, not an empty list: the model was assigned
-      // but the view has not laid it out yet (count still reads 0 this
-      // turn). Aborting here drops the snap seat and re-arms durations
-      // mid-choreography, stranding contentY wherever the old list left
-      // it - and a later follow then eases that stale position home as a
-      // visible slide. Hold the gate and retry bounded instead; a
-      // genuinely empty model still lands here and re-arms on give-up.
-      // Any seat meanwhile bumps the epoch and retires the retry, so a
-      // fresher choreography can never fight this one.
-      const e = root._seatEpoch
-      const retryIdx = index, retrySnap = snap, retryH = viewH
-      const retry = (n) => {
-        if (e !== root._seatEpoch) return
-        if (root.count > 0 || n >= 4) {
-          if (root.count === 0) {
-            root._stillPreempt()
-          } else root.settle(retryIdx, retrySnap, retryH)
-          return
-        }
-        Idle.run(() => retry(n + 1), 2)
+      // but the view has not laid it out yet. Aborting here drops the snap
+      // seat and re-arms durations mid-choreography, stranding contentY
+      // wherever the old list left it. Park the seat on the live count edge
+      // instead of polling for a row that may never arrive; a newer seat
+      // retires it by epoch, so a fresher choreography cannot fight this one.
+      root._settlePending = {
+        index: index, snap: snap, viewH: viewH, epoch: root._seatEpoch
       }
-      Idle.run(() => retry(0), 2)
       return
     }
     let i = Range.clamp(index, 0, count - 1)
@@ -1791,26 +1794,34 @@ ListView {
     // no frame lands between the two. Observed release re-arms the glide.
     root.seat(i, "land")
     root.seatTo(y, false, "restore", 0, viewH)
-    const e = root._seatEpoch
-    Idle.run(() => {
-      if (root.traceDebug) root._trace("list.restoreRetry", {
-        token: token === root._restoreToken, epoch: e === root._seatEpoch,
-        y: Math.round(y * 10) / 10, cY: Math.round(root.contentY * 10) / 10
-      })
-      if (token !== root._restoreToken) return
-      if (e !== root._seatEpoch) {
-        root._sweeping = false
-        return
-      }
-      // The bail branch MUST close the sweep window too: a stuck
-      // _sweeping suppresses auto-follow for the whole session in
-      // consumers that never call _endSweep (clipboard).
+    // Measurement drift can move the offset in the turns after the write.
+    // Re-apply on the live extent edge rather than a two-turn guess; the
+    // token and epoch retire a stale re-apply, and either path closes the
+    // sweep window (a stuck one suppresses auto-follow all session).
+    root._restorePending = {
+      token: token, epoch: root._seatEpoch, i: i, y: y, viewH: viewH
+    }
+    // If layout produces no extent edge at all, still re-apply and close the
+    // window on the turn edge the old two-hop retry used.
+    Qt.callLater(function() { Qt.callLater(root._drainRestorePending) })
+  }
+  property var _restorePending: null
+  function _drainRestorePending() {
+    const p = root._restorePending
+    if (!p) return
+    if (p.token !== root._restoreToken || p.epoch !== root._seatEpoch) {
+      root._restorePending = null
       root._sweeping = false
-      if (root.currentIndex !== i) {
-        return
-      }
-      root.seatTo(y, false, "restore-retry", 0, viewH)
-    }, 2)
+      return
+    }
+    root._restorePending = null
+    root._sweeping = false
+    if (root.traceDebug) root._trace("list.restoreRetry", {
+      y: Math.round(p.y * 10) / 10, cY: Math.round(root.contentY * 10) / 10
+    })
+    if (root.currentIndex === p.i) {
+      root.seatTo(p.y, false, "restore-retry", 0, p.viewH)
+    }
   }
 
   // Compat: closes the restore-sweep window early (menu calls this once
@@ -1829,23 +1840,31 @@ ListView {
   // replaced wholesale: position is captured before the swap and
   // re-applied until the re-layout settles.
   property var stableModel: undefined
+  property real _stableY: -1
+  property int _stableEpoch: -1
   onStableModelChanged: {
     const y = root.contentY
     root.model = root.stableModel
     if (y <= 0) return
-    // The epoch retires this restore when some OTHER seat moves the view.
-    // Our own seat bumps it too, so the baseline is re-read after every write:
-    // taken once, the first restore invalidated its own retry chain, and the
-    // offset was asserted a single time against content that had not finished
-    // measuring - which is the short land the retries exist to repair.
-    let e = root._seatEpoch
-    const retry = (n) => {
-      if (e !== root._seatEpoch) return
-      root.seatTo(y, false, "stable")
-      e = root._seatEpoch
-      if (n < 4) Idle.run(() => retry(n + 1), 2)
+    // The view resets contentY on a wholesale replacement and clamps it
+    // against content that has not measured yet. Re-apply on the live extent
+    // edge until the view's height agrees with the measured table, instead
+    // of guessing how many turns that takes with a fixed retry chain.
+    root._stableY = y
+    root._stableEpoch = root._seatEpoch
+    root._applyStable()
+  }
+  function _applyStable() {
+    if (root._stableY < 0) return
+    // Our own write is the only one allowed to have moved the epoch; any
+    // other seat is a newer intent and retires this restore.
+    if (root._seatEpoch !== root._stableEpoch) {
+      root._stableY = -1
+      return
     }
-    retry(0)
+    root.seatTo(root._stableY, false, "stable")
+    root._stableEpoch = root._seatEpoch
+    if (root.contentHeight >= root.tableTotal() - 0.5) root._stableY = -1
   }
 
   // --- swap machinery ---
@@ -2374,6 +2393,8 @@ ListView {
 
     function onChildrenChanged() {
       root._drainTrackPending()
+      root._drainRestorePending()
+      root._applyStable()
       root.bindAutoRevealItem()
       root.pursue()
     }
@@ -2495,6 +2516,11 @@ ListView {
   // while a seat tween is in flight - that seat owns contentY this
   // frame and scrollAnim.onFinished reclamps on landing.
   onContentHeightChanged: {
+    // Live geometry edges drive the parked restores: a wholesale model
+    // replacement re-applies until the extent agrees, and a restore re-seats
+    // once against the measurement that just landed.
+    root._applyStable()
+    root._drainRestorePending()
     // A held swap offset IS this event's reconciliation: it puts the view
     // where the content that just measured says it belongs, which the clamp
     // below cannot do - that path only ever pulls a view that overshot back
