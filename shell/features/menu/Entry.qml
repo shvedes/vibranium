@@ -162,6 +162,14 @@ Item {
     return out
   }
   readonly property bool hasGroup: row.groupChildren.length > 0
+  // Of an open chain, only the deepest group is where the cursor lives. An
+  // ancestor with an open child group is a level already passed through, so
+  // its chevron reads idle while the current one keeps the accent.
+  function isCurrentOpenGroup() {
+    const kid = row._focusedChildRow()
+    return isGroup && dropdownOpen && (!kid || !kid.isGroup || !kid.dropdownOpen)
+  }
+  readonly property bool currentOpenGroup: row.isCurrentOpenGroup()
   // A group's own slot hosts the children's rows. While any child slot is
   // live, the group's height follows that geometry without a second ease.
   readonly property bool nestedSlotLive: {
@@ -2136,7 +2144,7 @@ Item {
         // cursor bar already says which row is selected, and an accent arrow on
         // a collapsed group claimed an expansion that was not there yet.
         color: row.isGroup
-          ? (row.dropdownOpen ? Theme.color("accent")
+          ? (row.currentOpenGroup ? Theme.color("accent")
             : Ui.tint("foreground_1", 0.5))
           : (row.expanded || row.sel ? Theme.color("accent")
             : Ui.tint("foreground_1", 0.5))
