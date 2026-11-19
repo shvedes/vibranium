@@ -7,9 +7,10 @@ import qs.features.menu
 import "../../common/text/Format.js" as Format
 
 // Expansion editor shell for range/number/text rows: the validating
-// NumberPicker for numeric types, a free-form InputField for text, and
-// the OK commit button beside either. Commit/validation/escape route
-// OUT through signals - state ownership stays with the entry row and
+// NumberPicker for numeric types, a free-form InputField for text. Enter is
+// the only commit gesture - a menu is keyboard driven, so a click button
+// would duplicate the key without adding anything. Commit/validation/escape
+// route OUT through signals - state ownership stays with the entry row and
 // the Menu service.
 //
 // Focus asserts are no-ops once a field owns focus - re-selecting all
@@ -34,7 +35,7 @@ Item {
   property real stepSize: 1
   property string unitSuffix: ""
 
-  // Raw field text on OK/Enter; the row parses and clamps.
+  // Raw field text on Enter; the row parses and clamps.
   signal commit(string text)
   signal invalid(string message)
   signal recovered()
@@ -76,9 +77,9 @@ Item {
 
     visible: root.isText
     anchors.left: parent.left
-    anchors.right: okButton.left
+    anchors.right: parent.right
     anchors.leftMargin: Ui.m
-    anchors.rightMargin: Ui.s
+    anchors.rightMargin: Ui.m
     anchors.verticalCenter: parent.verticalCenter
     height: Ui.buttonHeight
     placeholder: root.placeholder
@@ -112,9 +113,9 @@ Item {
 
     visible: !root.isText
     anchors.left: parent.left
-    anchors.right: okButton.left
+    anchors.right: parent.right
     anchors.leftMargin: Ui.m
-    anchors.rightMargin: Ui.s
+    anchors.rightMargin: Ui.m
     anchors.verticalCenter: parent.verticalCenter
     height: Ui.buttonHeight
     value: root.numericValue
@@ -139,22 +140,4 @@ Item {
     onStepped: value => root.stepped(value)
   }
 
-  // The commit button takes the same elevation as the field, and drops it
-  // when the button is inert (Button lints `live` for exactly that state).
-  SoftShadow {
-    host: okButton
-    visible: okButton.visible && okButton.live
-  }
-
-  Button {
-    id: okButton
-
-    anchors.right: parent.right
-    anchors.rightMargin: Ui.m
-    anchors.verticalCenter: parent.verticalCenter
-    height: Ui.buttonHeight
-    variant: "primary"
-    label: "OK"
-    onClicked: root.commit(root.isText ? editorField.text : picker.text)
-  }
 }
