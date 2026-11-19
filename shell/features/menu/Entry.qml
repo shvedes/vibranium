@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
+import QtQuick.Effects
 import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
@@ -2748,6 +2749,21 @@ Item {
         easing.type: Easing.OutCubic
       }
 
+      // A soft, directionless halo under each nested cursor bar lifts the
+      // dropdown off its parent's fill. Offset-free so it reads as depth
+      // rather than a light source, and small enough to stay inside the
+      // column's inset. The page-level dropdown needs none: its bar already
+      // sits on the card.
+      RectangularShadow {
+        visible: focusBar.visible
+        anchors.fill: focusBar
+        radius: RoundingPolicy.radius
+        color: "#66000000"
+        blur: 12
+        spread: 1
+        offset: ({ x: 0, y: 0 })
+      }
+
       Rectangle {
         id: focusBar
 
@@ -2762,8 +2778,10 @@ Item {
         ]
         property string hueKey: focusBar.levelHues[
           row.nestedDepth % focusBar.levelHues.length]
+        // Even levels keep the parent's allocated solid shade; odd levels
+        // take the menu's default cursor wash. The two alternate by depth.
         property color barFill: row.nestedDepth % 2 === 0
-          ? Theme.color("background_1") : Theme.color("background_2")
+          ? Theme.color("background_1") : Ui.tint("background_2", 0.7)
         gradient: Gradient {
           orientation: Gradient.Horizontal
           GradientStop { position: 0; color: Theme.color(focusBar.hueKey) }
@@ -2825,6 +2843,10 @@ Item {
 
           delegate: GroupRow {
             width: groupCol.width
+            // Pass this row's depth on so each loaded child increments it;
+            // without this every nested row reports depth 1 and the fill and
+            // edge hue never change past the first dropdown.
+            nestedDepth: row.nestedDepth
             // The slot's growth plus the room below the focused child carry
             // the following rows past the box edge.
             slideY: index > row.childIndex && groupRoot.liveExtra > 0
