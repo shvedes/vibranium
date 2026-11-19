@@ -2495,11 +2495,17 @@ Item {
         }
         // Closed is its own key (-1). Only view-to-view swaps within one
         // expansion glide animate (dropdown -> editor, stage to stage, back).
+        // Derive the view from the row's stable facts, not from editorOpen:
+        // on open, expanded flips a frame before editorOpen's binding has
+        // re-evaluated, so reading it here sent the key through 1000 (body)
+        // and made an opening editor slide in as if it were a stage swap.
         property int stageKey: !row.expanded ? -1
           : row.isFlow ? row.flowIndex
           : row.isGroup ? 1004
-          : row.dropdownOpen ? 1001 : row.editorOpen ? 1002
-          : row.confirmOpen ? 1003 : 1000
+          : row.dropdownOpen ? 1001
+          : row.confirmOpen ? 1003
+          : (row.hasEditor || row.promptOpen) ? 1002
+          : 1000
         property int _prevStageKey: -1
         // The close drops expanded/editorOpen in the same turn the slot starts
         // folding. Hold the last view until the loader is released so its
