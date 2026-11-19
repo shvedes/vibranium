@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
-import QtQuick.Effects
 import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
@@ -2763,20 +2762,9 @@ Item {
         easing.type: Easing.OutCubic
       }
 
-      // A soft, directionless halo under each nested cursor bar lifts the
-      // dropdown off its parent's fill. Offset-free so it reads as depth
-      // rather than a light source, and small enough to stay inside the
-      // column's inset. The page-level dropdown needs none: its bar already
-      // sits on the card.
-      RectangularShadow {
-        visible: focusBar.visible
-        anchors.fill: focusBar
-        radius: RoundingPolicy.radius
-        color: "#66000000"
-        blur: 12
-        spread: 1
-        offset: ({ x: 0, y: 0 })
-      }
+      // Each nested bar gets the shared elevation halo. The page-level
+      // dropdown needs none: its bar already sits on the card.
+      SoftShadow { host: focusBar }
 
       Rectangle {
         id: focusBar
