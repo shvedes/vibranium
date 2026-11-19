@@ -34,6 +34,28 @@ Item {
   width: 16
   height: 16
 
+  // A direction change spins the chevron instead of snapping, so opening and
+  // closing reads as one motion with the slot it discloses. The initial
+  // binding is not animated; only later direction changes are.
+  Behavior on rotation {
+    enabled: MotionPolicy.enabled
+    NumberAnimation {
+      duration: Ui.fastMs
+      easing.type: Easing.OutCubic
+    }
+  }
+
+  // Tone changes (idle foreground to accent and back) cross-fade rather than
+  // flipping on one frame. Both bars read root.color, so one behavior covers
+  // the whole glyph.
+  Behavior on color {
+    enabled: MotionPolicy.enabled
+    ColorAnimation {
+      duration: Ui.fastMs
+      easing.type: Easing.OutCubic
+    }
+  }
+
   Rectangle {
     width: root.legL
     height: root.thickness
