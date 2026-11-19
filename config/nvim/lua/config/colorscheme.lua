@@ -1,10 +1,10 @@
 --==============================================================================
--- config/colorscheme.lua  -  Fallback colourscheme name
+-- config/colorscheme.lua  -  Fallback colorscheme name
 --
 -- This file is consumed by lua/utils/theme.lua when the Vibranium host
 -- theme integration is absent or its neovim.lua file cannot be loaded.
 --
--- It must return a single string: the name of an installed colourscheme
+-- It must return a single string: the name of an installed colorscheme
 -- plugin. The theme module falls back to "tokyonight" if even this file
 -- is missing or returns something invalid.
 --

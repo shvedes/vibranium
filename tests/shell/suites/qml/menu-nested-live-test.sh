@@ -1,7 +1,7 @@
 #!/bin/bash
-# Suite: menu-nested-live - nested row behaviour on the running shell.
+# Suite: menu-nested-live - nested row behavior on the running shell.
 #
-# These are behaviours a headless probe cannot see: a reveal seat is owned by
+# These are behaviors a headless probe cannot see: a reveal seat is owned by
 # the panel and the list together, Escape chooses a layer from live cursor
 # state, and a staged swap changes the loader content while the slot is open.
 # The suite drives the systemd shell through its menu IPC verbs and reads the

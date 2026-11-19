@@ -54,7 +54,7 @@ Item {
   property int phase: 0
   // The CrossfadeIcon flip is staged only once its front raster has decoded.
   // Reading `visible` before then answers false on a loaded machine, which is
-  // a probe race, not the slot-blanking behaviour this section pins.
+  // a probe race, not the slot-blanking behavior this section pins.
   property bool cfFlipDone: false
   property string scrimError: "not-attempted"
 
@@ -127,8 +127,8 @@ Item {
   // name, so the first flip is a swap into a layer that has never decoded -
   // the case that used to blank the slot.
   CrossfadeIcon { id: cfIcon; x: 600; y: 0; name: "clock" }
-  // Colour-only changes must not blank a glyph that already decoded: a literal
-  // colour tween produces a new data URL per frame, and every one of those
+  // Color-only changes must not blank a glyph that already decoded: a literal
+  // color tween produces a new data URL per frame, and every one of those
   // loads drops swapReady even though retainWhileLoading keeps the raster.
   CrossfadeIcon { id: cfColor; x: 620; y: 0; name: "bluetooth" }
 
@@ -884,7 +884,7 @@ Item {
     kv("icon.dpr.read", icPlain._dpr)
     kv("icon.debugBounds", icPlain._debug)
 
-    // Theme.color is the palette accessor underneath every icon colour. Its
+    // Theme.color is the palette accessor underneath every icon color. Its
     // fallback map is why an unknown key never yields "" - see the two
     // Icons.url comment lines claiming the opposite.
     kv("theme.unknownKey", Theme.color("not_a_palette_key"))
@@ -971,8 +971,8 @@ Item {
       && firstRect(zebra3).color !== zebra0.bandColor)
     kv("zebra.clicks", zebraClicks)
 
-    // Title's remaining levels, including the catch-all arms its colour and
-    // pixelSize blocks end on. Levels 1 and 2 use solid colours (six-digit
+    // Title's remaining levels, including the catch-all arms its color and
+    // pixelSize blocks end on. Levels 1 and 2 use solid colors (six-digit
     // hex, no alpha to parse), so those are compared to the palette token.
     kv("title1.px", title1.font.pixelSize)
     kv("title1.bold", title1.font.bold)
@@ -1115,7 +1115,7 @@ Item {
     kv("vig.none.hidden", !vigNone.visible)
 
     // DropdownButton: the disabled state as a full visual state, the resting
-    // colours, and the click wiring. A real press needs a compositor, so
+    // colors, and the click wiring. A real press needs a compositor, so
     // containsMouse/containsPress stay false and the hover/press tints are
     // out of reach - the click itself is driven at the signal level.
     kv("dbtn.height", dbtnOn.height)
@@ -2155,7 +2155,7 @@ Item {
   }
 
   function turn48() {
-    // CrossfadeIcon colour tween: the front layer holds a decoded glyph.
+    // CrossfadeIcon color tween: the front layer holds a decoded glyph.
     const before = cfColor.visible
     cfColor.colorKey = "#123456"
     kv("crossfade.color.before", before)

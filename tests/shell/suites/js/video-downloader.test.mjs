@@ -302,7 +302,7 @@ group('fpsLabel', () => {
   eq('an audio row has no rate', DL.fpsLabel({ kind: 'audio' }), '-')
   eq('a filler says nothing', DL.fpsLabel({ filler: true }), '')
 })
-group('extLabel and filetype colours', () => {
+group('extLabel and filetype colors', () => {
   eq('the container', DL.extLabel({ ext: 'webm' }), 'webm')
   eq('no container is a dash', DL.extLabel({ ext: '' }), '-')
   eq('mp4 is blue', DL.filetypeKey('mp4'), 'blue')
@@ -310,7 +310,7 @@ group('extLabel and filetype colours', () => {
   eq('m4a is orange', DL.filetypeKey('m4a'), 'orange')
   eq('an unknown type is plain', DL.filetypeKey('xyz'), 'foreground_1')
   eq('no type is plain', DL.filetypeKey(''), 'foreground_1')
-  eq('a prototype name is not a colour', DL.filetypeKey('constructor'), 'foreground_1')
+  eq('a prototype name is not a color', DL.filetypeKey('constructor'), 'foreground_1')
 })
 group('kindLabel', () => {
   eq('audio is the bare letter', DL.kindLabel({ kind: 'audio' }), 'a')
@@ -324,7 +324,7 @@ group('kindLabel', () => {
       DL.kindLabel({ kind: 'both' })].join('|'), 'a|v+a|a+v')
   eq('unknown is silent', DL.kindLabel({}), '')
   eq('a filler says nothing', DL.kindLabel({ filler: true }), '')
-  eq('the three states are colour-coded apart',
+  eq('the three states are color-coded apart',
     [DL.kindKey({ kind: 'audio' }), DL.kindKey({ kind: 'video' }),
       DL.kindKey({ kind: 'both' })].join(','), 'orange,blue,green')
   eq('an unknown kind stays plain', DL.kindKey({}), 'foreground_1')

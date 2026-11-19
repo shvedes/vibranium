@@ -8,7 +8,7 @@
 // asked for: the panel lies over the canvas rather than beside it, because it
 // is read once and the canvas is what the user came for.
 //
-// Every kind colour here is READ from `MixerModel.kindColorKey`, which is the
+// Every kind color here is READ from `MixerModel.kindColorKey`, which is the
 // one place that pairing is written down, so a legend that disagreed with the
 // cards would have to be wrong twice. The two port keys are the same pair the
 // card's own marks are drawn in (`GraphNode`'s `Handle`).
@@ -113,7 +113,7 @@ Rectangle {
     }
   }
 
-  // A kind's colour as the card's own top stripe draws it: three units of the
+  // A kind's color as the card's own top stripe draws it: three units of the
   // kind's palette key, from the mixer's classifier rather than from a literal.
   component LegendChip: Rectangle {
     property string kind: ""

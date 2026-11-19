@@ -15,7 +15,7 @@ SHELL_DIR="$VIBRANIUM_DIR/shell"
 
 # The pinned platform, from shell/README.md. A different pair is a platform
 # gate failure, not a silent "probably fine": the suites below assert on
-# behaviour that was written against this exact Quickshell and Qt.
+# behavior that was written against this exact Quickshell and Qt.
 REQUIRED_QUICKSHELL_VERSION="0.3.2"
 REQUIRED_QT_VERSION="6.12.0"
 
@@ -70,7 +70,7 @@ require_platform() {
 }
 
 # require_tools fails loudly when a suite needs a binary that is absent, but
-# does not treat it as a behavioural failure.
+# does not treat it as a behavioral failure.
 require_tools() {
   local tool
   for tool in "$@"; do

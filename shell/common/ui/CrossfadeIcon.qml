@@ -69,9 +69,9 @@ Item {
   property bool _swapPending: false
 
   // Once a layer has decoded a raster it keeps that raster painted while a new
-  // source loads (Icon.retainWhileLoading). A colour-only change drops
+  // source loads (Icon.retainWhileLoading). A color-only change drops
   // swapReady for the decode even though there is no empty slot to hide, and
-  // requiring it in `visible` blinked the glyph off on every frame of a colour
+  // requiring it in `visible` blinked the glyph off on every frame of a color
   // tween. Latched per layer so a name that has never decoded still waits for
   // its first raster.
   property bool _aPainted: false
@@ -150,7 +150,7 @@ Item {
   // before and is still retaining that raster through a load: on an empty ->
   // non-empty swap the incoming name is staged on the hidden layer and has no
   // retained raster, so binding this to `name` alone painted an empty slot
-  // until the trade. A colour-only change, by contrast, must not blank a glyph
+  // until the trade. A color-only change, by contrast, must not blank a glyph
   // that is already painted.
   visible: root.name !== ""
     && (root._aFront

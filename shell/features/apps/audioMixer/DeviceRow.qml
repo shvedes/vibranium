@@ -800,7 +800,7 @@ Item {
 
       // The disclosure, leading the row the way it leads a tree: a device
       // with nothing linked to it still shows the control, greyed by the
-      // caret's own colour rather than by hiding it, so the row's shape does
+      // caret's own color rather than by hiding it, so the row's shape does
       // not change when a stream starts and stops.
       Item {
         id: caret
@@ -935,7 +935,7 @@ Item {
       }
 
       // The mute affordance, and the island's: the glyph carries the level, the
-      // tiered paths carry the colour of it, and the click is the toggle. One
+      // tiered paths carry the color of it, and the click is the toggle. One
       // control rather than a glyph plus a switch side by side, because a row
       // with two mute buttons has no mute button.
       Item {
@@ -972,7 +972,7 @@ Item {
       // mute would be rating a level that is not being heard. The bands are the
       // island's: yellow from 101% up, red only past 150%, which is three
       // quarters of what even a boosted device track shows as headroom. The
-      // bands read the same rounded percentage the text prints, so the colour
+      // bands read the same rounded percentage the text prints, so the color
       // and the digits cannot disagree.
       Title {
         Layout.preferredWidth: row.pctW

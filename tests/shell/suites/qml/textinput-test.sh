@@ -18,15 +18,15 @@
 #     other rises in, the enter holding a short pause so total light dips
 #     mid-swap), so the pair is mid-flight on the second turn and landed
 #     by 600ms
-#   * the failure border cross-fades over 150ms, so a colour read too early is
+#   * the failure border cross-fades over 150ms, so a color read too early is
 #     a blend of the two ends rather than either of them
 #   * PasswordBox.failure is `failureTimer.running` and the window is 1400ms,
 #     so "still failing" and "expired" are 1400ms apart and the driver samples
 #     both ends of that range
 #
-# Colours are never asserted as literals. The theme palette lands milliseconds
+# Colors are never asserted as literals. The theme palette lands milliseconds
 # after boot, so every border assertion compares against `Theme.color()` read in
-# the same turn as the colour it judges.
+# the same turn as the color it judges.
 #
 # Not reachable here, and not claimed: anything a key press would do. There is
 # no compositor and no QTest, so InputField's accepted/escaped/backspaceEmpty
@@ -603,8 +603,8 @@ t_eq "against the placeholder's 12px" "12" "$(qp_get pw.default.prompt.px)"
 t_eq "and not bold, where the placeholder is" "false" "$(qp_get tick1.fail.prompt.bold)"
 t_eq "with the prompt's tracking dropped" "0" "$(qp_get tick1.fail.prompt.spacing)"
 t_eq "and the message is the configured one" "Wrong password!" "$(qp_get tick1.fail.prompt.text)"
-t_eq "its colour is an #AARRGGBB tint, not a literal theme value" "true" \
-  "$(qp_get tick1.fail.prompt.colourIsArgb)"
+t_eq "its color is an #AARRGGBB tint, not a literal theme value" "true" \
+  "$(qp_get tick1.fail.prompt.colorIsArgb)"
 
 t_section "the failure border, sampled while it cross-fades and after it lands"
 t_eq "the failure window is open 40ms in" "true" "$(qp_get tick1.fail.window)"
@@ -612,16 +612,16 @@ t_eq "and so is the 300ms one" "true" "$(qp_get tick1.fail.short)"
 t_eq "while an unfailed box is not flashing" "false" "$(qp_get tick1.fail.quiet)"
 t_eq "so the two borders differ" "true" "$(qp_get tick1.fail.borderDiffersFromIdle)"
 # The 600ms read is the first one the theme palette is guaranteed to have
-# landed for, so the pre-failure colour is compared with Theme.color() in the
+# landed for, so the pre-failure color is compared with Theme.color() in the
 # same turn.
 t_eq "both boxes start on the idle border" "true" "$(qp_get settle.border.preFail.equal)"
 t_eq "which is the unfocused palette entry" "true" "$(qp_get settle.border.preFail.isBackground3)"
 t_eq "the failure border is still cross-fading 120ms in" "false" "$(qp_get mid.late.quiet.landed)"
-t_eq "and has moved off the idle colour" "true" "$(qp_get mid.late.quiet.movedOffPre)"
+t_eq "and has moved off the idle color" "true" "$(qp_get mid.late.quiet.movedOffPre)"
 t_eq "with animated: false it has already landed" "true" "$(qp_get mid.late.still.landed)"
 t_eq "and is the palette's red" "true" "$(qp_get land.late.quiet.onRed)"
 t_eq "for the still box too" "true" "$(qp_get land.late.still.onRed)"
-t_note "animated: false disables the border fade, not the border: the Behaviour is enabled: root.animated (PasswordBox.qml:106), so a minimal-setup consumer gets the same red border with no fade. Asserted as the difference between a mid-fade colour and the landed one on the two boxes, in the same turn, which is the only way to see a tween without a compositor."
+t_note "animated: false disables the border fade, not the border: the Behavior is enabled: root.animated (PasswordBox.qml:106), so a minimal-setup consumer gets the same red border with no fade. Asserted as the difference between a mid-fade color and the landed one on the two boxes, in the same turn, which is the only way to see a tween without a compositor."
 
 t_section "the failure window expires on its own"
 t_eq "at 320ms the 300ms window has closed" "false" "$(qp_get tick8.fail.shortExpired)"
@@ -635,7 +635,7 @@ t_eq "at the placeholder's 12px" "12" "$(qp_get half.window.promptPx)"
 t_eq "in bold again" "true" "$(qp_get half.window.promptBold)"
 t_eq "with its 6px tracking" "6" "$(qp_get half.window.promptSpacing)"
 t_eq "100ms after it closed the border is still fading home" "true" "$(qp_get half.window.borderStillFading)"
-t_eq "700ms later it has landed on the idle colour" "true" "$(qp_get rest.window.borderBackToIdle)"
+t_eq "700ms later it has landed on the idle color" "true" "$(qp_get rest.window.borderBackToIdle)"
 t_eq "and so has the box that flashed for 300ms" "true" "$(qp_get rest.short.borderBackToIdle)"
 t_eq "a box that never failed is still not failing" "false" "$(qp_get rest.quiet.neverFailed)"
 

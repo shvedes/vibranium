@@ -144,7 +144,7 @@ LayerSurface {
     : NotificationsLib.pileDock(win.barDock, win.islandSharing && !Notifications.atTop, win.islandEdge, win.margin)
 
   // The pile's box, not a Column of cards. A Column would lay the cards out,
-  // and a Column assigns y itself: its Behaviour never sees that assignment and
+  // and a Column assigns y itself: its Behavior never sees that assignment and
   // it re-asserts it on every polish, so the slide the requirement asks for
   // cannot be built on one (measured on this build - see NotificationCard's y).
   // This holds the cards' box and nothing else; Notifications.yOf() places each

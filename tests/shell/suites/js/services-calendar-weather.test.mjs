@@ -21,7 +21,7 @@
 // timezone-free, except jobTime(), which is asserted against a locally
 // computed expectation rather than a literal.
 //
-// Two behaviours are pinned as they are rather than as the comments around
+// Two behaviors are pinned as they are rather than as the comments around
 // them read, and both are called out where they are asserted: a `1setOf`
 // attribute line is dropped by the printer report parser (so
 // printer-state-reasons and the marker pairs are always absent on a real

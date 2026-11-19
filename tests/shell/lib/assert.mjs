@@ -189,7 +189,7 @@ export function noThrow(label, fn) {
 }
 
 // approx(label, actual, expected, epsilon) - the numeric comparisons in this
-// tree are geometric and colour conversions, where exact equality is the
+// tree are geometric and color conversions, where exact equality is the
 // wrong assertion.
 export function approx(label, actual, expected, epsilon = 1e-9) {
   if (typeof actual === 'number' && Number.isFinite(actual) && Math.abs(actual - expected) <= epsilon) {
@@ -199,7 +199,7 @@ export function approx(label, actual, expected, epsilon = 1e-9) {
   }
 }
 
-// skip(label, reason) - an explicitly unverified behaviour. Counted, never a
+// skip(label, reason) - an explicitly unverified behavior. Counted, never a
 // pass, so the coverage gap is visible in the total.
 export function skip(label, reason = 'no reason given') {
   total++

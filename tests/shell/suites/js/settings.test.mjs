@@ -687,7 +687,7 @@ group('numbers: comma decimals in, leading zeros out, ranges inclusive', () => {
 })
 
 group('a float pass-through is a real number, not a string', () => {
-  // Geometry-ish and colour conversions in this tree are float work, where
+  // Geometry-ish and color conversions in this tree are float work, where
   // exact equality is the wrong assertion.
   const f = bare({ type: 'float', min: 0, max: 1 })
   const third = SL.validateValue(f, 1 / 3)
@@ -2177,7 +2177,7 @@ group('appending after a comma-less last child produces invalid lua', () => {
   // to "}," or "}". A section whose last option omits its comma - legal to
   // write by hand as a trailing field, but a comma IS required between fields
   // in a lua table constructor - gets the new entry appended with no comma
-  // either, which is a syntax error. Pinned as the real behaviour; see the
+  // either, which is a syntax error. Pinned as the real behavior; see the
   // report.
   const noComma = 'hl.config({\n  general = {\n    border_size = 2\n  },\n})\n'
   eq('a new option after a comma-less child', edit(noComma, ['general', 'rounding'], 8).content,

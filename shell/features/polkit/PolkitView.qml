@@ -129,7 +129,7 @@ Variants {
     // request behind it, which cannot be focused because `Polkit.visible` is
     // correctly false.
     //
-    // Both this and `state` are given `win.wanted`, so the behaviour and the
+    // Both this and `state` are given `win.wanted`, so the behavior and the
     // diagnostic can never disagree about whether a request is pending.
     readonly property bool showRequested: PolkitTrace.shouldShow({
       requested: win.wanted,

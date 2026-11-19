@@ -238,10 +238,10 @@ function replaceTagOf(hints) {
 // The separator between the two parts of the meta line, and the spaces that
 // clear it.
 //
-// A hyphen, at the line's own size and the line's own colour, because it is a
+// A hyphen, at the line's own size and the line's own color, because it is a
 // separator rather than punctuation: it says the time and the sender are two
 // fields of one card, and it has no business being more visible than either of
-// them. A glyph given its own size and colour reads as a third thing on the
+// them. A glyph given its own size and color reads as a third thing on the
 // line, which is the opposite of what a separator is for - and a mark set off
 // the baseline by its own box is not aligned with the words it sits between.
 //

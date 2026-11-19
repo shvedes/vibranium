@@ -971,12 +971,12 @@ group('appRow maps a record into the row the launcher renders', () => {
   eq('and the boolean flags default to false', [bare.runInTerminal, bare.removable], [false, false])
   eq('a non-string badge is stringified when enabled',
     LL.appRow(rec, { showBadges: true, showManagedBadge: true }).badge, 'webapp')
-  // PWA/TUI is a family under the master, not the master itself.
+  // PWA/TUI is its own family switch; there is no master.
   eq('webapp is off under the master alone', LL.appRow(rec, { showBadges: true }).badge, '')
   eq('and shows under its own switch',
     LL.appRow(rec, { showBadges: true, showManagedBadge: true }).badge, 'webapp')
-  eq('with the master off even its own switch cannot show it',
-    LL.appRow(rec, { showManagedBadge: true }).badge, '')
+  eq('a family switch alone shows it (no master)',
+    LL.appRow(rec, { showManagedBadge: true }).badge, 'webapp')
   const tui = { ...rec, badge: 'tui' }
   eq('TUI rides the same family switch',
     LL.appRow(tui, { showBadges: true, showManagedBadge: true }).badge, 'tui')
@@ -986,8 +986,8 @@ group('appRow maps a record into the row the launcher renders', () => {
   eq('the game badge is off under the master alone', LL.appRow(game, { showBadges: true }).badge, '')
   eq('and shows under its own switch',
     LL.appRow(game, { showBadges: true, showGameBadge: true }).badge, 'gamepad')
-  eq('with the master off it stays hidden',
-    LL.appRow(game, { showGameBadge: true }).badge, '')
+  eq('a family switch alone shows the gamepad',
+    LL.appRow(game, { showGameBadge: true }).badge, 'gamepad')
   eq('and the game switch does not gate a webapp',
     LL.appRow(rec, { showBadges: true, showManagedBadge: true, showGameBadge: false }).badge, 'webapp')
   const chat = { ...rec, badge: 'chat' }
@@ -2517,7 +2517,7 @@ group('the three re-exports delegate to the shared text helpers verbatim', () =>
   // "Shared helpers are delegated to qs.common/StringUtils.js - single source
   // of truth", so the launcher never grows a second stripJsonc or a second
   // shellQuote. Identity is not assertable here (the namespace is instrumented
-  // for coverage), so the delegation is proved behaviourally over a corpus,
+  // for coverage), so the delegation is proved behaviorally over a corpus,
   // with one spot value per helper so two wrong-in-the-same-way functions
   // cannot satisfy it.
   for (const t of ['// hi\n{"a":1}', '{"a":1,}', '{"u":"//cdn/x"}', '', '  // x\n{}', '{"a":[1,2,]}', '{"a":1} // hi']) {
@@ -3254,7 +3254,7 @@ group('launchArgv wraps everything else in vb-launch-cmd --', () => {
   throws('a nullish argv is a caller error', () => LL.launchArgv(null, false), /length/)
   // The first word is String()-ed for the *check* but the array is not
   // rebuilt, so a non-string element is forwarded untouched. Pinned because a
-  // stringifying rebuild would be a silent behaviour change.
+  // stringifying rebuild would be a silent behavior change.
   eq('a non-string first word is checked as text', LL.launchArgv([5], false), ['vb-launch-cmd', '--', 5])
   // The check is on String(args[0]), so an object whose toString names a
   // wrapper *is* treated as one - the check is textual, not nominal.
@@ -3586,7 +3586,7 @@ group('a secret or a binary payload never suggests anything', () => {
   // "Secrets and raw binary payloads never suggest anything" - and neither
   // does any type this module does not know. Only url, network and text
   // resolve a raw; everything else is inert, whatever the raw happens to be.
-  for (const type of ['secret', 'binary', 'image-data', 'colour', 'blob', '', 5, {}]) {
+  for (const type of ['secret', 'binary', 'image-data', 'color', 'blob', '', 5, {}]) {
     eq(`a ${JSON.stringify(type) ?? String(type)} entry with only a raw suggests nothing`,
       LL.clipTargetFor({ type, raw: '/a/b.txt' }, '/home/u'), null)
   }
@@ -4532,7 +4532,7 @@ group('two plugins do not share engine state', () => {
   const b = pluginInternals(path.join(PLUGIN_ROOT, 'calc', 'main.js'))
   ne('two evaluations produce different impl objects', a.impl, b.impl)
   ne('and different top-level function objects', a.fns.tryEvaluate, b.fns.tryEvaluate)
-  eq('but identical behaviour', a.fns.tryEvaluate('2+2'), b.fns.tryEvaluate('2+2'))
+  eq('but identical behavior', a.fns.tryEvaluate('2+2'), b.fns.tryEvaluate('2+2'))
   // Mutating one impl does not reach the other: they are separate closures
   // over separate engines.
   a.impl.__marker = 1
@@ -5311,7 +5311,7 @@ group('fx: it claims only currency queries, and the other four engines keep thei
   // plugin that asked on every gate hit would open a socket while the user
   // types "100 miles in km".
   eq('and it opened no socket while claiming nothing', rec.calls.length, 0)
-  // The engine-priority order, asserted through behaviour rather than through
+  // The engine-priority order, asserted through behavior rather than through
   // the constant: firstEngineClaiming is handed the plugins in the order a
   // directory scan would produce (alphabetical, so calc before fx), and fx
   // still has to win - because the calculator would take "100 usd in eur" as
@@ -6081,7 +6081,7 @@ const LIB_RATES = { base: 'USD', rates: { USD: 1, EUR: 0.878356, JPY: 157.489371
 group('the named table is built once and is what the gate depends on', () => {
   // namedMap is the memo behind resolveCode, and its `named` flag is the whole
   // bare-query rule. Asserted because the flag is invisible in the row output:
-  // only the behaviour it gates shows it.
+  // only the behavior it gates shows it.
   const first = FXL.namedMap()
   eq('it returns the same object on a second call', FXL.namedMap() === first, true)
   eq('a code resolves to itself', FXL.namedMap().usd.code, 'USD')
@@ -6695,7 +6695,7 @@ const PARITY = PLUGIN_NAMES.map((name) => {
   }
   // Non-function declarations: the data tables, which are as much the contract
   // as the functions are. A regex or a lookup table that drifted would change
-  // behaviour without changing a single function body.
+  // behavior without changing a single function body.
   const libData = out.libDeclarations.filter((n) => libFnNames.indexOf(n) < 0)
   const plugData = out.plugDeclarations.filter((n) => plugFnNames.indexOf(n) < 0)
   out.sharedData = plugData.filter((n) => libData.indexOf(n) >= 0)
@@ -7070,7 +7070,7 @@ group('the library file is the plugin file plus a contract block', () => {
 })
 
 // =========================================================================
-section('Plugin/library parity - behaviour')
+section('Plugin/library parity - behavior')
 // =========================================================================
 
 // One corpus per twin, including nullish, empty and degenerate inputs, run

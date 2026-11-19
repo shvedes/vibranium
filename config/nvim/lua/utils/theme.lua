@@ -1,22 +1,22 @@
 --==============================================================================
--- utils/theme.lua  -  Live colourscheme install/apply via Vibranium
+-- utils/theme.lua  -  Live colorscheme install/apply via Vibranium
 --
 -- When the host desktop theme changes, Vibranium (a host-level theme manager)
 -- atomically swaps the symlink at ~/.local/state/vibranium/theme/ and
 -- writes a new neovim.lua file containing a lazy.nvim spec list for the
--- corresponding colourscheme plugin.
+-- corresponding colorscheme plugin.
 --
 -- This module:
 --   1. Reads neovim.lua from the Vibranium theme directory.
 --   2. Filters out the LazyVim/LazyVim entry (would drag in the entire distro).
---   3. Returns the remaining specs, identifies the primary colourscheme plugin.
+--   3. Returns the remaining specs, identifies the primary colorscheme plugin.
 --   4. Falls back to lua/config/colorscheme.lua -> "tokyonight" if Vibranium
 --      is absent.
 --   5. Maintains a state file (stdpath("state")/vibranium-theme-state.lua) that
 --      records every theme plugin ever installed. This prevents :Lazy clean
 --      from treating an out-of-favour theme as an orphan.
 --   6. Provides a file-system watcher that detects symlink swaps and reapplies
---      the colourscheme live (no restart required).
+--      the colorscheme live (no restart required).
 --==============================================================================
 
 local M = {}
@@ -158,20 +158,20 @@ local function load_lua_file(path)
 end
 
 --==============================================================================
--- Identifying the primary colourscheme plugin
+-- Identifying the primary colorscheme plugin
 --==============================================================================
 
 -- Among the non-LazyVim specs, identify which one actually provides the
--- colourscheme. The naive "first entry" approach broke when a theme's
+-- colorscheme. The naive "first entry" approach broke when a theme's
 -- neovim.lua listed an override plugin (e.g. lualine/bufferline theming)
--- before the colourscheme repo itself.
+-- before the colorscheme repo itself.
 --
--- Strategy: colourscheme names are conventionally the plugin name (or the
+-- Strategy: colorscheme names are conventionally the plugin name (or the
 -- plugin name plus a variant suffix, e.g. "tokyonight" -> "tokyonight-storm").
--- Match the spec name against the known colourscheme name.
+-- Match the spec name against the known colorscheme name.
 --
 -- @param specs (table): filtered list of non-LazyVim specs.
--- @param colorscheme (string|nil): the colourscheme name from LazyVim opts.
+-- @param colorscheme (string|nil): the colorscheme name from LazyVim opts.
 -- @return (table|nil): the primary spec, or nil if none found.
 local function pick_primary(specs, colorscheme)
   if #specs == 0 then
@@ -217,13 +217,13 @@ local reported = {}
 
 -- Read and parse the source neovim.lua file (or fallback).
 -- @return (table): plugins array (every non-LazyVim entry).
--- @return (string): colourscheme name to pass to :colorscheme.
+-- @return (string): colorscheme name to pass to :colorscheme.
 -- @return (table|nil): the primary spec entry (needs installing/loading),
 --   or nil if we fell back to a bare name with nothing to clone.
 -- @return (boolean): true when the source file exists but could not be parsed.
 --   That is almost always a half-written file caught by the leading-edge
 --   watcher, so callers should skip this cycle instead of applying the
---   fallback colourscheme (which would flash on every theme switch).
+--   fallback colorscheme (which would flash on every theme switch).
 function M.read_source()
   if cache then
     return cache[1], cache[2], cache[3], cache[4]
@@ -251,7 +251,7 @@ function M.read_source()
       -- repo -- used to reach M.sname() and crash lazy.nvim's startup.
       if type(entry) == "table" and type(entry[1]) == "string" then
         if entry[1] == "LazyVim/LazyVim" then
-          -- Extract the colourscheme name from LazyVim's opts (if any).
+          -- Extract the colorscheme name from LazyVim's opts (if any).
           colorscheme = entry.opts and entry.opts.colorscheme
         else
           table.insert(plugins, entry)
@@ -303,10 +303,10 @@ function M.sync_state()
 end
 
 --==============================================================================
--- Apply the colourscheme (runtime, bypassing lazy.nvim's loader)
+-- Apply the colorscheme (runtime, bypassing lazy.nvim's loader)
 --==============================================================================
 
--- Some colourscheme plugins depend on a separate palette/helper repo.
+-- Some colorscheme plugins depend on a separate palette/helper repo.
 -- Since we are going through lazy.nvim's loader during initial setup but NOT
 -- during live apply (we clone directly), we need to wire up dependencies
 -- ourselves -- best effort, with notification on failure.
@@ -335,7 +335,7 @@ end
 -- Confirm that one of candidate names actually has a colors/*.{lua,vim} file
 -- on the runtimepath before calling :colorscheme. Calling it blind and
 -- swallowing the error is how this used to fail silently.
--- @param candidates (table): list of candidate colourscheme names.
+-- @param candidates (table): list of candidate colorscheme names.
 -- @return (string|nil): the first valid name found, or nil.
 local function resolve_colorscheme_name(candidates)
   for _, name in ipairs(candidates) do
@@ -346,8 +346,8 @@ local function resolve_colorscheme_name(candidates)
   return nil
 end
 
--- Colour names shipped by a plugin's colors/ directory.
--- Theme names and colourscheme names do not always match (everforest-nvim
+-- Color names shipped by a plugin's colors/ directory.
+-- Theme names and colorscheme names do not always match (everforest-nvim
 -- ships colors/everforest.lua), so the host spec alone is not enough.
 local function colors_names_from_dir(dir)
   local names = {}
@@ -357,7 +357,7 @@ local function colors_names_from_dir(dir)
   return names
 end
 
--- Resolve a candidate to a colourscheme that is really reachable, putting the
+-- Resolve a candidate to a colorscheme that is really reachable, putting the
 -- plugin directory on the runtimepath on the way. Three attempts, cheapest
 -- first: the names we were given, the names the plugin actually ships, and an
 -- installed plugin dir that is not on the rtp yet (the case where the host
@@ -390,7 +390,7 @@ local function resolve_reachable(candidates, dir)
   return nil
 end
 
--- Finish applying the colourscheme: add to rtp, link deps, run setup(),
+-- Finish applying the colorscheme: add to rtp, link deps, run setup(),
 -- then call :colorscheme.
 local function finish_apply(primary, dir, colorscheme)
   if dir then
@@ -406,7 +406,7 @@ local function finish_apply(primary, dir, colorscheme)
 
   if not resolved then
     -- Only once per candidate set: this used to fire on every single theme
-    -- switch, which made a transient mismatch (or a colour name that simply
+    -- switch, which made a transient mismatch (or a color name that simply
     -- does not match the plugin name) look like a permanent error.
     local key = table.concat(candidates, ",")
     if not reported[key] then
@@ -452,13 +452,13 @@ local function apply_now()
   if transient then
     -- The spec is mid-write; the watcher's trailing apply will retry once the
     -- host has finished. Applying the fallback here would flash the wrong
-    -- colourscheme on every switch.
+    -- colorscheme on every switch.
     return false
   end
   merge_into_state(plugins)
 
   if not primary then
-    -- No plugin to install; just apply the colourscheme name directly.
+    -- No plugin to install; just apply the colorscheme name directly.
     finish_apply(nil, nil, colorscheme)
     return false
   end
@@ -516,7 +516,7 @@ end
 
 -- M.apply: the main entry point for live theme switching.
 -- Reads the source, clones the plugin if not already installed (async via
--- vim.system), then applies the colourscheme.
+-- vim.system), then applies the colorscheme.
 function M.apply()
   if applying then
     -- Remember it instead of ignoring it: see `pending` above.
@@ -602,7 +602,7 @@ function M.watch()
   -- Watch only what this module consumes. The previous version watched the
   -- whole ~/.local/state/vibranium tree recursively, so writing wallpaper.json,
   -- monitors, nightshift or any of the ~20 sibling theme files re-applied the
-  -- colourscheme for nothing.
+  -- colorscheme for nothing.
   local function watch_path(dir, matches)
     if vim.fn.isdirectory(dir) == 0 then
       return
@@ -616,7 +616,7 @@ function M.watch()
         return
       end
       -- filename can be nil on some platforms; triggering then is the old
-      -- behaviour, i.e. the safe direction.
+      -- behavior, i.e. the safe direction.
       if filename == nil or matches(filename) then
         trigger()
       end

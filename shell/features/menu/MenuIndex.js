@@ -52,18 +52,27 @@ function sectionRows(builtin, registrations, settingsFamily) {
 function conditionVars(bundle) {
   const vars = {}
   if (!bundle || !Array.isArray(bundle.pages)) return vars
+  // A condition can ride a group's child as well as a page row. Walk the whole
+  // tree, or a store write that satisfies a child's showIf never bumps
+  // condRev and the child stays muted after its condition is met.
+  function walk(items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item || typeof item !== "object" || Array.isArray(item)) continue
+      const conds = item.showIf
+      if (Array.isArray(conds)) {
+        for (let c = 0; c < conds.length; c++) {
+          const cond = conds[c]
+          if (cond && cond.var !== undefined) vars[cond.var] = true
+        }
+      }
+      if (Array.isArray(item.children)) walk(item.children)
+    }
+  }
   for (let p = 0; p < bundle.pages.length; p++) {
     const page = bundle.pages[p]
     if (!page || !Array.isArray(page.items)) continue
-    for (let i = 0; i < page.items.length; i++) {
-      const item = page.items[i]
-      const conds = item ? item.showIf : null
-      if (!Array.isArray(conds)) continue
-      for (let c = 0; c < conds.length; c++) {
-        const cond = conds[c]
-        if (cond && cond.var !== undefined) vars[cond.var] = true
-      }
-    }
+    walk(page.items)
   }
   return vars
 }

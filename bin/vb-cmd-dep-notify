@@ -67,7 +67,7 @@ if [[ ${#DEPS[@]} -eq 0 ]]; then
   exit 1
 fi
 
-# Source the theme library for P_YELLOW and other colour variables used
+# Source the theme library for P_YELLOW and other color variables used
 # in the notification markup.
 # Argument validation completes prior to reading the theme color source.
 source "$VIBRANIUM_STATE/theme/colors.bash"

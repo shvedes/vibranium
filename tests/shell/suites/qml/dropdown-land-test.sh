@@ -1,7 +1,7 @@
 #!/bin/bash
 # Suite: dropdown-land - a landed DropdownSlot keeps following its content.
 #
-# land() snaps the slot to its destination with the Behaviour disabled, which
+# land() snaps the slot to its destination with the Behavior disabled, which
 # is how a region-growing reveal avoids animating the same height twice. The
 # landing goes through Binding objects so the declarative height and opacity
 # stay live: content that collapses later must shrink the slot with it, with

@@ -16,7 +16,7 @@
 #    types named ScrollBar, Button, CheckBox, Toggle and ProgressBar, so an
 #    unaliased import makes the bare name resolve back to the shell's own
 #    wrapper. It is silent - no error, no warning - and the result is a
-#    control with none of the native behaviour."
+#    control with none of the native behavior."
 #
 # Nothing here needs a live Quickshell, and nothing here needs qmllint: a
 # separate suite owns linting. qmllint is used at the very end as a recorded

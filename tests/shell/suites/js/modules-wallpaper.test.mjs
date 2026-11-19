@@ -19,14 +19,14 @@
 //
 // Two conventions worth stating up front:
 //
-//   * Colours. Five of these libraries return a PALETTE KEY ("red",
-//     "green", "orange", "yellow", "foreground_0"), never a colour value -
+//   * Colors. Five of these libraries return a PALETTE KEY ("red",
+//     "green", "orange", "yellow", "foreground_0"), never a color value -
 //     Icon.qml resolves the key through the theme. No assertion here pins a
-//     theme colour or a palette entry: the battery cluster tints the returned
+//     theme color or a palette entry: the battery cluster tints the returned
 //     key through a probe-local `tint()` fed a SYNTHETIC palette and asserts
 //     the shape of the result, so the test is about the level table and not
 //     about whichever theme is loaded.
-//   * Surprises. Behaviour that reads wrong at first glance is pinned with a
+//   * Surprises. Behavior that reads wrong at first glance is pinned with a
 //     `//` comment naming the source line that causes it, and the real value
 //     is asserted, so a future "fix" turns this suite red rather than silent.
 
@@ -64,7 +64,7 @@ const OWE_SEC = 9
 
 // tint() mirrors Ui.qml:132 - `Theme.color(key)` then `Qt.alpha(c, a)` -
 // with a palette supplied by the test. It exists so the battery assertions
-// can talk about the SHAPE of a tinted colour (8-digit #aarrggbb, alpha as
+// can talk about the SHAPE of a tinted color (8-digit #aarrggbb, alpha as
 // asked for) rather than about a theme value, which changes during
 // development. Nothing here reads the shipped palette.
 const PALETTE = { red: '#c03a3a', orange: '#c07a30', yellow: '#c0b030', green: '#3ac03a', foreground_0: '#d8d8e0' }
@@ -411,8 +411,8 @@ group('the accent key per level', () => {
   for (const l of LEVELS) eq(`${l.pct}% -> accent ${l.accent === '' ? '(none)' : l.accent}`, BAT.batteryAccentFor(l.pct, false), l.accent)
   // "battery-0 carries no pills (its outline goes red through
   // batteryColorFor)" - so its accent is the empty string, which is how Icon
-  // reads "recolour the whole icon in one tone".
-  eq('the empty accent is a key, not a colour', BAT.batteryAccentFor(0, false), '')
+  // reads "recolor the whole icon in one tone".
+  eq('the empty accent is a key, not a color', BAT.batteryAccentFor(0, false), '')
   eq('every other level carries a key', new Set(LEVELS.map((l) => l.accent)).size, 4)
 })
 group('the body tone per level', () => {
@@ -439,13 +439,13 @@ group('the three functions agree on the level, always', () => {
   eq('there are exactly four (icon, accent) pairs', pairs.size, 4)
   eq('and one more for charging', new Set([...pairs, 'battery-charging/green']).size, 5)
 })
-group('the returned strings are palette keys and icon stems, never colours', () => {
+group('the returned strings are palette keys and icon stems, never colors', () => {
   // Icon.qml takes colorKey/accentKey and resolves them through the theme, so
   // this library never produces a `#rrggbb`. Asserting the SHAPE keeps the
   // test about the level table rather than about a theme value.
   for (const l of LEVELS) {
-    is(`the icon ${l.icon} is an asset stem`, l.icon, (s) => /^[a-z]+(-\d)?$/.test(s) && !s.includes('#'), 'a bare stem, no colour')
-    is(`the accent ${l.accent || '(empty)'} is a key`, l.accent, (s) => s === '' || /^[a-z]+_[0-9]$/.test(s) || /^[a-z]+$/.test(s), 'a palette key, not a colour')
+    is(`the icon ${l.icon} is an asset stem`, l.icon, (s) => /^[a-z]+(-\d)?$/.test(s) && !s.includes('#'), 'a bare stem, no color')
+    is(`the accent ${l.accent || '(empty)'} is a key`, l.accent, (s) => s === '' || /^[a-z]+_[0-9]$/.test(s) || /^[a-z]+$/.test(s), 'a palette key, not a color')
   }
   // And the shape of what the view then paints, through a probe-local tint
   // over a synthetic palette (see tint() at the top).
@@ -984,7 +984,7 @@ group('the glyph is the device class, and the level when there is none', () => {
   eq('no type at all takes the level', iconOf({ label: 'x', percentage: 25 }), 'battery-2')
   eq('the charging glyph wins over the level', iconOf({ label: 'x', typeString: 'Phone', percentage: 25, charging: true }), 'battery-charging')
   // The class glyph is the row's subject, so it also beats a level that is
-  // worth a bolt or a colour on the bar.
+  // worth a bolt or a color on the bar.
   eq('a per-device class glyph wins over the level', iconOf({ label: 'x', typeString: 'Headset', percentage: 4, charging: true }), 'headset')
 })
 group('every row is exactly { icon, text }', () => {
@@ -2452,7 +2452,7 @@ group('the SSID is escaped before it reaches RichText', () => {
   eq('a hostile ssid loses its tags', NET.escapeHtml('<b>x</b>'), '&lt;b&gt;x&lt;/b&gt;')
 })
 group('a connected row with no verdict is the bare name', () => {
-  // The connected state is carried by the accent-coloured icon, so the title
+  // The connected state is carried by the accent-colored icon, so the title
   // no longer repeats "connected" - only a watcher verdict (if any) rides
   // beside the name.
   eq('connected', NET.ssidWithStatus('Net', true, '#A1', '#B2'), 'Net')
@@ -2487,15 +2487,15 @@ group('an unknown network is the bare name', () => {
   eq('a truthy non-boolean connected flag renders no connected word', NET.ssidWithStatus('Net', 1, '#A1', '#B2').includes('connected'), false)
   eq('the escaped name is still the whole output', NET.ssidWithStatus('a<b', false, '#A1', '#B2'), 'a&lt;b')
 })
-group('a missing dot colour falls back to the accent', () => {
-  // With no verdict the connected row is the bare name, so the dot colour
+group('a missing dot color falls back to the accent', () => {
+  // With no verdict the connected row is the bare name, so the dot color
   // only matters when a verdict rides along.
   eq('verdict with null dotHex', NET.ssidWithStatus('N', true, '#A1', null, 'portal', '#C3'), 'N <font color="#A1">•</font> <font color="#C3">login required</font>')
   eq('verdict with empty dotHex', NET.ssidWithStatus('N', true, '#A1', '', 'portal', '#C3'), 'N <font color="#A1">•</font> <font color="#C3">login required</font>')
   eq('verdict with undefined dotHex', NET.ssidWithStatus('N', true, '#A1', undefined, 'portal', '#C3'), 'N <font color="#A1">•</font> <font color="#C3">login required</font>')
   eq('a zero dotHex is passed through verbatim', NET.ssidWithStatus('N', true, '#A1', 0, 'portal', '#C3'), 'N <font color="0">•</font> <font color="#C3">login required</font>')
   eq('a disconnected row needs no dot at all', NET.ssidWithStatus('N', false, '#A1', null), 'N')
-  eq('an unknown network needs no colour at all', NET.ssidWithStatus('N', false, null, null), 'N')
+  eq('an unknown network needs no color at all', NET.ssidWithStatus('N', false, null, null), 'N')
 })
 group('a hostile SSID cannot inject a font tag', () => {
   const hostile = 'a<font color="#000">b'

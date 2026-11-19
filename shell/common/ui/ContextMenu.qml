@@ -5,7 +5,7 @@ import QtQuick.Effects
 import Quickshell.Widgets
 import qs.common
 
-// One shared context menu: the card, the rows and the pointer behaviour that
+// One shared context menu: the card, the rows and the pointer behavior that
 // every right-click menu in the tree uses - the wallpaper's, the image
 // viewer's and the tray's DBusMenu. It exists because those three had grown
 // three copies of the same card with three slightly different rhythms; the

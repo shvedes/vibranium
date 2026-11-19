@@ -266,7 +266,7 @@ function blurSamples(grid, vr, box) {
   })
 }
 
-// The average colour a cell covers: every pixel in the span, not one texel in
+// The average color a cell covers: every pixel in the span, not one texel in
 // it. Returns [r, g, b] or null when the span has no pixels in the block.
 function cellMean(px, box, span) {
   if (px === null || px === undefined || !px.data) return null
@@ -764,7 +764,7 @@ function selectHandles(b) {
 // Display-px inset for the staged text box, so the caret and the glyphs
 // sit inside it with real margins. Proportional with guards: calm on a
 // giant box, never eats a small one whole.
-// The palette's spoken names, for the one place a tool label names a colour.
+// The palette's spoken names, for the one place a tool label names a color.
 // Anything outside the palette is echoed verbatim, which is what keeps a
 // caller's custom ink readable instead of blank.
 var COLOR_NAMES = {

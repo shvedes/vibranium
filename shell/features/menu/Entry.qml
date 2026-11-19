@@ -149,6 +149,13 @@ Item {
     for (let i = 0; i < kids.length; i++) {
       const kid = kids[i]
       if (!kid) continue
+      // A provider marker expands to a surface-owned live row set (fonts).
+      // Resolved inside this binding so a scan landing later re-renders it.
+      if (kid.type === "provider") {
+        const rows = Menu.providerFontRows(kid)
+        for (let r = 0; r < rows.length; r++) out.push(rows[r])
+        continue
+      }
       if (trimmed && visible[String(kid.uid ?? "")] !== true) continue
       // Only a child with a guard of its own is asked: an ungated child is
       // always usable, and a provider's `visible` predicate describes a page
@@ -1368,7 +1375,7 @@ Item {
       const t = String(text).trim()
       // Settings-backed text (var): persist directly, honoring allowEmpty
       // (e.g. shell.statusbar.networkRightClick). Non-setting text (action)
-      // keeps the clear-then-run behaviour.
+      // keeps the clear-then-run behavior.
       if (itm && itm.var !== undefined && itm.var !== "") {
         Menu.setValue(itm, t)
         if (t !== "" && itm.onSubmit) Menu.runCommand(itm.onSubmit, t)
@@ -1512,7 +1519,9 @@ Item {
   MouseArea {
 
     anchors.fill: parent
-    enabled: !row.isSep
+    // A muted conditional row is inert: it must not even take the cursor on a
+    // click, or the bar would sit on a row that cannot be activated.
+    enabled: !row.isSep && row.enabled_
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     onClicked: mouse => {
       if (mouse.button === Qt.RightButton) {
@@ -1571,7 +1580,7 @@ Item {
       size: row.iconBox
       name: row.iconName
       // The glyph stays in the ordinary foreground so the swatch strip below
-      // - painted in the theme's real colours - is the only place colour is
+      // - painted in the theme's real colors - is the only place color is
       // sampled.
       colorKey: "foreground_0"
       accentKey: row.iconAccentKey
@@ -1750,7 +1759,7 @@ Item {
           }
         }
 
-        // Swatch line: a theme-remover row's own colours as 8px dots, and
+        // Swatch line: a theme-remover row's own colors as 8px dots, and
         // nothing else. The line is the strip alone, so its height is the
         // dot's own size.
         Row {
@@ -2990,7 +2999,7 @@ Item {
           && (row.dropdownOpen || row.expandFade > 0.001)
         opacity: row.dropdownOpen ? 1 : row.expandFade
         // The fill stays the plain two-shade step; only the left edge borrows
-        // a palette colour directly, one per depth. No mixing, no alpha.
+        // a palette color directly, one per depth. No mixing, no alpha.
         // Cool and warm alternate so no two neighbouring levels sit in the
         // same part of the spectrum; the brightest hue lands at the deepest
         // level as a finishing cue.
@@ -3453,7 +3462,7 @@ Item {
   // fill over the whole row mutes the copy underneath instead of the row
   // vanishing, and it fades out the moment every condition starts holding.
   // Drawn last so it covers the open slots too. No outline: the fill is the
-  // card colour, so it only mutes what is behind it and consecutive muted rows
+  // card color, so it only mutes what is behind it and consecutive muted rows
   // read as one area.
   //
   // The fade is an explicit tween started by the verdict's own change, not a

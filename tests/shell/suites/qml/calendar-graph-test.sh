@@ -85,10 +85,10 @@ t_eq "the plot box plus header is not collapsed" "173" "$(qp_get settle.graph.im
 # or NaN: the Canvas size and scale are both divided by it.
 t_eq "with no window the DPR falls back to 1" "1" "$(qp_get settle.dpr)"
 t_eq "and is a usable positive number" "true" "$(qp_get settle.dprPositive)"
-# Colour SHAPE only - the palette lands milliseconds after boot and the RGB
+# Color SHAPE only - the palette lands milliseconds after boot and the RGB
 # channels are theme values, so only the form is asserted here.
-t_eq "the mat colour is a bare rgb triple before tinting" "solid6" "$(qp_get settle.colour.bg)"
-t_eq "a tinted colour is already argb" "argb8" "$(qp_get settle.colour.axis)"
+t_eq "the mat color is a bare rgb triple before tinting" "solid6" "$(qp_get settle.color.bg)"
+t_eq "a tinted color is already argb" "argb8" "$(qp_get settle.color.axis)"
 
 # ---------------------------------------------------------------------------
 # Calendar geometry
@@ -724,7 +724,7 @@ t_eq "a NaN xMin is the one NaN that gets through" "true" "$(qp_get fin.nanMinIs
 t_eq "and the sampler's own guard stops it there" "true" "$(qp_get fin.nanMinSampleNull)"
 
 # ---------------------------------------------------------------------------
-# The nine theme-derived colours
+# The nine theme-derived colors
 # ---------------------------------------------------------------------------
 
 t_section "the palette is read through two different doors, and says so"
@@ -732,9 +732,9 @@ t_section "the palette is read through two different doors, and says so"
 # same value with an alpha and comes back #aarrggbb. The alpha channel is a
 # Ui.tint ARGUMENT, not a theme value, so it is exact - only the RGB channels
 # are theme-dependent and those are deliberately not asserted.
-t_eq "nine colour properties in total" "9" "$(qp_get col.count)"
+t_eq "nine color properties in total" "9" "$(qp_get col.count)"
 t_eq "none of them is empty" "true" "$(qp_get col.nonEmpty)"
-t_eq "all nine are a well-formed colour" "true" "$(qp_get col.allWellFormed)"
+t_eq "all nine are a well-formed color" "true" "$(qp_get col.allWellFormed)"
 t_eq "the four solid ones are bare rgb triples" "true" "$(qp_get col.solidsAreSixDigit)"
 t_eq "the mat (background_1)" "solid6" "$(qp_get col.bg)"
 t_eq "the plot fill (background_0)" "solid6" "$(qp_get col.plotBg)"
@@ -744,18 +744,18 @@ t_eq "the minor grid is tinted at 0.45" "argb8/115" "$(qp_get col.minor)"
 t_eq "the major grid is tinted at 0.95" "argb8/242" "$(qp_get col.major)"
 t_eq "the axis is tinted at 0.55" "argb8/140" "$(qp_get col.axis)"
 t_eq "the range labels are the same tint of the same key" "argb8/140" "$(qp_get col.label)"
-t_eq "so the label colour IS the axis colour" "true" "$(qp_get col.labelIsAxis)"
+t_eq "so the label color IS the axis color" "true" "$(qp_get col.labelIsAxis)"
 t_eq "0.45 scaled to 0..255" "true" "$(qp_get col.alpha45)"
 t_eq "0.95 scaled to 0..255" "true" "$(qp_get col.alpha95)"
 t_eq "0.55 scaled to 0..255" "true" "$(qp_get col.alpha55)"
 # Qt.alpha short-circuits at a = 1, so the fully-opaque title comes back as a
-# bare 6-digit colour instead of #ffrrggbb. Worth pinning: an assertion that
+# bare 6-digit color instead of #ffrrggbb. Worth pinning: an assertion that
 # "every Ui.tint result is 8-digit" would fail on this one for a good reason.
 t_note "FunctionGraph._title is Ui.tint(\"foreground_0\", 1), and Qt.alpha short-circuits at a = 1, so it returns the bare #rrggbb rather than #ffrrggbb (col.title). The other four tinted properties really are #aarrggbb. Pinned because a test that assumed all Ui.tint results carry an alpha channel would fail here for a reason that is not a bug."
-t_eq "so the title is a bare opaque colour" "solid6" "$(qp_get col.titleShape)"
+t_eq "so the title is a bare opaque color" "solid6" "$(qp_get col.titleShape)"
 t_eq "with no alpha channel for argb8Alpha to read" "-1" "$(qp_get col.titleAlpha)"
 t_eq "and is exactly Ui.solid of the same key" "true" "$(qp_get col.titleIsOpaque)"
-t_eq "a tinted colour is not the same string as an untiled one" "true" "$(qp_get col.minorIsNot)"
+t_eq "a tinted color is not the same string as an untiled one" "true" "$(qp_get col.minorIsNot)"
 
 # ---------------------------------------------------------------------------
 # Run 2: wide and invalid domains are constructed through the real component.
@@ -803,10 +803,10 @@ t_skip "the slide animation's in-flight position" \
 t_skip "the month title text" \
   "monthTitle is a file-private id, so Qt.formatDate(new Date(viewYear, viewMonth, 1), 'MMMM yyyy') cannot be read back; the grid is asserted instead, and it is derived from the same two properties"
 t_skip "rendered pixels of the plot" \
-  "the Canvas is a file-private id, so Canvas.painted/available and the painted path are unreachable; what is asserted is everything the paint READS - the sample, the step, the colours and the box geometry - plus the cost of one real repaint in the characterisation run"
+  "the Canvas is a file-private id, so Canvas.painted/available and the painted path are unreachable; what is asserted is everything the paint READS - the sample, the step, the colors and the box geometry - plus the cost of one real repaint in the characterisation run"
 t_skip "the weekday labels' rendered text and the day numbers' rendered text" \
   "both live in Repeater delegates with file-private ids; the library expressions driving them (weekdayOrder, cell.day) are asserted directly instead"
 t_skip "hover states" \
-  "containsMouse needs a real pointer; the chevron/underline colour changes on hover and today are unverified"
+  "containsMouse needs a real pointer; the chevron/underline color changes on hover and today are unverified"
 
 t_summary

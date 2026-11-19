@@ -4,7 +4,7 @@
 
 // Severity band for a normalized audio level.
 //
-// A level is printed as a rounded percent, and the colour a row paints must be
+// A level is printed as a rounded percent, and the color a row paints must be
 // derived from that same rounded number or the digits and the tone can
 // disagree at a threshold. The callers own the thresholds - a device track, a
 // stream and the island's readout have different headroom - so both bounds

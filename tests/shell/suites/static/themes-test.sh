@@ -1,15 +1,15 @@
 #!/bin/bash
 # Suite: themes/ - the 44 shipped palettes, the files each one carries, and
-# the colour keys the shell and the theme engine actually read.
+# the color keys the shell and the theme engine actually read.
 #
 # Nothing in the tree tests this surface. The settings suites cover
 # shell/common/settings/catalog.jsonc, the assets suite covers shell/assets/, and the
 # theme surfaces are only probed with a synthetic /tmp tree, so the 44 real
-# themes, their 14-colour palettes and their 247 wallpapers are untested data
+# themes, their 14-color palettes and their 247 wallpapers are untested data
 # that a single dropped `colors.list` key silently degrades.
 #
-# The required colour set is DERIVED, not copied. Four independent sources in
-# the tree name colour keys, and they are read back here rather than restated:
+# The required color set is DERIVED, not copied. Four independent sources in
+# the tree name color keys, and they are read back here rather than restated:
 #
 #   default/themed/*.tpl              the templates. Every {{ token }} is
 #                                      resolved against the suffix table in
@@ -36,7 +36,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
-t_init "themes" "the 44 shipped palettes: required files, the derived colour set, neovim.lua, backgrounds"
+t_init "themes" "the 44 shipped palettes: required files, the derived color set, neovim.lua, backgrounds"
 
 require_tools awk sed grep sort paste tr wc find md5sum cut comm iconv
 
@@ -47,7 +47,7 @@ THEME_QML="$SHELL_DIR/common/theme/Theme.qml"
 THEME_PICKER="$SHELL_DIR/features/pickers/theme/ThemePicker.qml"
 THEME_REMOVER="$SHELL_DIR/features/pickers/theme/ThemeRemover.qml"
 THEME_ROOTS="$SHELL_DIR/features/pickers/theme/ThemeRoots.qml"
-# The colour reader both theme surfaces call. The rules below are stated here
+# The color reader both theme surfaces call. The rules below are stated here
 # rather than in either page: the picker reads colors.list for its previews and
 # the remover reads it for its swatches, so a key added to one path cannot be
 # invisible to the other.
@@ -81,7 +81,7 @@ t_contains "the doc names theme.info as required" \
   "- \`theme.info\`" "$(<"$THEME_DOC")"
 t_contains "the doc requires at least one background image" \
   "At least one image in \`backgrounds/\`" "$(<"$THEME_DOC")"
-t_contains "and says every colour value must be defined" \
+t_contains "and says every color value must be defined" \
   "Every color value must be defined." "$(<"$THEME_DOC")"
 
 # The three theme.info fields, read back out of the two consumers that parse
@@ -122,7 +122,7 @@ theme_dirs() {
   find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%P\n' | LC_ALL=C sort
 }
 
-# palette_keys <file> - the colour names a colors.list declares, one per line,
+# palette_keys <file> - the color names a colors.list declares, one per line,
 # parsed the way both readers parse it: the key is everything before the first
 # "=", with the quotes and spaces vb-theme-set-templates:91 strips, and a
 # comment line (a leading #) and a blank line are dropped.
@@ -391,19 +391,19 @@ for theme in "${THEMES[@]}"; do
     fi
   done <<<"$keys"
 done
-t_eq "every colour value is a quoted #rrggbb" "" "$PAL_BAD"
-t_eq "no palette declares the same colour name twice" "" "$PAL_DUP"
-t_eq "no palette declares an empty colour name" "0" "$PAL_EMPTY_NAME"
-t_eq "every palette declares the same number of colours" "1" \
+t_eq "every color value is a quoted #rrggbb" "" "$PAL_BAD"
+t_eq "no palette declares the same color name twice" "" "$PAL_DUP"
+t_eq "no palette declares an empty color name" "0" "$PAL_EMPTY_NAME"
+t_eq "every palette declares the same number of colors" "1" \
   "$(printf '%s\n' "${PAL_COUNT[@]}" | LC_ALL=C sort -u | grep -c .)"
 t_eq "and that number is 14" "14" "${PAL_COUNT[0]}"
-t_note "a palette names one background and one foreground and nothing above or below them: the templates ramp every shade off those two with |pop= and |dim=, so a palette needs the 11 colour families, accent, and one key each for background and foreground. 14 rather than the 26 the ladders used to cost"
+t_note "a palette names one background and one foreground and nothing above or below them: the templates ramp every shade off those two with |pop= and |dim=, so a palette needs the 11 color families, accent, and one key each for background and foreground. 14 rather than the 26 the ladders used to cost"
 
 # --------------------------------------------------------------------------
-# the required colour set, derived from the four sources that name one
+# the required color set, derived from the four sources that name one
 # --------------------------------------------------------------------------
 
-t_section "the required colour set, derived from default/themed/*.tpl"
+t_section "the required color set, derived from default/themed/*.tpl"
 # The suffix table resolve_token() strips, read out of the engine rather than
 # restated: awk/vb-theme-set-templates.awk:279-292.
 SUFFIXES="$(grep -o 'sub(/_[a-z0-9]*[$]' "$THEME_AWK" | cut -c6- | tr -d '$' |
@@ -444,7 +444,7 @@ resolve_key() {
 
 TEMPLATE_TOKENS="$(grep -ho '{{[[:space:]]*[A-Za-z_][A-Za-z0-9_]*' "$THEMED_DIR"/*.tpl |
   sed 's/{{[[:space:]]*//' | LC_ALL=C sort -u)"
-t_ne "the templates ask for at least one colour" "0" \
+t_ne "the templates ask for at least one color" "0" \
   "$(printf '%s\n' "$TEMPLATE_TOKENS" | grep -c .)"
 
 TEMPLATE_KEYS=""
@@ -459,13 +459,13 @@ done <<<"$TEMPLATE_TOKENS"
 TEMPLATE_KEYS="$(printf '%s' "$TEMPLATE_KEYS" | LC_ALL=C sort -u | grep -c .)"
 
 t_eq "every placeholder in every template resolves to a palette key" "" "$UNRESOLVED"
-t_count "and the 21 shipped templates hold 181 distinct colour placeholders" \
+t_count "and the 21 shipped templates hold 181 distinct color placeholders" \
   "181" "$TOKENS_N"
 t_count "default/themed/ holds 21 templates, the whole render set" "21" \
   "$(printf '%s\n' "$THEMED_DIR"/*.tpl | grep -c .)"
 t_contains "and the renderer globs that set rather than naming it" \
   'for tpl in "$tpl_dir"/*.tpl; do' "$(<"$THEME_TEMPLATES")"
-t_note "181 distinct {{ key }} tokens collapse to 14 base palette keys, because the engine derives _rgb/_hsl/_lower/_r/... forms from one key (awk/vb-theme-set-templates.awk:279-292). The token count is the number of derived forms a theme must be able to satisfy, the 14 is the number of colours it must define"
+t_note "181 distinct {{ key }} tokens collapse to 14 base palette keys, because the engine derives _rgb/_hsl/_lower/_r/... forms from one key (awk/vb-theme-set-templates.awk:279-292). The token count is the number of derived forms a theme must be able to satisfy, the 14 is the number of colors it must define"
 t_eq "the 14 base keys the templates can reach are exactly this" \
   "accent background black blue cyan foreground gray green orange pink purple red white yellow" \
   "$(while read -r tok; do resolve_key "$tok"; printf '\n'; done <<<"$TEMPLATE_TOKENS" |
@@ -479,29 +479,29 @@ t_eq "and every one of them is defined in every theme" "0" \
     done
   done | tr ' ' '\n' | grep -c .)"
 
-# Every shade a template renders is a ramp off a base colour rather than a
+# Every shade a template renders is a ramp off a base color rather than a
 # palette key, so this is the assertion that keeps the two in step. A level
 # suffix would resolve to nothing the palette can answer for, and - because
 # the engine tries the whole token as a key before it strips any suffix, so
 # background_h would lose its _h and land on background - would hand back the
-# base colour under the guise of a shade. That is the one failure mode here
+# base color under the guise of a shade. That is the one failure mode here
 # that leaves no literal {{ ... }} behind to notice.
 t_eq "no template names a shade with a numeric level suffix" "0" \
   "$(grep -ohE '\{\{[[:space:]]*(background|foreground)_[0-5]' "$THEMED_DIR"/*.tpl | grep -c .)"
 t_eq "and no palette declares a level-suffixed base either" "0" \
   "$(palette_keys "$THEMES_DIR/nightfox/colors.list" |
     grep -E '^(background|foreground)_' | grep -c . || true)"
-t_note "_h is deliberately not in that count, and could not be: it is one of the engine's 14 format suffixes - the HSL hue scalar - so {{ background_h }} asks for the hue of the base colour, which is what colors.css.tpl puts on the -h row of every shade. It reads exactly like the retired background_h palette key and means nothing of the sort. That is why the check is on the numeric levels, and why a bare background_h must never be taken for the old key again"
+t_note "_h is deliberately not in that count, and could not be: it is one of the engine's 14 format suffixes - the HSL hue scalar - so {{ background_h }} asks for the hue of the base color, which is what colors.css.tpl puts on the -h row of every shade. It reads exactly like the retired background_h palette key and means nothing of the sort. That is why the check is on the numeric levels, and why a bare background_h must never be taken for the old key again"
 RAMP_STEPS="$(grep -ohE '\{\{[[:space:]]*(background|foreground)[a-z0-9_]*\|(pop|dim)=[0-9.]+' \
   "$THEMED_DIR"/*.tpl | sed 's/.*=//' | LC_ALL=C sort -u | paste -sd' ' -)"
 t_eq "the ramp uses one step for the ladder, plus a shorter one for each extreme" \
   "0.03 0.06 0.12 0.18 0.24 0.30 12 18 24 3 30 6" "$RAMP_STEPS"
-t_note "0.06 is the ladder step and 0.03 the background's deepest surface, half of it, because a background already sits at the far end of its range while a foreground needs a full step to read brighter than body text. The hsl lens takes unsigned percentage points and every other lens takes a fraction of the 0-100 lightness range, so one 0.06 step appears as pop=6 on an _hsl token and pop=0.06 elsewhere. Mixing the two forms within one level would silently render two different colours"
+t_note "0.06 is the ladder step and 0.03 the background's deepest surface, half of it, because a background already sits at the far end of its range while a foreground needs a full step to read brighter than body text. The hsl lens takes unsigned percentage points and every other lens takes a fraction of the 0-100 lightness range, so one 0.06 step appears as pop=6 on an _hsl token and pop=0.06 elsewhere. Mixing the two forms within one level would silently render two different colors"
 
 DOC_KEYS="$(sed -n '/^    ```toml$/,/^    ```$/p' "$THEME_DOC" |
   sed -n 's/^    \([a-z_0-9]*\)[[:space:]]*=.*/\1/p' | LC_ALL=C sort -u)"
-t_count "the doc's palette template lists 14 colours" "14" "$(printf '%s\n' "$DOC_KEYS" | grep -c .)"
-t_eq "and every documented colour is a real palette key" "" \
+t_count "the doc's palette template lists 14 colors" "14" "$(printf '%s\n' "$DOC_KEYS" | grep -c .)"
+t_eq "and every documented color is a real palette key" "" \
   "$(printf '%s\n' "$DOC_KEYS" | while read -r k; do
     [[ -n ${PAL[$k]+set} ]] || printf '%s ' "$k"
   done)"
@@ -510,7 +510,7 @@ t_eq "the palette is exactly the documented 14, so it names no extra" \
   "$(while read -r k; do printf '%s\n' "$k"; done < <(palette_keys "$THEMES_DIR/nightfox/colors.list") |
     LC_ALL=C sort -u)"
 
-# The documented colours no shipped template consumes.
+# The documented colors no shipped template consumes.
 UNUSED_KEYS=""
 while read -r key; do
   [[ -n $key ]] || continue
@@ -520,19 +520,19 @@ while read -r key; do
     UNUSED_KEYS="$UNUSED_KEYS$key"$'\n'
   fi
 done <<<"$DOC_KEYS"
-t_eq "every documented colour is asked for by some template" "" \
+t_eq "every documented color is asked for by some template" "" \
   "$(printf '%s' "$UNUSED_KEYS" | tr -d '\n')"
-t_note "with the shades computed there is no unreachable palette entry left: the 14 colours the doc documents are the 14 the templates read, and the derived set and the palette are the same set. Before the ramp the darkest foreground shade was in every colors.list and no template ever rendered it"
+t_note "with the shades computed there is no unreachable palette entry left: the 14 colors the doc documents are the 14 the templates read, and the derived set and the palette are the same set. Before the ramp the darkest foreground shade was in every colors.list and no template ever rendered it"
 
 t_section "the palette every theme declares, checked key by key"
-# "Every theme declares the same colour names" is one fact about the tree, so
+# "Every theme declares the same color names" is one fact about the tree, so
 # the digest of all 44 name sets is computed once. Inside the loop it was 44
 # identical 44-theme digests, which is the quadratic part of this suite.
 NAME_SET_VARIANTS="$(for theme in "${THEMES[@]}"; do
   palette_keys "$THEMES_DIR/$theme/colors.list" | LC_ALL=C sort -u |
     md5sum | cut -d' ' -f1
 done | LC_ALL=C sort -u | grep -c .)"
-MISSING_COLOUR=""
+MISSING_COLOR=""
 for theme in "${THEMES[@]}"; do
   keys="$(palette_keys "$THEMES_DIR/$theme/colors.list")"
   # One associative lookup per name in each direction, instead of a grep per
@@ -550,18 +550,18 @@ for theme in "${THEMES[@]}"; do
     [[ -n $key ]] || continue
     [[ -n ${HAVE[$key]+set} ]] || absent="$absent $key"
   done <<<"$DOC_KEYS"
-  t_eq "$theme defines all 26 documented colours" "" "$absent"
+  t_eq "$theme defines all 26 documented colors" "" "$absent"
   extra=""
   while read -r key; do
     [[ -n $key ]] || continue
     [[ -n ${WANT[$key]+set} ]] || extra="$extra $key"
   done <<<"$keys"
-  t_eq "$theme names no colour outside the documented palette" "" "$extra"
-  t_eq "$theme's colour-name set is the one every other theme declares" "1" \
+  t_eq "$theme names no color outside the documented palette" "" "$extra"
+  t_eq "$theme's color-name set is the one every other theme declares" "1" \
     "$NAME_SET_VARIANTS"
-  MISSING_COLOUR="$MISSING_COLOUR$absent"
+  MISSING_COLOR="$MISSING_COLOR$absent"
 done
-t_eq "no theme is missing a colour the shell reads" "" "$MISSING_COLOUR"
+t_eq "no theme is missing a color the shell reads" "" "$MISSING_COLOR"
 
 t_section "the shell's own palette readers, cross-checked against the set"
 QS_KEYS="$(grep -o '"[a-z_0-9]*": "{{' "$THEMED_DIR/qs.json.tpl" |
@@ -593,7 +593,7 @@ t_count "and the shell's 16 outputs come from 12 palette keys" "12" \
     resolve_key "$src"; printf '\n'
   done | LC_ALL=C sort -u | grep -c .)"
 t_note "4 of the 16 are background_1/2/3 and foreground_1, which no palette declares: they are ramp levels off background and foreground, and Theme.qml binds them by that name regardless of which theme is active. That is why the ramp has to be a template operation rather than a palette key - the shell's key set cannot move with the palette"
-# The status dot reads its colour through Ui.solid(key). A key the shell does
+# The status dot reads its color through Ui.solid(key). A key the shell does
 # not bind resolves to the black fallback, which looks like an unreserved dot
 # rather than a missing palette entry, so keep the viewer's keys inside QS_KEYS.
 IV_KEYS="$(grep -oE 'key: *"[a-z_0-9]+"' "$IMAGEVIEWER_META" |
@@ -608,7 +608,7 @@ t_eq "every image-viewer status-dot key is a shell palette key" "" \
 t_note "Ui.solid answers an unknown key with #000000 (Theme.qml's fallback), so a format whose dot key is absent from qs.json.tpl paints black instead of its reserved hue"
 SWATCH_KEYS="$(grep -m1 '^const PALETTE_KEYS' "$THEME_SCAN" |
   grep -o '"[a-z]*"' | tr -d '"' | LC_ALL=C sort -u)"
-t_eq "the shared palette reader takes 7 swatch colours" "7" \
+t_eq "the shared palette reader takes 7 swatch colors" "7" \
   "$(printf '%s\n' "$SWATCH_KEYS" | grep -c .)"
 t_eq "all 7 are inside the required palette" "" \
   "$(printf '%s\n' "$SWATCH_KEYS" | while read -r k; do
@@ -629,7 +629,7 @@ t_contains "and skips a line with no = on it" \
 # neovim.lua
 # --------------------------------------------------------------------------
 
-t_section "neovim.lua: a real Lua chunk with no unresolved colour"
+t_section "neovim.lua: a real Lua chunk with no unresolved color"
 LUA_BIN=""
 for candidate in luac luac5.4 luac5.3 luac5.2 luac5.1; do
   if command -v "$candidate" >/dev/null 2>&1; then
@@ -640,12 +640,12 @@ done
 if [[ -n $LUA_BIN ]]; then
   t_note "$LUA_BIN is on PATH, so every neovim.lua is compiled with the real Lua parser rather than only checked structurally"
 else
-  t_note "no luac on PATH: neovim.lua is checked structurally only (balanced block keywords, balanced braces, non-empty, and every colour it references defined in that theme's palette). A real Lua interpreter would be the stronger check; the structural checks are what runs here"
+  t_note "no luac on PATH: neovim.lua is checked structurally only (balanced block keywords, balanced braces, non-empty, and every color it references defined in that theme's palette). A real Lua interpreter would be the stronger check; the structural checks are what runs here"
 fi
 
 LUA_BAD=""
 LUA_EMPTY=""
-LUA_MISSING_COLOUR=""
+LUA_MISSING_COLOR=""
 LUA_COLORREF=0
 LUA_CHECKED=0
 for theme in "${THEMES[@]}"; do
@@ -676,12 +676,12 @@ for theme in "${THEMES[@]}"; do
           break
         fi
       done < <(palette_keys "$THEMES_DIR/$theme/colors.list")
-      [[ -n "$hex" ]] || LUA_MISSING_COLOUR="$LUA_MISSING_COLOUR$theme:$ref "
+      [[ -n "$hex" ]] || LUA_MISSING_COLOR="$LUA_MISSING_COLOR$theme:$ref "
     else
-      base="$(resolve_key "$ref")" || { LUA_MISSING_COLOUR="$LUA_MISSING_COLOUR$theme:$ref "
+      base="$(resolve_key "$ref")" || { LUA_MISSING_COLOR="$LUA_MISSING_COLOR$theme:$ref "
         continue; }
       palette_keys "$THEMES_DIR/$theme/colors.list" | grep -qxF -- "$base" ||
-        LUA_MISSING_COLOUR="$LUA_MISSING_COLOUR$theme:$base "
+        LUA_MISSING_COLOR="$LUA_MISSING_COLOR$theme:$base "
     fi
   done < <(grep -o '{{[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[}|]*\|#[0-9a-fA-F]\{6\}' "$file" |
     sed 's/{{[[:space:]]*//; s/[}|]*$//' | LC_ALL=C sort -u)
@@ -694,13 +694,13 @@ done
 t_count "every shipped neovim.lua is non-empty" "31" "$LUA_CHECKED"
 t_eq "no neovim.lua is empty" "" "$LUA_EMPTY"
 t_eq "no neovim.lua is structurally unbalanced" "" "$LUA_BAD"
-t_eq "no neovim.lua references a colour its theme does not define" "" "$LUA_MISSING_COLOUR"
-t_eq "the colour-reference check is not vacuous: 7 inline colours are checked against the palettes" \
+t_eq "no neovim.lua references a color its theme does not define" "" "$LUA_MISSING_COLOR"
+t_eq "the color-reference check is not vacuous: 7 inline colors are checked against the palettes" \
   "7" "$LUA_COLORREF"
-t_note "30 of the 31 hand-authored neovim.lua files select an upstream colourscheme plugin (catppuccin/nvim, neanias/everforest-nvim, ellisonleao/gruvbox.nvim, rose-pine/neovim, ...) and name no palette colour at all. ristretto is the exception: it hardcodes seven hexes in its monokai-pro override, and every one of them is a value its colors.list defines, so the reference check now runs on real input rather than on nothing. The template renderer, not the theme, supplies the generated palette, and the 4 gruvbox themes legitimately share one neovim.lua because the upstream plugin picks its own variant"
+t_note "30 of the 31 hand-authored neovim.lua files select an upstream colorscheme plugin (catppuccin/nvim, neanias/everforest-nvim, ellisonleao/gruvbox.nvim, rose-pine/neovim, ...) and name no palette color at all. ristretto is the exception: it hardcodes seven hexes in its monokai-pro override, and every one of them is a value its colors.list defines, so the reference check now runs on real input rather than on nothing. The template renderer, not the theme, supplies the generated palette, and the 4 gruvbox themes legitimately share one neovim.lua because the upstream plugin picks its own variant"
 t_contains "the generated palette ramps its dimmed background off the base" \
   'bg_dim = "{{ background|pop=0.06 }}"' "$(<"$THEMED_DIR/neovim.lua.tpl")"
-t_eq "all 11 colours it names are inside the required palette" "" \
+t_eq "all 11 colors it names are inside the required palette" "" \
   "$(grep -o '{{[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[}|]*' "$THEMED_DIR/neovim.lua.tpl" |
     sed 's/{{[[:space:]]*//; s/[}|]*$//' | LC_ALL=C sort -u |
     while read -r k; do

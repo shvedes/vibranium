@@ -286,15 +286,15 @@ BarModule {
       if (root.ssid !== "") nameFlash.pulse()
     }
   }
-  // Whether the reveal is up, read by both the slide and the colour rather
+  // Whether the reveal is up, read by both the slide and the color rather
   // than each reading the window on its own: one event - the reveal timer's
-  // expiry - flips both, so the pill's collapse and the colour's fade start
+  // expiry - flips both, so the pill's collapse and the color's fade start
   // together and land together. Reading the animated slide instead would flip
-  // the colour a whole glide later, when the slide has already reached zero,
+  // the color a whole glide later, when the slide has already reached zero,
   // and the glyph would stay green after the name was gone.
   readonly property bool revealed: nameFlash.active && root.ssid !== ""
   // The island's own reveal: the same slide, held for the island's lifespan
-  // while a wifi link stays connected. No window, no colour, no blink - the
+  // while a wifi link stays connected. No window, no color, no blink - the
   // island opening is the timer. A cable has no name, so it reveals nothing.
   readonly property bool islandReveal: root.islandOpen && root.ssid !== ""
   RevealFlash {
@@ -311,7 +311,7 @@ BarModule {
     Glide { duration: Ui.slowMs }
   }
   // Icon takes a literal hex for colorKey (Icons.url -> data URL), so an
-  // intermediate tween colour is a fresh decode; the reveal is a binary
+  // intermediate tween color is a fresh decode; the reveal is a binary
   // greenPhase blink, so one URL per phase is correct and the retained raster
   // covers the decode.
   property color glyphColor: reveal.glyphColor
@@ -337,8 +337,8 @@ BarModule {
 
     // The glyph flashes green-normal for the reveal: the reveal names the
     // access point that just came up, so the icon joins the announcement.
-    // The colour itself is the signal, so the wrapper holds full opacity -
-    // the island reveal slides the name with no colour at all.
+    // The color itself is the signal, so the wrapper holds full opacity -
+    // the island reveal slides the name with no color at all.
     //
     // The wrapper is one slot wide rather than filled from the pill: it is
     // then the item the label anchors to, because an anchor may only name a

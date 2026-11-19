@@ -27,10 +27,10 @@ import "../collections/BoundedCache.js" as BoundedCache
 // Keyed on the raw name, the fallback and the tone, NOT on any theme state:
 // the memo keeps the RESOLUTION (a shipped asset name or a platform URL), not
 // the themed data URL. Icons.url re-runs on every call against the live palette,
-// so a theme switch recolours a shipped glyph without invalidating the entry -
+// so a theme switch recolors a shipped glyph without invalidating the entry -
 // and reading Theme.color there is what makes caller bindings depend on the
 // palette and re-evaluate on a switch. Caching the data URL instead would pin
-// the first palette's colour into every entry (a dark-theme icon stays white
+// the first palette's color into every entry (a dark-theme icon stays white
 // after switching to a light theme). An install that adds an icon mid-session
 // is picked up when the entry is evicted rather than by watching the icon
 // theme (which would cost a watcher per distinct app for a lookup that is

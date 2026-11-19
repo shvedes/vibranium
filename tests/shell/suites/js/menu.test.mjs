@@ -47,7 +47,7 @@
 //      gives a clean slate for the cross-corpus leakage guard below.
 //
 // The two hazards the cache actually has - an in-place rebuild and a caller
-// mutating the array it was handed - are asserted as real behaviour in the
+// mutating the array it was handed - are asserted as real behavior in the
 // "module-level search cache" section, with the production caller named.
 
 import vm from 'node:vm'
@@ -143,7 +143,7 @@ const catalogRows = () => {
 const SURFACE = [
   'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'quantize',
   'decimalsOf', 'unitSuffix', 'widestValueString', 'defaultsFor', 'stripForHay',
-  'hayFromItem', 'hayForFilter', 'normalizeItem', 'buildOptionsPage', 'buildPage', 'mergedPageOpts',
+  'hayFromItem', 'hayForFilter', 'normalizeItem', 'normalizeChildren', 'buildOptionsPage', 'buildPage', 'mergedPageOpts',
   'normalizePage', 'normalizePages', 'parseBundle', 'bundleFromPages', 'orderSettingsIndex', 'mergePages', 'applyExtension',
   'mergedLabel', 'mergedWidth', 'replacePage', 'mergeRawItems', 'buildGuardScript',
   'uidKey', 'requiresExpr', 'requiresGuard', 'hideLine', 'guardLine', 'buildIndex',
@@ -180,13 +180,13 @@ suite('menu/MenuLib', 'the menu framework\'s pure layer - 73 functions')
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // The 73-name ledger plus ten top-level declarations the suite reads
+  // The 74-name ledger plus ten top-level declarations the suite reads
   // separately: the three filter-hay builders and the seven cache `var`s (the
   // six search caches and the scoped-filter hay cache), which the loader picks
   // up because a `.pragma library` namespace is its top-level declarations.
-  eq('83 declarations', Object.keys(M).length, 83)
+  eq('84 declarations', Object.keys(M).length, 84)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 73 named functions are callable', missing, [])
+  eq('all 74 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -206,11 +206,11 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 83 names', Object.keys(F).length, 83)
+  eq('the live view publishes the same 84 names', Object.keys(F).length, 84)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
-  eq('and on behaviour', M.fuzzyScore('power', ['power'], 'power'), F.fuzzyScore('power', ['power'], 'power'))
+  eq('and on behavior', M.fuzzyScore('power', ['power'], 'power'), F.fuzzyScore('power', ['power'], 'power'))
   eq('the live view starts with a null index', F._searchCacheIndex, null)
 })
 
@@ -925,8 +925,7 @@ group('scopeBundle spans one entry tree, not the whole file', () => {
     path.join(SHELL_DIR, 'common/settings/catalog.jsonc'), 'utf8')))
   const menus = M.parseBundle(JSON.stringify(catalog.menus))
   const main = M.scopeBundle(menus, 'main', [])
-  eq('main keeps its own pages', main.pages.map(p => p.id),
-    ['main', 'setup', 'install', 'remove', 'update', 'help'])
+  eq('main keeps its own pages', main.pages.map(p => p.id), ['main'])
   eq('and utilities is out of its search', main.byId.utilities, undefined)
   eq('the entry stays the opened page', main.entry, 'main')
   const util = M.scopeBundle(menus, 'utilities', [])
@@ -939,11 +938,11 @@ group('scopeBundle spans one entry tree, not the whole file', () => {
   eq('an unknown entry falls back to the bundle entry',
     [M.scopeBundle(menus, 'nope', []).entry,
       M.scopeBundle(menus, 'nope', []).pages.map(p => p.id)],
-    ['main', ['main', 'setup', 'install', 'remove', 'update', 'help']])
+    ['main', ['main']])
   const seeded = M.scopeBundle(menus, 'utilities', ['main'])
   eq('extension pages always join the search',
     seeded.pages.map(p => p.id).sort(),
-    ['help', 'install', 'main', 'remove', 'setup', 'update', 'utilities'])
+    ['main', 'utilities'])
   eq('without moving the entry', seeded.entry, 'utilities')
 })
 
@@ -1451,7 +1450,7 @@ group('guardLine emits one if/then/echo per expression', () => {
   // A trailing `;` in the expression is NOT stripped, so the emitted braces
   // carry `;;` - which bash rejects as a syntax error. Because all the guards
   // share ONE batched run, a single bundle row written that way takes down
-  // every row's guard answer, not just its own. Pinned as the real behaviour;
+  // every row's guard answer, not just its own. Pinned as the real behavior;
   // see the report.
   eq('a trailing semicolon in the expression is stripped, not doubled', M.guardLine('u', 'w', 'true;').includes('if { true; }'), true)
   eq('so the emitted braces stay well-formed bash', M.guardLine('u', 'w', 'true;').split('; then')[0], 'if { true; } >/dev/null 2>&1')
@@ -1590,7 +1589,7 @@ group('a chassis value outside the three known arms hides the row', () => {
   eq('an empty chassis is not ""-guarded either - it hits the else', M.requiresGuard('u', { chassis: '' }), "echo 'u:w:0'\n")
   // 'Unknown shapes log and hide the row.' No logging happens in this
   // function - the hide is silent. Pinned as documented-vs-actual drift; the
-  // behaviour itself (hide) is what the caller depends on.
+  // behavior itself (hide) is what the caller depends on.
   eq('an empty object has no expression to emit, so it hides', M.requiresGuard('u', {}), "echo 'u:w:0'\n")
   eq('a boolean requires hides', M.requiresGuard('u', false), "echo 'u:w:0'\n")
   eq('an array requires hides', M.requiresGuard('u', []), "echo 'u:w:0'\n")
@@ -2371,7 +2370,7 @@ group('a cache HIT is a fresh copy; the first result of a query is the cache', (
   // freshly-built `out` array on a miss - and that same array is what it
   // stores as `_searchCacheEntries`. So the caller's first result IS the
   // cached array, and mutating it corrupts the next identical query. Pinned
-  // as the real behaviour; see the report. Menu.qml assigns the result to
+  // as the real behavior; see the report. Menu.qml assigns the result to
   // root.results and never mutates it in place, so nothing is broken today.
   const idx = indexOf([['Power', 'power'], ['Powder', 'powder']])
   const first = M.search(idx, 'pow')
@@ -2502,7 +2501,7 @@ group('REGRESSION GUARD: a stale cache never leaks across corpora', () => {
 })
 
 group('the identity key means an in-place rebuild IS a cache hazard', () => {
-  // Pinned as the real behaviour, not as the desired one. The cache compares
+  // Pinned as the real behavior, not as the desired one. The cache compares
   // `index` with `===`, so an array that is *mutated* rather than replaced
   // keeps serving the previous corpus. Menu.qml never does this - both
   // rebuild sites (MenuLib.buildIndex at Menu.qml:543 and the row-patch .map
@@ -2600,7 +2599,7 @@ group('a tiebreak change between two calls on one pool is not re-applied', () =>
   // The launcher's cache-hit branch returns the previously sorted rows
   // verbatim, so a caller that changes only the tiebreak (the launcher passes
   // druncache counts, which move over time) keeps the old order until the
-  // pool identity or the query changes. Pinned as the real behaviour - the
+  // pool identity or the query changes. Pinned as the real behavior - the
   // menu forwarder inherits it unchanged.
   const pool = [{ label: 'a', words: ['t'] }, { label: 'b', words: ['t'] }]
   eq('first call, no tiebreak', M.filterCounter(pool, 't', 5).rows.map(r => r.label), ['a', 'b'])
@@ -4142,15 +4141,25 @@ group('rowSetGuard answers a fresh row array or a refusal code', () => {
   eq('a numeric uid and its string are one identity', M.rowSetGuard([{ uid: 7 }, { uid: '7' }]).error, 'duplicate_key')
 })
 
+section('normalizeChildren - the provider-fed group rows get the same contract')
+group('a provider row set normalizes like a declared one', () => {
+  const kids = M.normalizeChildren([
+    { type: 'action', id: 'f1', label: 'Font one', call: 'fontPicker pick %v' },
+    { type: 'action', id: 'f2', label: 'Font two', call: 'fontPicker pick %v' }
+  ], 'general', 'general#font')
+  eq('both rows survive', kids.length, 2)
+  eq('and carry a uid', typeof kids[0].uid, 'string')
+})
+
 section('coverage ledger')
-group('every one of the 70 functions was exercised above', () => {
+group('every one of the 71 functions was exercised above', () => {
   // A machine-checkable statement, not a claim in prose. The surface list at
   // the top of this file is checked against the loaded namespace, and then
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 73 long', SURFACE.length, 73)
-  eq('with no duplicates', new Set(SURFACE).size, 73)
+  eq('the surface list is 74 long', SURFACE.length, 74)
+  eq('with no duplicates', new Set(SURFACE).size, 74)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

@@ -19,7 +19,7 @@
 #     answerable from the table;
 #   - a class that needs a Hyprland rule has one, in both directions: no rule
 #     outlives its class, and no class loses the rule that carries its order,
-#     its lock behaviour or its animation;
+#     its lock behavior or its animation;
 #   - the modal scrims take input and the passive surfaces are click-through,
 #     which is a property of the mask each one declares;
 #   - an exclusive keyboard grab has a release branch, so it cannot outlive
@@ -266,7 +266,7 @@ t_section "the layer rules cover the surfaces that need them"
 
 # Both directions: a rule for a namespace that no longer asks for one is dead
 # configuration, and a namespace that needs an order or a `no_anim` without its
-# rule loses that behaviour silently.
+# rule loses that behavior silently.
 REG_RULES="$(reg_rule_namespaces | LC_ALL=C sort -u)"
 FILE_RULES="$(rule_namespaces | LC_ALL=C sort -u)"
 t_eq "every rule matches a registry row that asks for one" "$REG_RULES" "$FILE_RULES"
@@ -296,6 +296,6 @@ t_contains "it is named in the compositor's window list" 'title: "Lyrics"' "$LYR
 t_contains "and maps only when opened" "visible: root.opened" "$LYRICS_SRC"
 t_empty "and carries no layer-shell keyboard grab" "$(grep -o 'WlrKeyboardFocus' "$SHELL_DIR/$LYRICS")"
 
-t_note "layer choice is a contract with common/ui/LayerSpec.js: a namespace change edits the registry, the declaration and default/hypr/window-rules.lua, or the surface loses its order, its lock behaviour or its animation"
+t_note "layer choice is a contract with common/ui/LayerSpec.js: a namespace change edits the registry, the declaration and default/hypr/window-rules.lua, or the surface loses its order, its lock behavior or its animation"
 
 t_summary

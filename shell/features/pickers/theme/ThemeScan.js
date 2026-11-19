@@ -76,7 +76,7 @@ function preview(colors, isLight) {
     panel: mix(bg, fg, 0.12),
     edge: mix(bg, fg, 0.18),
     // One step brighter than the hairline used inside surfaces: this is the
-    // frame colour that has to separate a window from the wallpaper.
+    // frame color that has to separate a window from the wallpaper.
     windowEdge: mix(bg, fg, 0.28),
     fg: fg,
     muted: mix(fg, bg, 0.42),

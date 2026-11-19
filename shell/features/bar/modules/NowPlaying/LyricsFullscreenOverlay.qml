@@ -66,14 +66,14 @@ QtObject {
   property real _pressX: 0
 
   // Backdrop density. The surface paints the theme background solid under the
-  // transcript; a double click on empty space swaps it for the same colour at
+  // transcript; a double click on empty space swaps it for the same color at
   // 80% opacity, which lets the desktop read faintly behind the lyrics while
   // they stay legible. A view preference rather than a setting, so it lives in
   // the shell cache ($VIBRANIUM_CACHE/shell.json, "lyrics" section) instead of
   // the settings catalog.
   //
   // The fill is a Rectangle inside the window, not the window's own `color`:
-  // a surface colour reaches the compositor with the surface, so a live change
+  // a surface color reaches the compositor with the surface, so a live change
   // to it only shows up the next time the surface is mapped - the backdrop
   // stayed opaque until the overlay was reopened. A Rectangle is ordinary
   // scene graph and repaints on the tick the cache write lands, which is also
@@ -343,7 +343,7 @@ QtObject {
     Keys.onEscapePressed: root.close()
 
     // The surface's own backdrop, under everything else. See backdropColor for
-    // why this is a Rectangle rather than the window's colour.
+    // why this is a Rectangle rather than the window's color.
     Rectangle {
       id: backdrop
 

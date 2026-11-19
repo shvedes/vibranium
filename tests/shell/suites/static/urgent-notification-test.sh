@@ -12,7 +12,7 @@
 # Two properties of that shift are load-bearing, and both are invisible in a
 # screenshot:
 #
-#   1. The shift is made of PALETTE leaves, not of a colour chosen here. A
+#   1. The shift is made of PALETTE leaves, not of a color chosen here. A
 #      hardcoded tint would be the wrong red in every theme but one, and the
 #      card would stop following the theme the shell already follows for
 #      everything else on it.
@@ -54,7 +54,7 @@ t_contains "and the share is a named property" "readonly property real urgentMix
 t_contains "which is five percent" "readonly property real urgentMix: 0.05" "$CARD_SRC"
 # The card's own background is that blend, and only for an urgent card: the
 # rest keep the theme's plain background.
-t_contains "the card's colour is the blend" "color: root.fill" "$CARD_SRC"
+t_contains "the card's color is the blend" "color: root.fill" "$CARD_SRC"
 t_contains "and the blend is the urgent branch" "readonly property color fill: root.urgent" "$CARD_SRC"
 t_contains "the plain branch is the theme background" 'Ui.solid("background_0")' "$CARD_SRC"
 
@@ -78,7 +78,7 @@ t_section "the card's first frame is already urgent"
 # The pile's change is what creates the card, so the snapshot has to be in
 # place before the entry joins the pile: a card built against an empty
 # snapshot would paint its first frame without the urgency it has, and the
-# border's own tween would carry that wrong colour into the card's arrival.
+# border's own tween would carry that wrong color into the card's arrival.
 SNAPSHOT_LINE="$(grep -n 'entry.snapshot = snapshot' "$CONTROLLER" | head -1 | cut -d: -f1)"
 PILE_LINE="$(grep -n 'root._tracked = root._tracked.concat' "$CONTROLLER" | head -1 | cut -d: -f1)"
 t_not_empty "the controller assigns the snapshot" "$SNAPSHOT_LINE"

@@ -488,7 +488,7 @@ function linkNoteText(note) {
 
 // Primary row line: the SSID, with a watcher verdict (if any) riding
 // beside it ("SSID • login required", dot-separated, lowercase). The
-// connected state itself is carried by the accent-coloured icon, so no
+// connected state itself is carried by the accent-colored icon, so no
 // "connected" word is repeated here. One Text keeps the suffix glued to
 // the name through elision; the name is escaped, the dot painted in
 // dotHex (subtext) and the word in its own ink. Anything not connected

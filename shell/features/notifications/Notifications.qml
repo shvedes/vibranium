@@ -264,7 +264,7 @@ Singleton {
   readonly property int trackedCount: root._tracked.length
   readonly property int historyCount: root._history.length
   // The single global motion switch, wired at library level like
-  // PanelCard/OverlayWindow so the card's Behaviours need not bind it.
+  // PanelCard/OverlayWindow so the card's Behaviors need not bind it.
   readonly property bool animationsEnabled: MotionPolicy.enabled
 
   // --- the daemon ---------------------------------------------------------

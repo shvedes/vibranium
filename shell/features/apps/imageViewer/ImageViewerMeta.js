@@ -3,7 +3,7 @@
 .import "../../../common/text/StringUtils.js" as SU
 .import "../../../common/text/Format.js" as Format
 
-// Metadata for the image viewer: which formats it opens, what colour each
+// Metadata for the image viewer: which formats it opens, what color each
 // format family gets, and the strings its status bar prints.
 //
 // This is a library rather than bindings inside the window for two reasons.
@@ -25,7 +25,7 @@ const EXTENSIONS = ["png", "jpg", "jpeg", "bmp", "gif", "webp",
 // set of formats, so they are stated together rather than as two lists that
 // could name different extensions.
 //
-// The hues are palette keys rather than fixed colours so the dot follows the
+// The hues are palette keys rather than fixed colors so the dot follows the
 // active theme: teal/cyan for PNG, amber for JPEG, purple for GIF, blue for
 // WebP, orange/yellow for SVG, neutral for BMP, green for ICO and pink for
 // TIFF. The families match what file managers and editors use for the same

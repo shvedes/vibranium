@@ -247,7 +247,7 @@ Item {
 
   // The shell's own level icon, and the tiers that dim its waves by level.
   // Both come from the audio service rather than from a switch here, so a row
-  // in this window and a row in the bar's island colour by the same rule.
+  // in this window and a row in the bar's island color by the same rule.
   readonly property string levelIconName: row.audio === null
     ? "volume-off" : Core.Audio.volumeIconFor(row.volume, row.muted)
   readonly property int levelIconTiers: row.audio === null ? 0
@@ -257,7 +257,7 @@ Item {
   // would be rating a level that is not being heard. Two bands, matching the
   // island's app rows: a stream caps at 150%, so 126% is already a quarter of
   // the way past its own ceiling. The bands read the same rounded percentage
-  // the text prints, so the colour and the digits cannot disagree.
+  // the text prints, so the color and the digits cannot disagree.
   readonly property string pctText: row.muted ? "Muted" : Model.volumeText(row.volume, false)
   readonly property color pctColor: {
     if (row.muted) return Ui.tint("foreground_1", 0.6)
@@ -500,7 +500,7 @@ Item {
       }
 
       // The mute affordance, and the island's: the glyph carries the level, the
-      // tiered paths carry the colour of it, and the click is the toggle. One
+      // tiered paths carry the color of it, and the click is the toggle. One
       // control rather than a glyph plus a switch side by side, because a row
       // with two mute buttons has no mute button.
       Item {
@@ -733,7 +733,7 @@ Item {
   // The icon URL for this stream. `AppIcons.url` memoises, so a mixer that is
   // open for a day asks the theme once per distinct application rather than
   // per row per repaint; the empty name is answered with the shell's own
-  // generic glyph, which recolours with the palette where a theme icon cannot.
+  // generic glyph, which recolors with the palette where a theme icon cannot.
   readonly property string iconSource: {
     const name = Model.appIconName(row.node)
     if (name === "") return Icons.url("music", "foreground_1")

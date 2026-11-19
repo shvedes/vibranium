@@ -363,7 +363,7 @@ Singleton {
             if (theme === "" || String(theme) !== String(root.values["misc.cursorTheme"])) {
                 // The user switched theme while the scan ran. The result is
                 // correct for a theme that is no longer selected, and dropping
-                // it is the right behaviour: applying it would repin the enum
+                // it is the right behavior: applying it would repin the enum
                 // to the newly chosen theme's scan, which is the one after it.
                 return
             }

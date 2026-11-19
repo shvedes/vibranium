@@ -36,7 +36,7 @@ require("config.commands")
 require("utils.transparent")
 
 -- Editor options: leader keys, UI settings, indentation, search, editing
--- behaviour and performance tweaks. Contains no LSP-specific settings on
+-- behavior and performance tweaks. Contains no LSP-specific settings on
 -- purpose -- those would preload vim.lsp/vim.diagnostic on every start.
 require("config.options")
 

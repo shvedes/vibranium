@@ -331,7 +331,7 @@ Item {
       field.releaseFocus()
       // Spend the latch as well: re-grabbing the field the moment it is
       // released would make the rung a no-op, and an on-screen field that
-      // steals the keyboard back the instant you leave it is the behaviour
+      // steals the keyboard back the instant you leave it is the behavior
       // this whole ladder exists to undo.
       contentRoot._searchFocusArmed = false
       return true

@@ -34,6 +34,9 @@ Singleton {
   // Flat cache: [{family, style, label}] sorted by family, Regular first
   // within a family. null = never scanned.
   property var _cached: null
+  // The Font group's children come from this cache; a scan landing after boot
+  // has to invalidate the group's row set, not just the picker page.
+  on_CachedChanged: Menu.rev++
   property bool _scanRunning: false
   property var _pendingShow: null   // false = refresh silently, "open" = show when done
   // A scan that exited non-zero. Terminal: the arm stops retrying so a
@@ -78,6 +81,8 @@ Singleton {
     // arbitrary text, so no fixed set of words can predict it (see
     // Menu._indexProviderFor). claimsQuery decides, from the real values.
     Menu.provideIndexFor(root)
+    // Also a row provider: its `children()` hook feeds General > Font.
+    Menu.registerProvider("fontPicker", root)
     // Arm the scan now. The rows are indexed for global search, so they have
     // to exist before anyone can type a family name: gating the scan on
     // open() meant a fresh shell had no font rows in the index at all, and
@@ -409,14 +414,12 @@ Singleton {
 
   // --- page composition ---
 
-  function _compose() {
-    // No injection into standalone picker bundles (themes): a scan landing
-    // while one is open would register foreign rows into its search. The
-    // rows stay cached; the next settings-bundle load replays them.
-    if (!Menu.externalPagesAllowed()) return
+  // The same live rows the picker page shows, as group children of the
+  // General > Font entry. A `type: "provider"` marker in the catalog asks
+  // Menu for this hook, so the family list stays one definition.
+  function fontRows() {
     const rows = root._cached || []
     const items = []
-
     if (rows.length === 0) {
       items.push({
         type: "action",
@@ -428,23 +431,13 @@ Singleton {
         selectable: false
       })
     }
-
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i]
-      // Active row trails an accent "• active" in the subtext: dynamic
-      // pages never pass through buildGuardScript (bundle pages only), so
-      // bash `checked` marks cannot work here - the flag recomposes when
-      // the current font read lands instead. Identity compares the real
-      // family (variants install separately), while the label shows the
-      // collapsed base name.
       const active = root._current !== "" && root._current === root._fullIdentity(r.family, r.style)
-      // Every row carries its style, so entries share one height; patched
-      // variants lead with a bold expanded tag ("Nerd Font", "Powerline",
-      // ...), dot-separated from the style.
       const sub = (r.tag !== "" ? "<b>" + root._tagLabel(r.tag) + "</b> · " : "") + r.style
       items.push({
         type: "action",
-        id: "",
+        id: "font-" + r.family + "|" + r.style,
         label: r.base,
         previewFontFamily: r.family,
         sub: sub,
@@ -456,6 +449,15 @@ Singleton {
         selectable: true
       })
     }
+    return items
+  }
+
+  function _compose() {
+    // No injection into standalone picker bundles (themes): a scan landing
+    // while one is open would register foreign rows into its search. The
+    // rows stay cached; the next settings-bundle load replays them.
+    if (!Menu.externalPagesAllowed()) return
+    const items = root.fontRows()
 
     // Build through the shared pipeline (Menu.buildDynamicPage ->
     // MenuLib.buildPage) so rows get the uid/hay/selectable contract

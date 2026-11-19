@@ -3,7 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 
-// Accent wave overlay for the downloader bar icon. A thin accent-coloured
+// Accent wave overlay for the downloader bar icon. A thin accent-colored
 // slice of the same glyph scrolls from top to bottom while a job is active.
 // Uses only Item/Image/clip: the shell deliberately keeps effect nodes out of
 // bar surfaces (see LauncherEntry.qml on the Qt5Compat teardown crash).

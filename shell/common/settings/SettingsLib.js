@@ -748,8 +748,12 @@ function _lookup(table, key) {
 
 function conditionsMet(byKey, values, showIf, seen) {
   if (!showIf) return true
-  if (!Array.isArray(showIf)) return false
+  // A showIf read off a live row is a QML list, which is not a JS Array here;
+  // Array.isArray would fail it closed and leave every conditional row muted
+  // even after its condition holds. Accept any indexable, length-bearing list.
+  if (typeof showIf !== "object" || typeof showIf.length !== "number") return false
   if (showIf.length === 0) return true
+  if (typeof showIf[0] === "undefined") return false
   seen = seen || {}
   for (let i = 0; i < showIf.length; i++) {
     const cond = showIf[i]
@@ -1437,6 +1441,16 @@ function buildPages(schema, values) {
       const raw = section.items[i]
       if (!raw || typeof raw !== "object") continue
       const entry = raw.type === "group" ? buildGroupRow(raw, schema.byKey, values) : raw
+      // `before` and `after` are the two ways an item moves against the
+      // option rows that otherwise always lead the list. The key names either
+      // an option's var or a declared item's id; a miss falls back to append.
+      if (typeof raw.before === "string" && raw.before !== "") {
+        const at = items.findIndex(x => x.var === raw.before || x.id === raw.before)
+        if (at >= 0) {
+          items.splice(at, 0, entry)
+          continue
+        }
+      }
       if (typeof raw.after === "string" && raw.after !== "") {
         const at = items.findIndex(x => x.var === raw.after || x.id === raw.after)
         if (at >= 0) {
@@ -1511,14 +1525,22 @@ function buildBundle(schema, values) {
 // and persist like any other row.
 function _claimedKeys(section) {
   const claimed = Object.create(null)
+  // A group's children can themselves be groups (a master entry with a
+  // nested one). Their option keys are claimed too, or the same row would
+  // render both inside the nested dropdown and as a page row of its own.
+  function claim(children) {
+    for (let k = 0; k < children.length; k++) {
+      const key = children[k]
+      if (typeof key === "string" && key !== "") claimed[key] = true
+      else if (key && typeof key === "object" && !Array.isArray(key)
+        && Array.isArray(key.children)) claim(key.children)
+    }
+  }
   const list = section.items || []
   for (let i = 0; i < list.length; i++) {
     const raw = list[i]
     if (!raw || raw.type !== "group" || !Array.isArray(raw.children)) continue
-    for (let k = 0; k < raw.children.length; k++) {
-      const key = raw.children[k]
-      if (typeof key === "string" && key !== "") claimed[key] = true
-    }
+    claim(raw.children)
   }
   return claimed
 }
@@ -1673,6 +1695,19 @@ function buildGroupRow(raw, byKey, values) {
     if (key !== null && typeof key === "object" && !Array.isArray(key)) {
       const child = {}
       for (const k in key) child[k] = key[k]
+      // Inline children skip the option schema, so their showIf still spells
+      // the key as `key`; conditionsMet reads `var`. Normalize it here or a
+      // child like Clear usage history stays muted even when its gate holds.
+      if (child.showIf !== undefined && child.showIf !== null) {
+        const res = normalizeShowIf(child.showIf)
+        if (!res.error) child.showIf = res.norm
+      }
+      // A nested group names option keys too; resolve them the same way,
+      // or its dropdown fills with blank rows instead of the real switches.
+      if (child.type === "group") {
+        children.push(buildGroupRow(child, byKey, values))
+        continue
+      }
       children.push(child)
       continue
     }

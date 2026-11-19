@@ -5,9 +5,9 @@ import QtQuick
 // The name-reveal state the signal modules share: Bluetooth and Network both
 // flash a name pill when a link comes up, blink the glyph green while the
 // window is open, and hold the pill out for the island's lifespan without the
-// colour. The cadence lives here once so the two modules cannot drift apart.
+// color. The cadence lives here once so the two modules cannot drift apart.
 //
-// The colours and durations are caller-supplied rather than read from Ui, so
+// The colors and durations are caller-supplied rather than read from Ui, so
 // the state machine stays a plain QtObject with no singleton behind it and
 // constructs headlessly. The consumer keeps its own `revealed`/`islandReveal`
 // conditions (they read different link state) and its own Behaviors on the two

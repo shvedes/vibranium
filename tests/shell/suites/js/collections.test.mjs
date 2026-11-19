@@ -1129,7 +1129,7 @@ group('FrozenFootprint.js carries a .pragma library line', () => {
     match(`${label} does carry a .pragma library`, fs.readFileSync(SRC(name), 'utf8'), /^[ \t]*\.pragma[ \t]+library/m)
   }
 })
-group('behaviour that needs a QML engine, not a node harness', () => {
+group('behavior that needs a QML engine, not a node harness', () => {
   // Recorded rather than asserted, so the coverage gap is visible in the
   // total instead of being implied by silence.
   skip('BoundedCache in-place writes do not re-enter a QML binding', 'needs a QML engine: the reason the map mutates in place is that Icons.url() writes into it from inside a binding')

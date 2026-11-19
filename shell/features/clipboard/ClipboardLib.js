@@ -1316,7 +1316,7 @@ function buildOpenCmd(path) {
 // Local paths Enter should open instead of re-copying. Single-path rows
 // (file/folder/archive/image) yield at most one absolute path; multi-rows
 // (files/folders) yield every absolute path. Everything else (text, url,
-// network, secret) yields [] and keeps the copy behaviour. Image rows
+// network, secret) yields [] and keeps the copy behavior. Image rows
 // prefer the concrete file, then the session snapshot, then the lone
 // filePaths entry - all three are absolute local paths when present.
 function openPathsFor(entry) {

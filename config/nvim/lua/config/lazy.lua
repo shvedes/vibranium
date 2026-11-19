@@ -13,7 +13,7 @@
 --
 -- The theme.lua plugin spec (loaded by lazy via lua/plugins/theme.lua)
 -- is special: it reads the Vibranium host-theme neovim.lua at runtime and
--- returns the appropriate colourscheme spec for lazy to install.
+-- returns the appropriate colorscheme spec for lazy to install.
 -- The UIEnter autocmd then starts the fs watcher that detects host theme
 -- switches and applies them live.
 --==============================================================================
@@ -53,7 +53,7 @@ require("lazy").setup({
 	lockfile = vim.fn.stdpath("config") .. "/.lazy-lock.json",
 
 	-- Auto-install missing plugins (true) and use habamax as the temporary
-	-- colourscheme during the initial installation process (before the actual
+	-- colorscheme during the initial installation process (before the actual
 	-- theme plugin is downloaded).
 	install = { missing = true, colorscheme = { "habamax" } },
 
@@ -85,7 +85,7 @@ require("lazy").setup({
 -- After the first UI paint (UIEnter), start the live theme watcher.
 -- This polls and fs-watches the Vibranium host-theme symlink at
 -- ~/.local/state/vibranium/theme/neovim.lua so that when the host
--- theme changes, the Neovim colourscheme updates without a restart.
+-- theme changes, the Neovim colorscheme updates without a restart.
 vim.api.nvim_create_autocmd("UIEnter", {
 	callback = function()
 		require("utils.theme").watch()

@@ -2447,7 +2447,7 @@ Item {
           }
         }
 
-        // Container cell: colour-coded by type, so the two rows that share a
+        // Container cell: color-coded by type, so the two rows that share a
         // resolution read apart without having to be compared word by word.
         Item {
           width: root.extColW

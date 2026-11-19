@@ -103,7 +103,7 @@ LayerSurface {
 
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-  // Dot geometry and colour order: microphone, camera, screenshare. Each dot
+  // Dot geometry and color order: microphone, camera, screenshare. Each dot
   // is a fixed-size circle plus its own trailing gap.
   //
   // Two stacked opacity factors with two different durations. The show/hide

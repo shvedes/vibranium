@@ -17,7 +17,7 @@ import "../../../common/motion/Marquee.js" as Marquee
 // the Text it replaces (left, right, vertical centre), `clip` keeps the
 // overflow from painting over the chip's caret, and the Title inside is free to
 // travel. `text`, `level` and `color` are aliases onto that Title, so a call
-// site reads as it did before - and one that sets no colour keeps the level's
+// site reads as it did before - and one that sets no color keeps the level's
 // own, because an unset alias does not override the binding underneath it.
 Item {
   id: root

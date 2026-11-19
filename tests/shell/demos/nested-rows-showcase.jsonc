@@ -205,9 +205,9 @@
           "type": "group",
           "children": [
             {
-              "id": "cho-colour",
+              "id": "cho-color",
               "type": "select",
-              "label": "Colour",
+              "label": "Color",
               "sub": "Three ordinary options",
               "value": "green",
               "options": [

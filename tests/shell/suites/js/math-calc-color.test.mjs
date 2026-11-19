@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Suite: math/calc/colour - the five pure-JS engines behind the launcher's
-// live graph, inline calculator, unit converter, colour engine and the bar's
-// colour picker.
+// Suite: math/calc/color - the five pure-JS engines behind the launcher's
+// live graph, inline calculator, unit converter, color engine and the bar's
+// color picker.
 //
 // They are one cluster for a reason: FuncLib and CalcLib are the same shunting
 // yard at two strictness levels, ColorMath is a total function over normalized
@@ -97,7 +97,7 @@ const ftInShape = (s) => shapeOf(UL.parseFeetInches(s))
 // ColorMath parse helper so a "returns null" assertion reads as one call.
 const px = (s) => CM.parse(s)
 
-suite('math/calc/colour', 'FuncLib, CalcLib, ColorMath, ColorLib, UnitLib')
+suite('math/calc/color', 'FuncLib, CalcLib, ColorMath, ColorLib, UnitLib')
 
 // ---------------------------------------------------------------------------
 section('FuncLib.stripBody - the display prefixes and the trailing =')
@@ -1447,13 +1447,13 @@ group('clampAlpha defaults absent or junk to opaque, not to zero', () => {
   is('never returns a non-number', [undefined, null, NaN, -1, 2, 'x'], (v) => v.every((n) => typeof CM.clampAlpha(n) === 'number'), 'always a number')
 })
 
-group('valid() guards the serializers on the three colour channels', () => {
-  eq('a full colour', CM.valid({ r: 0, g: 0, b: 0 }), true)
+group('valid() guards the serializers on the three color channels', () => {
+  eq('a full color', CM.valid({ r: 0, g: 0, b: 0 }), true)
   eq('with out-of-range channels, which hex6 clamps', CM.valid({ r: -1, g: 2, b: 0.5 }), true)
   eq('null', CM.valid(null), false)
   eq('undefined', CM.valid(undefined), false)
   eq('an empty object', CM.valid({}), false)
-  eq('a partial colour', CM.valid({ r: 1 }), false)
+  eq('a partial color', CM.valid({ r: 1 }), false)
   eq('a NaN channel', CM.valid({ r: NaN, g: 0, b: 0 }), false)
   eq('an infinite channel', CM.valid({ r: Infinity, g: 0, b: 0 }), false)
   eq('a null channel', CM.valid({ r: null, g: 0, b: 0 }), true)
@@ -1468,8 +1468,8 @@ group('valid() guards the serializers on the three colour channels', () => {
   eq('an undefined channel is not valid at all', CM.valid({ r: undefined, g: 0, b: 0 }), false)
   eq('and hex6 answers "" for it', CM.hex6({ r: undefined, g: 0, b: 0 }), '')
   // alpha is deliberately not part of the check: it has its own clamp.
-  eq('a NaN alpha is still a valid colour', CM.valid({ r: 0, g: 0, b: 0, a: NaN }), true)
-  eq('a missing alpha is still a valid colour', CM.valid({ r: 0, g: 0, b: 0 }), true)
+  eq('a NaN alpha is still a valid color', CM.valid({ r: 0, g: 0, b: 0, a: NaN }), true)
+  eq('a missing alpha is still a valid color', CM.valid({ r: 0, g: 0, b: 0 }), true)
 })
 
 // ---------------------------------------------------------------------------
@@ -1497,7 +1497,7 @@ group('the 3 and 4 digit forms double each nibble', () => {
   approx('#ffff alpha is 1', px('#ffff').a, 1, 1e-12)
   approx('#0000 alpha is 0', px('#0000').a, 0, 1e-12)
   // A 3-digit form has no alpha nibble at all, so "#f0f" is f/0/f and opaque.
-  approx('#f0f is a 3-digit colour', px('#f0f').r, 1, 1e-12)
+  approx('#f0f is a 3-digit color', px('#f0f').r, 1, 1e-12)
   approx('#f0f green', px('#f0f').g, 0, 1e-12)
   approx('#f0f blue', px('#f0f').b, 1, 1e-12)
   approx('#f0f is opaque', px('#f0f').a, 1, 1e-12)
@@ -1577,7 +1577,7 @@ group('percentages and the modern slash alpha', () => {
 group('a channel above its range clamps, one below zero is rejected', () => {
   // _chan255 returns -1 for a negative value, which parseRgb treats as
   // malformed; a value above 255 is clamped. The asymmetry is deliberate:
-  // over-range is a readable colour, a negative one is not.
+  // over-range is a readable color, a negative one is not.
   eq('300 clamps to 255', px('rgb(300,0,0)').r, 1)
   eq('255.9 rounds through the clamp to 1', px('rgb(255.9,0,0)').r, 1)
   eq('a negative channel is null', px('rgb(-1,0,0)'), null)
@@ -1606,7 +1606,7 @@ group('hsl() and hsv() are different spaces, not aliases', () => {
   eq('hsv(0,100%,100%)', px('hsv(0,100%,100%)'), { r: 1, g: 0, b: 0, a: 1 })
   eq('hsv(120,100%,100%)', px('hsv(120,100%,100%)'), { r: 0, g: 1, b: 0, a: 1 })
   eq('hsva(0,100%,100%,0.25)', px('hsva(0,100%,100%,0.25)'), { r: 1, g: 0, b: 0, a: 0.25 })
-  eq('hsv(120,50%,50%) is a different colour from hsl(120,50%,50%)',
+  eq('hsv(120,50%,50%) is a different color from hsl(120,50%,50%)',
     px('hsv(120,50%,50%)') === px('hsl(120,50%,50%)'), false)
   eq('hsl(120,50%,50%) reads 50% as lightness', px('hsl(120,50%,50%)'), { r: 0.25, g: 0.75, b: 0.25, a: 1 })
   approx('hsv(120,50%,50%) reads 50% as value', px('hsv(120,50%,50%)').b, 0.25, 1e-12)
@@ -1626,7 +1626,7 @@ group('a negative hue is rejected by the parser even though the converter wraps 
   eq('hsv(-120,100%,100%) is null', px('hsv(-120,100%,100%)'), null)
   // The converter itself does wrap, and reaches blue at -120 degrees.
   eq('hslToRgb(-120) is blue', CM.hslToRgb(-120, 1, 0.5), { r: 0, g: 0, b: 1, a: 1 })
-  eq('hslToRgb(240) is the same colour', CM.hslToRgb(240, 1, 0.5), { r: 0, g: 0, b: 1, a: 1 })
+  eq('hslToRgb(240) is the same color', CM.hslToRgb(240, 1, 0.5), { r: 0, g: 0, b: 1, a: 1 })
   eq('and hslToRgb(360) is red', CM.hslToRgb(360, 1, 0.5), { r: 1, g: 0, b: 0, a: 1 })
   eq('hslToRgb(NaN) is null', CM.hslToRgb(NaN, 1, 0.5), null)
   skip('hsl() is documented to accept hsl()/hsla() forms', 'ColorMath.js:150 rejects h < 0 before :195 can wrap it, so a negative hue never parses')
@@ -1709,7 +1709,7 @@ group('the hue sextant boundaries are exact', () => {
   eq('360 degrees wraps to 0', at(360), at(0))
   eq('a negative hue wraps too', at(-120), at(240))
   eq('zero saturation is achromatic whatever the hue', CM.hsvToRgb(200, 0, 1), CM.hsvToRgb(0, 0, 1))
-  eq('and that achromatic colour is white', CM.hsvToRgb(200, 0, 1), { r: 1, g: 1, b: 1, a: 1 })
+  eq('and that achromatic color is white', CM.hsvToRgb(200, 0, 1), { r: 1, g: 1, b: 1, a: 1 })
   eq('zero saturation is white at full value', CM.hsvToRgb(0, 0, 1), { r: 1, g: 1, b: 1, a: 1 })
   eq('a zero value is black whatever the hue', CM.hsvToRgb(120, 1, 0), { r: 0, g: 0, b: 0, a: 1 })
   eq('out-of-range s and v are clamped', CM.hsvToRgb(0, 2, 2), { r: 1, g: 0, b: 0, a: 1 })
@@ -1756,7 +1756,7 @@ group('a non-finite channel zeroes the whole conversion', () => {
   eq('rgbToHsv(0,0,-1)', CM.rgbToHsv(0, 0, -1), { h: 60, s: 0, v: 0 })
   // s and v are both 0 there, so the hue is never used; the code still
   // computes one from the out-of-range channels because max === r.
-  eq('so the hue is meaningless and the colour is black', CM.hsvToRgb(CM.rgbToHsv(0, 0, -1).h, CM.rgbToHsv(0, 0, -1).s, CM.rgbToHsv(0, 0, -1).v), { r: 0, g: 0, b: 0, a: 1 })
+  eq('so the hue is meaningless and the color is black', CM.hsvToRgb(CM.rgbToHsv(0, 0, -1).h, CM.rgbToHsv(0, 0, -1).s, CM.rgbToHsv(0, 0, -1).v), { r: 0, g: 0, b: 0, a: 1 })
   eq('rgbToHsl(undefined,0,0)', CM.rgbToHsl(undefined, 0, 0), { h: 0, s: 0, l: 0 })
 })
 
@@ -1783,7 +1783,7 @@ group('hex6 is lowercase #rrggbb and "" when the channels are unusable', () => {
   eq('mid', CM.hex6({ r: 0.2, g: 0.4, b: 0.6 }), '#336699')
   eq('an uppercase parse normalises to lowercase', CM.hex6(px('#FF0000')), '#ff0000')
   eq('and mixed case', CM.hex6(px('#AbCdEf')), '#abcdef')
-  eq('a null colour', CM.hex6(null), '')
+  eq('a null color', CM.hex6(null), '')
   eq('an empty object', CM.hex6({}), '')
   eq('a NaN channel', CM.hex6({ r: NaN, g: 0, b: 0 }), '')
   eq('undefined', CM.hex6(undefined), '')
@@ -1813,7 +1813,7 @@ group('hex8 adds the alpha byte only once the alpha drops below 1', () => {
   eq('a half alpha', CM.hex8({ r: 1, g: 0, b: 0 }, 0.5), '#ff000080')
   eq('white at half', CM.hex8({ r: 1, g: 1, b: 1 }, 0.5), '#ffffff80')
   eq('mid at half', CM.hex8({ r: 0.2, g: 0.4, b: 0.6 }, 0.5), '#33669980')
-  eq('a null colour is null, not ""', CM.hex8(null, 1), null)
+  eq('a null color is null, not ""', CM.hex8(null, 1), null)
   eq('an empty object', CM.hex8({}, 1), null)
 })
 
@@ -1827,7 +1827,7 @@ group('rgb() drops the alpha and the space-after-comma shape is fixed', () => {
   // The header: "The opaque rgb() form cannot carry alpha; a is accepted and
   // dropped so every serializer shares one signature."
   eq('an alpha argument is accepted and dropped', CM.rgb({ r: 1, g: 0, b: 0 }, 0.5), 'rgb(255, 0, 0)')
-  eq('a null colour', CM.rgb(null), null)
+  eq('a null color', CM.rgb(null), null)
   eq('an empty object', CM.rgb({}), null)
   eq('out-of-range channels are clamped', CM.rgb({ r: -1, g: 2, b: 0.5 }), 'rgb(0, 255, 128)')
 })
@@ -1842,7 +1842,7 @@ group('rgba() carries the alpha at three decimal places', () => {
   eq('an alpha above 1 clamps', CM.rgba({ r: 1, g: 0, b: 0 }, 2), 'rgba(255, 0, 0, 1.000)')
   eq('a negative alpha clamps', CM.rgba({ r: 1, g: 0, b: 0 }, -1), 'rgba(255, 0, 0, 0.000)')
   eq('mid', CM.rgba({ r: 0.2, g: 0.4, b: 0.6 }, 0.25), 'rgba(51, 102, 153, 0.250)')
-  eq('a null colour', CM.rgba(null, 0.5), null)
+  eq('a null color', CM.rgba(null, 0.5), null)
   eq('an empty object', CM.rgba({}, 0.5), null)
 })
 
@@ -1875,10 +1875,10 @@ group('hsl(), hsla(), hsv() and hsva() round the percentages', () => {
   // hsl/hsv accept and drop the alpha for the same one-signature reason.
   eq('hsl drops an alpha argument', CM.hsl({ r: 1, g: 0, b: 0 }, 0.5), 'hsl(0, 100%, 50%)')
   eq('hsv drops an alpha argument', CM.hsv({ r: 1, g: 0, b: 0 }, 0.5), 'hsv(0, 100%, 100%)')
-  eq('hsl a null colour', CM.hsl(null), null)
-  eq('hsla a null colour', CM.hsla(null, 0.5), null)
-  eq('hsv a null colour', CM.hsv(null), null)
-  eq('hsva a null colour', CM.hsva(null, 0.5), null)
+  eq('hsl a null color', CM.hsl(null), null)
+  eq('hsla a null color', CM.hsla(null, 0.5), null)
+  eq('hsv a null color', CM.hsv(null), null)
+  eq('hsva a null color', CM.hsva(null, 0.5), null)
   eq('hsl an empty object', CM.hsl({}), null)
   eq('hsv a NaN channel', CM.hsv({ r: NaN, g: 0, b: 0 }), null)
 })
@@ -1901,7 +1901,7 @@ group('format dispatches on the seven names and nulls the rest', () => {
   eq('a null name', CM.format(red, null), null)
   eq('no name at all', CM.format(red), null)
   eq('an uppercase name is not a case', CM.format(red, 'HEX'), null)
-  eq('a null colour', CM.format(null, 'hex'), null)
+  eq('a null color', CM.format(null, 'hex'), null)
   eq('an empty object', CM.format({}, 'rgb'), null)
 })
 
@@ -1927,7 +1927,7 @@ group('allFormats returns exactly the seven, in chip order, with no nulls', () =
 group('allFormats drops the null serializers rather than carrying them', () => {
   // The comment: "null serializers are skipped". hex6 answers "" rather than
   // null, so it is the only name that can come back empty, and it is not.
-  eq('a null colour yields an empty map', CM.allFormats(null, 1), {})
+  eq('a null color yields an empty map', CM.allFormats(null, 1), {})
   eq('an empty object yields an empty map', CM.allFormats({}, 1), {})
   eq('a NaN channel yields an empty map', CM.allFormats({ r: NaN, g: 0, b: 0 }, 1), {})
   is('every value of a good map is a non-empty string', CM.allFormats(px('#336699'), 0.5), (v) => Object.values(v).every((s) => typeof s === 'string' && s !== ''), 'non-empty strings')
@@ -2040,7 +2040,7 @@ group('the switch is exactly between byte 127 and byte 128', () => {
   approx('luminance at byte 127', (299 * 127 + 587 * 127 + 114 * 127) / 1000, 127, 0)
 })
 
-group('an unusable colour falls back to white text', () => {
+group('an unusable color falls back to white text', () => {
   eq('null', CM.contrastText(null), '#ffffff')
   eq('undefined', CM.contrastText(undefined), '#ffffff')
   eq('an empty object', CM.contrastText({}), '#ffffff')
@@ -2082,7 +2082,7 @@ group('the alpha in the key is clamped and fixed to three places', () => {
 })
 
 group('the key separates on each of the three fields', () => {
-  ne('two colours', CH.recordKey({ color: '#fff' }), CH.recordKey({ color: '#000' }))
+  ne('two colors', CH.recordKey({ color: '#fff' }), CH.recordKey({ color: '#000' }))
   ne('two alphas', CH.recordKey({ color: '#fff', alpha: 1 }), CH.recordKey({ color: '#fff', alpha: 0.5 }))
   ne('two formats', CH.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CH.recordKey({ color: '#fff', alpha: 1, fmt: 'rgb' }))
   eq('the same record is the same key', CH.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CH.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }))
@@ -2182,7 +2182,7 @@ group('the JSON array document is read first when it starts with [', () => {
     [{ color: '#ffffff', alpha: 1, timestamp: -5 }])
 })
 
-group('records normalise their colour to hex6', () => {
+group('records normalise their color to hex6', () => {
   eq('a bare hex in', CH.parseHistory('[{"color":"#336699"}]'), [{ color: '#336699', alpha: 1, timestamp: 0 }])
   eq('a 3-digit hex is expanded', CH.parseHistory('[{"color":"#f00"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
   eq('a function form is converted', CH.parseHistory('[{"color":"rgb(51, 102, 153)"}]'), [{ color: '#336699', alpha: 1, timestamp: 0 }])
@@ -2190,7 +2190,7 @@ group('records normalise their colour to hex6', () => {
   eq('an uppercase hex is lowercased', CH.parseHistory('[{"color":"#FF0000"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
   // The JSONL bare-hex path does carry the hex alpha, but _recordFrom does
   // not: it takes the alpha only from a numeric o.alpha field and otherwise
-  // forces 1, so the 8-digit alpha is dropped on the record path. The colour
+  // forces 1, so the 8-digit alpha is dropped on the record path. The color
   // itself still normalises, which is what the store keys on.
   eq('a hex alpha is dropped by the record path', CH.parseHistory('[{"color":"#ff000080"}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
@@ -2221,7 +2221,7 @@ group('the formats and fmt extras are carried through when well formed', () => {
     CH.sanitizeFormats({ hex: '#f00', rgb: 'rgb(1, 2, 3)' }))
 })
 
-group('the one-record-per-line form accepts bare colours and JSON lines', () => {
+group('the one-record-per-line form accepts bare colors and JSON lines', () => {
   eq('two hex lines', CH.parseHistory('#ff0000\n#00ff00'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }, { color: '#00ff00', alpha: 1, timestamp: 0 }])
   eq('bare hex without the hash', CH.parseHistory('ff0000\n00ff00'),
@@ -2236,7 +2236,7 @@ group('the one-record-per-line form accepts bare colours and JSON lines', () => 
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
   eq('a bare hex alpha becomes the record alpha', CH.parseHistory('#ff000080'),
     [{ color: '#ff0000', alpha: 0.5019607843137255, timestamp: 0 }])
-  eq('a 3-digit bare line is a colour', CH.parseHistory('123\n#ff0000'),
+  eq('a 3-digit bare line is a color', CH.parseHistory('123\n#ff0000'),
     [{ color: '#112233', alpha: 1, timestamp: 0 }, { color: '#ff0000', alpha: 1, timestamp: 0 }])
   eq('CRLF line endings', CH.parseHistory('#ff0000\r\n#00ff00'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }, { color: '#00ff00', alpha: 1, timestamp: 0 }])
@@ -2441,12 +2441,12 @@ group('tryColor is ColorMath on every accepted code', () => {
 })
 
 // ---------------------------------------------------------------------------
-section('Color.mix - two colours blended into one')
+section('Color.mix - two colors blended into one')
 // ---------------------------------------------------------------------------
 
-group('the share is of the second colour', () => {
-  eq('no share is the first colour', COL.mix('#141414', '#877070', 0), '#141414')
-  eq('all of it is the second colour', COL.mix('#141414', '#877070', 1), '#877070')
+group('the share is of the second color', () => {
+  eq('no share is the first color', COL.mix('#141414', '#877070', 0), '#141414')
+  eq('all of it is the second color', COL.mix('#141414', '#877070', 1), '#877070')
   eq('halfway between black and white', COL.mix('#000000', '#ffffff', 0.5), '#808080')
   eq('a third of the way is a third of the way', COL.mix('#000000', '#ffffff', 1 / 3), '#555555')
   // The shell's own case: a near-black surface tinted five percent toward
@@ -2454,33 +2454,33 @@ group('the share is of the second colour', () => {
   // card is painted with, and a change in the rounding would change every
   // urgent card in every theme.
   eq('the urgent tint of the default background', COL.mix('#141414', '#877070', 0.05), '#1a1919')
-  eq('a colour mixed with itself is itself', COL.mix('#336699', '#336699', 0.3), '#336699')
+  eq('a color mixed with itself is itself', COL.mix('#336699', '#336699', 0.3), '#336699')
 })
 
 group('the share is clamped, and a share that is not a number is none', () => {
-  eq('above one is the second colour', COL.mix('#141414', '#877070', 2), '#877070')
-  eq('below zero is the first colour', COL.mix('#141414', '#877070', -1), '#141414')
+  eq('above one is the second color', COL.mix('#141414', '#877070', 2), '#877070')
+  eq('below zero is the first color', COL.mix('#141414', '#877070', -1), '#141414')
   eq('NaN is no share', COL.mix('#141414', '#877070', NaN), '#141414')
   eq('undefined is no share', COL.mix('#141414', '#877070', undefined), '#141414')
   eq('a numeric string is coerced', COL.mix('#141414', '#877070', '0.5'), '#4e4242')
 })
 
-group('a colour that cannot be read is no blend at all', () => {
-  eq('an unreadable first colour', COL.mix('not-a-color', '#877070', 0.3), '')
-  eq('an unreadable second colour', COL.mix('#141414', 'not-a-color', 0.3), '')
+group('a color that cannot be read is no blend at all', () => {
+  eq('an unreadable first color', COL.mix('not-a-color', '#877070', 0.3), '')
+  eq('an unreadable second color', COL.mix('#141414', 'not-a-color', 0.3), '')
   eq('an empty string', COL.mix('', '#877070', 0.3), '')
   eq('null', COL.mix(null, '#877070', 0.3), '')
   eq('undefined', COL.mix(undefined, '#877070', 0.3), '')
-  // "" and not a colour, so a caller can tell a failed blend from a black one.
+  // "" and not a color, so a caller can tell a failed blend from a black one.
   ne('a failed blend is not black', COL.mix('nope', '#877070', 0.3), '#000000')
 })
 
 group('the blend is over the channels, and the result is opaque', () => {
-  // The alpha of either colour is dropped: a blend of two palette leaves is a
+  // The alpha of either color is dropped: a blend of two palette leaves is a
   // surface, and a surface is opaque.
   eq('a translucent red mixed into black', COL.mix('#ff000080', '#000000', 0.5), '#800000')
-  eq('an hsl() colour blends like any other', COL.mix('hsl(0, 100%, 50%)', '#000000', 0.5), '#800000')
-  eq('an rgb() colour blends like any other', COL.mix('rgb(255, 0, 0)', '#000000', 0.5), '#800000')
+  eq('an hsl() color blends like any other', COL.mix('hsl(0, 100%, 50%)', '#000000', 0.5), '#800000')
+  eq('an rgb() color blends like any other', COL.mix('rgb(255, 0, 0)', '#000000', 0.5), '#800000')
   // The channels are mixed as they are stored - gamma-encoded sRGB, the
   // arithmetic CSS color-mix() does by default - so the midpoint of black and
   // white is the middle grey and not a gamma-space surprise.

@@ -11,7 +11,7 @@ import qs.common
 //   SkeletonBar { width: 120; pulse: root.loading; pulseIndex: row.index }
 //
 // Callers own the box (width, height, anchors, and any parent opacity); this
-// primitive owns the colour, the corner and the pulse. A site that fades the
+// primitive owns the color, the corner and the pulse. A site that fades the
 // block as a whole - the arch-updates handover - leaves `pulse` off and
 // animates its wrapper, so the two never write one opacity.
 Rectangle {

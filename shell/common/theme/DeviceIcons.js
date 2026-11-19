@@ -18,7 +18,7 @@ var SILENT_LEVEL = 0.01
 
 // Whether a level reads as silence: explicitly muted, or driven to zero.
 // This is the glyph's own question - volume-off is the answer for both -
-// and it is also the colour's: the red off-mark means "nothing audible",
+// and it is also the color's: the red off-mark means "nothing audible",
 // which a zero level is whether or not anyone pressed mute. Keep the raw
 // `muted` for the controls that must not claim a mute the user never
 // performed (a toggle, a "Muted" readout).

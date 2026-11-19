@@ -37,7 +37,7 @@
 // component's own public functions - selectDay() and goToToday() - which are
 // exactly what the MouseArea handlers call (Calendar.qml:325, :271, :324).
 // What that does NOT cover is noted in the suite: the MouseArea itself, the
-// hover colours, the wheel handler and the Keys handlers.
+// hover colors, the wheel handler and the Keys handlers.
 //
 // Wide and non-finite x domains are exercised by a second probe run. The
 // renderer chooses a nice grid interval from the plot width, so grid work is
@@ -235,7 +235,7 @@ Item {
     return finite + "/" + nan + "/" + inf
   }
 
-  // ---- alpha / colour shape -------------------------------------------
+  // ---- alpha / color shape -------------------------------------------
 
   function argb8Alpha(c) {
     const s = String(c)
@@ -245,7 +245,7 @@ Item {
 
   function isSolid6(c) { return /^#[0-9a-fA-F]{6}$/.test(String(c)) }
 
-  function colourShape(c) {
+  function colorShape(c) {
     const s = String(c)
     if (/^#[0-9a-fA-F]{8}$/.test(s)) return "argb8"
     if (/^#[0-9a-fA-F]{6}$/.test(s)) return "solid6"
@@ -461,7 +461,7 @@ Item {
       else if (root.phase === 23) p23StepYearForward()
       else if (root.phase === 24) p24NiceStepNice()
       else if (root.phase === 25) p25Finiteness()
-      else if (root.phase === 26) p26Colours()
+      else if (root.phase === 26) p26Colors()
       else if (root.phase === 27) p27StepYearBack()
       else if (root.phase === 28) p28Recap()
       else finish()
@@ -522,10 +522,10 @@ Item {
     kv("settle.graph.implicitHeight", gDef.implicitHeight)
     kv("settle.dpr", gDef._dpr)
     kv("settle.dprPositive", gDef._dpr > 0 && isFinite(gDef._dpr))
-    // The theme palette lands milliseconds after boot, so the colour SHAPE is
+    // The theme palette lands milliseconds after boot, so the color SHAPE is
     // asserted and the exact palette value is not.
-    kv("settle.colour.bg", colourShape(gDef._bg))
-    kv("settle.colour.axis", colourShape(gDef._axis))
+    kv("settle.color.bg", colorShape(gDef._bg))
+    kv("settle.color.axis", colorShape(gDef._axis))
   }
 
   // ---- phase 2: the geometry the wrapper paints from ---------------------
@@ -1322,12 +1322,12 @@ Item {
     kv("fin.nanMinSampleNull", gNaNMin._sample === null)
   }
 
-  // ---- phase 25: the nine theme-derived colours ------------------------
+  // ---- phase 25: the nine theme-derived colors ------------------------
   // Structure and alpha only. The palette lands milliseconds after boot and
   // the RGB channels are theme values, so asserting them would be asserting
   // the theme; the alpha channel is a Ui.tint argument and is exact.
 
-  function p26Colours() {
+  function p26Colors() {
     const solids = { bg: gDef._bg, plotBg: gDef._plotBg, border: gDef._border, curve: gDef._curve }
     const tints = { minor: gDef._minor, major: gDef._major, axis: gDef._axis,
       label: gDef._label, title: gDef._title }
@@ -1338,11 +1338,11 @@ Item {
     for (const name in solids) {
       if (String(solids[name]) === "") emptyBad++
       if (!isSolid6(solids[name])) solidBad++
-      if (colourShape(solids[name]) === "other") bad++
+      if (colorShape(solids[name]) === "other") bad++
     }
     for (const name in tints) {
       if (String(tints[name]) === "") emptyBad++
-      if (colourShape(tints[name]) === "other") bad++
+      if (colorShape(tints[name]) === "other") bad++
     }
     kv("col.count", names.length)
     kv("col.nonEmpty", emptyBad === 0)
@@ -1350,17 +1350,17 @@ Item {
     // Theme.color() and Ui.solid() return a bare #rrggbb; Ui.tint() wraps the
     // same value with an alpha, so it comes back #aarrggbb.
     kv("col.solidsAreSixDigit", solidBad === 0)
-    kv("col.minor", colourShape(gDef._minor) + "/" + argb8Alpha(gDef._minor))
-    kv("col.major", colourShape(gDef._major) + "/" + argb8Alpha(gDef._major))
-    kv("col.axis", colourShape(gDef._axis) + "/" + argb8Alpha(gDef._axis))
-    kv("col.label", colourShape(gDef._label) + "/" + argb8Alpha(gDef._label))
-    kv("col.title", colourShape(gDef._title) + "/" + argb8Alpha(gDef._title))
-    kv("col.titleShape", colourShape(gDef._title))
+    kv("col.minor", colorShape(gDef._minor) + "/" + argb8Alpha(gDef._minor))
+    kv("col.major", colorShape(gDef._major) + "/" + argb8Alpha(gDef._major))
+    kv("col.axis", colorShape(gDef._axis) + "/" + argb8Alpha(gDef._axis))
+    kv("col.label", colorShape(gDef._label) + "/" + argb8Alpha(gDef._label))
+    kv("col.title", colorShape(gDef._title) + "/" + argb8Alpha(gDef._title))
+    kv("col.titleShape", colorShape(gDef._title))
     kv("col.titleAlpha", argb8Alpha(gDef._title))
-    kv("col.bg", colourShape(gDef._bg))
-    kv("col.plotBg", colourShape(gDef._plotBg))
-    kv("col.border", colourShape(gDef._border))
-    kv("col.curve", colourShape(gDef._curve))
+    kv("col.bg", colorShape(gDef._bg))
+    kv("col.plotBg", colorShape(gDef._plotBg))
+    kv("col.border", colorShape(gDef._border))
+    kv("col.curve", colorShape(gDef._curve))
     // The alphas are the Ui.tint arguments (0.45, 0.95, 0.55, 0.55) scaled to
     // 0..255, so they are exact regardless of which theme is loaded.
     kv("col.alpha45", argb8Alpha(gDef._minor) === Math.round(0.45 * 255))
@@ -1368,7 +1368,7 @@ Item {
     kv("col.alpha55", argb8Alpha(gDef._axis) === Math.round(0.55 * 255))
     kv("col.labelIsAxis", gDef._label === gDef._axis)
     // Ui.tint(k, 1) short-circuits, so the fully-opaque title comes back as a
-    // bare 6-digit colour instead of #ffrrggbb.
+    // bare 6-digit color instead of #ffrrggbb.
     kv("col.titleIsOpaque", gDef._title === Ui.solid("foreground_0"))
     kv("col.minorIsNot", gDef._minor !== gDef._bg)
   }

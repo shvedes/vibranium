@@ -444,7 +444,7 @@ Item {
           ? Ui.solid("accent")
           : Ui.tint("foreground_1", lineHovered ? 0.65 : 0.4)
 
-        // The cue changing is a colour handover as well as a scroll, so the
+        // The cue changing is a color handover as well as a scroll, so the
         // old line dims as the new one takes the accent instead of both
         // swapping in one frame.
         Behavior on color {
@@ -458,7 +458,7 @@ Item {
         }
         // Held playback is its own transition, separate from the cue handover:
         // the accent fades toward the surface on pause and back on resume,
-        // whether or not this row animates its colour. Fading alpha over the
+        // whether or not this row animates its color. Fading alpha over the
         // same accent is the muted tint, just carried by a property that the
         // opening row is allowed to animate.
         opacity: index === root.currentIndex && !root.playing ? 0.55 : 1

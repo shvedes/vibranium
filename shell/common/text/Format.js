@@ -42,7 +42,7 @@ function percent(ratio) {
   return Math.round(n * 100) + "%"
 }
 
-// A normalized level as the integer percent a colour band and a readout
+// A normalized level as the integer percent a color band and a readout
 // compare. Unlike percent(), the scale is not clamped: a boosted level may
 // legitimately read above 100. Non-numeric input reads as 0.
 function percentInt(ratio) {

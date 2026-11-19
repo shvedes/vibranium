@@ -169,7 +169,7 @@ Rectangle {
   // of them is what a reader needs to tell "the prompt is on the wrong
   // screen" from "the prompt is the wrong size".
 
-  // The border and the echo both move on a 150ms colour tween that reads
+  // The border and the echo both move on a 150ms color tween that reads
   // neither the global motion policy nor the field's own `animated` switch.
   // `border.color` is a grouped property with no change signal of its own, so
   // the tween it runs is not observable per frame from here; the shake
@@ -238,7 +238,7 @@ Rectangle {
     focus: true
     // `busy` names the authentication-in-flight state, so it gates the field
     // it names. Both in-tree consumers also bind `enabled` to the same state,
-    // so this is defence in depth rather than a behaviour change for them - but
+    // so this is defence in depth rather than a behavior change for them - but
     // a consumer that sets busy alone must not keep taking keystrokes and a
     // submitted() for the secret being authenticated. Root enabled still wins,
     // so an explicitly disabled box stays disabled.

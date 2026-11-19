@@ -87,7 +87,7 @@ Item {
   readonly property bool activatable: root.target !== null
     && typeof root.target.activate === "function"
 
-  // Semantic signals, not behaviour: what closing means (unmapping a window,
+  // Semantic signals, not behavior: what closing means (unmapping a window,
   // leaving a mode, switching to the next island) belongs to whoever mounted
   // the router. This split is what lets the key map stay in one place while
   // ten islands keep their own state machines.

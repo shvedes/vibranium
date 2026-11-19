@@ -160,13 +160,13 @@ Singleton {
 
   // Palette color softened by alpha. Theme.color answers every key from its
   // fallback map - an unknown key is "#000000", never undefined - so there is
-  // no pending state to guard here and the lookup is always a real colour.
+  // no pending state to guard here and the lookup is always a real color.
   function tint(key, a) {
     return Qt.alpha(Theme.color(key), a)
   }
 
   // Solid palette lookup. Same contract as tint(): the value is always a
-  // colour string, so a boot frame paints the fallback rather than nothing.
+  // color string, so a boot frame paints the fallback rather than nothing.
   function solid(key) {
     return Theme.color(key)
   }

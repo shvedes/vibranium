@@ -122,7 +122,7 @@ Singleton {
   // The whole map, for the few readers that iterate it. Derived from the
   // shards, so the shards stay the single source of truth and this cannot
   // drift from them. It notifies whenever any shard does, which is exactly
-  // the old behaviour for whole-store readers.
+  // the old behavior for whole-store readers.
   readonly property var values: {
     const m = {}
     for (const k in root._shard0) m[k] = root._shard0[k]

@@ -60,7 +60,7 @@ ShellRoot {
     kv("ih.agree." + key, h.open === h.isOpenFor(anchor))
   }
 
-  // alphaOf reads the alpha channel back out of a #AARRGGBB colour, so "the
+  // alphaOf reads the alpha channel back out of a #AARRGGBB color, so "the
   // tint applied the alpha" is an assertion and not an assumption.
   function alphaOf(c) {
     const s = String(c)
@@ -272,7 +272,7 @@ ShellRoot {
     kv("ib.flat.brightFill", String(bFlatBright.color))
     // What the component's own binding asks the palette for, computed here
     // rather than pinned in the driver. IconButton.qml:72-74 resolves its
-    // colours through Ui.tint(key, alpha), so the contract under test is the
+    // colors through Ui.tint(key, alpha), so the contract under test is the
     // KEY and the ALPHA - not whichever theme happens to be loaded. A literal
     // pin would fail on every palette change, which is noise rather than
     // signal.

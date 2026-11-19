@@ -357,7 +357,7 @@ Singleton {
   // The warm is deliberately idle and chunked. Queuing every glyph's async
   // decode in one turn puts ~180 jobs on Qt's image thread during boot and the
   // resulting contention can stretch a bar module's own state transition - a
-  // glyph painted in the colour of an intermediate state instead of the settled
+  // glyph painted in the color of an intermediate state instead of the settled
   // one. The boot milestone already holds the warm off that window (the menu
   // cannot be summoned earlier), and the panel's adoption is the live signal
   // that the warmer exists - no delay timer and no turn budget.
@@ -418,7 +418,9 @@ Singleton {
     root._iconWarmIdx = end
     if (root._iconWarmIdx < root._iconWarmRequests.length) Qt.callLater(root._pumpIconPrewarm)
   }
-  on_IconWarmReadyChanged: if (root._iconWarmReady) root._pumpIconPrewarm()
+  // Defer off the binding edge: the pump mutates requests/probe state that the
+  // gate reads, so calling it inline re-enters evaluation as a binding loop.
+  on_IconWarmReadyChanged: if (root._iconWarmReady) Qt.callLater(root._pumpIconPrewarm)
 
   // Boot-time prewarm for the two most-opened bundles (see onCompleted).
   // Builds each container into the repeat-summon cache and runs its guard
@@ -434,7 +436,9 @@ Singleton {
     && !root.open
     && Settings.ready === true && HyprlandSettings.ready === true
     && MiscSettings.ready === true
-  on_PrewarmCanRunChanged: if (root._prewarmCanRun) root._maybePrewarm()
+  // Defer off the binding edge: the build mutates store/menu state that the
+  // gate reads, so running it inline re-enters evaluation as a binding loop.
+  on_PrewarmCanRunChanged: if (root._prewarmCanRun) Qt.callLater(root._maybePrewarm)
 
   function _maybePrewarm() {
     if (root._prewarmed) return
@@ -982,6 +986,17 @@ Singleton {
   // here). Keeps row view (Entry) free of service imports and id branches;
   // per-service knowledge lives in the owning provider. JSON may also
   // provide a `confirm` object directly; provider confirms take precedence.
+
+  // A group child marked `type: "provider"` is a placeholder for a live row
+  // set owned by a surface (the font list). Resolve its `fontRows` hook and
+  // normalize the rows exactly like any other group children, so a font
+  // installed mid-session appears in the dropdown without a menu reload.
+  function providerFontRows(marker) {
+    const p = root._providerFor(marker && marker.id)
+    const rows = MenuLib.hookValue(p, "fontRows", marker, root._hookCtxShared, null)
+    if (!Array.isArray(rows) || rows.length === 0) return []
+    return MenuLib.normalizeChildren(rows, marker.id, marker.id + "#font")
+  }
 
   function subFor(item) {
     if (!item) return ""

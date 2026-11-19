@@ -199,7 +199,7 @@ _ramp() {
 fg="${C[foreground]:-}"
 bg="${C[background]:-}"
 
-# The shades those slots want, each one a step off a base colour: the
+# The shades those slots want, each one a step off a base color: the
 # high-contrast foreground, and the three background levels foot uses for
 # selection, the black slot and the bright black slot.
 declare fg_h bg_3 bg_4 bg_5

@@ -48,7 +48,7 @@ Item {
   readonly property int visibleRows: 5
 
   // Row array behind the display model: one `{ key, m }` record per
-  // colour, keyed by the module's dedupe identity and holding the store's
+  // color, keyed by the module's dedupe identity and holding the store's
   // record by reference so a payload is never re-wrapped.
   property var _rows: []
 

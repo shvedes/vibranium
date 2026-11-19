@@ -143,7 +143,7 @@ The two extremes are not the same distance from their base, and that is delibera
 One step serves both directions because the operations read the theme mode: under `LIGHT=true` `pop=` darkens and `dim=` lightens, which is the ladder a light theme needs.
 The ramp holds a color's hue and saturation, so a theme whose base is a saturated cream shades toward a stronger cream rather than toward gray.
 
-Dimmed and brighter shades of the accent colours work the same way: they are not part of the palette either, and templates ask for them with `|dim=0.10` and `|pop=0.10`.
+Dimmed and brighter shades of the accent colors work the same way: they are not part of the palette either, and templates ask for them with `|dim=0.10` and `|pop=0.10`.
 
 These values are consumed by the theme templates to generate application configurations.
 For a complete example, see the default [Nightfox theme](https://github.com/shvedes/vibranium/tree/master/themes/nightfox).

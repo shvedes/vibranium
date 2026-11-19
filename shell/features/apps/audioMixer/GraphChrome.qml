@@ -10,7 +10,7 @@ pragma ComponentBehavior: Bound
 //
 // It talks to the tab through values and signals, not through the tab object:
 // the chrome reads four things (whether a legend is open, whether a line is
-// selected, and the status line's text and colour) and asks for five actions.
+// selected, and the status line's text and color) and asks for five actions.
 // That is the whole contract, and it is checked by the linter rather than only
 // at runtime.
 
@@ -149,8 +149,8 @@ Item {
     level: 5
     text: chromeRoot.statusText
     elide: Text.ElideRight
-    // The status function's empty states carry no colour, and a Title with a
-    // blank colour is a runtime error rather than an invisible one.
+    // The status function's empty states carry no color, and a Title with a
+    // blank color is a runtime error rather than an invisible one.
     color: chromeRoot.statusColor !== "" ? chromeRoot.statusColor : "transparent"
   }
 
@@ -158,7 +158,7 @@ Item {
   // what it is. The panel that says it is a component of its own: it is a
   // self-contained picture of the vocabulary, it shares nothing with the canvas
   // but the row it hangs under, and a second copy here would be two
-  // descriptions of one legend, free to disagree about a colour or a gesture.
+  // descriptions of one legend, free to disagree about a color or a gesture.
   GraphLegend {
     id: legend
 

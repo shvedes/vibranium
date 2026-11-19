@@ -727,7 +727,7 @@ Item {
         }
 
         // A drop shadow under every tile, so the cascade reads as a stack of
-        // separate pictures rather than one band of colour.
+        // separate pictures rather than one band of color.
         //
         // RectangularShadow and not a MultiEffect shadow: this one draws the
         // shadow ALONE. There is no source item painted along with it, which is
@@ -865,7 +865,7 @@ Item {
       + panel._key("Delete", Ui.solid("red")) + " remove · Esc close"
   }
   // The legend without its per-key markup, for the island's accessible name:
-  // a screen reader should read the keys, not the colour tags.
+  // a screen reader should read the keys, not the color tags.
   function _legendPlain() {
     return panel._legend().replace(/<[^>]*>/g, "")
   }
@@ -873,10 +873,10 @@ Item {
   // The footer sits on its own dark island rather than straight on the backdrop.
   // The deck behind it is a dimmed desktop, and a palette foreground on that is
   // exactly the light-theme failure this avoids: on a light theme `foreground_1`
-  // is a dark colour over an already dark backdrop, so the plain words vanished.
+  // is a dark color over an already dark backdrop, so the plain words vanished.
   // The island is theme-independent - a stronger scrim plus white text - which
   // is why the words are white instead of a palette leaf; the key hints keep
-  // their palette colours, and the border and rounding make the island read as
+  // their palette colors, and the border and rounding make the island read as
   // a surface of its own rather than a floating line of text.
   Rectangle {
     id: footer

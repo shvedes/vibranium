@@ -100,6 +100,7 @@ function stripForHay(s) { return Page.stripForHay(s) }
 function hayFromItem(item, includeMetadata) { return Page.hayFromItem(item, includeMetadata) }
 function uidKey(rawId, index) { return Page.uidKey(rawId, index) }
 function normalizeItem(raw, pageId, index) { return Page.normalizeItem(raw, pageId, index) }
+function normalizeChildren(rawChildren, pageId, parentKey) { return Page.normalizeChildren(rawChildren, pageId, parentKey) }
 function buildPage(id, title, width, rawItems, opts) { return Page.buildPage(id, title, width, rawItems, opts) }
 function buildOptionsPage(sel) { return Page.buildOptionsPage(sel) }
 function mergedPageOpts(extPage, base) { return Page.mergedPageOpts(extPage, base) }
@@ -749,7 +750,7 @@ function groupSearchResults(hits, lookup, isVisible, query) {
   // The query, lowercased/trimmed like every other search comparison, is what
   // lets a hit be read as a SECTION rather than as an entry. Absent it (a
   // caller that only wants the sectioning) no hit is hoisted, which is the
-  // behaviour every pre-section caller already had.
+  // behavior every pre-section caller already had.
   const q = typeof query === "string" ? query.toLowerCase().trim() : ""
   // Whether a hit is a SECTION - a row that opens a page, under the query's
   // own name - rather than an entry found inside one.

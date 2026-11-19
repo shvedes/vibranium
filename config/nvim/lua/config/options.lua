@@ -39,7 +39,7 @@ opt.cursorline = true
 -- "yes" avoids horizontal text shift when signs appear/disappear.
 opt.signcolumn = "yes"
 
--- Enable 24-bit true colour. Required for modern terminal colour schemes.
+-- Enable 24-bit true color. Required for modern terminal color schemes.
 opt.termguicolors = true
 
 -- Enable soft line wrapping (text wraps at window edge).
@@ -78,7 +78,7 @@ opt.cmdheight = 0
 -- Maximum height of the pop-up menu (completion, etc.).
 -- opt.pumheight = 10
 
--- Completion menu behaviour: show menu, show one item, don't auto-select.
+-- Completion menu behavior: show menu, show one item, don't auto-select.
 opt.completeopt = { "menu", "menuone", "noselect" }
 
 -- ===== INDENTATION =====

@@ -882,7 +882,7 @@ group('an explicit scope short-circuits the trace, so no depth has to be right',
 })
 group('a derived-scope record is refused before its trace is captured', () => {
   // The optimisation is invisible from outside except as a cost, so what is
-  // pinned here is the pair of behaviours it must preserve: a level no scope
+  // pinned here is the pair of behaviors it must preserve: a level no scope
   // carries still prints nothing, and the scoped gate agrees with the emission.
   // (That a widened scope is NOT refused is the Spec group above, which is where
   // the risk actually lives: an over-eager pre-gate would drop pinned records.)
@@ -1033,7 +1033,7 @@ group('no export is left untested', () => {
   for (const [label, lib] of [['LogScope', Scope], ['LogSpec', Spec], ['LogCore', Core]]) {
     // Constants are excluded deliberately: they are read as data by the cases
     // above (`Spec.DEFAULT_LEVEL`, `Core.JS_DEPTH`), and a constant has no
-    // behaviour to leave untested.
+    // behavior to leave untested.
     const names = Object.keys(lib).filter((n) => typeof lib[n] === 'function').sort()
     eq(`${label} exports functions`, names.length > 0, true)
     eq(`${label}: every exported function is named in this suite`,

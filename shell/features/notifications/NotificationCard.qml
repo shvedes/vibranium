@@ -81,18 +81,18 @@ Rectangle {
   property string hoveredLink: ""
 
   // The body as it is drawn: the sender's markup with the shell's link
-  // treatment on it - the anchors in the theme's accent colour and without
+  // treatment on it - the anchors in the theme's accent color and without
   // an underline of their own, and the one under the pointer underlined.
   readonly property string bodyMarkup: SU.linkMarkup(
     String(root.shot.body), root.linkColor, root.hoveredLink)
 
-  // The colour the body's links are painted in.
+  // The color the body's links are painted in.
   //
-  // The theme's accent rather than the palette's link colour: the shell is
+  // The theme's accent rather than the palette's link color: the shell is
   // themed, and a link a theme switch does not reach is a link that keeps
-  // the wrong colour across one. The accent is also what says "this does
+  // the wrong color across one. The accent is also what says "this does
   // something" everywhere else in the shell, and with the underline gone
-  // until the pointer arrives, the colour is what says it is a link at all.
+  // until the pointer arrives, the color is what says it is a link at all.
   readonly property string linkColor: String(Ui.solid("accent"))
 
   // Urgency, read off the snapshot rather than off the live Notification.

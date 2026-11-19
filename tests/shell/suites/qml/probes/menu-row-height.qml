@@ -53,7 +53,7 @@ Item {
   readonly property int sampleCap: 64
 
   // Strings that break a single-probe estimate: ascender/descender extremes, no
-  // descenders at all, wide glyphs, a CJK face, a colour emoji face, combining
+  // descenders at all, wide glyphs, a CJK face, a color emoji face, combining
   // marks, and the two the source names ("App launcher" renders a pixel taller
   // than "Mg").
   readonly property var fixture: [

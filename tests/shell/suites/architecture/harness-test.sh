@@ -138,7 +138,7 @@ t_eq \"a real assertion\" \"x\" \"x\""; then
 fi
 
 t_section "a skip is never a pass"
-if _case skip-only 0 "t_skip \"a behaviour that needs a compositor\" \"no compositor here\"
+if _case skip-only 0 "t_skip \"a behavior that needs a compositor\" \"no compositor here\"
 t_eq \"a real assertion\" \"x\" \"x\""; then
   t_eq "the skip is recorded as SKIP" "1" "$(_count "$R" SKIP)"
   t_eq "and not as a pass" "1" "$(_count "$R" PASS)"
@@ -201,7 +201,7 @@ t_eq "and records no passing assertion" "0" "$(_count "$WORK/dies.results" PASS)
 
 t_section "a suite with a missing tool blocks rather than fails"
 # require_tools is the gate that keeps "awk is not installed" from being
-# reported as seventeen behavioural failures.
+# reported as seventeen behavioral failures.
 _write notool 'require_tools definitely-not-a-real-tool-xyz
 t_eq "never reached" "x" "y"
 t_summary'

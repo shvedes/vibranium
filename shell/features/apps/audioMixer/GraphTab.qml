@@ -47,7 +47,7 @@ pragma ComponentBehavior: Bound
 //
 //   WHAT THE MARKS MEAN is on the tab rather than only in this comment: the
 //   `info` button in the chrome opens a tooltip over the canvas that names the
-//   two port shapes, the four kind colours, the dashed monitor route and the
+//   two port shapes, the four kind colors, the dashed monitor route and the
 //   gestures themselves. A canvas whose whole language is a gesture has to be
 //   able to say what that language is.
 //
@@ -296,7 +296,7 @@ Item {
   //   0.7          47.8             60.2              139.6
   //
   // Every pair is further apart at 0.7 and every hue is further from the ground,
-  // and 0.7 still reads as quieter than a card's own kind colour at 0.9 - the
+  // and 0.7 still reads as quieter than a card's own kind color at 0.9 - the
   // line is connective tissue, the card is the subject.
   //
   // The picked line is untouched: accent, 0.9, and the heavier stroke. It has to
@@ -367,7 +367,7 @@ Item {
 
   readonly property var link: tab._linkGroup(tab.linkKey)
   // What letting go of the wire right now would write, or null for nothing.
-  // One predicate for the whole drag: the rubber band's colour, the status line
+  // One predicate for the whole drag: the rubber band's color, the status line
   // and the release all have to agree about whether this drop writes anything.
   readonly property var wireTarget: tab._wireTarget()
   readonly property var status: tab._status()
@@ -669,7 +669,7 @@ Item {
   // What the card at this key IS, or null for a key no card holds. The canvas's
   // own read of the same classification the card reads for its own stripe, and
   // it goes through the card's node rather than a map kept beside it, so a line
-  // can never be coloured by a kind the card itself is not wearing.
+  // can never be colored by a kind the card itself is not wearing.
   function kindOf(key) {
     return Model.classify(tab.nodeOf(key))
   }
@@ -698,7 +698,7 @@ Item {
   // `pan'` is one multiplication and it is the whole of "the canvas follows
   // the pointer".
   //
-  // Immediate, with no Behaviour on the zoom anywhere: an animated scale is a
+  // Immediate, with no Behavior on the zoom anywhere: an animated scale is a
   // canvas that keeps moving after the wheel has stopped, and a wheel is
   // already as immediate as the compositor allows.
   function zoomBy(notches, atX, atY, fine) {
@@ -1007,7 +1007,7 @@ Item {
 
   // What letting go right now would write, or null. A pair the drag could make
   // and the line a reroute would move, both as the two node keys they are about,
-  // which is also what the status line names and what the rubber band's colour
+  // which is also what the status line names and what the rubber band's color
   // means.
   function _wireTarget() {
     if (!tab.wiring) return null
@@ -1381,7 +1381,7 @@ Item {
   // The canvas's one line of status, and the priority order it is chosen in: a
   // gesture in hand, then the last refusal, then the port enumeration's own
   // state, then the selected line, then the vocabulary. A function rather than a
-  // chain of nested bindings because the text and its colour have to agree about
+  // chain of nested bindings because the text and its color have to agree about
   // which of those won, and two bindings reading the same order is two answers
   // to one question.
   function _status() {

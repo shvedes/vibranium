@@ -54,26 +54,26 @@ t_eq "the button height token" "28" "$(qp_get token.buttonHeight)"
 t_eq "the input height token" "32" "$(qp_get token.inputHeight)"
 t_eq "the minimum row height token" "34" "$(qp_get token.rowMinH)"
 
-t_section "tint() routes every component colour through the palette"
+t_section "tint() routes every component color through the palette"
 t_eq "a fractional alpha is applied" "0.5019607843137255" "$(qp_get tint.knownKey.half)"
 t_eq "a zero alpha is applied" "0" "$(qp_get tint.knownKey.zero)"
-t_eq "alpha() guards a void colour" "transparent" "$(qp_get alpha.voidUndefined)"
-t_eq "alpha() guards an empty colour" "transparent" "$(qp_get alpha.voidEmpty)"
-t_eq "alpha() guards a null colour" "transparent" "$(qp_get alpha.voidNull)"
-t_eq "alpha() passes a real colour through" "#80000000" "$(qp_get alpha.voidTransparent)"
+t_eq "alpha() guards a void color" "transparent" "$(qp_get alpha.voidUndefined)"
+t_eq "alpha() guards an empty color" "transparent" "$(qp_get alpha.voidEmpty)"
+t_eq "alpha() guards a null color" "transparent" "$(qp_get alpha.voidNull)"
+t_eq "alpha() passes a real color through" "#80000000" "$(qp_get alpha.voidTransparent)"
 # Ui.tint and Ui.solid once branched on `Theme.color(key) === undefined`, but
 # Theme.color ends in a fallback map and returns a string for every input, so
 # that arm was unreachable and has been removed. An unknown key paints the
 # fallback at the requested alpha, which is what the assertions below pin.
 t_note "Ui.tint/Ui.solid no longer guard Theme.color against undefined: the lookup answers every key from its fallback map, so unknown keys paint that fallback"
 t_eq "Theme.color never returns undefined" "string" "$(qp_get theme.color.neverUndefined)"
-t_eq "an unknown key falls back to a colour, not undefined" "#000000" "$(qp_get theme.color.unknownIsBlack)"
+t_eq "an unknown key falls back to a color, not undefined" "#000000" "$(qp_get theme.color.unknownIsBlack)"
 t_eq "so tint() of an unknown key is that fallback at full alpha" "#000000" "$(qp_get tint.unknownKey)"
 t_eq "and at zero alpha it is fully transparent" "#00000000" "$(qp_get tint.unknownKey.0)"
 
 t_section "mix() blends two palette leaves"
 # The leaves are whichever theme is loaded, so what is asserted is the shape
-# of the blend and not a colour: a share of nothing is the first leaf, a full
+# of the blend and not a color: a share of nothing is the first leaf, a full
 # share is the second, and anything between is between them.
 t_eq "no share is the first leaf" "true" "$(qp_get mix.zeroIsBase)"
 t_eq "a full share is the second leaf" "true" "$(qp_get mix.oneIsTarget)"
@@ -81,9 +81,9 @@ t_eq "a share above one is the second leaf" "true" "$(qp_get mix.clampedHighIsTa
 t_eq "a share below zero is the first leaf" "true" "$(qp_get mix.clampedLowIsBase)"
 t_eq "a third of the way is neither leaf" "true" "$(qp_get mix.thirtyIsNotBase)"
 t_eq "and it is not the second leaf either" "true" "$(qp_get mix.thirtyIsNotTarget)"
-t_eq "the blend is a colour" "true" "$(qp_get mix.isHex)"
+t_eq "the blend is a color" "true" "$(qp_get mix.isHex)"
 t_eq "and it lies between the two leaves" "true" "$(qp_get mix.thirtyIsBetween)"
-t_match "the blend is a bare hex colour" '^#[0-9a-f]{6}$' "$(qp_get mix.thirty)"
+t_match "the blend is a bare hex color" '^#[0-9a-f]{6}$' "$(qp_get mix.thirty)"
 
 t_section "Chip: width is a function of text, icon and the boxed flag"
 t_eq "the boxed chip has width" "35.84375" "$(qp_get chip.boxed.width)"
@@ -145,7 +145,7 @@ t_eq "and always matches the gate exactly" "true" "$(qp_get motion.duration.matc
 t_eq "a large duration is not clamped" "60000" "$(qp_get motion.duration.large)"
 
 t_section "a real animation, sampled across its run"
-# This is the assertion a source read cannot make. The chip's selected colour
+# This is the assertion a source read cannot make. The chip's selected color
 # is driven by `Behavior on color { ColorAnim {} }`, so if the animation
 # machinery is wired the samples are distinct and move in one direction; if a
 # value were snapping to its target instead, every sample would be the same.
@@ -156,11 +156,11 @@ t_section "a real animation, sampled across its run"
 # applicable and asserting them anyway would report a slow machine as a broken
 # animation.
 t_eq "the event loop actually ran" "true" "$(qp_get anim.tick1.eventLoopRan)"
-t_eq "before the palette lands the colour is not ARGB" "false" "$(qp_get anim.start.isValidColor)"
-t_eq "and is a bare 6-digit colour" "#393939" "$(qp_get anim.start.color)"
-t_eq "on the first turn the colour is ARGB" "true" "$(qp_get anim.tick1.valid)"
+t_eq "before the palette lands the color is not ARGB" "false" "$(qp_get anim.start.isValidColor)"
+t_eq "and is a bare 6-digit color" "#393939" "$(qp_get anim.start.color)"
+t_eq "on the first turn the color is ARGB" "true" "$(qp_get anim.tick1.valid)"
 t_eq "and on the last" "true" "$(qp_get anim.tick3.valid)"
-t_match "the final sample is a real colour" '^#[0-9a-f]{8}$' "$(qp_get anim.tick3.color)"
+t_match "the final sample is a real color" '^#[0-9a-f]{8}$' "$(qp_get anim.tick3.color)"
 t_eq "the tween reached a different value than it started at" "true" "$(qp_get anim.tick3.changedFromStart)"
 
 if [[ $(qp_get anim.inFlight) == "true" ]]; then

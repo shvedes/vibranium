@@ -171,7 +171,7 @@ Item {
   readonly property real volume: card.audio !== null ? Number(card.audio.volume) : 0
   readonly property bool muted: card.audio !== null ? card.audio.muted === true : false
   // Nothing audible: the explicit mute or a level at zero. The glyph reads
-  // this; the title colour and the toggle keep `muted`.
+  // this; the title color and the toggle keep `muted`.
   readonly property bool silent: card.audio !== null
     && Core.Audio.silentFor(card.volume, card.muted)
   readonly property string kind: Model.classify(card.node)
@@ -188,7 +188,7 @@ Item {
   // The palette KEY this kind is drawn in, read from the library that owns the
   // pairing rather than written out here. The canvas's lines read the same
   // function for the same four kinds, so the two files cannot disagree about
-  // what colour a playback stream is - and the reasoning behind the four hues
+  // what color a playback stream is - and the reasoning behind the four hues
   // lives with `classify`, which is where the kinds themselves come from.
   //
   // A card wears it on the stripe and the glyph, because a card is identified
@@ -549,9 +549,9 @@ Item {
     // card that borrowed a row's background would read as a row that happened
     // to land on a canvas.
     //
-    // An unsupported card's surface is faded rather than recoloured, because
-    // colour is now carrying the kind: a dimmed surface and a dimmed name read as
-    // "not usable" without taking the kind's colour away from the stripe.
+    // An unsupported card's surface is faded rather than recolored, because
+    // color is now carrying the kind: a dimmed surface and a dimmed name read as
+    // "not usable" without taking the kind's color away from the stripe.
     color: card.linked ? Ui.tint("accent", 0.09)
       : (card.connectable ? Ui.solid("background_2") : Ui.tint("background_2", 0.45))
     border.width: card.linked ? 2 : 1
@@ -560,7 +560,7 @@ Item {
     // palette leaf: on a dark palette that is just brighter, on a light one
     // just darker, and either way barely there. The linked accent edge and
     // the unsupported faint edge are selection and state, not the surface,
-    // so they keep their own colours.
+    // so they keep their own colors.
     border.color: card.linked
       ? Ui.tint("accent", 0.7)
       : (card.connectable ? Ui.mix("background_2", "foreground_0", 0.14) : Ui.tint("foreground_1", 0.14))
@@ -583,7 +583,7 @@ Item {
 
   // The card a dragged line is over. A separate item from the plate so it can
   // carry no Behavior: the pointer crosses from one card to the next faster
-  // than a colour animation can follow, and a highlight that lags the pointer
+  // than a color animation can follow, and a highlight that lags the pointer
   // names the wrong card.
   Rectangle {
     anchors.fill: parent
@@ -743,7 +743,7 @@ Item {
     }
 
     // The mute affordance, and the island's: the glyph carries the level, the
-    // tiered paths carry its colour, and the click is the toggle. The same
+    // tiered paths carry its color, and the click is the toggle. The same
     // control as the stream row's, because it is the same node property.
     Item {
       id: mute
@@ -834,14 +834,14 @@ Item {
   // AT the edge, and a mark drawn inside the card would not be where the line's
   // end is.
   //
-  // Shape carries the SIDE and colour says the same thing again. An input is a
+  // Shape carries the SIDE and color says the same thing again. An input is a
   // ring and an output is a solid disc, because two identical dots give the user
   // nothing to aim at and nothing to tell them which way a wire runs, and the
   // difference has to survive the smallest zoom - so it is in the shape rather
   // than in a hue that four screen pixels would swallow. The ring keeps a hole
   // at every zoom because its thickness scales with the mark.
   //
-  // The COLOURS, and the discipline they are chosen under:
+  // The COLORS, and the discipline they are chosen under:
   //
   //   input    purple    hollow ring
   //   output   orange    solid disc
@@ -851,18 +851,18 @@ Item {
   // blue an output device, yellow an input device - so a mark in any of those four
   // reads as "this is the kind of this card". `accent` is out for the reason the
   // kinds already state: it is the user's own choice and on 12 of the 44 palettes
-  // shipped here it resolves to the same colour as `blue`. That leaves `purple`
+  // shipped here it resolves to the same color as `blue`. That leaves `purple`
   // and `orange`, and they are the best pair of what is left: `purple` is the
   // theme's `accent` in four (catppuccin, dracula), `orange` in one (ristretto),
   // and over the same 44 palettes `purple` is never nearer than 27 RGB units to a
-  // kind colour while `orange` closes to 16 on gray against yellow. A soft
+  // kind color while `orange` closes to 16 on gray against yellow. A soft
   // collision is not a collision: the mark is a mark on the card's edge and the
   // kind is a stripe along its top.
   //
   // LINKED is a third thing a mark says, and it is the one a user acts on: this
   // port already has a line on it, so a press here takes hold of that line rather
   // than starting a new one. It is drawn as a rim OUTSIDE the mark, so the mark's
-  // own shape still says the side and the tab still reads with no colour at all.
+  // own shape still says the side and the tab still reads with no color at all.
   //
   // ANTI-ALIASING is why the mark is a `Shape` and not a rounded `Rectangle`. A
   // Rectangle's rounded corners are drawn as a shader edge with no coverage
@@ -911,7 +911,7 @@ Item {
     property bool highlighted: false
     // The side's own palette key, from the mapping above. Two keys and not the
     // card's kind key: what this mark is FOR and what this card IS are two
-    // different facts, and the kind has a colour of its own already.
+    // different facts, and the kind has a color of its own already.
     readonly property string sideKey: grip.input ? "purple" : "orange"
     // The ring's stroke: a ninth of the mark, so the hole it leaves is seven
     // ninths of it. A quarter-wide stroke at this size is a four-pixel donut
@@ -995,7 +995,7 @@ Item {
       }
 
       // The rim, outside the body and drawn only on a mark a line stands on. Its
-      // own colour is the side's at a lower weight: the rim is a second fact
+      // own color is the side's at a lower weight: the rim is a second fact
       // about the same mark, not a third hue.
       ShapePath {
         fillColor: "transparent"

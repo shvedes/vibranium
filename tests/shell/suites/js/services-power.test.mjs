@@ -390,9 +390,9 @@ group('the glyph rides the recolorable leg, never the artwork leg', () => {
 group('the tone is a palette key on the hint the card reads', () => {
   eq('warn asks for orange', argOf(BM.notifyArgv('warn', 'X', 0.18), '-h'), 'string:x-vb-icon-color:orange')
   eq('critical asks for red', argOf(BM.notifyArgv('critical', 'X', 0.04), '-h'), 'string:x-vb-icon-color:red')
-  // A hex would freeze the colour at send time; Icons.url resolves a key
+  // A hex would freeze the color at send time; Icons.url resolves a key
   // against the live palette, so a card still on screen after a theme switch
-  // keeps the colour the new theme defines for that key.
+  // keeps the color the new theme defines for that key.
   eq('never a literal hex', BM.notifyArgv('warn', 'X', 0.18).some((a) => /#[0-9a-f]{6}/i.test(a)), false)
   eq('alertToneFor agrees with the argv', [BM.alertToneFor('warn'), BM.alertToneFor('critical')], ['orange', 'red'])
 })

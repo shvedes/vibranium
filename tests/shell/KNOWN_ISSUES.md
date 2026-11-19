@@ -4,17 +4,17 @@ Defects and doc/code drift the test suite found. Every entry here was
 **independently reproduced** before being written down, not taken on an agent's
 word — several plausible claims did not survive that and were dropped.
 
-Entries marked (fixed) are resolved; the rest are the actionable list. The suites themselves pin each behaviour as
+Entries marked (fixed) are resolved; the rest are the actionable list. The suites themselves pin each behavior as
 it currently is, with a comment saying why it is wrong, so a fix turns a suite
 red and forces the record to be updated rather than passing silently.
 
 **2 open findings, both low and both recorded rather than fixed:** the unused
 icon set (17) and the constructible-type census (38). Everything else below is
 fixed and kept for the record - the code and its suite now pin the corrected
-behaviour - including the high-severity paths, the calendar month roll, the
+behavior - including the high-severity paths, the calendar month roll, the
 password busy gate and glyph warnings, and the island's margin re-park,
 shared-component freeze and first-size snap. Most came from the
-behavioural QML component suites (`suites/qml/`), which is the argument for
+behavioral QML component suites (`suites/qml/`), which is the argument for
 having them: the component layer is where the shell's user-visible contracts
 live, and reading the source does not find a `fail()` that forgets to re-mask.
 
@@ -360,7 +360,7 @@ and `publish("7", …)` are the same topic.*
 **Resolved.** The dead `=== undefined` arm is gone from both functions; they
 now call `Theme.color` directly, which answers every key from its fallback map.
 Unknown keys paint that fallback at the requested alpha, and the ui suite pins
-both the unknown-key colour and its zero-alpha form.
+both the unknown-key color and its zero-alpha form.
 
 `shell/common/ui/Ui.qml:133` branches on `Theme.color(key) === undefined`, but
 `Theme.color` ends in a fallback map and returns a string for every input — an
@@ -451,7 +451,7 @@ not an accident.
 
 # QML component findings
 
-These came from the behavioural QML suites, which construct real components in
+These came from the behavioral QML suites, which construct real components in
 a live Quickshell and drive them across event-loop turns. They are numbered
 from 19 so the numbering the earlier sections established stays stable.
 
@@ -561,7 +561,7 @@ unmask a field whose consumer refused the reveal.
 `shell/common/ui/Calendar.qml:31-32` declares `viewYear`/`viewMonth` as plain
 ints. `monthGrid` compares `cellMonth === month` against the raw value, so an
 out-of-range month makes **every one of the 42 cells report `inMonth: false`** -
-the whole grid renders in the dimmed neighbouring-month colour and the selected
+the whole grid renders in the dimmed neighbouring-month color and the selected
 day has no highlight, while the title (which goes through
 `Qt.formatDate(new Date(2024, 12, 1), ...)`) reads "January 2025" beside a
 `viewYear` of 2024.
@@ -629,7 +629,7 @@ the one that did nothing.
 
 **Fixed.** The control's enabled state is `root.enabled && !root.busy`, so
 busy gates input while an explicitly disabled box stays disabled. Both
-consumers see the same behaviour they already had; a consumer that sets busy
+consumers see the same behavior they already had; a consumer that sets busy
 alone now gets the gate its name promises.
 
 *Reproduced and now verified by `suites/qml/textinput-test.sh`.*

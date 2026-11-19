@@ -326,7 +326,7 @@ QtObject {
 
   // The entry `delta` steps onto, skipping the ones this selector refuses, or
   // -1 at either end. It stops at the end rather than wrapping: a scroll past
-  // the last entry that jumps to the first is a different control's behaviour
+  // the last entry that jumps to the first is a different control's behavior
   // and reads as a skip rather than a step. Bounded by the list length, so an
   // all-refused list costs one pass and stops.
   function stepIndex(list, at, delta) {
@@ -925,7 +925,7 @@ QtObject {
     // claims it and hides it when the facade releases the claim.
     visible: AudioMixer.visible
     screen: mixer._targetScreen
-    // Not "transparent": this surface IS the window, so its own colour is the
+    // Not "transparent": this surface IS the window, so its own color is the
     // ground the rows are drawn on, and a transparent toplevel is a hole with a
     // title bar over it. The window sets no `title`: a real toplevel is named
     // by the compositor, and an app that sets one is asking for a title bar it
@@ -1231,7 +1231,7 @@ QtObject {
 
         // --- Devices tab ---
         //
-        // Unchanged behaviour: two headed lists over the two device sets, each
+        // Unchanged behavior: two headed lists over the two device sets, each
         // row disclosing the streams the graph says are linked to it.
         Column {
           width: parent.width

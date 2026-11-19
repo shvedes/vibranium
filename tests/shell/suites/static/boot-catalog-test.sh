@@ -2,7 +2,7 @@
 # Suite: boot/Boot.qml's _catalog - the declarative data itself.
 #
 # The sibling suite suites/qml/unitgate-test.sh drives UnitGate with a
-# synthetic catalog and tests the gate's *behaviour*. This one tests the real
+# synthetic catalog and tests the gate's *behavior*. This one tests the real
 # catalog *data* against the rules the gate enforces on it, so a descriptor
 # that would be refused at registration is caught here rather than at boot.
 #
@@ -387,7 +387,7 @@ later_only_dependencies() {
   printf '%s' "${out%$'\n'}"
 }
 
-# Iterative-coloured DFS over the whole graph; CYCLE is the loop, if any.
+# Iterative-colored DFS over the whole graph; CYCLE is the loop, if any.
 declare -A G_COLOR=()
 declare -A DFS_POS=()
 DFS_STACK=()

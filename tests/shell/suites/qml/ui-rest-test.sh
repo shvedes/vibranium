@@ -6,7 +6,7 @@
 # CheckBox.boxSize, ProgressBar's clamping, Divider's hairline, Title's level
 # heights, Notice.danger, Toggle.toggle() and MotionPolicy.duration. This suite
 # is the other half - the twenty-one components that have logic in them and no
-# behavioural coverage:
+# behavioral coverage:
 #
 #   BodyText  ConfirmSlot  DropdownButton  DropdownSlot  Glide  GridList  Icon
 #   PanelCard  PanelFocus  ProgressBar  ScrimWindow  ScrollBar  ZebraRow
@@ -36,7 +36,7 @@
 #   * ScrimWindow (and any PanelWindow) cannot be constructed at all - the
 #     engine has no PanelWindow backend without a compositor. The probe
 #     attempts it at runtime through Qt.createQmlObject so the failure is data
-#     and the exact message is the evidence, then the window-only behaviour is
+#     and the exact message is the evidence, then the window-only behavior is
 #     t_skipped.
 #   * Quickshell.screens is EMPTY under offscreen, not one virtual screen, so
 #     Ui.validScreens.length is 0 and Ui.primaryScreen is null. Any per-screen
@@ -116,14 +116,14 @@ t_eq "the source is a data URL" "true" "$(qp_get icon.url.known.isDataUrl)"
 t_eq "with the documented media type prefix" "data:image/svg+xml;utf" "$(qp_get icon.url.known.prefix)"
 t_eq "carrying the recolored body tone" "true" "$(qp_get icon.url.known.hasBodyTone)"
 # A NOTE, not an assertion, and deliberately. The line above is the assertion
-# that matters: it asks whether the recoloured source CONTAINS the encoded
+# that matters: it asks whether the recolored source CONTAINS the encoded
 # `foreground_0`, which is the claim being made - the icon took the theme's
-# token rather than a hardcoded colour.
+# token rather than a hardcoded color.
 #
 # This one used to assert the token's literal value (`%23dfdfdf`) and it was a
 # FAIL on any other theme - it pins one host's palette and calls it a contract.
 # `foreground_0` here is `%23d3c6aa`, a green, and nothing about the icon
-# pipeline is wrong. A theme's colours are the theme's business; recording the
+# pipeline is wrong. A theme's colors are the theme's business; recording the
 # value is an observation, which is what a note is for.
 t_note "foreground_0 on this host is $(qp_get icon.url.known.bodyToneIsForeground0), not a fixed value; the assertion above is the theme-independent one"
 t_eq "and the asset's own paints are gone" "true" "$(qp_get icon.url.known.paintsRewritten)"
@@ -152,25 +152,25 @@ t_section "Icon: the colorKey path, including a literal #rrggbb"
 t_eq "a literal colorKey still produces a data URL" "true" "$(qp_get icon.url.literalColorKey.isDataUrl)"
 t_eq "painted in the literal" "true" "$(qp_get icon.url.literalColorKey.hasLiteral)"
 t_eq "and it skips the palette entirely" "true" "$(qp_get icon.url.literalColorKey.skipsPalette)"
-t_eq "an unknown palette key falls back to a colour, never undefined" "#000000" "$(qp_get theme.unknownKey)"
+t_eq "an unknown palette key falls back to a color, never undefined" "#000000" "$(qp_get theme.unknownKey)"
 t_eq "an empty palette key does the same" "#000000" "$(qp_get theme.emptyKey)"
 # FINDING: Icons.qml:97-98 says an empty colorKey "still keeps the binding
 # pending" and Icons.qml:104-105 says an invalid accent key "resolves to \"\"
 # and keeps the binding pending". Neither arm is reachable: the hex is
 # `String(Theme.color(colorKey) ?? "")`, and Theme.color ends in a fallback map
-# that answers every key - including "" and unknown names - with a colour, so
+# that answers every key - including "" and unknown names - with a color, so
 # the guard never sees the empty string. Recorded rather than asserted as
-# intended behaviour.
+# intended behavior.
 t_eq "so an EMPTY colorKey silently produces a URL, not a pending binding" "true" "$(qp_get icon.url.noColorKey.isDataUrl)"
 t_eq "an invalid accent key also produces a URL" "true" "$(qp_get icon.url.badAccent.isDataUrl)"
 t_eq "painted with Theme's black fallback" "true" "$(qp_get icon.url.badAccent.paintedWithFallback)"
 t_eq "Icons.url agrees: it returns a 772-character URL" "772" "$(qp_get icons.url.badAccentKey.length)"
 t_eq "whose indicator is painted in that same fallback" "true" "$(qp_get icons.url.badAccentKey.paintsFallback)"
-t_note "FINDING (Low, doc/code drift): Icons.url's two 'keeps the binding pending' guards are unreachable. Icons.qml:98 resolves the colorKey through Theme.color, and Theme.color:47-67 answers every key - including the empty string and unknown names - with a colour from its fallback map, so the 'if (hex === empty) return empty' guard at Icons.qml:101 and the matching accent guard at Icons.qml:111 can never fire. Observed: colorKey \"\" and accentKey \"not_a_palette_key\" both yield a fully-formed data URL with the glyph painted in the #000000 fallback, where the comment promises a pending binding. Same shape as the Ui.tint fallback ui-test.sh already records, one layer up."
+t_note "FINDING (Low, doc/code drift): Icons.url's two 'keeps the binding pending' guards are unreachable. Icons.qml:98 resolves the colorKey through Theme.color, and Theme.color:47-67 answers every key - including the empty string and unknown names - with a color from its fallback map, so the 'if (hex === empty) return empty' guard at Icons.qml:101 and the matching accent guard at Icons.qml:111 can never fire. Observed: colorKey \"\" and accentKey \"not_a_palette_key\" both yield a fully-formed data URL with the glyph painted in the #000000 fallback, where the comment promises a pending binding. Same shape as the Ui.tint fallback ui-test.sh already records, one layer up."
 t_skip "an invalid colorKey or accentKey holds the binding pending instead of resolving" "Theme.color's fallback map makes both guards unreachable, so there is no pending-binding state to observe; see the note above"
 
 t_section "Icon: features, layering and the two-tone split"
-t_eq "an asset with an indicator but no behaviour is flagged exactly so" '{"indicator":true,"blink":false,"pulse":false}' "$(qp_get icons.features.indicatorNoBehavior)"
+t_eq "an asset with an indicator but no behavior is flagged exactly so" '{"indicator":true,"blink":false,"pulse":false}' "$(qp_get icons.features.indicatorNoBehavior)"
 t_eq "an asset declaring blink is flagged so" '{"indicator":true,"blink":true,"pulse":false}' "$(qp_get icons.features.blink)"
 t_eq "a tiered asset has no indicator" '{"indicator":false,"blink":false,"pulse":false}' "$(qp_get icons.features.tiered)"
 t_eq "and neither does a plain asset" '{"indicator":false,"blink":false,"pulse":false}' "$(qp_get icons.features.plainAsset)"
@@ -263,11 +263,11 @@ t_eq "and the outgoing layer is hidden" "0" "$(qp_get crossfade.late.outgoingOpa
 t_eq "re-asserting the showing name changes nothing" "true" "$(qp_get crossfade.sameName.noop)"
 t_eq "an empty name drops any staged swap" "true" "$(qp_get crossfade.empty.snapped)"
 t_eq "and hides the slot at once" "false" "$(qp_get crossfade.empty.visible)"
-# A colour tween produces a new URL per frame; the front layer's last-good
+# A color tween produces a new URL per frame; the front layer's last-good
 # raster stays painted, so the slot must not blink off on each decode.
-t_eq "a decoded colour-changing glyph starts visible" "true" \
+t_eq "a decoded color-changing glyph starts visible" "true" \
   "$(qp_get crossfade.color.before)"
-t_eq "a colour-only change keeps it visible" "true" "$(qp_get crossfade.color.visible)"
+t_eq "a color-only change keeps it visible" "true" "$(qp_get crossfade.color.visible)"
 t_eq "and does not disturb the name" "true" "$(qp_get crossfade.color.nameHeld)"
 
 # ---------------------------------------------------------------------
@@ -917,7 +917,7 @@ t_eq "with the standard card border" "2" "$(qp_get pc.borderW)"
 t_eq "on the standard background" "#141414" "$(qp_get pc.color)"
 t_eq "and centred in its parent" "parent" "$(qp_get pc.anchors)"
 t_eq "the show gate opens within the documented window" "true" "$(qp_get pc.gate.shown)"
-t_note "PanelCard's width tween and height tween are both gated on shown, which is false until show() has run for Ui.resizeMs + Ui.fastMs (280ms). The gate is asserted at construction and asserted open at turn 30, and every height in this section was read while the gate was still shut, so those are snapped values - which is the behaviour the gate exists to prevent a consumer seeing."
+t_note "PanelCard's width tween and height tween are both gated on shown, which is false until show() has run for Ui.resizeMs + Ui.fastMs (280ms). The gate is asserted at construction and asserted open at turn 30, and every height in this section was read while the gate was still shut, so those are snapped values - which is the behavior the gate exists to prevent a consumer seeing."
 
 # ---------------------------------------------------------------------
 # PanelFocus.
@@ -968,7 +968,7 @@ t_eq "and row 3's too" "0" "$(qp_get zebra.fourthRow.alpha)"
 t_eq "the odd row is fully transparent" "#00000000" "$(qp_get zebra.oddRow.color)"
 t_eq "a three-row set is band / none / band" "true" "$(qp_get zebra.parity.threeRows)"
 t_eq "a four-row set ends on an odd row" "true" "$(qp_get zebra.parity.fourRows)"
-t_note "The odd row is painted the literal 'transparent', which Qt normalises to #00000000 rather than leaving as a named colour - the probe reads the composed colour off the band Rectangle, so the assertion is on the alpha channel, which is 0 either way."
+t_note "The odd row is painted the literal 'transparent', which Qt normalises to #00000000 rather than leaving as a named color - the probe reads the composed color off the band Rectangle, so the assertion is on the alpha channel, which is 0 either way."
 
 t_section "ZebraRow: selection overrides parity, and hover never overrides selection"
 t_eq "the selection band is a 0.22 tint of accent" "0.2196078431372549" "$(qp_get zebra.selected.alpha)"
@@ -997,7 +997,7 @@ t_eq "and the count holds after the row that never emitted" "1" "$(qp_get zebra.
 t_section "BodyText: markup defaults to plain, so a runtime string is never parsed"
 t_eq "the default is Text.PlainText" "true" "$(qp_get body.defaultFormat)"
 t_eq "markup: true switches to Text.StyledText" "true" "$(qp_get body.markupFormat)"
-t_eq "the colour is a 0.75 tint" "0.7490196078431373" "$(qp_get body.plain.colorAlpha)"
+t_eq "the color is a 0.75 tint" "0.7490196078431373" "$(qp_get body.plain.colorAlpha)"
 t_eq "at the fontS token" "11" "$(qp_get body.px)"
 t_eq "in the shared font family" "true" "$(qp_get body.family.matchesToken)"
 t_eq "a fixed 15px line height" "15" "$(qp_get body.lineHeight)"
@@ -1047,7 +1047,7 @@ t_section "BodyText: newlines only break through styledMarkup"
 t_eq "plain text honours a raw newline" "2" "$(qp_get body.nl.plainLineCount)"
 t_eq "StyledText collapses a raw newline instead" "1" "$(qp_get body.nl.rawInMarkupLineCount)"
 t_eq "and styledMarkup's <br> breaks it again" "2" "$(qp_get body.nl.styledLineCount)"
-t_eq "which is the behaviour the source documents" "true" "$(qp_get body.nl.styledMatches)"
+t_eq "which is the behavior the source documents" "true" "$(qp_get body.nl.styledMatches)"
 t_note "BodyText.qml:12 says \"\\n breaks via MenuLib.styledMarkup\", and that is load-bearing: StyledText does not treat a raw newline as a line break, it collapses it. A markup:true BodyText handed \"a\\nb\" renders one line; handed MenuLib.styledMarkup(\"a\\nb\") - the same text as a<br>b - it renders two. Both counts are asserted."
 
 t_section "BodyText: height follows the wrapped text"
@@ -1066,7 +1066,7 @@ t_eq "and height follows it" "60" "$(qp_get body.stack.height)"
 t_section "Card: the padded content host and the capture net"
 t_eq "the standard card background" "#141414" "$(qp_get card.color)"
 t_eq "the standard card border width" "2" "$(qp_get card.borderW)"
-t_eq "in the standard border colour" "#434343" "$(qp_get card.borderColor)"
+t_eq "in the standard border color" "#434343" "$(qp_get card.borderColor)"
 t_eq "clipped" "true" "$(qp_get card.clip)"
 t_eq "square corners" "0" "$(qp_get card.radius)"
 t_eq "the content host is inset by the outer pad per side" "14" "$(qp_get card.contentInsetEach)"
@@ -1079,15 +1079,15 @@ t_eq "but it does not chase the pointer" "false" "$(qp_get card.net.hoverEnabled
 
 t_section "Divider: a solid rule, not a tint"
 t_eq "it is the background_3 token" "true" "$(qp_get divider.isSolidToken)"
-t_eq "which is a six-digit opaque colour" "#434343" "$(qp_get divider.color)"
+t_eq "which is a six-digit opaque color" "#434343" "$(qp_get divider.color)"
 t_eq "with no border of its own" "1" "$(qp_get divider.borderW)"
 t_eq "and square corners" "0" "$(qp_get divider.radius)"
-t_note "Divider.qml's own note forbids routing its default colour through custom properties of that file, and the observed colour is the plain background_3 token - a full-alpha solid, unlike the tinted bands in ZebraRow and Notice."
+t_note "Divider.qml's own note forbids routing its default color through custom properties of that file, and the observed color is the plain background_3 token - a full-alpha solid, unlike the tinted bands in ZebraRow and Notice."
 
 t_section "Title: the remaining levels and the catch-all arms"
 t_eq "level 1 is the island style: fontM" "12" "$(qp_get title1.px)"
-t_eq "reading the raw colour as the opaque foreground_0" "#dfdfdf" "$(qp_get title1.color)"
-t_eq "level 3's raw colour is the opaque foreground_1" "#d5d5d5" "$(qp_get title3.color)"
+t_eq "reading the raw color as the opaque foreground_0" "#dfdfdf" "$(qp_get title1.color)"
+t_eq "level 3's raw color is the opaque foreground_1" "#d5d5d5" "$(qp_get title3.color)"
 t_eq "level 4 is not bold" "false" "$(qp_get title4.bold)"
 t_eq "bold" "true" "$(qp_get title1.bold)"
 t_eq "in the opaque foreground_0" "true" "$(qp_get title1.isSolidToken)"
@@ -1150,7 +1150,7 @@ t_eq "and the thumb is 12 square" "12" "$(qp_get toggle.on.thumbW)"
 t_eq "on both axes" "12" "$(qp_get toggle.on.thumbH)"
 t_eq "parked at the right when checked" "18" "$(qp_get toggle.on.thumbX)"
 t_eq "which is width - thumb - 2" "18" "$(qp_get toggle.on.thumbX.expected)"
-t_eq "in the background colour" "#141414" "$(qp_get toggle.on.thumbColor)"
+t_eq "in the background color" "#141414" "$(qp_get toggle.on.thumbColor)"
 t_eq "and at the left when not" "2" "$(qp_get toggle.off.thumbX)"
 t_eq "over the background_3 track" "#434343" "$(qp_get toggle.off.color)"
 t_eq "a dimmed toggle fades to the disabled opacity" "0.45" "$(qp_get toggle.dimmed.opacity)"
@@ -1179,7 +1179,7 @@ t_eq "nothing fired before the drive" "0" "$(qp_get dbtn.clicks)"
 t_eq "and a disabled button's own signal still reaches its handler" "1" "$(qp_get dbtn.offClicks.afterEmit)"
 t_eq "at rest it is not pressed" "1" "$(qp_get dbtn.scale.resting)"
 t_eq "a labelled button shows its label" "true" "$(qp_get dbtn.label.visible)"
-t_eq "in the accent colour" "#877070" "$(qp_get dbtn.label.color)"
+t_eq "in the accent color" "#877070" "$(qp_get dbtn.label.color)"
 t_eq "bold" "true" "$(qp_get dbtn.label.bold)"
 t_eq "at fontS" "11" "$(qp_get dbtn.label.px)"
 t_eq "and an unlabelled one hides it" "false" "$(qp_get dbtn.bare.labelVisible)"

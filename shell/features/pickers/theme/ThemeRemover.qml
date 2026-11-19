@@ -267,7 +267,7 @@ Singleton {
     // Last row went away while the page was on top (confirm-stage
     // removal): pushed summon pops back to the chain below; a standalone
     // summon (single frame) closes outright, which is the `vb-shell menu
-    // close` behaviour. Guarded on the page being the current frame, so a
+    // close` behavior. Guarded on the page being the current frame, so a
     // deferred scan landing under some other page never pops its frame.
     if (roots.isPageOpen(root.pageId)) {
       if (Menu.stack.length > 1) Menu.pop()

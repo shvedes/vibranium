@@ -2,7 +2,7 @@
 // Suite: the capture geometry and the annotation math.
 //
 // Three pure libraries, one theme: every coordinate that reaches the frame
-// pixels is derived rather than stored, so the interesting behaviour is not
+// pixels is derived rather than stored, so the interesting behavior is not
 // the happy path but the degenerate one. A drag that collapses to zero, a
 // selection that starts off-screen, a DPR ratio the compositor has not
 // reported yet, a font size a stroke claims is negative. Each library states
@@ -1039,7 +1039,7 @@ group('a press inside the window is an echo', () => {
 })
 
 section('AnnotationTools.colorName - the palette name a tool label speaks')
-group('a palette colour has a name, anything else is echoed', () => {
+group('a palette color has a name, anything else is echoed', () => {
   eq('white', AT.colorName('#ffffff'), 'white')
   eq('black', AT.colorName('#000000'), 'black')
   eq('red', AT.colorName('#ff5555'), 'red')
@@ -2231,7 +2231,7 @@ group('pixelateSamples gives one clamped source span per cell', () => {
   // The span is the cell, not a point in it. A single texel per cell is
   // not a sample of the cell: at the step pixelateGrid picks for a large
   // region, anything thinner than a cell misses the centre and the region
-  // collapses to a flat slab of the background colour.
+  // collapses to a flat slab of the background color.
   eq('the first cell spans its own rect', s[0].box, { x: 0, y: 0, w: 3, h: 3 })
   eq('the spans are view-relative', s[1].box, { x: 3, y: 0, w: 3, h: 3 })
   eq('every span is inside the box', s.every((v) => v.box.x >= 0 && v.box.x + v.box.w <= box.w && v.box.y >= 0 && v.box.y + v.box.h <= box.h), true)
@@ -2346,7 +2346,7 @@ group('cellMean averages the pixels a cell covers', () => {
       px.data[o + 3] = 255
     }
   }
-  eq('a uniform cell is that colour', AT.cellMean(px, box, { x: 0, y: 0, w: 4, h: 4 }), [200, 0, 0])
+  eq('a uniform cell is that color', AT.cellMean(px, box, { x: 0, y: 0, w: 4, h: 4 }), [200, 0, 0])
   eq('a uniform cell on the other half', AT.cellMean(px, box, { x: 4, y: 0, w: 4, h: 4 }), [0, 0, 200])
   eq('a cell straddling both is their average', AT.cellMean(px, box, { x: 2, y: 0, w: 4, h: 4 }), [100, 0, 100])
   eq('one pixel is its own mean', AT.cellMean(px, box, { x: 0, y: 0, w: 1, h: 1 }), [200, 0, 0])

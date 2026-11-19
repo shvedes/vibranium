@@ -344,12 +344,12 @@ _progress() {
   local now elapsed
   now=$(date +%s)
   elapsed=$((now - RUN_START))
-  local colour=""
+  local color=""
   case "$status" in
-  PASS) colour="$C_PASS" ;;
-  REGRESSION | EMPTY) colour="$C_REG" ;;
-  BLOCKED) colour="$C_BLOC" ;;
-  *) colour="$C_BASE" ;;
+  PASS) color="$C_PASS" ;;
+  REGRESSION | EMPTY) color="$C_REG" ;;
+  BLOCKED) color="$C_BLOC" ;;
+  *) color="$C_BASE" ;;
   esac
   # A suite past this is worth naming as slow, because otherwise a 20s qmllint
   # looks identical to a hang.
@@ -357,7 +357,7 @@ _progress() {
   ((ms >= 3000)) && slow=" ${C_DIM}(slow)${C_OFF}"
   printf '%s[%2d/%2d]%s %s%-10s%s %-*s %6dms  %selapsed %ds%s%s\n' \
     "$C_DIM" "$done" "$total" "$C_OFF" \
-    "$colour" "$status" "$C_OFF" "$NAME_WIDTH" "$name" "$ms" \
+    "$color" "$status" "$C_OFF" "$NAME_WIDTH" "$name" "$ms" \
     "$C_DIM" "$elapsed" "$C_OFF" "$slow" >&2
 }
 
@@ -747,7 +747,7 @@ printf '  %spassed%s   an assertion that held.\n' "$C_BOLD" "$C_OFF"
 printf '  %sfailed%s   an assertion that did not. On a non-PASS row every failure is\n' "$C_REG" "$C_OFF"
 printf '           named under the table, and anything not in baseline.txt is a\n'
 printf '           REGRESSION: an exit status of 1.\n'
-printf '  %sskipped%s  behaviour that is explicitly unverified here, with the reason.\n' "$C_BASE" "$C_OFF"
+printf '  %sskipped%s  behavior that is explicitly unverified here, with the reason.\n' "$C_BASE" "$C_OFF"
 printf '           A skip is never a pass; it is a visible gap in the total.\n'
 printf '  %snoted%s    a recorded observation. NOT an assertion: a documented\n' "$C_BASE" "$C_OFF"
 printf '           surprise pinned with its reason, a value that depends on this\n'

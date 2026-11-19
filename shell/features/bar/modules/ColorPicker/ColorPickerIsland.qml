@@ -23,8 +23,8 @@ import "../../../../common/math/Range.js" as Range
 //
 // The sv field, the hue slider and the alpha slider all write `picked`
 // on every pointer move while dragging, and nothing persists until the
-// user confirms through Copy or Add: a colour that is never committed is
-// a colour the user changed their mind about.
+// user confirms through Copy or Add: a color that is never committed is
+// a color the user changed their mind about.
 Item {
   id: root
 
@@ -52,7 +52,7 @@ Item {
   // Set from the module: move an existing entry (by key) to the front
   // without re-adding it.
   property var promoteRecord: null
-  // Set from the module: the remembered preview colour + hue, or null on a
+  // Set from the module: the remembered preview color + hue, or null on a
   // first run. Read once, on open.
   property var workingState: null
   // Set from the module: report the live preview so it survives the session.
@@ -138,7 +138,7 @@ Item {
   // threw the thumb from one end to the other under the cursor. A drag
   // aimed at "as red as it goes" then fought itself: every position at the
   // right edge resolved to the left edge, and the next pointer event mapped
-  // back from there. ColourMath.hsvToRgb treats 360 as red, so nothing
+  // back from there. ColorMath.hsvToRgb treats 360 as red, so nothing
   // downstream needed the wrap; only the thumb's position did, and it is
   // the thumb that has to stay under the pointer.
   function setHue(h) {
@@ -166,7 +166,7 @@ Item {
     root._pickerTookOver()
     root.hue = Color.rgbToHsv(c.r, c.g, c.b).h
     root.picked = { r: c.r, g: c.g, b: c.b, a: Color.clampAlpha(rec.alpha) }
-    // A colour is the one value in this feature that is safe to print: it is
+    // A color is the one value in this feature that is safe to print: it is
     // four numbers the user just dragged, it carries nothing about the machine
     // or the account, and a reader diagnosing "why is my accent wrong" needs it.
     Log.info("picked color " + Color.format(root.picked, "hex", 1))
@@ -324,7 +324,7 @@ Item {
 
   // Module -> island: copy command settled. Accepted copies land the picked
   // color in the history and close the island; refusals keep it open with the
-  // copied flash cleared, so the user's colour is not on the clipboard and the
+  // copied flash cleared, so the user's color is not on the clipboard and the
   // island says so by staying there. A history-row copy only promotes its
   // existing entry to the front - never re-adds. No island action lights the
   // bar's code flash: the island's own copied flash is the feedback here.
@@ -866,7 +866,7 @@ Item {
     if (root.records.length > 0) root.pickRecord(root.records[0])
     // The remembered preview is applied OVER the history's top record,
     // not under it: the history only knows committed picks, so it has no
-    // transparency to restore and no uncommitted colour at all. Reading
+    // transparency to restore and no uncommitted color at all. Reading
     // it first would mean a picker whose alpha was dialled to 0.4 and
     // never committed came back opaque on the next open.
     root.restoreWorking()
@@ -876,13 +876,13 @@ Item {
     root._syncCode()
   }
 
-  // Apply the remembered colour and hue. Both move together and neither is
+  // Apply the remembered color and hue. Both move together and neither is
   // derived from the other: a gray carries no hue, so restoring the
-  // colour alone would leave the rainbow thumb at 0 and make the hue
+  // color alone would leave the rainbow thumb at 0 and make the hue
   // slider inert on white/black.
   //
   // `picked` and `hue` are written directly rather than through setHue,
-  // which would rebuild the colour from the restored hue and discard the
+  // which would rebuild the color from the restored hue and discard the
   // saturation and value that came with it.
   function restoreWorking() {
     const w = root.workingState

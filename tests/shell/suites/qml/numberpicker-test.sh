@@ -18,7 +18,7 @@
 # holds the value alone, which deletes the caret-clamp and suffix-stripping
 # that existed only to police a suffix the field no longer carries.
 #
-# The condition the Qt rule makes load-bearing is asserted behaviourally, on
+# The condition the Qt rule makes load-bearing is asserted behaviorally, on
 # the real file evaluated from disk: what the field holds, what the unit does
 # instead, and what the component's own writes put back into it. The seed
 # itself lives one file up in InlineEditor, and that file is asserted as source

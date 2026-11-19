@@ -40,7 +40,12 @@ Rectangle {
   signal picked()
 
   width: parent.width
-  height: child.restH
+  // A separator's own row is the bare hairline (or the labeled strip), far
+  // shorter than a normal child. Sizing its wrapper at a normal row left the
+  // line pinned to the wrapper's top with all the breathing below it.
+  height: child.modelData && child.modelData.type === "separator"
+    ? RowGeometry.childRestSeparator(String(child.modelData.label ?? "") !== "")
+    : child.restH
   radius: RoundingPolicy.radius
   color: "transparent"
 

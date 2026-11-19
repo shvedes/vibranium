@@ -231,7 +231,7 @@ Item {
   // properties: an assignment would destroy the live bindings and pin the
   // slot at its largest height, so nested content that later collapses would
   // leave the difference as blank space. The Binding writes the same value
-  // through to the destination with the Behaviour disabled, then keeps
+  // through to the destination with the Behavior disabled, then keeps
   // tracking contentHost.height for the rest of the unfold.
   property bool _landedHold: false
 

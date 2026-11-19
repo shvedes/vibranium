@@ -637,7 +637,7 @@ qp_assert "and the native control never saw a hover" "ib.tip.nativeHovered" "fal
 # ---------------------------------------------------------------------------
 t_section "IconButton: the ground is a three-step ladder"
 # Each rung is checked through the alpha channel rather than a pinned theme
-# colour, so the assertion is about the tint the source asks for.
+# color, so the assertion is about the tint the source asks for.
 t_eq "the resting ground is transparent black" "#00000000" "$(qp_get ib.defaults.color)"
 qp_assert "and the chrome paints it" "ib.defaults.bgColor" "#00000000"
 qp_assert "the resting border is a 1px line" "ib.defaults.bgBorderWidth" "1"
@@ -701,7 +701,7 @@ t_eq "at the target's alpha" "0.12156862745098039" "$(qp_get ib.tween.landedAlph
 qp_assert "releasing forceHover puts the ground back" "ib.tween.releasedHovered" "false"
 t_eq "to transparent" "#00000000" "$(qp_get ib.tween.releasedColor)"
 if [[ $MOTION_ENABLED == "true" ]]; then
-  t_match "the chrome is a real ARGB colour mid-flight" '^#[0-9a-f]{8}$' "$(qp_get ib.tween.mid5)"
+  t_match "the chrome is a real ARGB color mid-flight" '^#[0-9a-f]{8}$' "$(qp_get ib.tween.mid5)"
   t_ne "one turn in, it is neither the start nor the target" "#00000000" "$(qp_get ib.tween.mid5)"
   t_ne "nor the target" "$(qp_get expect.fg012)" "$(qp_get ib.tween.mid5)"
   t_ne "two turns in it has moved again" "$(qp_get ib.tween.mid5)" "$(qp_get ib.tween.mid6)"
@@ -740,7 +740,7 @@ t_note "dimTiers has no clamp: a negative value dims every tier, because the rul
 is dim !== 0 and N > dim (Icons.qml:258), and every N is greater than a negative
 dim. IconButton forwards dimTiers unvalidated (IconButton.qml:156), so a caller
 that computed a negative level would render a fully ghosted glyph rather than a
-fully solid one. Pinned here as measured behaviour, not as a recommendation"
+fully solid one. Pinned here as measured behavior, not as a recommendation"
 # The forwarded end: IconButton hands the value to its Icon, and the Icon hands
 # it to Icons.url, so the artwork on the two buttons has to differ.
 qp_assert "a tier-0 button paints the tier-0 artwork" "ic.forward.zero" "true"
@@ -751,8 +751,8 @@ qp_assert "and the same tier twice is the same artwork" "ic.forward.sameTierSame
 
 # ---------------------------------------------------------------------------
 t_section "the components themselves, and the expressions the probe measured"
-# The probe measured behaviour; these pin the expressions that produced it, so
-# an edit that keeps the behaviour and breaks the contract is still caught.
+# The probe measured behavior; these pin the expressions that produced it, so
+# an edit that keeps the behavior and breaks the contract is still caught.
 t_file "IslandHost is where the suite says it is" "$ISLAND_HOST"
 t_file "IconButton is where the suite says it is" "$ICON_BUTTON"
 t_file "and the footprint store it delegates to" "$FROZEN_FOOTPRINT"

@@ -762,7 +762,7 @@ Singleton {
   // File-backed rows open in their default app instead of re-copying:
   // a copied file's whole point is the path, and re-copying it when the
   // user wanted to look at it is the extra step. Everything else keeps
-  // the copy behaviour.
+  // the copy behavior.
   function activateAt(index) {
     const list = root.filtered
     if (index < 0 || index >= list.length) return

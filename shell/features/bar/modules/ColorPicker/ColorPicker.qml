@@ -102,8 +102,8 @@ BarModule {
 
   // --- the picker's working state ---
   //
-  // The preview colour and the hue, as the user last left them - which is
-  // not the history. A colour dialled into the sv field and abandoned was
+  // The preview color and the hue, as the user last left them - which is
+  // not the history. A color dialled into the sv field and abandoned was
   // never committed, so it is in no record; and a pick is opaque unless the
   // alpha slider says otherwise, so the history's top entry carries no
   // transparency to restore. Both live in the shell cache under one
@@ -159,7 +159,7 @@ BarModule {
 
   function reportWorking(picked, hue) {
     // A screen pick owns the preview while it runs; whatever the island
-    // reports meanwhile is not a colour the user chose on the picker.
+    // reports meanwhile is not a color the user chose on the picker.
     if (root.picking === true) return
     const rgb = ["r", "g", "b"]
     const out = {}
@@ -332,7 +332,7 @@ BarModule {
     // holds the state store's `{data: [...]}` wrapper, which is what an
     // upgrade from the pre-slot bare-array file looks like. A present slot
     // with no `records` key is unreadable history, not an empty history, so
-    // treating it as "nothing to do" would silently drop every colour the
+    // treating it as "nothing to do" would silently drop every color the
     // user picked.
     const payload = AppState.value(root._storeKey)
     const wrappedBareArray = payload !== null && typeof payload === "object"
@@ -481,24 +481,24 @@ BarModule {
     // Nothing matched, so nothing was removed and nothing was written.
     // Reached when a second delete lands on an already-deleted row.
     if (next.length === base.length) return false
-    // The slot and the size, not the colour. The colour itself is user content
+    // The slot and the size, not the color. The color itself is user content
     // in the same way a clipboard entry is, and the record that was dropped is
     // gone by the time this prints anyway.
     const removed = base.length - next.length
     const ok = root._persist(next)
     if (ok !== false) Log.info("cleared entry " + base.length + ", total " + next.length)
     // The INFO reports a size before and a size after, which is what a delete
-    // should report: the colour is user content in the same way a clipboard
+    // should report: the color is user content in the same way a clipboard
     // entry is, and the record is gone by the time the line prints.
     //
     // What two numbers cannot give back is the shape of what was dropped, and
-    // the shape is the only part of a colour that is not the colour. This
+    // the shape is the only part of a color that is not the color. This
     // function takes a dedupe key rather than a record, and `recordKey` builds
     // that key as `<color>|<alpha>|<fmt>`, so splitting it at the separators
     // yields the record's transparency and the serialization it was stored
-    // under while the first segment - the colour - is never touched. Summarize
+    // under while the first segment - the color - is never touched. Summarize
     // is deliberately not applied to the whole key: a bounded `#rrggbb` is
-    // still the colour, and bounding it would look like permission to print it.
+    // still the color, and bounding it would look like permission to print it.
     //
     // The cap rides along because `total` says how many records the document
     // holds and nothing says how many it may hold, so a store at its cap is one
@@ -565,7 +565,7 @@ BarModule {
   // settles. The island closes only after the copy command completed.
   //
   // This component's ONE external process. The island's `copied` and the pick's
-  // own `picked` say what colour went where; the child agrees or does not.
+  // own `picked` say what color went where; the child agrees or does not.
 
   property var _pendingCopies: ({})
   property int _copySeq: 0
@@ -608,7 +608,7 @@ BarModule {
       return false
     }
     if (job === null) {
-      // The registry refused or threw: no child ever ran, so the colour
+      // The registry refused or threw: no child ever ran, so the color
       // never reached the clipboard.
       root._copyFinished(id, false)
       return false
@@ -633,7 +633,7 @@ BarModule {
 
   // Every copy in this component - the screen pick, the island's Copy button
   // and its history rows - settles here exactly once, which is what makes this
-  // the one place that can say whether the colour reached the clipboard. Not
+  // the one place that can say whether the color reached the clipboard. Not
   // _copyText: there the child has only been asked to run, so the request is
   // accepted there, not copied.
   function _copyFinished(id, ok, result) {
@@ -824,12 +824,12 @@ BarModule {
       root._grabResult = result
       // The overlay's own ratio, not one derived here: the lens the user
       // aimed with magnifies by that one, and a click mapped through a
-      // second ratio reads a real colour from the wrong pixel.
+      // second ratio reads a real color from the wrong pixel.
       pixelSampler.sample(url, x, y, overlayPick.frameRatio, gen)
     })
   }
 
-  // The pixel read did not produce a colour. Unlike an empty grab this keeps
+  // The pixel read did not produce a color. Unlike an empty grab this keeps
   // the pick OPEN - the overlay is still up and the user can click again.
   function _sampleFailed() {
     root._grabResult = null
@@ -978,7 +978,7 @@ BarModule {
       // The one conversion in the component that can change the ANSWER
       // rather than only the position: a window-logical click point is mapped
       // onto physical frame pixels here, and a wrong ratio or a wrong
-      // rounding returns a real colour from the wrong place. The rounding is
+      // rounding returns a real color from the wrong place. The rounding is
       // floor, not round, and must stay floor: the magnified block the cross
       // covers is the one containing the pointer, which is floor of the
       // click's frame coordinate. Rounding to the nearest pixel centre reads

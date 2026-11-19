@@ -595,7 +595,7 @@ Singleton {
   }
 
   // Whether a level reads as silence (muted or at zero). Canonical in
-  // common/theme/DeviceIcons.js; consumers colour the off glyph with it
+  // common/theme/DeviceIcons.js; consumers color the off glyph with it
   // and keep the raw mute flag for their own readouts and toggles.
   function silentFor(volume, muted) {
     return DeviceIcons.silentFor(volume, muted)

@@ -39,7 +39,7 @@
 //      markup are derivations of already-classified rows, so they live here
 //      rather than in the controller's property bodies. The only injected
 //      dependency is colorOf(), the theme lookup the controller owns: a
-//      library that resolved a colour itself would be a QML type in a .js
+//      library that resolved a color itself would be a QML type in a .js
 //      file.
 .pragma library
 

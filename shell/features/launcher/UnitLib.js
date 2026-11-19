@@ -586,7 +586,7 @@ var SUGGEST_RANGE = {
 // 5000 and 0.005 are both readings, 5e-6 and 5e9 are neither. It is not the
 // formatter's threshold - formatNumber only reaches for exponential form past
 // 1e12 and under 1e-6 - so a row can still print "1.55e+7 in2" inside this
-// window. That is the formatter's documented behaviour and this bound is the
+// window. That is the formatter's documented behavior and this bound is the
 // looser of the two: the question here is whether the number is worth a row,
 // not whether it is the shape the formatter prefers.
 var MAX_DECADES = 5;

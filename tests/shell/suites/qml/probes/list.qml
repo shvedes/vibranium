@@ -66,7 +66,7 @@ Item {
 
   // ---- fixtures --------------------------------------------------------
   //
-  // One list per behaviour cluster. All delegates are 34px (Ui.rowMinH)
+  // One list per behavior cluster. All delegates are 34px (Ui.rowMinH)
   // unless the case is about row height, so every geometry number below is
   // 34 tall with 2px spacing - a 36px row pitch.
 
@@ -1078,7 +1078,7 @@ Item {
 
   // The selection bar is the ListView's highlight: a child of its
   // contentItem that is not a delegate. The delegates in this probe are
-  // plain Items, and the bar is the only child that paints, so a colour
+  // plain Items, and the bar is the only child that paints, so a color
   // is what tells the two apart.
   function barWidth(list) {
     const kids = list.contentItem.children
@@ -1909,7 +1909,7 @@ Item {
   }
 
   // Motion gating: the two gates the component exposes, and what they do to
-  // the durations the delegate behaviours read.
+  // the durations the delegate behaviors read.
   function motionGate() {
     // The sweep armed by the previous step is still in flight one turn later,
     // because that seat was animated. It is read again in final(), long after

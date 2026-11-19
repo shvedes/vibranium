@@ -404,7 +404,7 @@ section('StringUtils.linkMarkup - the body as it is drawn')
 group('the stylesheet comes first, so it reaches the anchors', () => {
   eq('the sheet is in front of the markup', SU.linkMarkup('body', '#cba6f7', '').indexOf('<style>') < SU.linkMarkup('body', '#cba6f7', '').indexOf('body'), true)
   eq('the anchors carry no underline of their own', SU.linkMarkup('body', '#cba6f7', ''), '<style>a { text-decoration: none; } a { color: #cba6f7; }</style>body')
-  eq('the anchors are painted in the given colour', SU.linkMarkup('body', '#cba6f7', '').includes('a { color: #cba6f7; }'), true)
+  eq('the anchors are painted in the given color', SU.linkMarkup('body', '#cba6f7', '').includes('a { color: #cba6f7; }'), true)
 })
 
 group('the hovered link is underlined, and only it', () => {
@@ -423,10 +423,10 @@ group('the text is not moved by the treatment', () => {
   eq('the body text is the same', plain.replace(/<style>.*<\/style>/, ''), hovered.replace(/<style>.*<\/style>/, '').replace('<u>', '').replace('</u>', ''))
 })
 
-group('a colour that is not there is simply not written', () => {
-  eq('no colour', SU.linkMarkup('body', '', ''), '<style>a { text-decoration: none; }</style>body')
-  eq('undefined colour', SU.linkMarkup('body', undefined, ''), '<style>a { text-decoration: none; }</style>body')
-  eq('a blank colour', SU.linkMarkup('body', '   ', ''), '<style>a { text-decoration: none; }</style>body')
+group('a color that is not there is simply not written', () => {
+  eq('no color', SU.linkMarkup('body', '', ''), '<style>a { text-decoration: none; }</style>body')
+  eq('undefined color', SU.linkMarkup('body', undefined, ''), '<style>a { text-decoration: none; }</style>body')
+  eq('a blank color', SU.linkMarkup('body', '   ', ''), '<style>a { text-decoration: none; }</style>body')
 })
 
 group('the truncate helpers never return more than the requested cap', () => {

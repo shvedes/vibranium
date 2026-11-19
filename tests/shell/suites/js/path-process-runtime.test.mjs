@@ -7,7 +7,7 @@
 // lives: what a path decision may say, what a command may carry, and which
 // IPC verb a caller is allowed to believe exists.
 //
-// Each library's own header is the contract, and where the behaviour is
+// Each library's own header is the contract, and where the behavior is
 // deliberate but surprising the test says so and pins the real value rather
 // than the intuitive one.
 

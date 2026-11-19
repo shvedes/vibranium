@@ -30,7 +30,7 @@ import "PreviewPlacement.js" as PreviewPlacement
 // accepted and ignored, and the painter's transform hint behind it is not
 // reachable from QML - so a Canvas drawImage always interpolates and the lens
 // would show a blend of up to four frame pixels where the cross sits, a
-// colour no probe ever copies. And drawImage on an Image argument does not
+// color no probe ever copies. And drawImage on an Image argument does not
 // use the item's texture either: it resolves to a pixmap Qt loads itself,
 // asynchronously, from the source URL, so every paint before that load lands
 // draws nothing and the lens is a black box until the pointer happens to move
@@ -80,7 +80,7 @@ LayerSurface {
   // delivered. This is the ratio the lens magnifies by and the ratio the
   // module's probe has to read a click's pixel with, so it is one number for
   // both: a probe that maps the same click through a second ratio returns a
-  // real colour from the wrong place.
+  // real color from the wrong place.
   readonly property real frameRatio: view.sourceSize.width > 0 && view.width > 0
     ? view.sourceSize.width / Math.max(1, view.width)
     : 0
@@ -113,7 +113,7 @@ LayerSurface {
   // pixels. An aim outside this surface has no pixel to sample: the exclusive
   // surface keeps the pointer even when the cursor sits on another output, and
   // the module's probe clamps an out-of-frame coordinate to the frame's edge -
-  // a real colour from the wrong place.
+  // a real color from the wrong place.
   function pickAim() {
     if (overlay.aimX < 0 || overlay.aimY < 0) return false
     if (overlay.aimX > overlay.width) return false
@@ -356,7 +356,7 @@ LayerSurface {
       // assignment is accepted and ignored, and the painter's transform hint
       // is not reachable from QML - so a Canvas drawImage always interpolates.
       // A Canvas lens therefore shows a blend of up to four frame pixels where
-      // the cross sits, a colour no probe ever copies, while smooth: false
+      // the cross sits, a color no probe ever copies, while smooth: false
       // keeps every block hard-edged at any ratio.
       //
       // The Image carries the whole mapping: at window size it is one frame
@@ -396,7 +396,7 @@ LayerSurface {
     }
 
     // Cross over the sampled pixel (at crossX/crossY in lens coords). Its
-    // colour comes from the pixel underneath, so the mark stays visible on
+    // color comes from the pixel underneath, so the mark stays visible on
     // any background. Zero-size anchor item so the bars center on the
     // point, wherever rim clamping pushed it.
     Item {
@@ -419,7 +419,7 @@ LayerSurface {
   }
 
   // Live contrast for the cross. The mark covers one magnified source pixel -
-  // the one a click samples - so its colour is decided from that pixel in the
+  // the one a click samples - so its color is decided from that pixel in the
   // frame the lens shows. The hidden Image decodes the grabbed frame once per
   // pick; only the 1x1 Canvas repaints as the aim moves.
   Image {
@@ -455,7 +455,7 @@ LayerSurface {
       const url = crossProbe.source
       if (url === "" || crossProbe.status !== Image.Ready) return
       // The Canvas keeps its own copy of the frame; drawing before that copy
-      // lands reads the bare backing - zeros - and colours the cross for black
+      // lands reads the bare backing - zeros - and colors the cross for black
       // over a pixel that was never black.
       if (!crossSampler.isImageLoaded(url)) return
       if (overlay.aimX < 0 || overlay.aimY < 0 || !(overlay.frameRatio > 0)) return
@@ -465,7 +465,7 @@ LayerSurface {
       const ctx = crossSampler.getContext("2d")
       if (ctx === null) return
       // The same floor-to-frame-pixel mapping the module's pick uses, so the
-      // colour read here belongs to the block the cross actually covers.
+      // color read here belongs to the block the cross actually covers.
       const gx = Range.clamp(Math.floor(overlay.aimX * overlay.frameRatio), 0, fw - 1)
       const gy = Range.clamp(Math.floor(overlay.aimY * overlay.frameRatio), 0, fh - 1)
       ctx.clearRect(0, 0, 1, 1)

@@ -17,7 +17,7 @@
 #
 # Two halves, and the first is the one that matters:
 #
-#   * BEHAVIOUR, in the live registry: a claim either takes the id or leaves the
+#   * BEHAVIOR, in the live registry: a claim either takes the id or leaves the
 #     record exactly as it was, only the owner releases it, the recovery is the
 #     host's own and it is synchronous, and a bad argument is refused rather
 #     than stored. The probe calls ProviderHost itself; nothing below reads the

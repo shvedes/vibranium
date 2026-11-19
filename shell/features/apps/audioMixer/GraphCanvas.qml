@@ -188,7 +188,7 @@ Item {
         width: line.modelData.box.w
         height: line.modelData.box.h
 
-        // ONE ShapePath for the whole line, whatever its dash is. The stroke's colour
+        // ONE ShapePath for the whole line, whatever its dash is. The stroke's color
         // and weight live here and nowhere else, and the path is one string of
         // sub-cubics: a solid line is a string of one, so there is no second
         // place for a property to be set and no branch on which kind of line is

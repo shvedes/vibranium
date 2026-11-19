@@ -11,7 +11,7 @@
 //   2. `.import "path" as Alias` binds the resolved library's namespace
 //      object to `Alias` in the importing file's scope.
 //
-// Each library gets its own vm context. That matches the QJSEngine behaviour
+// Each library gets its own vm context. That matches the QJSEngine behavior
 // the libs are written for, and it means a `var` of the same name in two
 // libraries cannot collide, which a single shared context would allow.
 //
@@ -95,7 +95,7 @@ export function loadLib(file) {
 
 // setEnv installs an environment value visible to Quickshell.env(name).
 // Scripts read the environment lazily inside a function body, so a test can
-// set this after loading and still affect behaviour.
+// set this after loading and still affect behavior.
 export function setEnv(key, value) {
   process.env[key] = value
 }

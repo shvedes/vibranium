@@ -47,8 +47,8 @@ BarModule {
   // connectivity glyph's own (Ui.blinkMs), counted rather than held.
   property int _blinkLeft: 0
   property bool _blinkOn: false
-  // The blink snaps between two real colours, so each blink is one data URL
-  // (Icons.url), not the ~30 a tween through intermediate hex colours would
+  // The blink snaps between two real colors, so each blink is one data URL
+  // (Icons.url), not the ~30 a tween through intermediate hex colors would
   // decode; the retained raster covers the single decode per endpoint.
   property color glyphColor: root._blinkOn ? Ui.solid("red")
     : Ui.solid("foreground_0")

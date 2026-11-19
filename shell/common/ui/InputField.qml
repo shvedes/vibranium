@@ -40,7 +40,7 @@ Rectangle {
   readonly property bool focused: input.activeFocus
   // Border hue while the field owns focus.
   property color focusColor: Theme.color("accent")
-  // Force the focus-coloured border without taking the keyboard. A consumer
+  // Force the focus-colored border without taking the keyboard. A consumer
   // that drives the query while another item keeps focus (the theme deck's
   // type-to-filter) sets this so the field still reads as active.
   property bool engaged: false
@@ -286,8 +286,8 @@ Rectangle {
     input.cursorPosition = EditUtils.boundaryBackward(input.text, input.cursorPosition)
   }
 
-  // The caps echo hides the control's glyphs by making its text colour
-  // transparent, and the default caret is painted in that colour, so the
+  // The caps echo hides the control's glyphs by making its text color
+  // transparent, and the default caret is painted in that color, so the
   // caret would vanish with the glyphs. This delegate keeps a visible caret
   // for exactly as long as the echo is up; the control still positions it.
   Component {

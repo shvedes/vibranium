@@ -1,12 +1,12 @@
 --==============================================================================
--- plugins/hightlight_colors.lua  -  Inline colour preview
+-- plugins/hightlight_colors.lua  -  Inline color preview
 --
 -- Plugin: brenoprata10/nvim-highlight-colors
 --
--- Detects colour codes in buffer text (hex, rgb, hsl, named colours, etc.)
--- and renders a small colour swatch (background highlight) behind each code.
+-- Detects color codes in buffer text (hex, rgb, hsl, named colors, etc.)
+-- and renders a small color swatch (background highlight) behind each code.
 --
--- Useful for CSS, SCSS, and any file containing colour literals.
+-- Useful for CSS, SCSS, and any file containing color literals.
 -- opts = {} means default configuration.
 --==============================================================================
 

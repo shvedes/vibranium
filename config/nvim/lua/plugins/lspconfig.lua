@@ -478,7 +478,7 @@ return {
     })
 
     --==========================================================================
-    -- LspAttach: buffer-local keymaps and behaviour
+    -- LspAttach: buffer-local keymaps and behavior
     --==========================================================================
     vim.api.nvim_create_autocmd("LspAttach", {
       group = vim.api.nvim_create_augroup("UserLspAttach", { clear = true }),

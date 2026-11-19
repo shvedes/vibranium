@@ -452,10 +452,10 @@ function alertFor(pct, levels) {
 //
 // Quickshell resolves an `image`-leg name to `image://icon/<name>`, which is an
 // XDG icon-theme lookup: the glyph a system theme happens to ship for that
-// name, in whatever colour that theme gave it, with the palette hint read into
+// name, in whatever color that theme gave it, with the palette hint read into
 // snapshot.iconColor and then having no leg to paint. So `-i` produces a card
 // that cannot be tinted at all, and it is not a daemon limitation - the daemon
-// carries both fields, and the recolourable one is the appIcon leg.
+// carries both fields, and the recolorable one is the appIcon leg.
 //
 // `-i` also resolves to a different ASSET than the bar paints: the bar's
 // battery-2 is shell/assets/icons/battery/battery-2.svg recolored through

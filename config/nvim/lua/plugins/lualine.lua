@@ -5,8 +5,8 @@
 --
 -- This is the most heavily customised plugin spec. It defines:
 --   1. A suite of helper functions for dynamic component rendering (mode
---      mapping, colour lookup, Aerial integration, LSP client names, file
---      size, filetype colour).
+--      mapping, color lookup, Aerial integration, LSP client names, file
+--      size, filetype color).
 --   2. A multi-section tabline (tabs, filename, user@host, time).
 --   3. A multi-section statusline (mode, branch, diff, Aerial symbol,
 --      LSP clients, file size, filetype, diagnostics, progress).
@@ -70,8 +70,8 @@ local function cached_hl(name)
 	return v or nil
 end
 
--- Convert a 24-bit colour integer (from nvim_get_hl) into a hex colour string.
--- @param color_int (number|nil): the colour integer (e.g. 0xRRGGBB).
+-- Convert a 24-bit color integer (from nvim_get_hl) into a hex color string.
+-- @param color_int (number|nil): the color integer (e.g. 0xRRGGBB).
 -- @return (string|nil): hex string like "#ff8800", or nil if input was nil.
 local function hex(color_int)
 	if not color_int then
@@ -80,19 +80,19 @@ local function hex(color_int)
 	return ("#%06x"):format(color_int)
 end
 
--- Look up the foreground colour of a highlight group as a hex string.
+-- Look up the foreground color of a highlight group as a hex string.
 -- @param name (string): highlight group name (e.g. "Function").
--- @return (string|nil): hex colour string, or nil if the group has no fg.
+-- @return (string|nil): hex color string, or nil if the group has no fg.
 local function hl_fg(name)
 	local hl = cached_hl(name)
 	return hl and hex(hl.fg) or nil
 end
 
--- Get the background colour from the statusline area, falling back through
+-- Get the background color from the statusline area, falling back through
 -- multiple groups for compatibility with transparent/opaque setups.
--- This is the colour used as the background for all lualine sections so they
+-- This is the color used as the background for all lualine sections so they
 -- appear seamless with the statusline.
--- @return (string|nil): hex colour string, or nil if none found.
+-- @return (string|nil): hex color string, or nil if none found.
 local function get_statusline_bg()
 	for _, name in ipairs({ "StatusLine", "StatusLineNC", "TabLine", "Normal" }) do
 		local hl = cached_hl(name)
@@ -103,20 +103,20 @@ local function get_statusline_bg()
 	return nil
 end
 
--- Get the background colour lualine assigns to section b (branch, diff).
+-- Get the background color lualine assigns to section b (branch, diff).
 -- Lualine creates highlight groups at runtime named lualine_<section>_<mode>.
 -- We query the normal-mode active-window group so diagnostics / tabline
 -- sections can use the exact same bg as the branch component.
--- @return (string|nil): hex colour string, or nil if not found.
+-- @return (string|nil): hex color string, or nil if not found.
 local function get_section_bg()
 	local hl = cached_hl("lualine_b_normal")
 	return hl and hex(hl.bg) or get_statusline_bg()
 end
 
--- Create a dynamic colour function for a component based on an existing
--- highlight group's foreground colour, combined with the statusline background.
--- This makes all components adapt to any colourscheme automatically.
--- @param name (string): highlight group name for the foreground colour.
+-- Create a dynamic color function for a component based on an existing
+-- highlight group's foreground color, combined with the statusline background.
+-- This makes all components adapt to any colorscheme automatically.
+-- @param name (string): highlight group name for the foreground color.
 -- @param is_italic (boolean|nil): if true, add gui = "italic".
 -- @return (function): returns { fg = ..., bg = ... } each time it is called.
 local function color_from_hl(name, is_italic)
@@ -132,7 +132,7 @@ end
 -- Like color_from_hl, but uses the section background (StatusLineNC) instead of
 -- the main statusline background.  Use this for components that should visually
 -- pop as a separate group (diagnostics, tabline sections, user@host).
--- @param name (string): highlight group name for the foreground colour.
+-- @param name (string): highlight group name for the foreground color.
 -- @param is_italic (boolean|nil): if true, add gui = "italic".
 -- @return (function): returns { fg = ..., bg = ... } each time it is called.
 local function color_from_section_hl(name, is_italic)
@@ -273,12 +273,12 @@ local function file_size_info()
 	return info and info.text, info and info.hl
 end
 
--- Suffixes used to find the filetype-specific highlight group for colouring.
+-- Suffixes used to find the filetype-specific highlight group for coloring.
 local ft_suffixes = { "Function", "Keyword", "Statement", "Identifier", "Type" }
 
--- Pick a matching highlight group colour for the current buffer's filetype.
--- Many colourschemes define groups like "luaFunction", "pythonKeyword", etc.
--- @return (string|nil): hex colour string, or nil.
+-- Pick a matching highlight group color for the current buffer's filetype.
+-- Many colorschemes define groups like "luaFunction", "pythonKeyword", etc.
+-- @return (string|nil): hex color string, or nil.
 local function ft_color()
 	local ft = vim.bo.filetype
 	if ft == "" then
@@ -405,8 +405,8 @@ return {
 								indicators = indicators .. "%#DiagnosticError# [-]%*"
 							end
 
-							-- Highlight colour for the tab label: active tabs use a
-							-- filetype-specific colour; inactive tabs use Comment.
+							-- Highlight color for the tab label: active tabs use a
+							-- filetype-specific color; inactive tabs use Comment.
 							local tab_hl = "Comment"
 							if is_active then
 								local ft_hl_map = {

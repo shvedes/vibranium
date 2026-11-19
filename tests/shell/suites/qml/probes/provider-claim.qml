@@ -1,4 +1,4 @@
-// Probe: does ProviderHost own the provider-id space, as behaviour?
+// Probe: does ProviderHost own the provider-id space, as behavior?
 //
 // The registry is state, not a shape: what a unit needs from it is that a claim
 // either takes the id or leaves it exactly as it was, that only the owner can
@@ -6,7 +6,7 @@
 // host's job. Every assertion below is a call and its consequence - nothing
 // greps the source to find out whether the claim works.
 //
-// The recovery being SYNCHRONOUS is part of the behaviour: `claim-a` is refused
+// The recovery being SYNCHRONOUS is part of the behavior: `claim-a` is refused
 // once, then succeeds on the retry the host does itself, in the same call. A
 // deferred retry would answer false here and take the id two turns later, which
 // is exactly the shape this suite exists to rule out.

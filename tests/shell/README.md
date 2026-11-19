@@ -46,7 +46,7 @@ grepping the suites for a filename, which a single comment can fake.
 | Subject | Covered | How |
 | --- | --- | --- |
 | `.js` libraries | **98%** | every exported function, in a node `vm` |
-| `.qml` behaviourally exercised | **32/199 (16%)** | constructed in a live Quickshell, driven, result read back |
+| `.qml` behaviorally exercised | **32/199 (16%)** | constructed in a live Quickshell, driven, result read back |
 | `.qml` statically analysed | **199/199 (100%)** | imports, module declarations, lint, construction |
 | Launcher plugins | **7/7** | through the real `PluginInstance.qml` host contract |
 | Settings catalog | 32 `.jsonc` | `suites/static/settings-catalog-test.sh` |
@@ -55,10 +55,10 @@ grepping the suites for a filename, which a single comment can fake.
 
 **The honest headline is the QML line.** Every `.qml` file is checked for import
 correctness, module-boundary correctness, `singleton` declaration agreement, and
-clean construction — but only a handful are *behaviourally* exercised, meaning
+clean construction — but only a handful are *behaviorally* exercised, meaning
 something is constructed, something is changed, and the result is read back.
 
-`common/ui` is now behaviourally covered in full — all 28 components, which is
+`common/ui` is now behaviorally covered in full — all 28 components, which is
 the whole component layer. The earlier 3% was a real gap and closing it is what
 found most of the defects in `KNOWN_ISSUES.md`: a `fail()` that forgets to
 re-mask a password, a `wrap: false` that wraps anyway, a gridline loop that
@@ -73,9 +73,9 @@ structurally analysed only. That is the biggest remaining gap.
 
 Ordered by value per unit of effort:
 
-1. **Behavioural probes for the feature surfaces.** The 132 files under
+1. **Behavioral probes for the feature surfaces.** The 132 files under
    `features/` are covered structurally and, where the logic is in a JS
-   library, behaviourally through that library. The QML compositions around
+   library, behaviorally through that library. The QML compositions around
    them — `features/launcher/AppLauncherPanel.qml`, the bar's island and pill
    wiring, `features/wallpaper/WallpaperView.qml`, the OSD — are not. Same
    harness, same pump; this is simply the largest untouched surface left.
@@ -127,8 +127,8 @@ components, and asserts the things a source read cannot reach:
   `CheckBox.boxSize` defaults to `14` and honours an explicit `size`.
 - **Signals.** `Toggle.toggle()` emits `toggled` exactly once carrying the new
   value, and a disabled `Toggle` does not move.
-- **An animation sampled *in flight*.** `Chip` drives its colours through
-  `Behavior on color { ColorAnim {} }`. Reading the colour on three successive
+- **An animation sampled *in flight*.** `Chip` drives its colors through
+  `Behavior on color { ColorAnim {} }`. Reading the color on three successive
   event-loop turns gives three distinct values whose alpha moves monotonically
   — `0.882 → 0.765 → 0.647`. If the animation were not wired and a value were
   snapping to its target, the first sample would already equal the last, and
@@ -247,7 +247,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
 t_init "my-thing" "what it covers"
-t_section "a behaviour cluster"
+t_section "a behavior cluster"
 t_eq "a label" "expected" "$actual"
 t_summary
 ```
@@ -262,7 +262,7 @@ suite honest:
 - `t_note` records an observation that is not an assertion — a documented
   difference from the shell README, a host-dependent value. Notes are counted
   separately so they can never be mistaken for coverage.
-- `t_skip` marks behaviour that is explicitly unverified, with a reason. A skip
+- `t_skip` marks behavior that is explicitly unverified, with a reason. A skip
   is never a pass; it is a visible gap in the total.
 - The qml helpers `qp_probe_ran <key>` distinguishes "the value was empty" from
   "the probe never got that far" — the difference between a wrong value and a
@@ -283,7 +283,7 @@ one of the 13 skips in the suite carries its reason inline.
 - **No compositor, and no screens at all.** `Quickshell.screens` is *empty*
   under `offscreen` - not one virtual screen - so `Ui.primaryScreen` is `null`
   and every per-screen surface is untestable. Multi-output geometry, screen
-  hotplug and nested-compositor behaviour are source-level only.
+  hotplug and nested-compositor behavior are source-level only.
 - **No window backend.** `PanelWindow`-backed types cannot be constructed:
   `IslandHost` and `ScrimWindow` both fail with "No PanelWindow backend loaded",
   at component-compile time, so a probe that merely *mentions* one never
@@ -295,7 +295,7 @@ one of the 13 skips in the suite carries its reason inline.
   and the `Connections` are the file's own bytes, and the probe self-reports
   what it dropped so a source change it no longer understands fails loudly.
   That is a real caveat: those assertions are on a modified copy, and the
-  window-only behaviour is not asserted at all.
+  window-only behavior is not asserted at all.
 - **No synthesised input.** QML offers no way to post a key or mouse event
   without a compositor: `MouseArea.clicked()` throws `Insufficient arguments`,
   and `containsMouse` / `containsPress` / `AbstractButton.pressed` are
@@ -304,7 +304,7 @@ one of the 13 skips in the suite carries its reason inline.
   read asserted instead. That is 41 skips, and it is the largest single gap in
   the component coverage.
 - **No PipeWire daemon.** Tracker unbinding is unverifiable, and the audio
-  service's PipeWire-dependent behaviour is not exercised.
+  service's PipeWire-dependent behavior is not exercised.
 - **No PAM agent, polkit agent or credential store.** The polkit and lock
   surfaces are covered structurally, not by an actual authentication.
 - **No cupsd and no printer.** The IPP suites read the request templates, the
@@ -329,7 +329,7 @@ entry there was independently reproduced before being written down; several
 plausible claims from the review did not survive that and were dropped.
 
 **38 findings: 7 high, 14 medium, 17 low.** Two thirds came from the
-behavioural QML component suites, which is the argument for having them.
+behavioral QML component suites, which is the argument for having them.
 
 The high ones:
 
@@ -351,7 +351,7 @@ The high ones:
   from a launch that never happened.
 
 The suite records what it found rather than only what it asserts. `t_note`
-lines carry a surprising-but-correct behaviour with its reason, and the suites
+lines carry a surprising-but-correct behavior with its reason, and the suites
 pin each known defect as it currently is, with a comment saying why it is
 wrong, so a fix turns a suite red and forces the record to be updated instead
 of passing silently.

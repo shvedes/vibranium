@@ -13,7 +13,7 @@
 -- across restarts so you don't have to re-enable transparency every session.
 --
 -- Autocommands on ColorScheme, FileType, and VimEnter re-clear groups after
--- any event that might redefine highlights (e.g. a colourscheme change).
+-- any event that might redefine highlights (e.g. a colorscheme change).
 -- Multiple deferred calls (500ms/1s/3s/5s) handle async highlight redefinitions
 -- from plugins like bufferline, lualine, etc.
 --==============================================================================
@@ -37,7 +37,7 @@ local islist = vim.islist or vim.tbl_islist
 --==============================================================================
 
 -- Default set of highlight groups whose background will be cleared.
--- These cover the vast majority of syntax and UI groups in any colourscheme.
+-- These cover the vast majority of syntax and UI groups in any colorscheme.
 -- Users can extend or override via M.setup().
 local config = {
   groups = {
@@ -175,12 +175,12 @@ end
 --==============================================================================
 
 -- @param opt (nil|boolean): nil = flip, true = enable, false = disable.
--- After toggling, re-applies the current colourscheme. This is the cleanest
+-- After toggling, re-applies the current colorscheme. This is the cleanest
 -- approach because:
---   - A colourscheme plugin redefines ALL highlights from scratch.
+--   - A colorscheme plugin redefines ALL highlights from scratch.
 --   - Our autocommand on ColorScheme fires immediately after, clearing backgrounds.
 --   - The result is a pristine transparent state.
--- If no colourscheme is loaded yet, falls back to M.clear() directly.
+-- If no colorscheme is loaded yet, falls back to M.clear() directly.
 function M.toggle(opt)
   if opt == nil then
     vim.g.transparent_enabled = not vim.g.transparent_enabled
@@ -310,7 +310,7 @@ end)
 -- :TransparentDisable  -> disable transparency
 -- :TransparentToggle   -> flip the state
 -- Each command calls M.toggle(), which persists the state and re-applies
--- the colourscheme for a clean visual result.
+-- the colorscheme for a clean visual result.
 api.nvim_create_user_command("TransparentEnable", function()
   M.toggle(true)
 end, {})

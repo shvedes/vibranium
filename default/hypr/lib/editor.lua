@@ -617,7 +617,7 @@ end
 -- `animations` tables, say) are all discovered as separate entries in
 -- file order, ready for `resolve_occurrence` to index into.
 --
--- Note this pop-on-`}` behaviour is intentionally unconditional: even
+-- Note this pop-on-`}` behavior is intentionally unconditional: even
 -- when we're scanning for a nested path and cross a closing brace that
 -- belongs to some OTHER, unrelated section the stack was never tracking
 -- as part of the current match attempt, popping is still correct --

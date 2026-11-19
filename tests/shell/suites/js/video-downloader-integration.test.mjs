@@ -6,7 +6,7 @@
 // sort invariants under fuzz, and the round trip from a listed table through
 // the selector the wrapper records back into the already-downloaded marks.
 //
-// A failure here is a behaviour the island depends on, not a formatting
+// A failure here is a behavior the island depends on, not a formatting
 // preference: absent values must stay absent under both sort directions,
 // fillers must never become picks, and a URL spelling must key the same thing
 // on both sides of the CLI.
@@ -224,8 +224,8 @@ group('a filler is never a pick', () => {
   eq('no kind', DL.kindLabel(filler), '')
   eq('no size', DL.cellLabel(undefined), '-')
   eq('no selector', DL.downloadSelector(filler), '')
-  eq('plain colour', DL.filetypeKey(filler.ext), 'foreground_1')
-  eq('plain kind colour', DL.kindKey(filler), 'foreground_1')
+  eq('plain color', DL.filetypeKey(filler.ext), 'foreground_1')
+  eq('plain kind color', DL.kindKey(filler), 'foreground_1')
 })
 
 group('labels', () => {

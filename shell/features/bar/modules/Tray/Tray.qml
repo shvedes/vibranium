@@ -202,7 +202,7 @@ CollapsibleSlot {
   // take right-clicks as the explicit opt-in and run it.
   //
   // That gate IS the tray's non-command fallback path, so the handler reads
-  // the return instead of discarding it. The tray's own right-click behaviour
+  // the return instead of discarding it. The tray's own right-click behavior
   // is the item's DBusMenu, and it is reached by the gate withholding the
   // button rather than from here: the items sit above the fill, so a press
   // they accept never reaches the fill below. Both halves read the same

@@ -809,7 +809,7 @@ Singleton {
     // A drop that arrives while the wallpaper is off is a no-op and stays one:
     // the desktop's DropArea is gated on the same flag, so this is reachable
     // only over IPC or from the bar, and a toast here would be a new
-    // user-visible behaviour for something that did nothing.
+    // user-visible behavior for something that did nothing.
     if (!root.enabled) return
     if (root._busy()) {
       root._dropFail("another drop in progress")
@@ -914,7 +914,7 @@ Singleton {
       Log.info("dropped wallpaper (file)")
       // The size the stat answered with, and the one measurement this arm took.
       // The three refusals above print it in a toast and nothing here kept it,
-      // so a wallpaper that decodes oddly or shows as a flat colour - usually
+      // so a wallpaper that decodes oddly or shows as a flat color - usually
       // a few kilobytes - has no other record of how big the file was. The
       // parsed number rather than the stat line, which is the child's own
       // formatting and would want summarising to stay bounded.

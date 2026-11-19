@@ -152,7 +152,7 @@ function isDeviceKind(kind) {
 // written down.
 //
 //   playbackStream  green        what plays
-//   captureStream   red          what captures, the recording colour
+//   captureStream   red          what captures, the recording color
 //   outputDevice    blue         one end of the hardware
 //   inputDevice     yellow       the other end
 //   anything else   foreground_1 no claim
@@ -160,17 +160,17 @@ function isDeviceKind(kind) {
 // A card wears this key on its stripe and its glyph, and a line wears the key
 // of the kind of the card it LEAVES. The line continues the identity of the
 // card it starts at, the same way its endpoint continues the mark it meets, so
-// the canvas speaks one colour system rather than three: a user tracing a line
+// the canvas speaks one color system rather than three: a user tracing a line
 // back learns what class of thing feeds it without reading a word of it.
 //
 // Four fixed hues and never `accent`: `accent` is the user's own choice and on
-// more than one palette here it resolves to the same colour as `blue`, which
+// more than one palette here it resolves to the same color as `blue`, which
 // would hand two kinds one hue - and a hue that cannot be told apart is a hue
 // carrying nothing.
 //
 // A kind this table does not know wears the foreground's grey. That is not a
 // fallback for a bug: it is the honest answer for a node that is none of the
-// four, and grey is a colour that claims no membership.
+// four, and grey is a color that claims no membership.
 function kindColorKey(kind) {
   if (kind === "playbackStream") return "green"
   if (kind === "captureStream") return "red"
@@ -190,7 +190,7 @@ function kindColorKey(kind) {
 //                                    `pw-link <device:capture_FL>
 //                                    <sink:playback_FL>`, the mic's own capture
 //                                    into the speakers. This is the wiremix
-//                                    behaviour and the only one that works for
+//                                    behavior and the only one that works for
 //                                    a capture-only device.
 //   outputDevice ->  inputDevice    the older shape,
 //                                    `pw-link <sink:monitor_FL>

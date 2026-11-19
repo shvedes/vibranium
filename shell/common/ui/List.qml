@@ -570,7 +570,7 @@ ListView {
   // the two ends and the middle - is invisible to the sampled fingerprint
   // below, so such a consumer binds its identity changes here. A swap AT one
   // of those three positions is caught by the fingerprint itself. 0 means a
-  // static model and keeps the fingerprint's pre-revision behaviour exactly.
+  // static model and keeps the fingerprint's pre-revision behavior exactly.
   property int identityRevision: 0
   // Retained identities. A session measures a few hundred distinct
   // rows at most (pass navigation alone touches ~140 view keys), while
@@ -2048,7 +2048,7 @@ ListView {
 
   // The region height a surface is GROWING TOWARD for the live claim, or -1
   // when it is not growing the region for one. -1 default: with no surface
-  // claiming the reveal, this list owns it outright, which is the behaviour
+  // claiming the reveal, this list owns it outright, which is the behavior
   // every list that is not inside a card already has.
   //
   // A plain property, written by the surface from a change handler, and never a
@@ -2170,7 +2170,7 @@ ListView {
     // includes helpers - a function called from a binding may not read a
     // property the binding has not already read, because every read registers
     // as a dependency of that binding. A helper that reads more than the
-    // binding it serves changes the behaviour it observes, which is worse than
+    // binding it serves changes the behavior it observes, which is worse than
     // having no helper.
     const it = root.autoRevealItem
     if (!it || !(it.height > 0)) return -1

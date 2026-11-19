@@ -31,7 +31,7 @@ import "../../../common/math/Range.js" as Range
 // the window ground, two translucent bars sampled out of the picture behind
 // them, and the viewer's own flat buttons. What changed in the port is where
 // the values come from, not what the window looks like - the source's private
-// `theme` object is gone and every colour, and every font family, is a shell
+// `theme` object is gone and every color, and every font family, is a shell
 // token, so the window follows a palette change without this file being read
 // again.
 //
@@ -454,7 +454,7 @@ QtObject {
   // never reset mid-flight and emits no begin/endReset pair.
   property FolderListModel folderModel: FolderListModel {
     // One table, in ImageViewerMeta.js, spells both the filter pairs and the
-    // format families the status dot colours.
+    // format families the status dot colors.
     nameFilters: Meta.nameFilters()
     showDirs: false
     sortField: FolderListModel.Name
@@ -669,7 +669,7 @@ QtObject {
   // The picture's own bytes, offered under the format's media type: a paste
   // target that accepts an image receives the image, not a location. wl-copy
   // reads the file through a redirection, so the bytes never pass through this
-  // process, and the MIME table is the same one the status dot colours from.
+  // process, and the MIME table is the same one the status dot colors from.
   function copyImage() {
     const path = root.currentPath
     const mime = Meta.mimeType(root.currentFileName)
@@ -723,7 +723,7 @@ QtObject {
     // `WindowScreen` is the name-matching bridge, shared with the audio mixer.
     screen: WindowScreen.forScreen(Ui.primaryScreen)
 
-    // Not "transparent": this surface IS the window, so its own colour is the
+    // Not "transparent": this surface IS the window, so its own color is the
     // ground the gradient below is drawn over and a transparent toplevel is a
     // hole with a title bar over it.
     color: Ui.solid("background_0")
@@ -863,7 +863,7 @@ QtObject {
           // step below), and without this the item blanks for the decode;
           // with it the old frame stays up until the new one is ready.
           // Scoped to vectors so raster file switches keep their existing
-          // blank-then-paint behaviour.
+          // blank-then-paint behavior.
           retainWhileLoading: root.isVector
           // Vectors rasterize at display size. `sourceSize` is the raster
           // size in device pixels (see `vecRaster`); left `undefined` for
@@ -1395,7 +1395,7 @@ QtObject {
           // The file name, led by the format dot. The dot carries the format
           // family rather than the accent: which kind of file is open is
           // information, and an accent dot is a second copy of the zoom cell's
-          // colour.
+          // color.
           Row {
             spacing: 7
             Layout.alignment: Qt.AlignVCenter

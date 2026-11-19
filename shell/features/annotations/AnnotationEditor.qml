@@ -176,7 +176,7 @@ LayerSurface {
     return i >= 0 && i < editor.redoIndex && i < editor.strokes.length ? i : -1
   }
 
-  // The colour the palette is editing: the active element's own colour while
+  // The color the palette is editing: the active element's own color while
   // one is active - a Select selection or the element the last drag just
   // committed - and the next-stroke ink otherwise. One expression for the tile
   // highlight and the screen-reader state, so they cannot disagree about which
@@ -186,10 +186,10 @@ LayerSurface {
     return i >= 0 ? String(editor.strokes[i].color || "") : editor.ink
   }
 
-  // A palette tile. While an element is active it recolours that element -
-  // text included, since a text stroke paints from its own colour - and with
+  // A palette tile. While an element is active it recolors that element -
+  // text included, since a text stroke paints from its own color - and with
   // nothing active it chooses the ink for the next one. Select with nothing
-  // selected leaves both alone rather than recolouring whatever happens to be
+  // selected leaves both alone rather than recoloring whatever happens to be
   // next.
   function applyColor(color) {
     const i = editor.selectedStrokeIndex
@@ -2141,7 +2141,7 @@ LayerSurface {
          }
          if (!drawArea._inside(mouse)) return
          // A new element takes the focus: whatever the last release left active
-         // stops being the colour and width target here. Select keeps its own
+         // stops being the color and width target here. Select keeps its own
          // selection, which its press handler decides.
          if (editor.tool !== "select") editor.selectedIndex = -1
          const raw = editor._toDoc(mouse.x, mouse.y)
@@ -2912,7 +2912,7 @@ LayerSurface {
           activeFocusOnTab: true
           enabled: !editor.interactionLocked
           // Dimmed only when the tile would do nothing: Select is active and no
-          // element is selected for it to recolour.
+          // element is selected for it to recolor.
           opacity: editor.tool === "select" && editor.selectedStrokeIndex < 0 ? 0.5 : 1
            Accessible.role: Accessible.Button
            Accessible.name: "Color " + editor._colorName(swatch.modelData)

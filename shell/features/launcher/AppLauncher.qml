@@ -395,8 +395,8 @@ Singleton {
   }
 
   // Menu provider surface: overlays clearUsageHistory-row semantics onto
-  // the bundle-declared row by id (two-step confirm, empty-history
-  // visibility gate). ProviderHost holds the surfaces under this unit as
+  // the bundle-declared row by id (two-step confirm). ProviderHost holds the
+  // surfaces under this unit as
   // owner and replays them when Menu registers as its host, so drain order
   // does not gate the rows. The menu closes on clear by design
   // (LauncherEntry flow), so no reopen logic belongs in the provider.
@@ -408,7 +408,6 @@ Singleton {
   // read is the projection above, and what they write is a demand.
   function _registerMenuProvider() {
     ProviderHost.claimProvider("clearUsageHistory", {
-      visible: () => root.hasUsageHistory !== false,
       sub: (item, ctx) => (ctx && ctx.isExpanded(item)) ? "Select to confirm clear" : null,
       confirm: () => ({
         stages: 2,

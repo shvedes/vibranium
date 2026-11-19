@@ -1179,7 +1179,7 @@ Rectangle {
       // over, with the head row pushed down by the offset it remembered.
       // Both projections seat the head on every keystroke. A filter is a trim,
       // so the cursor stays on the top result while the rows under it shrink
-      // away - the conventional filter behaviour. The row held at arm time is
+      // away - the conventional filter behavior. The row held at arm time is
       // remembered separately (see _scopedReturn*) and given back on clear.
       if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
       if (!panel._sameRecords(records)) {

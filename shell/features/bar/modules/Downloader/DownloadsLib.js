@@ -201,9 +201,9 @@ function extLabel(row) {
   return cellLabel(row && row.ext)
 }
 
-// Container to theme colour. The palette is the theme's own accent set, so the
+// Container to theme color. The palette is the theme's own accent set, so the
 // coding travels with the theme instead of hard-coding hexes here. Anything
-// unknown reads as ordinary foreground rather than as a made-up colour.
+// unknown reads as ordinary foreground rather than as a made-up color.
 var FILETYPE_KEYS = {
   mp4: "blue", m4v: "blue",
   webm: "green", mkv: "cyan", mov: "cyan", avi: "cyan", flv: "cyan",
@@ -223,7 +223,7 @@ function filetypeKey(ext) {
 // downloadSelector below, so it lands with sound and says so - "v+a", video
 // plus the audio added for it. A row whose stream already carries both reads
 // "a+v": the order is what tells the two combined states apart, alongside the
-// colour, so no video row ever reads as silent.
+// color, so no video row ever reads as silent.
 function kindLabel(row) {
   if (isFiller(row)) return ""
   const kind = String(row.kind || "").trim()

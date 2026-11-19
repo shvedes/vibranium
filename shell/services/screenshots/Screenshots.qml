@@ -497,7 +497,7 @@ Singleton {
   // flow that claims can never photograph an open menu - the one thing a
   // capture pressed over a menu is for. Skipping it is safe for the copy
   // because the shot window contributes nothing to what the compositor
-  // hands back: transparent colour, an empty input mask, no keyboard focus,
+  // hands back: transparent color, an empty input mask, no keyboard focus,
   // and a screencopy child at opacity 0.
   function _claimFlow(kind, keepSurfaces) {
     if (root.sessionLocked) {

@@ -142,7 +142,7 @@ vim.api.nvim_create_autocmd("QuitPre", {
 --
 -- This is a common Vim convention: informational buffers should be dismissable
 -- with a single keystroke rather than requiring the user to type :q.
--- The <Esc> mapping mirrors the common "press Escape to close" behaviour.
+-- The <Esc> mapping mirrors the common "press Escape to close" behavior.
 --
 -- Also sets nobuflisted so these buffers don't appear in the buffer list
 -- or interfere with :bnext/:bprev navigation.
@@ -225,7 +225,7 @@ vim.api.nvim_create_autocmd('BufWritePost', {
 --   r - Insert comment leader when pressing <Enter> in Insert mode.
 --   o - Insert comment leader when pressing o or O in Normal mode.
 --
--- Many users find this behaviour annoying because it forces them to manually
+-- Many users find this behavior annoying because it forces them to manually
 -- delete the continued comment leader. This autocmd removes all three flags
 -- for every filetype, ensuring that pressing <Enter> inside a comment
 -- produces a plain newline without a leader.
@@ -299,7 +299,7 @@ vim.api.nvim_create_autocmd({ "InsertEnter", "WinLeave" }, {
 
 local enable_dim_inactive = false
 if enable_dim_inactive then
-  -- Define the dimmed foreground colour for inactive windows.
+  -- Define the dimmed foreground color for inactive windows.
   vim.cmd("highlight default DimInactiveWindows guifg=#666666")
 
   -- On WinLeave: collect every highlight group currently defined and set ALL
@@ -315,7 +315,7 @@ if enable_dim_inactive then
     end,
   })
 
-  -- On WinEnter: clear the winhighlight override, restoring original colours.
+  -- On WinEnter: clear the winhighlight override, restoring original colors.
   vim.api.nvim_create_autocmd({ "WinEnter" }, {
     desc = "Restore highlights on window enter",
     callback = function()
@@ -455,7 +455,7 @@ vim.api.nvim_create_autocmd({ "BufNewFile", "BufReadPost", "VimEnter" }, {
 
 -- On TextChanged (any edit), check if the q mapping exists and remove it.
 -- This ensures that once the user starts typing in the empty buffer, q goes
--- back to its normal behaviour (recording a macro).
+-- back to its normal behavior (recording a macro).
 vim.api.nvim_create_autocmd("TextChanged", {
   callback = function(args)
     local ok, maps = pcall(vim.api.nvim_buf_get_keymap, args.buf, "n")

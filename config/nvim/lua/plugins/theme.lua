@@ -22,7 +22,7 @@ local theme = require("utils.theme")
 -- This ensures every currently known theme is in the state.
 theme.sync_state()
 
--- Read the source to get the active colourscheme and primary plugin spec.
+-- Read the source to get the active colorscheme and primary plugin spec.
 local _, colorscheme, primary = theme.read_source()
 
 -- URL and short name of the primary theme plugin.

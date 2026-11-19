@@ -1733,7 +1733,7 @@ Item {
 
           // Primary line: the SSID, with a watcher verdict (if any) riding
           // beside it ("SSID • login required", lowercase, thick dot). The
-          // connected state itself is carried by the accent-coloured icon, so
+          // connected state itself is carried by the accent-colored icon, so
           // no "connected" word is repeated here. One Text keeps the suffix
           // glued to the name through elision - no Row width math to drift
           // apart. Dot renders in subtext, word in its own ink. A remembered

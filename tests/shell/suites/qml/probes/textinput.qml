@@ -17,8 +17,8 @@
 //     1400ms, so "still failing" and "expired" are 1400ms apart and the
 //     driver samples both ends of that range;
 //   * the theme palette lands milliseconds after boot, so the border
-//     assertions read `Theme.color()` in the same turn as the colour they
-//     compare against, and no assertion anywhere depends on a literal colour.
+//     assertions read `Theme.color()` in the same turn as the color they
+//     compare against, and no assertion anywhere depends on a literal color.
 //
 // What is NOT reachable, and is not claimed: anything a key press would do.
 // There is no compositor and no QTest, so `accepted`, `escaped` and
@@ -158,7 +158,7 @@ Window {
   }
 
   // 600ms: the palette has landed and every tween has finished, so this is
-  // the first moment a border colour means what it says.
+  // the first moment a border color means what it says.
   Timer { id: settle; interval: 600; onTriggered: onSettle() }
   // 120ms into a 150ms cross-fade.
   Timer { id: mid; interval: 720; onTriggered: onMid() }
@@ -1025,7 +1025,7 @@ Window {
     kv("tick1.fail.prompt.px", promptOf(pwWindow) ? promptOf(pwWindow).font.pixelSize : "missing")
     kv("tick1.fail.prompt.bold", promptOf(pwWindow) ? promptOf(pwWindow).font.bold : "missing")
     kv("tick1.fail.prompt.spacing", promptOf(pwWindow) ? promptOf(pwWindow).font.letterSpacing : "missing")
-    kv("tick1.fail.prompt.colourIsArgb", /^#[0-9a-fA-F]{8}$/.test(String(promptOf(pwWindow).color)))
+    kv("tick1.fail.prompt.colorIsArgb", /^#[0-9a-fA-F]{8}$/.test(String(promptOf(pwWindow).color)))
 
     // The display row, one box per echo state.
     kv("glyph.masked.count", glyphCount(pwMask))
@@ -1144,7 +1144,7 @@ Window {
   }
 
   // 600ms. The palette has landed and every tween has finished, so this is
-  // the first moment a border colour means what it says.
+  // the first moment a border color means what it says.
   function onSettle() {
     kv("settle.motion.duration100", MotionPolicy.duration(100))
     kv("settle.chip.opacity", chipOf(chipFader) ? chipOf(chipFader).opacity : "missing")
@@ -1210,7 +1210,7 @@ Window {
   }
 
   // Past 1400ms from construction, short of the 600 + 1400 deadline. The
-  // border is still cross-fading back here (100ms into 150ms), so its colour
+  // border is still cross-fading back here (100ms into 150ms), so its color
   // is read once everything has settled, in onRest.
   function onHalf() {
     kv("half.window.expired", pwWindow.failure)
@@ -1239,7 +1239,7 @@ Window {
     kv("rest.promptBack", promptOf(pwMask) ? promptOf(pwMask).text : "missing")
     kv("rest.imh.stillSensitive", pwMask.input.inputMethodHints === Qt.ImhSensitiveData)
     // 700ms after the 1400ms window closed, so the border has landed on the
-    // idle colour again.
+    // idle color again.
     kv("rest.window.border", String(pwWindow.border.color))
     kv("rest.window.borderBackToIdle", String(pwWindow.border.color) === Theme.color("background_3"))
     kv("rest.short.borderBackToIdle", String(pwShort.border.color) === Theme.color("background_3"))

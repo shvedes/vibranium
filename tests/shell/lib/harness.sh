@@ -45,7 +45,7 @@ T_TOTAL=0
 T_SECTION=""
 _T_INIT_DONE=0
 
-# Colour, dropped when stdout is not a terminal so CI logs stay readable.
+# Color, dropped when stdout is not a terminal so CI logs stay readable.
 if [[ -t 1 && -z ${NO_COLOR:-} ]]; then
   _C_G=$'\e[0;32m'; _C_R=$'\e[0;31m'; _C_C=$'\e[0;36m'
   _C_Y=$'\e[0;33m'; _C_Z=$'\e[0;90m'; _C_B=$'\e[1m'; _C_0=$'\e[0m'
@@ -108,7 +108,7 @@ _t_no() {
   fi
 }
 
-# t_skip <label> [reason] - records an explicitly unverified behaviour. Kept
+# t_skip <label> [reason] - records an explicitly unverified behavior. Kept
 # separate from t_block so the runner can count real coverage gaps. A skip is
 # never a pass.
 t_skip() {

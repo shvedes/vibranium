@@ -1,8 +1,8 @@
 // Shared numeric range helpers (qs.common.math).
 //
-// The shell clamps ratios in a dozen places - colour channels, scrub
+// The shell clamps ratios in a dozen places - color channels, scrub
 // positions, calendar day fractions, meter levels. Stating the two
-// operations once keeps the inclusive bounds and the NaN behaviour (it
+// operations once keeps the inclusive bounds and the NaN behavior (it
 // propagates, because every caller has already validated its input) from
 // drifting between copies. Pure JS, pragma library, no Qt imports.
 .pragma library

@@ -694,18 +694,18 @@ t_contains "and a negative integer keeps its sign" "scale = -3," "$(cat "$TYPE_D
 
 # inferType runs Number(s) and takes the result whenever it is not NaN, so
 # anything JavaScript can read as a number is written unquoted - including the
-# hex form a Hyprland colour is written in. The value is silently turned into a
+# hex form a Hyprland color is written in. The value is silently turned into a
 # different value rather than refused.
 types_fixture "$TYPE_DIR/hex.lua"
 cli set general:col.active_border 0xff89b4fa "$TYPE_DIR/hex.lua"
-t_result "a hex colour as a value" 0 "$TYPE_DIR/hex.lua"
+t_result "a hex color as a value" 0 "$TYPE_DIR/hex.lua"
 t_contains "is written as a decimal number, not as a string" '["col.active_border"] = 4287214842,' "$(cat "$TYPE_DIR/hex.lua")"
 cli get general:col.active_border "$TYPE_DIR/hex.lua"
 t_result "and reads back as that number" 0 "4287214842"
 types_fixture "$TYPE_DIR/hex_str.lua"
 cli set general:col.active_border red "$TYPE_DIR/hex_str.lua"
 t_contains "while a non-numeric value stays a quoted string" '["col.active_border"] = "red",' "$(cat "$TYPE_DIR/hex_str.lua")"
-t_note "inferType coerces any value JavaScript can parse as a number, so 0xff89b4fa, 1e3, 0b1010, 0o17, ' 5 ' and Infinity are all written unquoted; a Hyprland colour is silently stored as a decimal"
+t_note "inferType coerces any value JavaScript can parse as a number, so 0xff89b4fa, 1e3, 0b1010, 0o17, ' 5 ' and Infinity are all written unquoted; a Hyprland color is silently stored as a decimal"
 
 # ---------------------------------------------------------------------------
 # The in-place write

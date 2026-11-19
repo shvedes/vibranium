@@ -43,7 +43,7 @@ Item {
   // instantly. Defaults on for standalone consumers off the menu.
   property bool animationsEnabled: true
 
-  // The pill is the surface, so callers that recolour a Toggle keep working
+  // The pill is the surface, so callers that recolor a Toggle keep working
   // through these aliases now that its root is an Item.
   property alias color: pill.color
   property alias radius: pill.radius

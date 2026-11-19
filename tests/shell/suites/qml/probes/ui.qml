@@ -64,7 +64,7 @@ Item {
   Card { id: card }
   Divider { id: divider }
 
-  // A chip whose colour is animated by its own Behavior, so the tween can be
+  // A chip whose color is animated by its own Behavior, so the tween can be
   // sampled in flight.
   Chip { id: animatedChip; text: "x"; selected: false }
 
@@ -121,7 +121,7 @@ Item {
     kv("token.rowMinH", Ui.rowMinH)
     kv("token.scaling", Ui.fontScale)
 
-    // tint() is the palette accessor every component colour goes through.
+    // tint() is the palette accessor every component color goes through.
     kv("tint.unknownKey", Ui.tint("definitely_not_a_palette_key", 1))
     kv("tint.unknownKey.0", Ui.tint("definitely_not_a_palette_key", 0))
     kv("tint.knownKey.isColor", typeof Ui.tint("accent", 1))
@@ -132,7 +132,7 @@ Item {
     // Ui.tint and Ui.solid both branch on `Theme.color(key) === undefined`,
     // but Theme.color ends in a fallback and never returns undefined. Pinned
     // here because the branch is unreachable in the running shell, so its
-    // behaviour cannot be changed without a test change.
+    // behavior cannot be changed without a test change.
     kv("theme.color.neverUndefined", typeof Theme.color("definitely_not_a_palette_key"))
     kv("theme.color.unknownIsBlack", Theme.color("definitely_not_a_palette_key"))
     kv("alpha.voidUndefined", Ui.alpha(undefined, 0.5))
@@ -141,7 +141,7 @@ Item {
     kv("alpha.voidTransparent", Ui.alpha("transparent", 0.5))
 
     // mix() is the palette-aware blend: a tint of one leaf by another. What is
-    // asserted are relations rather than colours, because the leaves this
+    // asserted are relations rather than colors, because the leaves this
     // reads are whichever theme is loaded - a hardcoded hex here would be a
     // claim about the theme the suite happens to run under.
     kv("mix.zeroIsBase", same(Ui.mix("background_0", "red", 0), Ui.solid("background_0")))
@@ -156,14 +156,14 @@ Item {
     kv("mix.thirty", Ui.mix("background_0", "red", 0.3))
   }
 
-  // Two colours are the same colour when their hex is the same: the palette
+  // Two colors are the same color when their hex is the same: the palette
   // and the blend both speak in lowercase #rrggbb, and a case difference is
-  // not a different colour.
+  // not a different color.
   function same(a, b) {
     return String(a).toLowerCase() === String(b).toLowerCase()
   }
 
-  // The three channels of a #rrggbb colour, or null for anything else.
+  // The three channels of a #rrggbb color, or null for anything else.
   function channels(c) {
     const s = String(c).toLowerCase()
     if (!/^#[0-9a-f]{6}$/.test(s)) return null
@@ -186,7 +186,7 @@ Item {
     return true
   }
 
-  // alphaOf reads the alpha channel back out of a #AARRGGBB colour string, so
+  // alphaOf reads the alpha channel back out of a #AARRGGBB color string, so
   // "the tint applied the alpha" is an assertion and not an assumption.
   function alphaOf(c) {
     const s = String(c)
@@ -287,10 +287,10 @@ Item {
     kv("motion.duration.matchesGate", MotionPolicy.duration(100) === (MotionPolicy.enabled ? 100 : 0))
     kv("motion.duration.large", MotionPolicy.duration(60000))
 
-    // Chip drives its own colours through ColorAnim, so its behaviour is a
+    // Chip drives its own colors through ColorAnim, so its behavior is a
     // direct readout of the gate plus the easing.
     kv("anim.chip.exists", typeof animatedChip === "object" && animatedChip !== null)
-    // The pre-palette colour is reported as text as well as brightness,
+    // The pre-palette color is reported as text as well as brightness,
     // because a NaN brightness is only explicable if you can see the string:
     // Theme's own comment says the palette lands milliseconds after boot, and
     // this is that window.
