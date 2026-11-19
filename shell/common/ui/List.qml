@@ -76,6 +76,7 @@ ListView {
   readonly property int debugFollowIdx: root._followIdx
   readonly property bool debugSeatsInstant: root._seatsInstant
   readonly property int debugScrollEasing: scrollAnim.easing.type
+  readonly property int debugHoldLegMs: root._holdLegMs
 
   // Smooth-scroll seat motion when the consumer's animation gate is
   // on; instant otherwise. User-driven motion always wins.
@@ -218,6 +219,10 @@ ListView {
   function seat(index, cause, snap, viewH) {
     var c = (cause === "step" || cause === "click") ? cause : "land"
     root._lastSeatCause = c
+    if (c !== "step") {
+      root._hlMoveEasing = Easing.OutCubic
+      root._holdLegMs = 0
+    }
     if (c === "step" || c === "click") {
       root._stillPreempt()
       // A gesture takes the bar back from any pinned origin: the user is
@@ -292,6 +297,10 @@ ListView {
   // timings). Set per animated seat in seatTo, cleared on land/grab/
   // instant seat. -1 = off (default 120ms glide).
   property int _sweepMs: -1
+  // The bar eases on the same curve as the content seat so both land together
+  // with a constant viewport offset. A held key switches both to one short
+  // linear leg (see _holdLegMs); a single step keeps the gentle curve.
+  property int _hlMoveEasing: Easing.OutCubic
   property bool _highlightHandoff: false
   readonly property real _currentSlotMotionMs:
     root.currentItem && typeof root.currentItem.slotMotionMs === "number"
@@ -508,7 +517,7 @@ ListView {
       Behavior on y {
         NumberAnimation {
           duration: root.highlightMoveDuration
-          easing.type: Easing.OutCubic
+          easing.type: root._hlMoveEasing
           onFinished: {
             root._highlightHandoff = false
             if (!scrollAnim.running) root._sweepMs = -1
@@ -540,6 +549,10 @@ ListView {
       })
       if (!root._highlightHandoff) root._sweepMs = -1
       root._followIdx = -1
+      // The leg lands with the seat: spend it so the next single step takes
+      // the normal glide instead of another repeat-length leg.
+      root._holdLegMs = 0
+      root._hlMoveEasing = Easing.OutCubic
       // A landed pursuit is not tracking anything, so a later reveal for
       // this row is a real scroll again and may ease. Without this the
       // claim outlives its own tween and every following seek on the row
@@ -1364,25 +1377,12 @@ ListView {
     // hold below has to be able to tell a no-op from a landed seat.
     root._seatWrites++
     root._lastWriteTag = owner
-    // A held key re-arms this seat faster than any ease can advance: every
-    // restart begins at zero velocity, so the view stays one leg behind and
-    // only catches up after the key is released. Land repeat follow seats
-    // directly; the bar lands with them so the cursor stays dead centre.
-    if (owner === "follow" && root._repeatFollow) {
-      scrollAnim.stop()
-      root.contentY = target
-      root._followIdx = -1
-      root._repeatFollow = false
-      root._sweepMs = 0
-      root._highlightHandoff = false
-      if (root.traceDebug) root._trace("list.followSnap", {
-        tag: owner, y: Math.round(root.contentY * 10) / 10
-      })
-      return target
-    }
     if (animated === true) {
       const distance = Math.abs(target - root.contentY)
       let distanceMs = root.stepMs(distance)
+      if (owner === "follow" && root._holdLegMs > 0) {
+        distanceMs = root._holdLegMs
+      }
       // A reveal paced by its slot rides the slot's WHOLE clock, with its
       // fast-start curve: the slot's height eases over that same duration.
       // Capping it at the distance pace landed a 140px scroll in 120ms while
@@ -1399,11 +1399,13 @@ ListView {
       const handoffMs = root._highlightHandoff && root._sweepMs >= 0
         ? root._sweepMs : 0
       scrollAnim.duration = Math.max(distanceMs, handoffMs)
-      // A follow seat must answer the very next repeat, so it uses the bar's
-      // fast-start curve; a paced reveal matches the slot's open curve for
-      // the same reason. Other seats keep the gentle one.
-      scrollAnim.easing.type = owner === "follow" || pacedReveal
-        ? Easing.OutCubic : Easing.InOutCubic
+      // A held key rides one linear leg with the bar (see _holdLegMs), so the
+      // two move as one and the cursor stays centred. A lone follow uses the
+      // bar's fast-start curve, a paced reveal the slot's open curve; other
+      // seats keep the gentle one.
+      scrollAnim.easing.type = owner === "follow" && root._holdLegMs > 0
+        ? Easing.Linear
+        : (owner === "follow" || pacedReveal ? Easing.OutCubic : Easing.InOutCubic)
       scrollAnim.to = target
       // Re-aiming a running tween by moving `to` alone does NOT work in
       // this engine: the endpoints are captured when the animation
@@ -1476,9 +1478,12 @@ ListView {
   // Index of the in-flight follow seat for the layout-shift retarget
   // below; -1 outside follow seats.
   property int _followIdx: -1
-  // Armed by move() only: a follow seat that is another step of a held key.
-  // Direct followCursor callers (landings, probe drivers) still ease.
-  property bool _repeatFollow: false
+  // Held-key leg. A repeat re-arms the seat before a stepMs-floored ease can
+  // land, so the view would creep and the cursor trail the bar. A repeat leg
+  // runs at the key's cadence instead. The bar reads the same duration and
+  // curve, so it and the content stay one motion and centre never has to be
+  // pinned to a screen slot that would snap at the clamp boundary.
+  property int _holdLegMs: 0
   // Index of the row whose open-slot pursuit put the contentY tween now in
   // flight, or -1 when the running seat is anything else. seatTo clears it
   // on every seat that is not a pursuit, so it describes the tween in
@@ -1591,12 +1596,19 @@ ListView {
     // very first keypress. GridList.moveRow/moveCell special-case the
     // same state (GridList.qml:154, :174).
     if (i < 0) i = dir > 0 ? -1 : count
+    let wrapped = false
     for (let n = 0; n < count; n++) {
+      const fromIndex = i
       if (root.wrap) {
         i = (i + dir + count) % count
       } else {
         i += dir
         if (i < 0 || i >= count) return false
+      }
+      // A lap across the ends is one seat over the whole list, not another
+      // leg of a hold. It keeps its length-derived pace and its own glide.
+      if (root.wrap && ((dir > 0 && i < fromIndex) || (dir < 0 && i > fromIndex))) {
+        wrapped = true
       }
       if (root.isSelectable(i)) {
         if (i === root.currentIndex) return false
@@ -1618,13 +1630,19 @@ ListView {
         const handoff = fromSlotMs > 0
           || (typeof highlightMs === "number" && highlightMs > 0)
         root._highlightHandoff = handoff
-        // A held key is still armed in the content tween: its next seat lands
-        // directly (see seatTo). The bar must land with it, and its tween
-        // launches on the index write below - so the zero has to be armed
-        // here, before the write, not in seatTo afterwards.
-        const repeating = repeat === true && scrollAnim.running && root._followIdx >= 0
-        root._repeatFollow = repeating
-        root._sweepMs = repeating ? 0
+        // A held key restarts the seat every repeat before the last one can
+        // land at the stepMs floor. Give both content and bar one short
+        // linear leg at the key's cadence so they move as a single motion:
+        // the bar rides its row on the same curve and lands with the content,
+        // so the centre holds in the scrollable range and the handover at the
+        // clamp boundary is a glide, not a snap to a pinned screen slot.
+        // Wraps keep the length-derived pace and their own curve.
+        const moving = ft >= 0 && Math.abs(ft - root.contentY) >= 0.5
+        const hold = repeat === true && !wrapped && root.centerFollow
+          && root.smoothScroll && moving
+        root._holdLegMs = hold ? Math.round(Ui.fastMs / 4) : 0
+        root._hlMoveEasing = hold ? Easing.Linear : Easing.OutCubic
+        root._sweepMs = hold ? root._holdLegMs
           : (focusMs > 0 ? focusMs
             : (ft < 0 ? Ui.fastMs : root.stepMs(Math.abs(ft - root.contentY))))
         root.seat(i, "step")

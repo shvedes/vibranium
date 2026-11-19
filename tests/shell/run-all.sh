@@ -197,6 +197,7 @@ describe() {
   menu-nested-live) printf 'reveal restore, layered Escape and staged swaps on the live shell' ;;
   dropdown-land) printf 'a landed DropdownSlot keeps following its content height' ;;
   list-follow-curve) printf 'keyboard follow keeps the centre on a held key' ;;
+  list-hold) printf 'held-key centre lock: a pinned bar and sliding rows' ;;
   capture-annotations) printf 'RectMath, ShotLib, AnnotationTools' ;;
   bar-models) printf 'BarLib, the bar module models, and the media helpers' ;;
   services-calendar-weather) printf 'CalendarLib, PrivacyLib, PrintersLib, weather Model' ;;
