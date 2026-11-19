@@ -65,6 +65,12 @@ Item {
     }
   }
 
+  // The editor field is the one input that lives inside an entry dropdown,
+  // so it takes the same elevation as the dropdown cursors and notices. Menu
+  // search fields and island inputs stay flat - they opt in nowhere. An
+  // inactive row never opens an editor, so no separate gate is needed here.
+  SoftShadow { host: editorField }
+
   InputField {
     id: editorField
 
@@ -127,6 +133,13 @@ Item {
     onRecovered: root.recovered()
     onEscaped: root.escaped()
     onStepped: value => root.stepped(value)
+  }
+
+  // The commit button takes the same elevation as the field, and drops it
+  // when the button is inert (Button lints `live` for exactly that state).
+  SoftShadow {
+    host: okButton
+    visible: okButton.visible && okButton.live
   }
 
   Button {

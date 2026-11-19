@@ -31,7 +31,7 @@ import qs.common
 // Which is also why `checked` stays read-only here, `enabled_` keeps its
 // name, and toggled(bool) carries the requested state in place of a
 // native signal with no argument.
-Rectangle {
+Item {
   id: root
 
   property bool checked: false
@@ -42,6 +42,11 @@ Rectangle {
   // Kill switch: disables the thumb/color tweens; state still lands
   // instantly. Defaults on for standalone consumers off the menu.
   property bool animationsEnabled: true
+
+  // The pill is the surface, so callers that recolour a Toggle keep working
+  // through these aliases now that its root is an Item.
+  property alias color: pill.color
+  property alias radius: pill.radius
 
   signal toggled(bool checked)
 
@@ -55,33 +60,47 @@ Rectangle {
   // from the same token this widget draws itself from.
   implicitWidth: Ui.toggleW
   implicitHeight: 16
-  radius: RoundingPolicy.radius
-  color: root.checked ? Theme.color("accent") : Theme.color("background_3")
   opacity: root.dimmed ? 0.45 : 1
 
-  Behavior on color {
-    enabled: root.animationsEnabled
-    ColorAnim {}
+  // The same elevation as a nested dropdown or a notice, declared before the
+  // pill so the halo paints behind its surface. A grayed-out switch is inert,
+  // so it casts no shadow at all.
+  SoftShadow {
+    host: pill
+    visible: pill.visible && !root.dimmed && root.enabled_
   }
 
   Rectangle {
-    id: thumb
+    id: pill
 
-    x: root.checked ? root.width - width - 2 : 2
-    anchors.verticalCenter: parent.verticalCenter
-    width: 12
-    height: 12
+    anchors.fill: parent
     radius: RoundingPolicy.radius
-    color: root.checked ? Theme.color("background_0")
-      : Ui.tint("foreground_1", 0.6)
+    color: root.checked ? Theme.color("accent") : Theme.color("background_3")
 
-    Behavior on x {
-      enabled: root.animationsEnabled
-      Glide { duration: Ui.fastMs }
-    }
     Behavior on color {
       enabled: root.animationsEnabled
       ColorAnim {}
+    }
+
+    Rectangle {
+      id: thumb
+
+      x: root.checked ? root.width - width - 2 : 2
+      anchors.verticalCenter: parent.verticalCenter
+      width: 12
+      height: 12
+      radius: RoundingPolicy.radius
+      color: root.checked ? Theme.color("background_0")
+        : Ui.tint("foreground_1", 0.6)
+
+      Behavior on x {
+        enabled: root.animationsEnabled
+        Glide { duration: Ui.fastMs }
+      }
+      Behavior on color {
+        enabled: root.animationsEnabled
+        ColorAnim {}
+      }
     }
   }
 
