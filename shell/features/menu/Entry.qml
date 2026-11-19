@@ -835,8 +835,7 @@ Item {
       // rather than on the next open is what lets a dropdown that does NOT
       // resize the region animate normally on the next keystroke: the hold is
       // a property of one unfold, not of the row, and `release()` clears the
-      // gate the Behaviors actually read rather than just the flag.
-      row._slotSettle = false
+      // gate the Behaviors actually read.
       descSlot.release()
       expandSlot.release()
       return
@@ -847,24 +846,6 @@ Item {
 
   // This unfold resizes the region, and the region resize is not animated.
   //
-  // MONOTONIC, for the same reason _slotMsLatch is: the verdict is published
-  // while the dropdown is opening and is gone by the time it closes, so the
-  // close needs the value the open was given. Taking the latest reading
-  // instead would animate the open and not the collapse - one motion, two
-  // clocks - which is the seam this exists to remove.
-  property bool _slotSettle: false
-
-  // Land both slots at their destination and hold them there. Called from the
-  // panel's verdict, never from a slot's own transition: a slot cannot know
-  // whether the region is about to grow for it, and asking the row first and
-  // the panel second would be a turn too late - the slot's height has already
-  // been written by then, and its Behavior has already armed.
-  function _settleSlots() {
-    if (row._slotSettle) return
-    row._slotSettle = true
-    if (descSlot.open || descSlot.closing) descSlot.land()
-    if (expandSlot.open || expandSlot.closing) expandSlot.land()
-  }
   // Panel-side slot claim (see MenuPanel.expansionNeedH).
   readonly property real expandSlotH: expandSlot.height
   // Where this row lands once its slots finish unfolding, known from the

@@ -2203,22 +2203,7 @@ Rectangle {
   // collapsing over 160ms, the card visibly late. The latch holds the last
   // figure the row published, which is the slot's own duration, and clears
   // when the resize that used it has finished.
-  readonly property int _slotRegionMs: {
-    const live = panel.listView ? panel.listView.revealSlotMs : 0
-    return live > 0 ? live : panel._slotMsLatch
-  }
   property int _slotMsLatch: 0
-  // The same figure, read the way the tween needs it: DIRECTLY, not through
-  // the binding above. A binding is evaluated lazily, so reading
-  // _slotRegionMs in the same synchronous turn that set _slotMsLatch returns
-  // the pre-write value - which is how the open armed at the fixed resize
-  // duration while the collapse armed at the slot's, and the two directions
-  // of one motion ran on different clocks.
-  function _slotDurationMs() {
-    const live = list.revealSlotMs
-    if (live > 0) return live
-    return panel._slotMsLatch > 0 ? panel._slotMsLatch : Ui.resizeMs
-  }
 
   // The resting size is what the fallbacks measure against, so it is
   // re-latched the moment the last slot closes and the live geometry is a
@@ -2567,12 +2552,12 @@ Rectangle {
     onTriggered: panel._widthSettling = false
   }
 
-  // No Behavior on height: the slot-driven region is tweened explicitly in
-  // _syncSlotRegion, and the card has to read the SAME animated number as the
-  // viewport (they are one box). A Behavior here would ease the card a second
-  // time on top of the region tween, so the card would lag the viewport by a
-  // frame of easing and the gap between them is exactly what clips the last
-  // row. Page transitions and fits keep their own tween (heightAnim ->
+  // No Behavior on height: the slot-driven region is written straight from
+  // the row's own unfold in _followSlotRow, and the card reads the SAME number
+  // as the viewport (they are one box). A Behavior here would ease the card a
+  // second time on top of the row's motion, so the card would lag the viewport
+  // and the gap between them is exactly what clips the last row. Page
+  // transitions and fits keep their own tween (heightAnim ->
   // _animatedListH), which renderedListH already prefers.
   //
   // The show gate still applies: before the opening layout settles, a real
@@ -2677,50 +2662,40 @@ Rectangle {
     return provisional > 0 ? provisional : -1
   }
 
-  // While a slot is closing, the reveal claim is held clear and the panel's
-  // latched region can keep the size the open slot had. The row still folds
-  // frame by frame; tie both boxes to that live height for the motion so the
-  // window does not stay grown and then drop after the fold has landed.
-  function _liveSlotRowH() {
-    // The row whose slot is FOLDING, not the row under the cursor. A cursor
-    // step taken during the close moves currentItem to a resting row, and
-    // reading that row here dropped the override for one frame: the card fell
-    // back to its latched region, contentHeight followed in the same frame,
-    // and the list engine clamped contentY - a jump with no seatTo writer
-    // behind it (the same bug _trackCloseSeat was fixed for).
+  // The single clock for a slot-driven card: the row's own unfold. The row
+  // publishes a new height each frame of its slot animation; the region is
+  // simply that height, clamped to the resting region and the screen ceiling.
+  // - The floor keeps a still-short slot from shrinking the card. A row with a
+  //   slot that FITS the resting region never crosses it, so the list scrolls
+  //   instead - growForSlot's decision is carried by the claim guard below.
+  // - The ceiling keeps a row taller than the screen from growing the card
+  //   past it; growForSlot refuses those and hands the rest to the list.
+  // - A fold keeps following its live height until the row reaches rest, then
+  //   the region is released - there is no second tween to hand off to.
+  function _followSlotRow() {
+    // The folding row, not the row under the cursor: a step taken mid-close
+    // moves the cursor, but the card still has to follow the row that folds.
     const row = panel._closePageMode && panel._closeRow
       ? panel._closeRow : list.currentItem
-    if (!row || row.height <= row.restHeight + 0.5) {
-      if (Menu.traceEnabled && (panel._slotRegionH > 0 || Menu.slotClosing
-        || panel._nestedSeatPending || panel._trackingCloseSeat
-        || panel._closePageMode)) Menu.trace("frame.liveSlotDrop", {
-        id: row && row.itm ? String(row.itm.id ?? "") : "",
-        h: row ? Math.round(row.height * 10) / 10 : -1,
-        rest: row ? Math.round(row.restHeight * 10) / 10 : -1,
-        reg: Math.round(panel._slotRegionH * 10) / 10,
-        slot: Menu.slotClosing, nest: panel._nestedSeatPending,
-        track: panel._trackingCloseSeat, cY: Math.round(list.contentY * 10) / 10
-      })
-      return -1
+    const live = row && row.height > row.restHeight + 0.5 ? row.height : -1
+    // No live slot, or no claim while not folding: the region is clear and the
+    // list scrolls. Only the region is cleared here. The CLAIM belongs to
+    // _latchClaim's revealNeedH lifecycle - clearing it from a row-height
+    // handler (the row is still at rest on the first frames of an unfold)
+    // hides the growth for the whole animation and lands the card in one
+    // frame when the claim reappears at the end of the pursuit.
+    if (!(live > 0) || (!(panel._claimListH > 0) && !Menu.slotClosing
+      && !panel._nestedSeatPending && !panel._trackingCloseSeat
+      && !panel._closePageMode)) {
+      panel._slotRegionH = -1
+      return
     }
-    const moving = Menu.slotClosing || panel._nestedSeatPending
-      || panel._trackingCloseSeat
-    // Keep following until the latch catches up: dropping the override a
-    // frame before the claim re-latches would pop the card back to the height
-    // the open slot had.
-    const stale = panel._slotRegionH > 0
-      && Math.abs(panel._slotRegionH - row.height) > 1
-    if (!(moving || stale)) return -1
-    // The resting list is taller than a bare row: it carries the outer pad
-    // and filter line. Letting the live row take over below that floor folds
-    // the card past its resting size and pops it back on the terminal edge.
-    const floor = panel._restingFallbackH()
-    return floor > 0 ? Math.max(row.height, floor) : row.height
+    const base = panel._restingFallbackH()
+    panel._slotRegionH = Math.max(base, Math.min(live, panel.screenMaxListH))
   }
 
   readonly property real layoutListH: {
-    const liveSlot = panel._liveSlotRowH()
-    if (liveSlot > 0) return liveSlot    // The page transition's own tween outranks the slot region, and outranks
+    // The page transition's own tween outranks the slot region, and outranks
     // the model too: navigation is the bigger motion and it owns the card for
     // its duration, gliding from the height the user can see.
     if ((panel._transitionActive || panel._heightAnimating)
@@ -2754,8 +2729,6 @@ Rectangle {
   // way: the card and the viewport are one box, and a disagreement between
   // them is a row drawn outside the card or clipped by it.
   readonly property real renderedListH: {
-    const liveSlot = panel._liveSlotRowH()
-    if (liveSlot > 0) return liveSlot
     if ((panel._transitionActive || panel._heightAnimating)
       && panel._animatedListH > 0) return panel._animatedListH
     if (panel._slotRegionH > 0) return panel._slotRegionH
@@ -2767,18 +2740,18 @@ Rectangle {
   // --- slot-driven region ---
   //
   // The card and the viewport are the same box, so they have to move as one.
-  // That rules out a Behavior on the card's height: the card would glide while
-  // listBox snapped to the target, and the gap between them is exactly what
-  // clips rows (see layoutListH). So the region is animated ONCE, here, and
-  // both boxes read this number.
+  // Both read this one number. It is written by _followSlotRow() straight from
+  // the row's own unfold - there is no second animation for the card, so there
+  // is no handoff between two clocks at the end of an unfold.
   //
   // -1 means "no slot is driving the region", which is every page transition,
   // fit and resting state: those keep their own machinery (_animatedListH,
   // heightAnim) and fall through to the base.
   property real _slotRegionH: -1
   // The region the claim asks for, LATCHED. A plain property, written
-  // imperatively by _latchClaim, and the only slot-driven input the height
-  // chain reads. Two rules earn that:
+  // imperatively by _latchClaim. It is the scroll/region SPLIT decision for
+  // the list and the gate for a card growth; the card's actual height is the
+  // row's live height (_slotRegionH), not this target. Two rules earn that:
   //
   // - It must not be a binding. The claim comes from the list and the result
   //   becomes this panel's height, so a binding would close the loop
@@ -2816,38 +2789,11 @@ Rectangle {
     claim: Math.round(panel._claimListH * 10) / 10
   })
 
-  NumberAnimation {
-    id: slotRegionAnim
-    target: panel
-    property: "_slotRegionH"
-    easing.type: Easing.OutCubic
-    duration: panel._slotRegionMs > 0 ? panel._slotRegionMs : Ui.resizeMs
-    // The duration is assigned per arm in _armSlotRegion, from the same
-    // sources read directly; the binding above is only the idle default.
-    onFinished: {
-      Menu.trace("panel.regionDone", {
-        h: Math.round(panel._slotRegionH * 10) / 10,
-        claim: Math.round(panel._claimListH * 10) / 10
-      })
-      // A collapse RELEASES when it lands. Parking the region at the resting
-      // size instead looks harmless and is not: _slotRegionH outranks the page
-      // transition's own tween in the height chain, so a value left there is a
-      // permanent override, and every later navigation to a page of a
-      // different height is ignored - a short submenu arrives inside the tall
-      // parent's box with the difference as empty space under the list, and
-      // going back up does not restore it either. -1 hands the size back to
-      // listRegionH, which is what the region was folded back to anyway.
-      if (panel._claimListH < 0) {
-        panel._slotRegionH = -1
-        panel._slotMsLatch = 0
-      }
-    }
-  }
-
-  // Re-read the claim and re-arm. Every caller is an EVENT, never a frame:
-  // the claim appearing, moving or going away, the duration changing, and a
-  // seat landing (the scroll branch moves the content, which moves where the
-  // claim lands relative to the viewport).
+  // Re-read the claim. Every caller is an EVENT, never a frame: the claim
+  // appearing, moving or going away, the duration changing, and a seat landing
+  // (the scroll branch moves the content, which moves where the claim lands
+  // relative to the viewport). The card itself does not need this turn - it
+  // follows the row's live height frame by frame through _followSlotRow.
   function _latchClaim() {
     // Latch the slot's own duration while the row is publishing it. The claim
     // goes live a tick BEFORE the row reports a duration - Entry raises
@@ -2884,16 +2830,10 @@ Rectangle {
     // card kept the size it had. The latch means "a slot is driving the
     // region", and only a real growth says so.
     const grown = want > base + 0.5 ? want : -1
-    // A pace-only change never re-arms the tween. The row publishes its
-    // slot duration progressively as its content lays out, so a pace rise
-    // with an unchanged target would restart the running tween on every
-    // layout step: each restart resets the easing velocity and extends
-    // the duration, and the region crawls instead of travelling - it lands
-    // after the unfold it was meant to accompany, which reads as the
-    // window jumping to the grown size afterwards. The latch above still
-    // records the rise (the collapse and the pursuit seat both read it);
-    // only the in-flight tween is left alone. A changed target still
-    // re-arms through _syncSlotRegion below.
+    // An unchanged target still needs its list-side copy refreshed: the claim
+    // is content-space, so a seat that does not change the target can change
+    // whether the region is short of it. The card itself needs no second
+    // write - its region follows the row's live height, independent of pace.
     if (grown > 0 && Math.abs(grown - panel._claimListH) < 0.5) {
       // Unchanged, but the list's copy of the target still has to track the
       // scroll offset: the claim is content-space, so a seat that does not
@@ -2919,115 +2859,22 @@ Rectangle {
     }
     panel._claimListH = grown
     list.growthH = grown
-    panel._syncSlotRegion()
+    panel._followSlotRow()
   }
 
-  // Move the region to the latch.
-  //
-  // The show gate is honoured for a size the card is being OPENED at, not for
-  // a slot the user just expanded: the gate exists so the first real sizing
-  // after a summon does not animate (the opening layout is still settling and
-  // the resize would be visible on open), and a dropdown opened inside that
-  // window is not that resize - it is a deliberate user action, and gating it
-  // made the card snap open instead. Traced: no "open" arm at all, only the
-  // instant branch, for every dropdown opened in the first 280ms of a summon.
-  //
-  // So the gate's real question is "is the card still finding its size?", which
-  // is the summon transition and its pending fit - both of which are states
-  // this panel already tracks.
-  // A nested child's slot feeds its height into the page row frame by frame.
-  // While a nested slot is live, the region follows the claim directly so the
-  // card and the content share the child's own motion.
+  // A nested child's slot feeds its height into the page row frame by frame,
+  // so the row's live height already includes it; no special case is needed
+  // in _followSlotRow, only in the grow decision above when the claim is held
+  // clear by a nested restore.
   function _nestedSlotLive() {
     const row = list.currentItem
     return !!(row && row.nestedSlotLive === true)
   }
 
-  function _syncSlotRegion() {
-    const target = panel._claimListH
-    const settling = panel._transitionActive || panel._fitPending
-    if (panel._nestedSlotLive()) {
-      // During the close the reveal claim is held clear, so the claim writer
-      // reports no target. The row still publishes its live height; use it so
-      // the card folds with the content instead of dipping to the resting size
-      // and growing back when the seat lands.
-      const row = list.currentItem
-      const live = row && row.height > row.restHeight + 0.5 ? row.height : -1
-      const seat = target > 0 ? target : live
-      if (slotRegionAnim.running) slotRegionAnim.stop()
-      panel._slotRegionH = seat > 0 ? seat : -1
-      if (!(seat > 0)) panel._slotMsLatch = 0
-      return
-    }
-    if (!MotionPolicy.enabled || settling) {
-      if (slotRegionAnim.running) slotRegionAnim.stop()
-      const moved = target > 0 && Math.abs(target - panel._slotRegionH) > 0.5
-      panel._slotRegionH = target > 0 ? target : -1
-      if (!target) panel._slotMsLatch = 0
-      // The region is reaching its destination in this turn with no tween, so
-      // the row's slot must arrive with it rather than ease into a box that is
-      // already there. Only when the region actually MOVED: re-latching an
-      // unchanged claim is bookkeeping, and landing the slot on it would write
-      // the row's height from inside the claim's own evaluation - a loop
-      // through height -> revealNeedH -> this function.
-      if (moved) panel._settleClaimRow()
-      return
-    }
-    if (!(target > 0)) {
-      // No claim. Fall back to the resting base, and that is a real tween on
-      // the way DOWN - the collapse, which had no animation at all while the
-      // region tracked the slot's live height. It releases on landing (see
-      // slotRegionAnim.onFinished), so the region is transient: it exists only
-      // while a slot is opening, open or closing, and the resting size belongs
-      // to the ordinary chain.
-      // The resting region plainly, for the same reason as the open branch:
-      // this is where the card returns TO, and growForSlot would fold a claim
-      // back in (there is none here, but the two must not depend on that).
-      const rest = panel._restingFallbackH()
-      if (!(rest > 0) || panel._slotRegionH < 0) {
-        if (slotRegionAnim.running) slotRegionAnim.stop()
-        panel._slotRegionH = -1
-        return
-      }
-      if (Math.abs(rest - panel._slotRegionH) < 0.5) {
-        if (slotRegionAnim.running) slotRegionAnim.stop()
-        panel._slotRegionH = -1
-        return
-      }
-      panel._armSlotRegion(rest)
-      return
-    }
-    // A live claim. The tween starts from the RESTING region, so the base is
-    // read plainly - growForSlot already applies the growth, and using it here
-    // made `from` equal `to` and the card snapped open instead of animating
-    // (traced: a 145 -> 558 resize with no "open" arm logged at all, because
-    // the tween it should have started was never armed).
-    if (panel._slotRegionH < 0) panel._slotRegionH = panel._restingFallbackH()
-    if (Math.abs(target - panel._slotRegionH) < 0.5) return
-    panel._armSlotRegion(target)
-  }
-
-  // Tell the claimed row that its unfold resizes the region, so the row can
-  // land its slots instead of easing them (see DropdownSlot.settle).
-  //
-  // Reached through the list's own claim rather than through a signal, because
-  // the row is the thing that owns the slots and only the row knows whether
-  // one is open. The claim is a delegate that may have been recycled, so the
-  // identity is checked against the live index before it is touched.
-  function _settleClaimRow() {
-    const index = list.autoRevealIndex
-    if (index < 0) return
-    const row = list.itemAtIndex(index)
-    if (!row || typeof row._settleSlots !== "function") return
-    row._settleSlots()
-  }
-
-  // Hand the size back to the ordinary chain, at once. Navigation and close
-  // are the only callers: both abandon the row the claim was about, and
-  // neither wants a region tween interpolating towards a page that is no
-  // longer on screen.
+  // Hand the size back to the ordinary chain. Navigation, close and a row that
+  // no longer has a live slot are the callers: all abandon the row the claim
+  // was about, and none wants a stale region outranking the height chain.
   function _releaseSlotRegion() {
-    if (slotRegionAnim.running) slotRegionAnim.stop()
     panel._claimListH = -1
     panel._slotRegionH = -1
     panel._slotMsLatch = 0
@@ -3040,37 +2887,14 @@ Rectangle {
     list.growthH = -1
   }
 
-  function _armSlotRegion(to) {
-    slotRegionAnim.stop()
-    slotRegionAnim.from = panel._slotRegionH
-    slotRegionAnim.to = to
-    // Read directly, not through the _slotRegionMs binding: a binding is
-    // evaluated lazily, so reading it in the same turn that set the latch
-    // returned the pre-write value, and the two directions of one motion ran
-    // on different clocks.
-    slotRegionAnim.duration = panel._slotDurationMs()
-    Menu.trace("panel.regionArm", {
-      from: Math.round(slotRegionAnim.from * 10) / 10,
-      to: Math.round(to * 10) / 10, dur: slotRegionAnim.duration
-    })
-    slotRegionAnim.restart()
-  }
-
   Connections {
     target: panel.listView
 
-    // The claim appearing, moving or going away, and the duration that tells
-    // the tween how fast to travel. The resting base is read inside the
-    // handler rather than watched, because it is derived from the row set and
-    // a fit landing under an open slot must not re-arm the tween (the fit is
-    // held while a slot is open - see tryFit).
-    //
-    // Deliberately NOT onHeightChanged: this tween WRITES the viewport height
-    // (both boxes read _slotRegionH), so re-arming on it would restart the
-    // animation from its own current value every frame - a tween that never
-    // arrives, which is a region that crawls. The claim and its duration are
-    // the only inputs; a base change under an open slot is not a thing that
-    // happens, because the fit is held.
+    // The claim says WHETHER the region grows and how far the list still owes;
+    // the row's own height change (connected below) says HOW FAR IT HAS GROWN.
+    // The resting base is read inside the handler rather than watched, because
+    // it is derived from the row set and a fit landing under an open slot must
+    // not disturb the claim (the fit is held while a slot is open - see tryFit).
     function onRevealNeedHChanged() { panel._latchClaim() }
     function onRevealSlotMsChanged() { panel._latchClaim() }
   }
@@ -5273,10 +5097,17 @@ Rectangle {
               })
               if (ms > 0) return
               panel._closeSeatDone()
+              // The collapse has landed: the width pace may drop its slot
+              // latch now (it was held for the fold that just finished).
+              panel._slotMsLatch = 0
               Menu.slotCloseFinished(rowItem.itm)
             }
 
             function onHeightChanged() {
+              // One clock: the row's own unfold drives the card and viewport.
+              // The region follow is a plain write (no tween to re-arm), so
+              // per-frame updates are exactly what it needs.
+              panel._followSlotRow()
               if (panel._trackingCloseSeat) panel._trackCloseSeat()
             }
 
@@ -5408,7 +5239,7 @@ Rectangle {
         curH: it ? Math.round(it.height * 10) / 10 : -1,
         reg: Math.round(panel._slotRegionH * 10) / 10,
         claim: Math.round(panel._claimListH * 10) / 10,
-        live: Math.round(panel._liveSlotRowH() * 10) / 10,
+        live: Math.round(panel._slotRegionH * 10) / 10,
         slot: Menu.slotClosing, nest: panel._nestedSeatPending,
         track: panel._trackingCloseSeat, pg: panel._closePageMode,
         anim: list.debugAnimRunning, auto: list.autoRevealIndex,
@@ -5420,7 +5251,7 @@ Rectangle {
 
   onHeightChanged: if (Menu.traceEnabled) Menu.trace("frame.cardH", {
     h: Math.round(panel.height * 10) / 10, y: Math.round(panel.y * 10) / 10,
-    live: Math.round(panel._liveSlotRowH() * 10) / 10,
+    live: Math.round(panel._slotRegionH * 10) / 10,
     reg: Math.round(panel._slotRegionH * 10) / 10,
     slot: Menu.slotClosing, nest: panel._nestedSeatPending
   })
