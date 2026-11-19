@@ -436,6 +436,9 @@ Item {
   readonly property real debugSlotH: expandSlot.height
   readonly property real debugEditorH: expLoader.item && expLoader.item.debugEditorHost
     ? expLoader.item.debugEditorHost.height : 0
+  readonly property string debugGhostLabels: expLoader.item
+    && expLoader.item.debugEditorHost
+    ? expLoader.item.debugEditorHost.debugGhostLabels : ""
 
   // A guard landing (or a store write) can remove a child under the cursor;
   // the index then points past the end, so it retreats to the last child.
@@ -858,6 +861,12 @@ Item {
   //
   // Panel-side slot claim (see MenuPanel.expansionNeedH).
   readonly property real expandSlotH: expandSlot.height
+  // Collapse progress of the expansion slot: 1 while open, easing to 0 as
+  // the slot folds. The dropdown body already fades on this ratio; the
+  // nested cursor bars ride it too, so they fade out with the content they
+  // belong to instead of blinking off on the frame `dropdownOpen` flips.
+  readonly property real expandFade: Range.clamp01(
+    expandSlot.height / Math.max(1, expandSlot._settledHLatch))
   // Where this row lands once its slots finish unfolding, known from the
   // moment they open. The list's reveal reads this (List.rowSettledHeight)
   // so a dropdown on the last row is scrolled into view in ONE ease that
@@ -2300,8 +2309,7 @@ Item {
       // old denominator (content + Ui.m) missed the nested top gap, so the
       // content reached full opacity while the slot - and the neighbour
       // push driven by its live height - still had several pixels to travel.
-      opacity: nested ? Range.clamp01(
-        expandSlot.height / Math.max(1, expandSlot._settledHLatch)) : 1
+      opacity: nested ? row.expandFade : 1
       sourceComponent: expansionComp
     }
   }
@@ -2431,12 +2439,12 @@ Item {
       property alias debugEditorHost: stageHost
 
       function takeFocus() {
-        const inner = innerLoader.item
+        const inner = stageHost.frontItem
         if (inner && inner.takeFocus) inner.takeFocus()
       }
 
       function commitNow() {
-        const inner = innerLoader.item
+        const inner = stageHost.frontItem
         if (inner && inner.commitNow) inner.commitNow()
       }
 
@@ -2457,45 +2465,168 @@ Item {
           id: String(itm?.id ?? ""), visible: showWarn,
           closing: row._shellClosing
         })
-      // Staged-flow slide: the incoming stage glides in from the right
-      // (24px -> 0, 0 -> 1 opacity, Ui.fastMs OutCubic) while the slot's
-      // own height still eases on the shared Glide curve. Animations off
-      // cuts instantly - no offset, no fade.
+      // Staged-flow swap: a view-to-view change keeps the outgoing body alive
+      // as a ghost layer and runs both views on one slide-fade. Going forward
+      // the incoming view enters from the right while the old one leaves to
+      // the left; ESC reverses both. Opening and closing cut, because the
+      // slot's own height glide already carries those. The slot's height reads
+      // only the front layer, so the ghost is a visual overlay that fades
+      // without resizing the card underneath it.
       Item {
         id: stageHost
 
         width: parent.width
-        height: innerLoader.height
-        // Closed is its own key (-1): the first view on expand never
-        // slides - the slot height glide already announces the opening.
-        // Only view-to-view swaps within one expansion glide (dropdown ->
-        // editor, stage to stage, back again). Opening (-1 -> view) and
-        // closing (view -> -1) cut instantly.
+        height: frontLayer ? frontLayer.height : 0
+        // The front layer's height changes the instant the layers swap. Left
+        // raw, the content layout snaps to the new type's size in one frame
+        // and the slot's own ease just chases a value that already moved.
+        // Ride the same clock as the slide so the box transforms with it.
+        property bool _swapping: false
+        Behavior on height {
+          enabled: stageHost._swapping
+          NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+        }
+        // Closed is its own key (-1). Only view-to-view swaps within one
+        // expansion glide animate (dropdown -> editor, stage to stage, back).
         property int stageKey: !row.expanded ? -1
           : row.isFlow ? row.flowIndex
           : row.isGroup ? 1004
           : row.dropdownOpen ? 1001 : row.editorOpen ? 1002
           : row.confirmOpen ? 1003 : 1000
         property int _prevStageKey: -1
-        // The loader creates this host only after the row is already open, so
-        // `stageKey` is born at its first view and no change handler runs for
-        // it. Seed the previous key here, or the first real swap would see an
-        // unset predecessor and cut instead of gliding.
-        Component.onCompleted: {
-          if (stageKey !== -1) stageHost._prevStageKey = stageKey
-        }
-        // The close drops expanded/editorOpen in the same turn the slot
-        // starts folding. Hold the last view until the loader is released so
-        // its height - and the content's fade - ride the fold out.
+        // The close drops expanded/editorOpen in the same turn the slot starts
+        // folding. Hold the last view until the loader is released so its
+        // height - and the content's fade - ride the fold out.
         readonly property int liveStageKey: stageKey !== -1
           ? stageKey : row._lastStageKey
+
+        // Two alternating layers. At rest the front paints and the other is
+        // parked invisible; on a swap the parked layer becomes the incoming
+        // view and the old front becomes its outgoing ghost.
+        property bool _frontA: true
+        property Component _compA: null
+        property Component _compB: null
+        // Each layer remembers the option list it was built with, so a layer
+        // becoming a ghost keeps the list that was on screen instead of the
+        // next stage's data.
+        property var _compAFrozen: null
+        property var _compBFrozen: null
+        readonly property Loader frontLayer: _frontA ? layerA : layerB
+        readonly property Item frontItem: frontLayer ? frontLayer.item : null
+
+        // A view-to-view swap is a full-width replacement: the incoming body
+        // starts entirely off the right edge and the outgoing one leaves by
+        // the left, both fading as they travel. A short nudge reads as an
+        // in-place type change rather than a slide.
+        readonly property int slidePx: stageHost.width
+        // Captured at swap time: the option labels the outgoing layer actually
+        // keeps while it fades, for the live regression probe.
+        property string debugGhostLabels: ""
+
+        function currentOptions() {
+          return row.isFlow
+            ? (row.flowStep && row.flowStep.options ? row.flowStep.options : [])
+            : (row.itm ? row.itm.options ?? [] : [])
+        }
+
+        function componentFor(key) {
+          if (key < 0) return null
+          // Flow stages use their index as the key; their kind names the view
+          // and stays stable with the stage the key denotes.
+          if (row.isFlow) {
+            if (row.flowKind === "select") return optionsComp
+            if (row.flowKind === "text" || row.flowKind === "number"
+              || row.flowKind === "range") return editorComp
+            return bodyComp
+          }
+          if (key === 1004) return groupComp
+          if (key === 1003) return confirmComp
+          if (key === 1001) return optionsComp
+          if (key === 1002) return editorComp
+          return bodyComp
+        }
+
         onLiveStageKeyChanged: if (Menu.traceEnabled)
           Menu.trace("stage.key", {
             id: String(itm?.id ?? ""), key: liveStageKey,
             stage: stageKey, last: _lastStageKey,
-            item: !!innerLoader.item, ih: innerLoader.item
-              ? Math.round(innerLoader.item.implicitHeight * 10) / 10 : -1
+            item: !!stageHost.frontItem, ih: stageHost.frontItem
+              ? Math.round(stageHost.frontItem.implicitHeight * 10) / 10 : -1
           })
+
+        // The host is created only after the row is open, so stageKey is born
+        // at its first view. Seed the front layer there without a slide - the
+        // slot's open ease is the announcement.
+        Component.onCompleted: {
+          if (stageKey === -1) return
+          stageHost._prevStageKey = stageKey
+          const front = _frontA ? layerA : layerB
+          const opts = stageHost.currentOptions()
+          if (_frontA) {
+            stageHost._compAFrozen = opts
+            stageHost._compA = stageHost.componentFor(stageKey)
+          } else {
+            stageHost._compBFrozen = opts
+            stageHost._compB = stageHost.componentFor(stageKey)
+          }
+          front.x = -Ui.m
+          front.opacity = 1
+        }
+
+        function swap(key, dir) {
+          const incoming = _frontA ? layerB : layerA
+          const outgoing = _frontA ? layerA : layerB
+          const ghostModel = outgoing.item && outgoing.item.optionModel
+          stageHost.debugGhostLabels = ghostModel && ghostModel.map
+            ? ghostModel.map(o => o.label).join("|") : ""
+          swapAnim.stop()
+          stageHost._swapping = true
+          const opts = currentOptions()
+          if (_frontA) {
+            stageHost._compBFrozen = opts
+            stageHost._compB = componentFor(key)
+          } else {
+            stageHost._compAFrozen = opts
+            stageHost._compA = componentFor(key)
+          }
+          _frontA = !_frontA
+          // Reset both legs before starting: the ghost of the previous swap
+          // carries an off-edge offset that the next incoming must not inherit.
+          incoming.x = -Ui.m + dir * slidePx
+          incoming.opacity = 0
+          outgoing.x = -Ui.m
+          outgoing.opacity = 1
+          inSlide.from = -Ui.m + dir * slidePx
+          inSlide.target = incoming
+          inFade.from = 0
+          inFade.target = incoming
+          outSlide.from = -Ui.m
+          outSlide.to = -Ui.m - dir * slidePx
+          outSlide.target = outgoing
+          outFade.from = 1
+          outFade.target = outgoing
+          swapAnim.start()
+        }
+
+        function cutTo(key) {
+          swapAnim.stop()
+          stageHost._swapping = false
+          const incoming = _frontA ? layerB : layerA
+          const outgoing = _frontA ? layerA : layerB
+          const opts = currentOptions()
+          if (_frontA) {
+            stageHost._compBFrozen = opts
+            stageHost._compB = componentFor(key)
+          } else {
+            stageHost._compAFrozen = opts
+            stageHost._compA = componentFor(key)
+          }
+          _frontA = !_frontA
+          incoming.x = -Ui.m
+          incoming.opacity = 1
+          outgoing.x = -Ui.m
+          outgoing.opacity = 0
+        }
 
         onStageKeyChanged: {
           if (Menu.traceEnabled) Menu.trace("stage.changed", {
@@ -2503,56 +2634,95 @@ Item {
             to: stageKey, expanded: row.expanded, editor: row.editorOpen
           })
           if (stageKey !== -1) row._lastStageKey = stageKey
-          const swap = stageHost._prevStageKey !== -1 && stageHost.stageKey !== -1
-          stageHost._prevStageKey = stageHost.stageKey
-          if (swap && MotionPolicy.enabled) { stageSlide.restart(); stageFade.restart() }
-          else { innerLoader.x = 0; innerLoader.opacity = 1 }
+          const prev = stageHost._prevStageKey
+          stageHost._prevStageKey = stageKey
+          if (prev === -1 || stageKey === -1) {
+            // Open / close: the slot's height glide is the whole motion.
+            swapAnim.stop()
+            stageHost._swapping = false
+            const front = _frontA ? layerA : layerB
+            front.x = -Ui.m
+            front.opacity = 1
+            return
+          }
+          if (MotionPolicy.enabled) swap(stageKey, stageKey > prev ? 1 : -1)
+          else cutTo(stageKey)
         }
 
-        Loader {
-          id: innerLoader
+        // The views slide inside the dropdown's content gutter. Clipping at
+        // the padding boundary keeps neither the incoming nor the outgoing
+        // body painting over the border; the layers carry their own Ui.m
+        // inset, cancelled by their base offset so their resting place is
+        // unchanged. Height spans both layers so the ghost is not cut short
+        // vertically while the slot eases to the new content's height.
+        Item {
+          id: stageClip
 
-          width: parent.width
-          height: item ? item.implicitHeight : 0
-          sourceComponent: {
-            const key = stageHost.liveStageKey
-            if (key < 0) return null
-            // Flow stages use their index as the key, not the fixed view keys.
-            // Their kind names the view and stays stable through the close.
-            if (row.isFlow) {
-              if (row.flowKind === "select") return optionsComp
-              if (row.flowKind === "text" || row.flowKind === "number"
-                || row.flowKind === "range") return editorComp
-              return bodyComp
-            }
-            if (key === 1004) return groupComp
-            if (key === 1003) return confirmComp
-            if (key === 1001) return optionsComp
-            if (key === 1002) return editorComp
-            return bodyComp
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.leftMargin: Ui.m
+          anchors.rightMargin: Ui.m
+          height: Math.max(layerA.height, layerB.height)
+          clip: true
+
+          Loader {
+            id: layerA
+
+            x: -Ui.m
+            width: stageHost.width
+            height: item ? item.implicitHeight : 0
+            sourceComponent: stageHost._compA
+            opacity: 0
+            onItemChanged: if (item && item.frozenOptions !== undefined)
+              item.frozenOptions = stageHost._compAFrozen
+          }
+
+          Loader {
+            id: layerB
+
+            x: -Ui.m
+            width: stageHost.width
+            height: item ? item.implicitHeight : 0
+            sourceComponent: stageHost._compB
+            opacity: 0
+            onItemChanged: if (item && item.frozenOptions !== undefined)
+              item.frozenOptions = stageHost._compBFrozen
           }
         }
 
-        NumberAnimation {
-          id: stageSlide
+        ParallelAnimation {
+          id: swapAnim
 
-          target: innerLoader
-          property: "x"
-          from: 24
-          to: 0
-          duration: Ui.fastMs
-          easing.type: Easing.OutCubic
-        }
+          onFinished: stageHost._swapping = false
 
-        NumberAnimation {
-          id: stageFade
-
-          target: innerLoader
-          property: "opacity"
-          from: 0
-          to: 1
-          duration: Ui.fastMs
-          easing.type: Easing.OutCubic
+          NumberAnimation {
+            id: inSlide
+            property: "x"
+            to: -Ui.m
+            duration: Ui.normalMs
+            easing.type: Easing.InOutCubic
+          }
+          NumberAnimation {
+            id: inFade
+            property: "opacity"
+            to: 1
+            duration: Ui.normalMs
+            easing.type: Easing.InOutCubic
+          }
+          NumberAnimation {
+            id: outSlide
+            property: "x"
+            duration: Ui.normalMs
+            easing.type: Easing.InOutCubic
+          }
+          NumberAnimation {
+            id: outFade
+            property: "opacity"
+            to: 0
+            duration: Ui.normalMs
+            easing.type: Easing.InOutCubic
+          }
         }
       }
 
@@ -2720,10 +2890,10 @@ Item {
       property Item cursorItem: null
       property int cursorIndex: row.childIndex
       function trackCursor() {
-        if (row.childIndex < 0) {
-          groupRoot.cursorItem = null
-          return
-        }
+        // Collapse clears childIndex, but the bar must keep reading its last
+        // row while the slot folds - otherwise y and height snap to zero and
+        // it vanishes before its collapse fade can play.
+        if (row.childIndex < 0) return
         const it = groupRepeater.itemAt(row.childIndex)
         if (it) groupRoot.cursorItem = it
       }
@@ -2764,12 +2934,21 @@ Item {
 
       // Each nested bar gets the shared elevation halo. The page-level
       // dropdown needs none: its bar already sits on the card.
-      SoftShadow { host: focusBar }
+      SoftShadow {
+        host: focusBar
+        opacity: focusBar.opacity
+      }
 
       Rectangle {
         id: focusBar
 
-        visible: row.dropdownOpen && row.childIndex >= 0 && groupRoot.cursorItem !== null
+        // Stay painted through the fold: `dropdownOpen` flips on the frame the
+        // collapse is called, while the content it belongs to is still fading.
+        // Opacity rides the slot's collapse progress so the bar and its halo
+        // are swallowed by the same motion as the dropdown body.
+        visible: groupRoot.cursorItem !== null
+          && (row.dropdownOpen || row.expandFade > 0.001)
+        opacity: row.dropdownOpen ? 1 : row.expandFade
         // The fill stays the plain two-shade step; only the left edge borrows
         // a palette colour directly, one per depth. No mixing, no alpha.
         // Cool and warm alternate so no two neighbouring levels sit in the
@@ -2931,8 +3110,17 @@ Item {
         duration: Ui.fastMs + 20
         easing.type: Easing.OutCubic
       }
-      readonly property int count: row.isFlow && row.flowStep
-        ? (row.flowStep.options ?? []).length : row.itm ? (row.itm.options ?? []).length : 0
+      // A ghosted view keeps the option list it was built with: the row's
+      // live flow step already names the NEXT stage by the time the outgoing
+      // layer starts fading, so reading it here would swap the list under a
+      // still-visible body (the row's plain options read as "Legacy option").
+      property var frozenOptions: null
+      readonly property var optionModel: frozenOptions !== null
+        ? frozenOptions
+        : (row.isFlow
+          ? (row.flowStep && row.flowStep.options ? row.flowStep.options : [])
+          : (row.itm ? row.itm.options ?? [] : []))
+      readonly property int count: optsRoot.optionModel.length
       readonly property bool twoCols: MenuLib.optionColumnCount(count) > 1
       readonly property int colCount: MenuLib.optionColumnCount(count)
       readonly property int rowCount: MenuLib.optionRowCount(count)
@@ -2969,12 +3157,19 @@ Item {
 
       // Same elevation as the group and entry cursors, so every selector
       // reads at the same depth. Declared before the cursor to paint behind.
-      SoftShadow { host: optCursor }
+      SoftShadow {
+        host: optCursor
+        opacity: optCursor.opacity
+      }
 
       Rectangle {
         id: optCursor
 
-        visible: row.dropdownOpen
+        // Same collapse fade as the group cursor: the bar is part of the
+        // dropdown body, so it leaves with that body rather than on the frame
+        // `dropdownOpen` drops.
+        visible: row.dropdownOpen || row.expandFade > 0.001
+        opacity: row.dropdownOpen ? 1 : row.expandFade
         // One step ABOVE the surface this sits on, the way the list bar is one
         // step above the card. The open row's own bar already paints the whole
         // dropdown background_1 - it unfolds inside the focused row - so a
@@ -3026,8 +3221,7 @@ Item {
         rowSpacing: 1
 
         Repeater {
-          model: row.isFlow && row.flowStep && row.flowStep.options
-            ? row.flowStep.options : row.itm ? row.itm.options ?? [] : []
+          model: optsRoot.optionModel
 
           delegate: OptionRow {
             width: optsRoot.cellW

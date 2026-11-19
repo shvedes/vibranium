@@ -120,6 +120,11 @@ t_eq "the group stays open across the stage swap" "True" \
 t_ne "the stage content height changes" "$stage0" "$stage1"
 t_eq "the editor stage is shorter than the option stage" "True" \
   "$(python3 -c "print($stage1 < $stage0)")"
+# The outgoing option list is frozen for its slide-fade. It must keep the
+# stage's own options, not fall back to the row's plain "Legacy option" when
+# the next stage has no option list of its own.
+t_eq "the ghost holds the outgoing stage's options" "One|Two" \
+  "$(probe_field 'd["childGhostLabels"]')"
 
 # Enter on an open editor commits it, including when the key reaches the row
 # through the group's pickCurrent() path, and advances to the next stage.
@@ -140,6 +145,26 @@ p debugActivatePanel >/dev/null 2>&1
 sleep 0.9
 t_eq "a fresh open starts from the first stage" "$stage0" \
   "$(probe_field 'd["childExpandH"]')"
+
+# The nested cursor bar belongs to the dropdown body: when the group folds it
+# must fade out with the content, not blink off on the frame `expanded` drops.
+# Escape collapses the group while its internal cursor still points at a child.
+t_section "the nested cursor fades with the collapse"
+open_fixture
+p debugSetCurrentIdx 8 >/dev/null 2>&1
+sleep 0.3
+p debugActivatePanel >/dev/null 2>&1
+sleep 0.7
+t_eq "the group cursor is painted while open" "True" \
+  "$(probe_field 'd["grpBarVisible"]')"
+t_eq "and fully opaque" "1" "$(probe_field 'd["grpBarOpacity"]')"
+p debugEscape >/dev/null 2>&1
+# First read lands while the slot is still folding: the bar must still paint.
+t_eq "the cursor stays painted into the fold" "True" \
+  "$(probe_field 'd["grpBarVisible"]')"
+sleep 0.6
+t_eq "and is gone once the fold lands" "False" \
+  "$(probe_field 'd["grpBarVisible"]')"
 
 # --- 4. the panel resizes in step with a nested fold -----------------------
 #

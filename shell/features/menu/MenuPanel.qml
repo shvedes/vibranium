@@ -4584,6 +4584,7 @@ Rectangle {
       childExpandH: cr ? Math.round(cr.expandSlotH * 10) / 10 : 0,
       childFlowIdx: cr && cr.isFlow ? cr.flowIndex : -1,
       childBuilds: cr ? cr.debugExpBuilds : -1,
+      childGhostLabels: cr ? cr.debugGhostLabels : "",
       pushProg: gv ? Math.round(gv.pushProgress * 1000) / 1000 : -1,
       boxTarget: gv ? Math.round(gv.boxTarget * 10) / 10 : -1,
       curY: list.currentItem ? Math.round(list.currentItem.y * 10) / 10 : -1,
@@ -4595,6 +4596,9 @@ Rectangle {
       childEditorH: cr ? Math.round(cr.debugEditorH * 10) / 10 : -1,
       grpBarY: gv && gv.focusBar ? Math.round(gv.focusBar.y * 10) / 10 : -1,
       grpBarH: gv && gv.focusBar ? Math.round(gv.focusBar.height * 10) / 10 : -1,
+      grpBarOpacity: gv && gv.focusBar
+        ? Math.round(gv.focusBar.opacity * 100) / 100 : -1,
+      grpBarVisible: gv && gv.focusBar ? gv.focusBar.visible : false,
       grpColY: gv && gv.groupCol ? Math.round(gv.groupCol.y * 10) / 10 : -1,
       focusRestH: gv ? Math.round(gv.focusRestH * 10) / 10 : 0,
       focusBarH: gv ? Math.round(gv.focusBarH * 10) / 10 : 0,
