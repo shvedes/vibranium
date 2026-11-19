@@ -612,7 +612,14 @@ Item {
     if (stage !== null) return stage
     return String(itm?.desc ?? "")
   }
-  readonly property string warnText: String(itm?.warning ?? "")
+  // Flow rows may override the warning per stage, like sub and desc, so a
+  // stage can put a message box in the expansion shell and change its height.
+  readonly property string warnText: {
+    Menu.rev
+    const stage = MenuLib.stageText(row.expanded, row.flowStep, "warning")
+    if (stage !== null) return stage
+    return String(itm?.warning ?? "")
+  }
   readonly property string bodyText: String(itm?.body ?? "")
   // Active marker. A guard expression is one source for it (Menu.isChecked
   // over the batched bash verdicts); `active` is the data-driven one, set
@@ -2511,6 +2518,15 @@ Item {
         // next stage's data.
         property var _compAFrozen: null
         property var _compBFrozen: null
+        // The view and the copy beside it are frozen per layer as one set, so
+        // a ghost keeps the stage's whole body - options, description and
+        // message box - while the incoming layer carries the next stage's.
+        property Component _viewA: null
+        property Component _viewB: null
+        property string _descA: ""
+        property string _descB: ""
+        property string _warnA: ""
+        property string _warnB: ""
         readonly property Loader frontLayer: _frontA ? layerA : layerB
         readonly property Item frontItem: frontLayer ? frontLayer.item : null
 
@@ -2562,12 +2578,22 @@ Item {
           stageHost._prevStageKey = stageKey
           const front = _frontA ? layerA : layerB
           const opts = stageHost.currentOptions()
+          const view = stageHost.componentFor(stageKey)
+          const desc = row.descText
+          const warn = row.warnText
           if (_frontA) {
+            stageHost._viewA = view
             stageHost._compAFrozen = opts
-            stageHost._compA = stageHost.componentFor(stageKey)
+            stageHost._descA = desc
+            stageHost._warnA = warn
+            stageHost._compA = null
+            stageHost._compA = stageViewComp
           } else {
+            stageHost._viewB = view
             stageHost._compBFrozen = opts
-            stageHost._compB = stageHost.componentFor(stageKey)
+            stageHost._descB = desc
+            stageHost._warnB = warn
+            stageHost._compB = stageViewComp
           }
           front.x = -Ui.m
           front.opacity = 1
@@ -2576,7 +2602,8 @@ Item {
         function swap(key, dir) {
           const incoming = _frontA ? layerB : layerA
           const outgoing = _frontA ? layerA : layerB
-          const ghostModel = outgoing.item && outgoing.item.optionModel
+          const ghostView = outgoing.item && outgoing.item.viewItem
+          const ghostModel = ghostView && ghostView.optionModel
           stageHost.debugGhostLabels = ghostModel && ghostModel.map
             ? ghostModel.map(o => o.label).join("|") : ""
           swapAnim.stop()
@@ -2588,12 +2615,23 @@ Item {
           incoming.enabled = true
           outgoing.enabled = false
           const opts = currentOptions()
+          const view = componentFor(key)
+          const desc = row.descText
+          const warn = row.warnText
           if (_frontA) {
+            stageHost._viewB = view
             stageHost._compBFrozen = opts
-            stageHost._compB = componentFor(key)
+            stageHost._descB = desc
+            stageHost._warnB = warn
+            stageHost._compB = null
+            stageHost._compB = stageViewComp
           } else {
+            stageHost._viewA = view
             stageHost._compAFrozen = opts
-            stageHost._compA = componentFor(key)
+            stageHost._descA = desc
+            stageHost._warnA = warn
+            stageHost._compA = null
+            stageHost._compA = stageViewComp
           }
           _frontA = !_frontA
           // Reset both legs before starting: the ghost of the previous swap
@@ -2622,12 +2660,23 @@ Item {
           incoming.enabled = true
           outgoing.enabled = false
           const opts = currentOptions()
+          const view = componentFor(key)
+          const desc = row.descText
+          const warn = row.warnText
           if (_frontA) {
+            stageHost._viewB = view
             stageHost._compBFrozen = opts
-            stageHost._compB = componentFor(key)
+            stageHost._descB = desc
+            stageHost._warnB = warn
+            stageHost._compB = null
+            stageHost._compB = stageViewComp
           } else {
+            stageHost._viewA = view
             stageHost._compAFrozen = opts
-            stageHost._compA = componentFor(key)
+            stageHost._descA = desc
+            stageHost._warnA = warn
+            stageHost._compA = null
+            stageHost._compA = stageViewComp
           }
           _frontA = !_frontA
           incoming.x = -Ui.m
@@ -2683,8 +2732,14 @@ Item {
             height: item ? item.implicitHeight : 0
             sourceComponent: stageHost._compA
             opacity: 0
-            onItemChanged: if (item && item.frozenOptions !== undefined)
-              item.frozenOptions = stageHost._compAFrozen
+            onItemChanged: if (item) {
+              item.viewFrozen = stageHost._compAFrozen
+              item.infoDesc = stageHost._descA
+              item.infoWarn = stageHost._warnA
+              // Last: assigning the component creates the inner view, which
+              // reads the frozen data the three lines above just supplied.
+              item.viewComponent = stageHost._viewA
+            }
           }
 
           Loader {
@@ -2695,8 +2750,12 @@ Item {
             height: item ? item.implicitHeight : 0
             sourceComponent: stageHost._compB
             opacity: 0
-            onItemChanged: if (item && item.frozenOptions !== undefined)
-              item.frozenOptions = stageHost._compBFrozen
+            onItemChanged: if (item) {
+              item.viewFrozen = stageHost._compBFrozen
+              item.infoDesc = stageHost._descB
+              item.infoWarn = stageHost._warnB
+              item.viewComponent = stageHost._viewB
+            }
           }
         }
 
@@ -2745,43 +2804,6 @@ Item {
         width: parent.width - 2 * Ui.m
       }
 
-      // Single hairline over the info block: it sits above the
-      // description when one exists, else directly above a lone
-      // warning - never one line per section.
-      Divider {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.margins: Ui.m
-        visible: wrapCol.showDesc || wrapCol.showWarn
-        color: Ui.tint("background_3", 0.8)
-      }
-
-      Item {
-        width: parent.width
-        height: visible ? descLabel.height : 0
-        visible: wrapCol.showDesc
-
-        BodyText {
-          id: descLabel
-
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.margins: Ui.m
-          markup: true
-          text: MenuLib.styledMarkup(row.descText)
-        }
-      }
-
-      // Warning trails the description with no separator of its own -
-      // the block shares the single hairline above. Declarative copy,
-      // so it renders the same whitelisted inline markup as desc.
-      Notice {
-        message: MenuLib.styledMarkup(row.warnText)
-        markup: true
-        x: Ui.m
-        width: parent.width - 2 * Ui.m
-        visible: wrapCol.showWarn
-      }
     }
   }
 
@@ -3246,6 +3268,88 @@ Item {
     }
   }
 
+  // One stage body: the view for the stage plus the copy that belongs to it.
+  // Both live in the same slide layer, so a description or message box leaves
+  // with the outgoing stage and arrives with the incoming one instead of
+  // blinking in place while the input slides past it.
+  Component {
+    id: stageViewComp
+
+    Column {
+      id: stageView
+
+      property Component viewComponent: null
+      property var viewFrozen: null
+      property string infoDesc: ""
+      property string infoWarn: ""
+      readonly property Item viewItem: viewLoader.item
+
+      width: parent.width
+      // Same gap as the shell used between the view and its copy. Without a
+      // column the view and the info block both sat at y=0 and painted over
+      // each other; the stack is what makes the box grow for the copy.
+      spacing: Ui.m
+
+      function takeFocus() {
+        if (viewLoader.item && viewLoader.item.takeFocus) viewLoader.item.takeFocus()
+      }
+      function commitNow() {
+        if (viewLoader.item && viewLoader.item.commitNow) viewLoader.item.commitNow()
+      }
+
+      Loader {
+        id: viewLoader
+
+        width: parent.width
+        height: item ? item.implicitHeight : 0
+        sourceComponent: stageView.viewComponent
+        onItemChanged: if (item && item.frozenOptions !== undefined)
+          item.frozenOptions = stageView.viewFrozen
+      }
+
+      Column {
+        id: infoCol
+
+        width: parent.width
+        spacing: Ui.m
+
+        Divider {
+          width: parent.width
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.margins: Ui.m
+          visible: stageView.infoDesc !== "" || stageView.infoWarn !== ""
+        }
+
+        Item {
+          id: descItem
+
+          width: parent.width
+          height: visible ? descLabel.height : 0
+          visible: stageView.infoDesc !== ""
+
+          BodyText {
+            id: descLabel
+
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.margins: Ui.m
+            markup: true
+            text: MenuLib.styledMarkup(stageView.infoDesc)
+          }
+        }
+
+        Notice {
+          x: Ui.m
+          width: parent.width - 2 * Ui.m
+          markup: true
+          message: MenuLib.styledMarkup(stageView.infoWarn)
+          visible: stageView.infoWarn !== ""
+        }
+      }
+    }
+  }
+
   Component {
     id: editorComp
 
@@ -3293,7 +3397,7 @@ Item {
       // commit and escape verbs.
       function ownsRow() {
         const host = expLoader.item && expLoader.item.debugEditorHost
-        return !host || host.frontItem === stageEditor
+        return !host || (host.frontItem && host.frontItem.viewItem === stageEditor)
       }
       onCommit: text => { if (stageEditor.ownsRow()) row.commitEditor(text) }
       onInvalid: msg => row.showEditorError(msg)

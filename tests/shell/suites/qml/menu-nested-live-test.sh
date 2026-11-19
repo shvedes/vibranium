@@ -118,8 +118,8 @@ flow1="$(probe_field 'd["childFlowIdx"]')"
 t_eq "the group stays open across the stage swap" "True" \
   "$(probe_field 'd["childExpanded"]')"
 t_ne "the stage content height changes" "$stage0" "$stage1"
-t_eq "the editor stage is shorter than the option stage" "True" \
-  "$(python3 -c "print($stage1 < $stage0)")"
+t_eq "the stage description grows the editor stage" "True" \
+  "$(python3 -c "print($stage1 > $stage0)")"
 # The outgoing option list is frozen for its slide-fade. It must keep the
 # stage's own options, not fall back to the row's plain "Legacy option" when
 # the next stage has no option list of its own.

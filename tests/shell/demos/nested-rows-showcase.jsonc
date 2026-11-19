@@ -278,9 +278,22 @@
                 { "label": "Legacy option", "value": "legacy" }
               ],
               "flow": [
-                { "kind": "select", "label": "Mode", "options": [ { "label": "One", "value": "1" }, { "label": "Two", "value": "2" } ], "value": "1" },
-                { "kind": "text", "label": "Label", "placeholder": "name it" },
-                { "kind": "number", "label": "Count", "min": 0, "max": 10, "step": 2, "value": 4 },
+                {
+                  "kind": "select", "label": "Mode",
+                  "sub": "Step one of three — pick a mode",
+                  "options": [ { "label": "One", "value": "1" }, { "label": "Two", "value": "2" } ],
+                  "value": "1"
+                },
+                {
+                  "kind": "text", "label": "Label", "placeholder": "name it",
+                  "sub": "Step two of three — name it",
+                  "desc": "A stage description under its own hairline — the dropdown grows to hold it, then gives the space back on the next stage."
+                },
+                {
+                  "kind": "number", "label": "Count", "min": 0, "max": 10, "step": 2, "value": 4,
+                  "sub": "Step three of three — set the count",
+                  "warning": "Message box: keep the count between zero and ten."
+                },
                 { "kind": "nonsense", "label": "Discarded stage" },
                 null
               ]
