@@ -2591,20 +2591,28 @@ Rectangle {
     const row = panel._closePageMode && panel._closeRow
       ? panel._closeRow : list.currentItem
     const live = row && row.height > row.restHeight + 0.5 ? row.height : -1
-    // No live slot, or no claim while not folding: the region is clear and the
-    // list scrolls. Only the region is cleared here. The CLAIM belongs to
+    const claimed = panel._claimListH > 0 || Menu.slotClosing
+      || panel._nestedSeatPending || panel._trackingCloseSeat || panel._closePageMode
+    // No claim and no fold in flight: the region is clear and the list
+    // scrolls. Only the region is cleared here. The CLAIM belongs to
     // _latchClaim's revealNeedH lifecycle - clearing it from a row-height
     // handler (the row is still at rest on the first frames of an unfold)
     // hides the growth for the whole animation and lands the card in one
     // frame when the claim reappears at the end of the pursuit.
-    if (!(live > 0) || (!(panel._claimListH > 0) && !Menu.slotClosing
-      && !panel._nestedSeatPending && !panel._trackingCloseSeat
-      && !panel._closePageMode)) {
+    if (!claimed) {
       panel._slotRegionH = -1
       return
     }
     const base = panel._restingFallbackH()
-    panel._slotRegionH = Math.max(base, Math.min(live, panel.screenMaxListH))
+    // The claim arms a tick before the row's first slot step. The row is
+    // still at its rest height on that edge, so there is no live height to
+    // follow - but clearing the region there let the height chain fall
+    // through to the full claim and flashed the card to the dropdown's
+    // destination for one frame before the first step brought it back.
+    // Holding the resting region across the gap keeps the card where it is
+    // until the slot actually grows; from then on it follows the live row.
+    panel._slotRegionH = live > 0
+      ? Math.max(base, Math.min(live, panel.screenMaxListH)) : base
   }
 
   readonly property real layoutListH: {
