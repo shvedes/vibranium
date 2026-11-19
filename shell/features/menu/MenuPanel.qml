@@ -1473,41 +1473,38 @@ Rectangle {
     if (Menu.open && panel._summonSeat) panel._clearCursorForSwap()
   }
 
+  function _reweaveOnWidth() {
+    if (!Menu.open || panel.searching) return
+    if (panel._seenGridCols === panel.gridCols) return
+    panel._seenGridCols = panel.gridCols
+    // Keyed, not wholesale. A column change is a re-weave of the
+    // header/spacer slots, which the keyed sync expresses as insert,
+    // remove and move, so the cursor keeps its row and the
+    // repositioning glides. Forcing a bulk install here made every
+    // width change a clear-and-refill: the view was emptied for a
+    // tick, the cursor landed on row 0, and the remembered seat came
+    // back a frame later - a visible jump to the first entry on every
+    // summon and every back navigation, since both resize the card.
+    // Most columns do not reach a header at all, and the candidate
+    // then compares equal, which is the early return doing its job.
+    panel.recomputeRows("reveal", true)
+  }
+
   onGridColsChanged: {
     if (!Menu.open || panel.searching) return
     if (panel._seenGridCols === panel.gridCols) return
-    // No width ease to ride (closed, or motion off): the geometry is final
-    // now, so re-weave in this turn and publish card and rows together.
-    // A live glide keeps the debounce and waits for the width to settle.
-    if (!panel.shown || !MotionPolicy.enabled) {
-      recompTimer.stop()
-      panel._seenGridCols = panel.gridCols
-      panel.recomputeRows("reveal", true)
-      return
-    }
-    recompTimer.restart()
+    // No width ease to ride (motion off, or no tween in flight): the
+    // geometry is final now, so re-weave in this turn and publish card
+    // and rows together. A live glide owns the width; its landing edge
+    // does the re-weave once, on the final column count.
+    if (!panel.shown || !MotionPolicy.enabled || !widthAnim.running)
+      panel._reweaveOnWidth()
   }
 
-  Timer {
-    id: recompTimer
+  Connections {
+    target: widthAnim
 
-    interval: 260
-
-    onTriggered: {
-      if (!Menu.open || panel.searching) return
-      panel._seenGridCols = panel.gridCols
-      // Keyed, not wholesale. A column change is a re-weave of the
-      // header/spacer slots, which the keyed sync expresses as insert,
-      // remove and move, so the cursor keeps its row and the
-      // repositioning glides. Forcing a bulk install here made every
-      // width change a clear-and-refill: the view was emptied for a
-      // tick, the cursor landed on row 0, and the remembered seat came
-      // back a frame later - a visible jump to the first entry on every
-      // summon and every back navigation, since both resize the card.
-      // Most columns do not reach a header at all, and the candidate
-      // then compares equal, which is the early return doing its job.
-      panel.recomputeRows("reveal", true)
-    }
+    function onFinished() { panel._reweaveOnWidth() }
   }
 
   onSearchingChanged: {
