@@ -3513,6 +3513,13 @@ Rectangle {
     panel._closeStartH = row.height
     panel._closeRestH = row.restHeight
     panel._trackingCloseSeat = true
+    // The page close abandons any nested seat: the offset owed is the page
+    // origin, not the nested one. There is no deferred pin any more - the
+    // nested restore is a live function of its own row - but clear the seat so
+    // a later reveal cannot capture a stale offset from this fold.
+    panel._nestedSeatY = -1
+    panel._nestedCloseStartY = -1
+    panel._nestedSeatPending = false
     Menu.trace("panel.pageClose", {
       from: Math.round(panel._closeStartY * 10) / 10,
       to: Math.round(panel._revealOriginY * 10) / 10,
@@ -3521,54 +3528,11 @@ Rectangle {
     })
     panel._trackCloseSeat()
   }
-  // The close-end rev re-arms the claim, and its pursuit is animated. The
-  // exact pin follows both that tween and the slot close, so a late seat
-  // cannot move the offset again.
-  property int _pinTries: 0
-  property Timer nestedSeatPin: Timer {
-    interval: 260
-    repeat: false
-    onTriggered: {
-      const y = panel._nestedSeatY
-      // A claim chasing a still-shrinking row adds a second leg after the
-      // restore. Hold the re-arm until the close and the tween are quiet, but
-      // a bound count keeps the landing from depending on a foreign flag
-      // clearing on time.
-      if (panel._nestedSeatPending
-        && (list.debugAnimRunning || Menu.slotClosing)
-        && panel._pinTries < 3) {
-        panel._pinTries++
-        restart()
-        return
-      }
-      panel._pinTries = 0
-      Menu.trace("panel.pin", {
-        seat: Math.round(y * 10) / 10, cY: Math.round(list.contentY * 10) / 10,
-        auto: list.autoRevealIndex, anim: list.debugAnimRunning,
-        write: y >= 0 && Math.abs(list.contentY - y) > 0.5
-      })
-      if (y >= 0 && Math.abs(list.contentY - y) > 0.5)
-        list.seatTo(y, false, "nested-pin")
-      panel._nestedSeatY = -1
-      panel._nestedSeatPending = false
-      panel._closeSeatDone()
-      // The parent slot is already open and settled at this edge. Re-arming
-      // its reveal claim leaves a live pursuit that drags the view on the
-      // next cursor step, far from the seat just restored. Drop the claim for
-      // this row; a different row still opening keeps its own.
-      // Re-arm against settled geometry: the parent's pursuit target then
-      // matches the seat and adds no extra motion.
-      if (list.currentIndex >= 0) panel._rearmOpenSlot()
-    }
-  }
-
   // A page or bundle swap destroys the delegate that held the nested slot,
   // so its close never lands. Drop the remembered seat at those edges; a
   // stale offset would be restored into an unrelated page on the next open.
   function _resetNestedSeat() {
     _nestedSeatY = -1
-    _pinTries = 0
-    nestedSeatPin.stop()
     _revealOriginY = -1
     _closePageMode = false
     _trackingCloseSeat = false
@@ -3591,8 +3555,6 @@ Rectangle {
     _trackingCloseSeat = false
     _closePageMode = false
     _closeRow = null
-    _pinTries = 0
-    nestedSeatPin.stop()
     Menu.trace("panel.reveal", {
       seat: Math.round(_nestedSeatY * 10) / 10, pending: hadPendingSeat,
       cY: Math.round(list.contentY * 10) / 10, cur: list.currentIndex,
@@ -3615,19 +3577,22 @@ Rectangle {
     // tracking at all and its row would collapse with the scroll frozen.
     const hadSeat = _nestedSeatY >= 0
     _nestedSeatPending = hadSeat
+    // One paced seat back to the nested origin, on the closing slot's own
+    // duration and curve: it starts and lands with the fold, so the scroll
+    // and the close are one motion. No deferred writer is needed - the pin
+    // that used to follow this seat was the source of the late stale write,
+    // and removing it leaves nothing that can fire after a parent close.
+    const row = list.currentItem
+    _nestedCloseStartY = list.contentY
     // Suspend the page-level pursuit while the child folds; its target is the
     // parent's settled bottom, which is still below the view here.
     Menu.trace("panel.clear", { site: "nestedRestore", auto: list.autoRevealIndex })
     list.autoRevealIndex = -1
     _trackingCloseSeat = true
-    // One paced ride back to the nested seat, on the slot's own clock. The
-    // page row's bottom is NOT a safe target here: the card folds with the
-    // child, so the bottom lands short of the seat, and the end pin then wrote
-    // the remainder in a single frame - a visible teleport. Holding the seat
-    // through the fold leaves the pin nothing to write.
     if (hadSeat && Math.abs(list.contentY - _nestedSeatY) > 0.5)
       list.seatTo(_nestedSeatY, true, "nested-restore", paceMs)
   }
+  property real _nestedCloseStartY: -1
 
   property bool _trackingCloseSeat: false
   function _closeSeatDone() {
@@ -3653,6 +3618,9 @@ Rectangle {
       panel._closeStartY = -1
       panel._closeStartH = -1
       panel._closeRestH = -1
+      panel._nestedSeatY = -1
+      panel._nestedCloseStartY = -1
+      panel._nestedSeatPending = false
     }
   }
   function _trackCloseSeat() {
@@ -3671,16 +3639,14 @@ Rectangle {
         cY: Math.round(list.contentY * 10) / 10
       })
     } else {
-      // The nested seat is the only offset this close owes. The page row's
-      // live bottom is a moving FIT - the card folds together with the child,
-      // so it lands short of the seat and the end pin writes the remainder in
-      // one frame. The close edge armed one paced ride to the seat; hold it
-      // here and never cut that ride short with a second instant writer.
-      if (list.debugAnimRunning) return
-      target = panel._nestedSeatY >= 0 ? panel._nestedSeatY : list.contentY
-      if (Math.abs(target - list.contentY) < 0.5) return
+      // The paced nested-restore seat owns the scroll for this fold. Starting
+      // on the same edge with the slot's own duration and curve already makes
+      // the two one motion; a second writer here would only cut the ride short
+      // and land the remainder in one frame.
+      return
     }
-    list.seatTo(target, false, "close-track")
+    if (Math.abs(target - list.contentY) >= 0.05)
+      list.seatTo(target, false, "close-track")
   }
 
   function nestedSlotFinished() {
@@ -3691,20 +3657,21 @@ Rectangle {
     })
     // A PARENT close that began while this slot was still folding owns the
     // offset now: its page close rides the fold down and lands on the
-    // pre-open origin by itself. The seat this slot remembers belongs to the
-    // nested OPEN, an offset that close has already scrolled back past -
-    // arming the pin with it writes the old offset back after the restore has
-    // landed, and the engine clamps that write to the bottom of the now
-    // shorter list (measured: land at 134.5, pin writes 241, clamp to 218).
+    // pre-open origin by itself. The nested seat belongs to the open that
+    // close has already scrolled back past; writing it here would push the
+    // old offset back over the restore.
     if (panel._closePageMode) {
       panel._nestedSeatPending = false
-      nestedSeatPin.stop()
       return
     }
-    // The parent group stays open, so its claim comes back - but only once
-    // the close and the restore tween have settled, from the pin handler.
-    panel._nestedSeatPending = true
-    nestedSeatPin.restart()
+    // The paced restore seat lands on the origin; nothing is left to write.
+    // Drop the seat so a later reveal cannot capture a stale offset.
+    panel._nestedSeatY = -1
+    panel._nestedCloseStartY = -1
+    panel._nestedSeatPending = false
+    // The parent slot is settled now. Re-arming its reveal claim against the
+    // settled geometry keeps the next step from dragging the view.
+    if (list.currentIndex >= 0) panel._rearmOpenSlot()
   }
 
   function moveGridCell(step) { grid.moveCell(step) }
@@ -5246,6 +5213,7 @@ Rectangle {
         seatN: Math.round(panel._nestedSeatY * 10) / 10,
         seatO: Math.round(panel._revealOriginY * 10) / 10
       })
+
     }
   }
 
