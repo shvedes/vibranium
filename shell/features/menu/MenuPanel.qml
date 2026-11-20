@@ -1543,7 +1543,10 @@ Rectangle {
     if (!panel.searching && Menu.open) {
       Qt.callLater(() => {
         if (!panel.searching && Menu.open) {
-          if (searchField.text !== "") searchField.text = ""
+          // A result selection fades the query on its own clock; clearing it
+          // here would drop the text in one frame before that fade lands.
+          if (searchField.text !== "" && !panel._resultFadeActive)
+            searchField.text = ""
           if (panel.mode === "filter") focusCtrl.grabList()
         }
       })
@@ -3730,19 +3733,116 @@ Rectangle {
     // also releases waiters whose row never arrived because that page went
     // away, so they cannot fire on an unrelated row of a later open.
     function onOpenChanged() {
-      if (!Menu.open) panel._settledWaiters = []
+      if (!Menu.open) {
+        panel._settledWaiters = []
+        // A close mid-fade otherwise leaves the text input invisible.
+        panel.finishResultFade()
+      }
     }
+  }
+
+  // A result selection is a two-phase handoff. First the search results
+  // fade out while the query text and the field's focus border fade on the
+  // same edge; only then does the page switch and fade in. The old rows stay
+  // on screen for phase one, so there is no empty card between the two.
+  property bool _resultFadeActive: false
+  property var _resultPending: null
+
+  function beginResultFade(it) {
+    if (panel._resultFadeActive) panel.finishResultFade()
+    if (!MotionPolicy.enabled) return
+    panel._resultFadeActive = true
+    panel._resultPending = it
+    focusCtrl.grabList()
+    textFadeAnim.restart()
+    resultOutAnim.restart()
+  }
+
+  // Phase two: the query still names this hit, so commit the landing while
+  // pageHost is hidden and let the new rows fade in.
+  function commitResultFade() {
+    const it = panel._resultPending
+    panel._resultPending = null
+    if (!panel._resultFadeActive) return
+    if (!Menu.open || Menu.query === "") {
+      panel.finishResultFade()
+      return
+    }
+    panel.applyResult(it)
+  }
+
+  function finishResultFade() {
+    if (!panel._resultFadeActive) return
+    panel._resultFadeActive = false
+    panel._resultPending = null
+    resultOutAnim.stop()
+    resultInAnim.stop()
+    textFadeAnim.stop()
+    // A submenu hit can push another page inside this fade; its own
+    // transition owns pageHost opacity from then on.
+    if (!panel._transitionActive) pageHost.opacity = 1
+    searchField.input.opacity = 1
+    // The query is cleared at the start of phase two, so the ghost hint's
+    // own Ui.fastMs fade rides in with the page reveal, not after it.
+  }
+
+  NumberAnimation {
+    id: resultOutAnim
+    target: pageHost
+    property: "opacity"
+    from: 1
+    to: 0
+    // Linear over a full clock: OutCubic spent most of its duration already
+    // at zero, which read as a few still frames before the page switched.
+    duration: Ui.fastMs
+    easing.type: Easing.Linear
+    onFinished: panel.commitResultFade()
+  }
+
+  NumberAnimation {
+    id: resultInAnim
+    target: pageHost
+    property: "opacity"
+    // Not zero: the first frame of the reveal would be an empty card while
+    // the new delegates build.
+    from: 0.3
+    to: 1
+    duration: Ui.fastMs
+    easing.type: Easing.OutCubic
+    onFinished: panel.finishResultFade()
+  }
+
+  NumberAnimation {
+    id: textFadeAnim
+    target: searchField.input
+    property: "opacity"
+    from: 1
+    to: 0
+    duration: Ui.fastMs
+    easing.type: Easing.OutCubic
   }
 
   function consumePendingResult() {
     const it = panel.pendingResult
     panel.pendingResult = null
     if (!it || !Menu.open || it.pageId === undefined) return
+    if (!Menu.hasPage(it.pageId)) return
+    panel.beginResultFade(it)
+    if (panel._resultFadeActive) return
+    panel.applyResult(it)
+  }
+
+  function applyResult(it) {
     if (!Menu.jumpTo(it.pageId, it.row)) return
-    // A selection leaves search behind: bar cleared, cursor on the row.
+    if (panel._resultFadeActive) {
+      pageHost.opacity = 0.3
+      resultInAnim.restart()
+    }
     Menu.clearQuery()
+    // Emptying the field here starts the placeholder's own Ui.fastMs fade
+    // on the same edge as the page reveal; the text control stays
+    // transparent until that reveal lands.
     searchField.text = ""
-    focusCtrl.grabList()
     if (list) {
       if (typeof list.unpinHighlight === "function") list.unpinHighlight()
       list._keepCursor = false
@@ -4394,7 +4494,11 @@ Rectangle {
     }
     // Keep PanelFocus' serviceVisible in sync (it watches Menu.open)
     // and let it decide list vs filter ownership.
-    if (searchField.focused || focusCtrl.mode === "filter" || panel.searching) {
+    // A result handoff keeps the query alive through the results' fade-out.
+    // Reasserting filter focus here would put the border back on the field
+    // until the page switch, fading it with the reveal instead of the fold.
+    if (!panel._resultFadeActive
+      && (searchField.focused || focusCtrl.mode === "filter" || panel.searching)) {
       focusCtrl.mode = "filter"
       if (!searchField.focused) searchField.grabFocus()
       return
@@ -4688,6 +4792,13 @@ Rectangle {
       // so any page-id churn it sees must not consume the first-open
       // seat or start the tween off-screen.
       if (!Menu.open) return
+      // A search-result handoff fades the page in on its own clock. Keep the
+      // depth bookkeeping current but leave pageHost opacity to that fade;
+      // a same-depth snap here would show the whole swap in one frame.
+      if (panel._resultFadeActive) {
+        listBox.lastDepth = depth
+        return
+      }
       if (transitionGen !== undefined && transitionGen !== panel._transitionGen) return
       if (panel._fitPending || panel._transitionActive) {
         if (launchWhileMasked !== true) return
