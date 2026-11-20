@@ -345,4 +345,24 @@ t_eq "the group stays open through the step" "True" \
   "$(probe_field 'd["dropdownOpen"]')"
 t_eq "the scroll holds through the step" "$exit_y" "$(probe_field 'd["contentY"]')"
 
+# --- 10. a search hit owned by the CURRENT page still unfolds its group -----
+
+t_section "search-result landing on the current page"
+open_fixture
+# "Signal strength" lives inside the Devices group on this very page. The
+# landing must still consume its pending seat here: no page change means no
+# onCurrentPageIdChanged install to hand the seat over, so an unconsumed
+# pendingSel leaves every settled waiter gated off and the group folded.
+p debugType signal >/dev/null 2>&1
+sleep 0.7
+t_eq "the hit is a search result" "result" "$(probe_field 'd["rowType"]')"
+p debugActivatePanel >/dev/null 2>&1
+sleep 1.2
+t_eq "the landing stays on the hit's page" "nested-showcase" \
+  "$(probe_field 'd["page"]')"
+t_eq "the owning group opens" "True" \
+  "$(probe_field 'd["dropdownOpen"]')"
+t_eq "the matching child is seated" "Signal strength" \
+  "$(probe_field 'd["childLabel"]')"
+
 t_summary

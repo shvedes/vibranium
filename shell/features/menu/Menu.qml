@@ -1882,6 +1882,10 @@ Singleton {
 
   function jumpTo(pageId, row) {
     if (!root.hasPage(pageId)) return false
+    // A jump to the page already on screen installs no new page, so the
+    // panel's onCurrentPageIdChanged handler never runs to hand the seat
+    // over. Note the case before the stack is replaced.
+    const samePage = !!root.frame && root.frame.id === pageId
     root.collapseFrame(root.frame.id)
     const vs = Object.assign({}, root.viewState)
     delete vs[pageId]
@@ -1900,6 +1904,16 @@ Singleton {
         sel: at,
         y: 0
       }]
+    // A page change consumes pendingSel in applyFrameState from its own
+    // install. Clearing the search onto the SAME page leaves no such install,
+    // so hand the seat over here instead - otherwise pendingSel stays armed
+    // and every settled waiter (the group/select/search-result landings) is
+    // blocked on its `pendingSel < 0` gate forever. Deferred so the search
+    // teardown's same-turn row install has landed before the seat is applied.
+    if (samePage && root.panel && typeof root.panel.applyFrameState === "function") {
+      const panel = root.panel
+      Qt.callLater(function() { panel.applyFrameState() })
+    }
     return true
   }
 
