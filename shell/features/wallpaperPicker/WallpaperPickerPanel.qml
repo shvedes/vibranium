@@ -240,7 +240,9 @@ Item {
     let at = 0
     while (departing > 0) {
       if (deck.get(at).vanishing === true) {
-        deck.move(at, deck.count - 1)
+        // move() takes a row COUNT as its third argument; without it the call
+        // throws and abandons the patch below, leaving only invisible rows.
+        deck.move(at, deck.count - 1, 1)
         departing--
       } else {
         at++
