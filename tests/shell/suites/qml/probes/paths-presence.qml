@@ -162,7 +162,6 @@ Item {
     themeColorsFile: Paths.themeColorsFile,
     wallpaperStateJson: Paths.wallpaperStateJson,
     screenshotsDir: Paths.screenshotsDir,
-    screenshotFallbackDir: Paths.screenshotFallbackDir,
     launcherUserPluginsDir: Paths.launcherUserPluginsDir,
     drunCacheFile: Paths.drunCacheFile,
     hyprInputFile: Paths.hyprInputFile,
@@ -351,8 +350,6 @@ Item {
     // from it rather than from $VIBRANIUM_CACHE.
     kv("derive.drunCacheFile.under", under(Paths.cacheHome, Paths.drunCacheFile))
     kv("derive.drunCacheFile.suffix", Paths.drunCacheFile === Paths.cacheHome + "/vibranium/druncache.json")
-    kv("derive.screenshotFallbackDir.under", under(Paths.vibraniumCache, Paths.screenshotFallbackDir))
-    kv("derive.screenshotFallbackDir.suffix", Paths.screenshotFallbackDir === Paths.vibraniumCache + "/screenshot-clipboard-fallbacks")
 
     // screenshotsDir follows XDG_PICTURES_DIR when the session sets it and $HOME
     // when it does not, which is the choice the bash screenshot tool makes.

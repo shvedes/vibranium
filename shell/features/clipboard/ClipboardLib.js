@@ -618,8 +618,9 @@ function buildTitleSub(entry) {
       entry.pathLike = true
       return
     }
-    // Snapshot off the clipboard: no path exists.
-    entry.title = prettyImageName(entry) + " image"
+    // Snapshot off the clipboard: the bytes live in a cache file, not at a
+    // user-facing path, so the row is named for what it is.
+    entry.title = "Image"
     entry.icon = String(entry.mime).indexOf("svg") >= 0 ? ICONS.svg : ICONS.image
     entry.pathLike = false
     return
@@ -712,6 +713,12 @@ function buildSubLeft(entry) {
     }
     case "image": {
       const parts = []
+      // A snapshot has no filename to carry its format, so keep the subtype
+      // in the subtext now that the title reads simply "Image".
+      if (entry.imageDataFile && (entry.filePaths || []).length === 0) {
+        const subtype = prettyImageName(entry)
+        if (subtype !== "Image") parts.push(subtype)
+      }
       if (entry.imageW > 0 && entry.imageH > 0)
         parts.push(entry.imageW + "x" + entry.imageH)
       if (entry.fileSize !== undefined && entry.fileSize > 0)
@@ -863,16 +870,15 @@ function buildCopySecretCmd() {
 function buildCopyUriListCmd() {
   return ["wl-copy", "-n", "--type", "text/uri-list"]
 }
-// The mime argument is accepted and ignored: the bytes already live in a
-// snapshot file, so only a file:// URI is offered - the same fragment an
-// image file re-copy uses.
+// A snapshot's own bytes are offered under their recorded media type, so a
+// re-serve keeps the clipboard an image instead of turning it into a path.
+// wl-copy buffers the file before it claims the selection.
 function buildCopyImageDataCmd(mime, path) {
-  return buildCopyImageFileCmd(path)
+  return ["sh", "-c", "wl-copy --type " + sq(mime) + " < " + sq(path)]
 }
-// Retained shell fragment: the URI list reaches wl-copy as one quoted word
-// instead of a stdin write, because callers route an image re-copy through a
-// single process. The data is a file:// URI, not credential material, and sq()
-// keeps a path with spaces or quotes from splitting the command.
+// A URI list reaches wl-copy as one quoted word instead of a stdin write.
+// The data is a file:// URI, not credential material, and sq() keeps a path
+// with spaces or quotes from splitting the command.
 function buildCopyUrisCmd(uris) {
   return ["sh", "-c", "printf %s " + sq(uris) + " | wl-copy -n --type text/uri-list"]
 }

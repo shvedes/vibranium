@@ -18,7 +18,7 @@ If you don't like this effect, disable it in the settings.
 To stop the active recording, press ++ctrl+alt+r++ again, or click on the bar indicator.  
 The flash confirms the stop, and the finished file saved in `~/Videos/Screencasts/`.
 
-Once the encoder has flushed and exited, the finished file is placed on the clipboard as a `file://` URI-list, the same way a screenshot is.
+Once the encoder has flushed and exited, the finished file is placed on the clipboard as a `file://` URI-list.
 That entry is a normal Vibranium clipboard-history entry: it can be previewed, copied again, and pinned.
 The clipboard keeps serving the URI after the recording stops, so you can paste the path straight into a file manager, an editor, or a chat window.
 

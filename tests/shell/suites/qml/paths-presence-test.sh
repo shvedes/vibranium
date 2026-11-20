@@ -76,7 +76,7 @@ DERIVED_PATHS=(
   configHome cacheHome themesUserRoot settingsFile settingsBundlePath
   settingsCatalogPath settingsSchemaDir runtimeEnvFile themeNameFile
   themeStateDir themeBackgroundsDir themeColorsFile wallpaperStateJson
-  screenshotsDir screenshotFallbackDir launcherUserPluginsDir drunCacheFile
+  screenshotsDir launcherUserPluginsDir drunCacheFile
   hyprInputFile hyprAppearanceFile hyprAdvancedFile hyprSmartGapsFile
   hyprAnimationsFile
 )
@@ -160,8 +160,7 @@ assert_derivation() {
   for name in settingsFile themesUserRoot launcherUserPluginsDir hyprInputFile \
     hyprAppearanceFile hyprAdvancedFile hyprSmartGapsFile hyprAnimationsFile \
     settingsSchemaDir settingsBundlePath settingsCatalogPath runtimeEnvFile themeNameFile themeStateDir \
-    themeBackgroundsDir themeColorsFile wallpaperStateJson drunCacheFile \
-    screenshotFallbackDir; do
+    themeBackgroundsDir themeColorsFile wallpaperStateJson drunCacheFile; do
     qp_assert "$name is under the root it was derived from" "derive.$name.under" "true"
   done
   qp_assert "settingsFile is configHome + /vibranium/settings.json" "derive.settingsFile.suffix" "true"
@@ -174,8 +173,6 @@ assert_derivation() {
   qp_assert "themeBackgroundsDir is themeStateDir + /backgrounds" "derive.themeBackgroundsDir.suffix" "true"
   qp_assert "themeColorsFile is themeStateDir + /qs.json" "derive.themeColorsFile.suffix" "true"
   qp_assert "drunCacheFile is cacheHome + /vibranium/druncache.json" "derive.drunCacheFile.suffix" "true"
-  qp_assert "screenshotFallbackDir is vibraniumCache + /screenshot-clipboard-fallbacks" \
-    "derive.screenshotFallbackDir.suffix" "true"
   qp_assert "the five hyprland files share one config dir" "derive.hyprFiles.sharedDir" "true"
   qp_assert "settingsBundlePath sits under shell/common/settings" "derive.settingsBundlePath.underSettingsDir" "true"
   qp_assert "settingsBundlePath is the catalog itself" "derive.settingsBundlePath.isTheCatalog" "true"

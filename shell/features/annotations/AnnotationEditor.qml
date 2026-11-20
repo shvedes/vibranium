@@ -17,8 +17,8 @@ import "../../common/math/Range.js" as Range
 // Native annotation editor as a modal fullscreen overlay: black veil over
 // the desktop, the shot fitted center, one Canvas painting base image +
 // replayed strokes in image pixels, floating icon tool panel at the
-// bottom. Clipboard offers a persistent file URI through wl-copy (plus a
-// text URI fallback) and toasts reuse the daemon bridge.
+// bottom. Clipboard offers image bytes through wl-copy (with a text URI
+// fallback) and toasts reuse the daemon bridge.
 // Owned one-directionally by the screenshots service via shotPath; file
 // browsing stays with ImageViewer.
 //
@@ -98,8 +98,6 @@ LayerSurface {
   property bool _saveTargetPending: false
   property int _saveCheckSeq: 0
   property int _copySeq: 0
-  property string _fallbackTarget: ""
-  property bool _fallbackCommitted: false
   property var _childProcesses: []
   property bool _saveDialogOpen: false
   readonly property bool interactionLocked: editor.exporting || editor._saveTargetPending || editor._saveDialogOpen
@@ -726,16 +724,6 @@ LayerSurface {
     editor._cleanupExportOutput(output)
   }
 
-  function _cleanupFallbackTarget() {
-    if (editor._fallbackTarget !== "") {
-      if (!editor._fallbackCommitted) {
-        Exec.rm(editor._fallbackTarget)
-      }
-      editor._fallbackTarget = ""
-      editor._fallbackCommitted = false
-    }
-  }
-
   function _trackProcess(proc) {
     editor._childProcesses = editor._childProcesses.concat([proc])
   }
@@ -1044,70 +1032,9 @@ LayerSurface {
      }
    }
 
-  function _setClipboardFallback(path, deleteAfter, then, onFailed) {
-    if (deleteAfter !== true) {
-      Quickshell.clipboardText = Paths.toFileUrl(path)
-      if (typeof then === "function") then()
-      return
-    }
-    editor._copySeq++
-    const mime = ShotLib.mimeForPath(path)
-    const ext = mime === "image/jpeg" ? "jpg"
-      : mime === "image/webp" ? "webp"
-      : mime === "image/bmp" ? "bmp"
-      : mime === "image/tiff" ? "tif"
-      : mime === "image/svg+xml" ? "svg" : "png"
-    const target = Paths.screenshotFallbackDir + "/image-" + editor._sessionId + "-"
-      + editor._uid + "-" + editor._copySeq + "." + ext
-    const proc = jobComp.createObject(editor, {
-      command: Exec.setsidTimeoutCmd(["cp",
-        "--remove-destination", "--", path, target], 10)
-    })
-    if (proc === null) {
-      if (typeof onFailed === "function") onFailed()
-      return
-    }
-    editor._trackProcess(proc)
-    editor._fallbackTarget = target
-    editor._fallbackCommitted = false
-    proc.exited.connect((code) => {
-      editor._untrackProcess(proc)
-      proc.destroy()
-      if (editor._closing) {
-        if (editor._fallbackTarget === target) {
-          editor._fallbackTarget = ""
-          editor._fallbackCommitted = false
-        }
-        Exec.rm(target)
-        return
-      }
-      if (code !== 0) {
-        if (editor._fallbackTarget === target) {
-          editor._fallbackTarget = ""
-          editor._fallbackCommitted = false
-        }
-        Exec.rm(target)
-        if (typeof onFailed === "function") onFailed()
-        return
-      }
-      editor._fallbackCommitted = true
-      editor._copyImageFile(target, false, () => {
-        if (editor._fallbackTarget === target) {
-          editor._fallbackTarget = ""
-          editor._fallbackCommitted = false
-        }
-        Exec.rm(path)
-        if (typeof then === "function") then()
-      }, onFailed)
-    })
-    proc.running = true
-  }
-
+  // Clipboard offers the image's own bytes. wl-copy holds them once it
+  // exits zero, so a one-shot export can be removed here.
   function _copyImageFile(path, deleteAfter, then, onFailed) {
-    if (deleteAfter === true) {
-      editor._setClipboardFallback(path, deleteAfter, then, onFailed)
-      return
-    }
     const proc = jobComp.createObject(editor, {
       command: Exec.setsidTimeoutCmd(ShotLib.copyImageCmd(path), 10)
     })
@@ -1115,7 +1042,7 @@ LayerSurface {
       if (typeof then === "function") then()
     }
     if (proc === null) {
-      editor._setClipboardFallback(path, deleteAfter, done, onFailed)
+      if (typeof onFailed === "function") onFailed()
       return
     }
     editor._trackProcess(proc)
@@ -1123,9 +1050,10 @@ LayerSurface {
       editor._untrackProcess(proc)
       proc.destroy()
       if (code === 0) {
+        if (deleteAfter === true) Exec.rm(path)
         done()
-      } else {
-        editor._setClipboardFallback(path, deleteAfter, done, onFailed)
+      } else if (typeof onFailed === "function") {
+        onFailed()
       }
     })
     proc.running = true
@@ -1174,7 +1102,6 @@ LayerSurface {
       editor._stopProcesses()
       editor._cleanupExportOutput(output)
       editor._cleanupPreservedOutput()
-     editor._cleanupFallbackTarget()
     board.unloadImage(editor.fileUrl)
     editor.visible = false
     editor.destroy()
@@ -1184,7 +1111,6 @@ LayerSurface {
      editor._stopProcesses()
     editor._cleanupExportOutput(editor._activeOutput)
     editor._cleanupPreservedOutput()
-    editor._cleanupFallbackTarget()
     editor._cleanupBlurPlate()
   }
 

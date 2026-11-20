@@ -267,11 +267,12 @@ function fileUri(path) {
   return FileUri.toUri(path, { keepExisting: true, blankNull: true })
 }
 
-// URI-list clipboard offer: paste targets receive a persistent file URI.
-// Forking wl-copy lets one-shot callers delete their source only after the
-// URI target has been preserved.
+// Binary image offer: the file's own bytes go to wl-copy through a shell
+// redirection, so the paste target receives an image rather than a location.
+// wl-copy buffers stdin before it claims the selection, so a one-shot caller
+// may delete the source once the child exits successfully.
 function copyImageCmd(path) {
-  return ["sh", "-c", "printf '%s\\n' " + sq(fileUri(path)) + " | wl-copy --type text/uri-list"]
+  return ["sh", "-c", "wl-copy --type " + sq(mimeForPath(path)) + " < " + sq(path)]
 }
 
 // Label map identical to the bash tool's notify() case list.

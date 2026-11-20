@@ -60,8 +60,6 @@ Singleton {
     const xdg = Quickshell.env("XDG_PICTURES_DIR")
     return (xdg !== null && xdg !== "" ? xdg : root.home) + "/Screenshots"
   }
-  readonly property string screenshotFallbackDir:
-    root.vibraniumCache + "/screenshot-clipboard-fallbacks"
   readonly property string themeBackgroundsDir: root.themeStateDir + "/backgrounds"
   readonly property string themeColorsFile: root.themeStateDir + "/qs.json"
 

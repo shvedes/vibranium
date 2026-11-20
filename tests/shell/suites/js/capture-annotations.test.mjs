@@ -971,23 +971,21 @@ group('fileUri percent-encodes each segment and keeps one scheme', () => {
     (v) => decodeURIComponent(v.slice('file://'.length)) === '/tmp/a b.png', 'decodes to the input')
 })
 
-group('copyImageCmd is a URI-list offer through a forking wl-copy', () => {
-  eq('a plain path', SL.copyImageCmd('/tmp/a.png'), ['sh', '-c', "printf '%s\\n' 'file:///tmp/a.png' | wl-copy --type text/uri-list"])
-  eq('a path with a space is quoted', SL.copyImageCmd('/tmp/a b.png')[2], "printf '%s\\n' 'file:///tmp/a%20b.png' | wl-copy --type text/uri-list")
-  eq('a quote in the path is escaped for the shell', SL.copyImageCmd("/tmp/it's.png")[2], "printf '%s\\n' 'file:///tmp/it'\\''s.png' | wl-copy --type text/uri-list")
+group('copyImageCmd offers the image bytes through wl-copy', () => {
+  eq('a png path', SL.copyImageCmd('/tmp/a.png'), ['sh', '-c', "wl-copy --type 'image/png' < '/tmp/a.png'"])
+  eq('a jpeg path', SL.copyImageCmd('/tmp/a.jpeg')[2], "wl-copy --type 'image/jpeg' < '/tmp/a.jpeg'")
+  eq('a jpg path', SL.copyImageCmd('/tmp/a.jpg')[2], "wl-copy --type 'image/jpeg' < '/tmp/a.jpg'")
+  eq('a path with a space is quoted', SL.copyImageCmd('/tmp/a b.png')[2], "wl-copy --type 'image/png' < '/tmp/a b.png'")
+  eq('a quote in the path is escaped for the shell', SL.copyImageCmd("/tmp/it's.png")[2], "wl-copy --type 'image/png' < '/tmp/it'\\''s.png'")
   eq('exactly three argv entries', SL.copyImageCmd('/tmp/a.png').length, 3)
   eq('it runs through sh -c', SL.copyImageCmd('/tmp/a.png').slice(0, 2), ['sh', '-c'])
-  contains('the URI type is named', SL.copyImageCmd('/tmp/a.png')[2], '--type text/uri-list')
-  contains('printf is used so no trailing newline is lost', SL.copyImageCmd('/tmp/a.png')[2], "printf '%s\\n'")
-  // The URI encoder is what neutralises the shell metacharacters: a path
-  // segment keeps only the unreserved set, so the quoting is belt and braces
-  // rather than the only defence.
+  contains('the media type is named', SL.copyImageCmd('/tmp/a.png')[2], '--type \'image/png\'')
+  contains('the file is redirected into wl-copy', SL.copyImageCmd('/tmp/a.png')[2], " < '/tmp/a.png'")
+  // The path reaches the shell as one single-quoted word, so the
+  // metacharacters stay literal arguments rather than shell syntax.
   const nasty = SL.copyImageCmd("/tmp/a'b\"c;d`e$f.png")[2]
-  contains("a quote in the path is URI-encoded, then shell-quoted", nasty, "'file:///tmp/a'\\''b%22c%3Bd%60e%24f.png'")
-  notContains('no raw semicolon reaches the shell', nasty, ';')
-  notContains('no raw backtick reaches the shell', nasty, '`')
-  notContains('no raw dollar reaches the shell', nasty, '$')
-  eq('exactly one pipe separates the stages', nasty.split('|').length - 1, 1)
+  eq('shell metacharacters stay inside single quotes', nasty, "wl-copy --type 'image/png' < '/tmp/a'\\''b\"c;d`e$f.png'")
+  eq('no pipe is used', nasty.split('|').length - 1, 0)
   eq('an empty path still yields a command', SL.copyImageCmd('').length, 3)
   eq('a null path still yields a command', SL.copyImageCmd(null).length, 3)
 })

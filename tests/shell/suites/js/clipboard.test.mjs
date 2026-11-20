@@ -660,14 +660,18 @@ group('buildCopyUrisCmd / buildCopyImageFileCmd / buildCopyImageDataCmd', () => 
   // first by toFileUri, so a space never reaches the shell unencoded.
   eq('a space is percent-encoded before quoting', body(CL.buildCopyUrisCmd(CL.toFileUri('/tmp/my pic.png'))), "printf %s 'file:///tmp/my%20pic.png' | wl-copy -n --type text/uri-list")
   eq('an image file is copied through the same fragment', CL.buildCopyImageFileCmd('/tmp/a.png'), CL.buildCopyUrisCmd('file:///tmp/a.png'))
-  // The mime argument of buildCopyImageDataCmd is accepted and ignored: the
-  // bytes already live in a snapshot file, so only a file:// URI is offered.
-  eq('buildCopyImageDataCmd ignores its mime', CL.buildCopyImageDataCmd('image/png', '/tmp/a.png'), CL.buildCopyImageFileCmd('/tmp/a.png'))
-  eq('buildCopyImageDataCmd with a different mime is identical', CL.buildCopyImageDataCmd('image/webp', '/tmp/a.png'), CL.buildCopyImageDataCmd('image/png', '/tmp/a.png'))
+  // A snapshot re-serve keeps the clipboard an image: the bytes go through
+  // a redirection under the mime the snapshot was captured with.
+  eq('a snapshot is copied as bytes under its own mime', CL.buildCopyImageDataCmd('image/png', '/tmp/a.png'), ['sh', '-c', "wl-copy --type 'image/png' < '/tmp/a.png'"])
+  eq('the mime is used, not ignored', CL.buildCopyImageDataCmd('image/webp', '/tmp/a.png')[2], "wl-copy --type 'image/webp' < '/tmp/a.png'")
+  eq('the byte-offer skeleton is fixed', skeleton(body(CL.buildCopyImageDataCmd('image/png', '/tmp/a.png'))), `wl-copy --type ${SPAN} < ${SPAN}`)
   for (const [label, p] of INJECTIONS) {
     const frag = body(CL.buildCopyImageFileCmd(p))
     notContains(`${label} never escapes the quotes`, skeleton(frag), p.replace(/\n/g, ''))
     eq(`${label} leaves the skeleton untouched`, skeleton(frag), `printf %s ${SPAN} | wl-copy -n --type text/uri-list`)
+    const data = body(CL.buildCopyImageDataCmd('image/png', p))
+    notContains(`${label} never escapes the byte-offer quotes`, skeleton(data), p.replace(/\n/g, ''))
+    eq(`${label} leaves the byte-offer skeleton untouched`, skeleton(data), `wl-copy --type ${SPAN} < ${SPAN}`)
   }
   // encodeURIComponent leaves "'" alone, so the quote reaches sq() and is
   // spliced - close the word, escaped quote, reopen it.
@@ -2249,12 +2253,12 @@ group('buildTitleSub - the per-type title and icon', () => {
   const i1 = one({ type: 'image', filePaths: [HOME + '/pics/a.webp'] })
   eq('a copied image keeps the full folded path as its title', [i1.title, i1.icon, i1.pathLike], ['~/pics/a.webp', 'file-image', true])
   const i2 = one({ type: 'image', filePaths: [], mime: 'image/svg+xml' })
-  eq('a snapshot image has no path to title', [i2.title, i2.icon, i2.pathLike], ['Image image', 'file-svg', false])
-  eq('a png snapshot is named from its mime', one({ type: 'image', filePaths: [], mime: 'image/png' }).title, 'PNG image')
+  eq('a snapshot image has no path to title', [i2.title, i2.icon, i2.pathLike], ['Image', 'file-svg', false])
+  eq('a png snapshot is named for what it is', one({ type: 'image', filePaths: [], mime: 'image/png' }).title, 'Image')
   eq('a single image path is extension-iconed', one({ type: 'image', filePaths: ['/a/b.jpeg'] }).icon, 'file-image')
   eq('an svg path gets the svg icon', one({ type: 'image', filePaths: ['/a/b.svg'] }).icon, 'file-svg')
   eq('an unrecognised image extension falls back to the image icon', one({ type: 'image', filePaths: ['/a/b.bin'] }).icon, 'file-image')
-  eq('a two-path image row is treated as a snapshot', one({ type: 'image', filePaths: ['/a/b.png', '/c/d.png'], mime: 'image/png' }).title, 'PNG image')
+  eq('a two-path image row is treated as a snapshot', one({ type: 'image', filePaths: ['/a/b.png', '/c/d.png'], mime: 'image/png' }).title, 'Image')
   const f1 = one({ type: 'file', filePaths: [HOME + '/docs/a.pdf'] })
   eq('a file row keeps the folded path', [f1.title, f1.icon, f1.pathLike], ['~/docs/a.pdf', 'file-pdf', true])
   eq('a path outside home is not rewritten', one({ type: 'file', filePaths: ['/etc/passwd'] }).title, '/etc/passwd')
@@ -2311,6 +2315,8 @@ group('buildSubLeft - what the thing IS, quantified', () => {
   eq('an empty text row still counts', CL.buildSubLeft({ type: 'text', raw: '' }), '0 words • 0 chars')
   eq('a missing raw counts as the word "undefined"', CL.buildSubLeft({ type: 'text' }), '1 word • 9 chars')
   eq('an image with dimensions and a size', CL.buildSubLeft({ type: 'image', imageW: 800, imageH: 600, fileSize: 2048 }), '800x600 • 2 KB')
+  eq('an image snapshot carries its subtype in the subtext', CL.buildSubLeft({ type: 'image', imageDataFile: '/c/t1.jpg', mime: 'image/jpeg', filePaths: [], imageW: 800, imageH: 600, fileSize: 2048 }), 'JPEG • 800x600 • 2 KB')
+  eq('a path-backed image keeps no subtype prefix', CL.buildSubLeft({ type: 'image', imageFile: '/p/a.png', mime: 'image/png', filePaths: ['/p/a.png'], imageW: 800, imageH: 600 }), '800x600')
   eq('an image with only dimensions', CL.buildSubLeft({ type: 'image', imageW: 800, imageH: 600 }), '800x600')
   eq('an image with only a size', CL.buildSubLeft({ type: 'image', fileSize: 2048 }), '2 KB')
   eq('a pending image', CL.buildSubLeft({ type: 'image' }), 'Image')

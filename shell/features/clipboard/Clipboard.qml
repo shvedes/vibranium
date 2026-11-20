@@ -929,7 +929,7 @@ Singleton {
     root._suppressHash = ""
     root._suppressSecret = ""
     if (entry.type === "image" && entry.imageDataFile && !entry.imageFile) {
-      root._suppressHash = "uri:" + CL.toFileUri(entry.imageDataFile)
+      root._suppressHash = root._imageHash(entry)
     } else if (entry.type === "image" && entry.imageFile) {
       root._suppressHash = "uri:" + CL.toFileUri(entry.imageFile)
     } else if (entry.filePaths && entry.filePaths.length > 0) {
@@ -1028,11 +1028,19 @@ Singleton {
     return { cmdArr: cmdArr, sink: sink }
   }
 
+  // The echo hash a snapshot's own bytes arrive under. _onImageSnapshot
+  // keys by content, so a re-serve of the same snapshot is matched here
+  // rather than being read back as a second, path-backed row.
+  function _imageHash(entry) {
+    if (!entry.imageSha || !(entry.fileSize > 0)) return ""
+    return "img:" + String(entry.imageSha) + ":" + String(entry.fileSize)
+  }
+
   // The echo hash a copy of this row suppresses: the same value a manual
   // re-copy computes, so the watcher does not store the row twice.
   function _suppressHashFor(entry) {
     if (entry.type === "image" && entry.imageDataFile && !entry.imageFile)
-      return "uri:" + CL.toFileUri(entry.imageDataFile)
+      return root._imageHash(entry)
     if (entry.type === "image" && entry.imageFile)
       return "uri:" + CL.toFileUri(entry.imageFile)
     if (entry.filePaths && entry.filePaths.length > 0)

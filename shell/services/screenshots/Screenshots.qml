@@ -63,7 +63,6 @@ Singleton {
     && root._lockState.locked === true
   readonly property string runtimeDir:
     Paths.vibraniumRuntime + "/screenshots-" + Quickshell.processId
-  readonly property string fallbackDir: Paths.screenshotFallbackDir
   property bool _runtimeReady: false
   property bool _runtimeFailed: false
   property var _queuedStart: null
@@ -93,9 +92,6 @@ Singleton {
   property var _startupProcess: null
   property var _sourceStatProcess: null
   property var _copyProcesses: []
-  property string _fallbackTarget: ""
-  property bool _fallbackCommitted: false
-  property int _copySeq: 0
   property int _jobSeq: 0
   property int _activeJob: 0
   property int _editorUid: -1
@@ -456,7 +452,7 @@ Singleton {
         ? (job.crop.h || 0) : (job.frameH || 0)
     }
     root._activeDelivery = delivery
-    root._copyImage(job.path, !job.config.saveToDisk, job.config.fileType, delivery,
+    root._copyImage(job.path, !job.config.saveToDisk, delivery,
       () => root._finishDelivery(delivery),
       () => root._failDelivery(delivery, "Clipboard image copy failed"))
   }
@@ -659,13 +655,6 @@ Singleton {
     const copies = root._copyProcesses.slice()
     root._copyProcesses = []
     for (let i = 0; i < copies.length; i++) ProcControl.kill(copies[i], "copy")
-    if (root._fallbackTarget !== "") {
-      if (!root._fallbackCommitted) {
-        Exec.rm(root._fallbackTarget)
-      }
-      root._fallbackTarget = ""
-      root._fallbackCommitted = false
-    }
     if (root._editorRequest !== 0) {
       const request = root._editorRequest
       root._editorRequest = 0
@@ -786,31 +775,17 @@ Singleton {
     return true
   }
 
-  // The runtime directory gates the first capture; the orphan sweep and
-  // the fallback prune run in the background as best-effort, so a slow
-  // sweep is not a slow first screenshot. The prune always runs and
-  // excludes only the active path: wl-paste feeds the exclusion alone and
-  // never gates the time-based sweep.
+  // The runtime directory gates the first capture; the orphan sweep runs
+  // in the background as best-effort, so a slow sweep is not a slow first
+  // screenshot.
   function _initRuntime() {
     const current = Quickshell.processId
-    const clipboardPath = ShotLib.pathFromFileUrl(String(Quickshell.clipboardText ?? ""))
-    const activeFallback = root.fallbackDir !== "" && SU.isUnder(clipboardPath, root.fallbackDir)
-      ? ShotLib.sq(clipboardPath) : "''"
     const mkdirScript = "set -eu; rt=" + ShotLib.sq(Paths.vibraniumRuntime)
-      + "; fb=" + ShotLib.sq(root.fallbackDir)
-      + "; mkdir -p -- \"$rt/screenshots-" + current + "\" \"$fb\""
+      + "; mkdir -p -- \"$rt/screenshots-" + current + "\""
     const sweepScript = "set -eu; rt=" + ShotLib.sq(Paths.vibraniumRuntime)
-      + "; fb=" + ShotLib.sq(root.fallbackDir)
-      + "; active=" + activeFallback + "; "
-      + "if uri=$(wl-paste --type text/uri-list 2>/dev/null | head -n 1); then "
-      + "case \"$uri\" in file://*) p=${uri#file://}; p=${p#localhost}; "
-      + "case \"$p\" in \"$fb\"/*) active=\"$p\";; esac;; esac; fi; "
-      + "for d in \"$rt\"/screenshots-*; do [ -d \"$d\" ] || continue; "
+      + "; for d in \"$rt\"/screenshots-*; do [ -d \"$d\" ] || continue; "
       + "pid=${d##*-}; [ \"$pid\" = \"" + current + "\" ] && continue; "
-      + "kill -0 \"$pid\" 2>/dev/null || rm -rf -- \"$d\"; done; "
-      + "if [ -n \"$active\" ]; then find \"$fb\" -type f -mmin +1440 ! -path "
-      + "\"$active\" -delete 2>/dev/null || true; "
-      + "else find \"$fb\" -type f -mmin +1440 -delete 2>/dev/null || true; fi"
+      + "kill -0 \"$pid\" 2>/dev/null || rm -rf -- \"$d\"; done"
     const sweepArgv = Exec.setsidTimeoutCmd(["sh", "-c", sweepScript], 15)
     const sweepProc = jobComp.createObject(root, { command: sweepArgv })
     if (sweepProc !== null) {
@@ -1906,10 +1881,7 @@ Singleton {
     root._daemonNotify(saved === true ? "Screenshot Saved" : "Screenshot Copied", ShotLib.notifyBody(mode, saved), "Screenshots")
   }
 
-  // URI-list clipboard offer for a saved file. One-shot sources are
-  // copied to the persistent fallback directory before the URI is
-  // published; saved files are referenced directly. A text URI remains
-  // the last-resort fallback when wl-copy is unavailable.
+  // In-flight copy children, tracked so a cancelled flow can kill them.
   function _trackCopyProcess(proc) {
     root._copyProcesses = root._copyProcesses.concat([proc])
   }
@@ -1918,90 +1890,16 @@ Singleton {
     root._copyProcesses = root._copyProcesses.filter(p => p !== proc)
   }
 
-  // Stage the one-shot source into the persistent fallback directory
-  // before the URI is published, so a paste target that reads the URI later
-  // still finds a file. This is the only place a screenshot is copied, and
-  // it runs only when `saveToDisk` is off - a saved file is referenced in
-  // place and is never staged.
-  function _setClipboardFallback(path, deleteAfter, fileType, owner, done, failed) {
+  // The paste itself: `sh -c 'wl-copy --type <mime> < file'`. wl-copy
+  // buffers stdin before it claims the selection, so a zero exit means the
+  // bytes are its own and a one-shot source can be removed here.
+  function _copyImage(path, deleteAfter, owner, done, failed) {
     if (owner !== null && root._activeDelivery !== owner) return
-    if (deleteAfter !== true) {
-      // The last resort: a text URI in the shell's own clipboard, for when
-      // wl-copy is not installed. It is a paste target that most
-      // applications will not accept as an image.
-      Quickshell.clipboardText = Paths.toFileUrl(path)
-      if (typeof done === "function") done()
-      return
-    }
-    root._copySeq++
-    const lower = path.toLowerCase()
-    const ext = lower.endsWith(".jpg") || lower.endsWith(".jpeg")
-      ? "jpg" : ShotLib.suffixFor(fileType)
-    const target = root.fallbackDir + "/image-" + root._sessionId + "-"
-      + root._copySeq + "." + ext
-    const argv = Exec.setsidTimeoutCmd(["cp",
-      "--remove-destination", "--", path, target], 10)
-    const proc = jobComp.createObject(root, { command: argv })
-    if (proc === null) {
-      Exec.rm(target)
-      if (typeof failed === "function") failed()
-      return
-    }
-    root._fallbackTarget = target
-    root._fallbackCommitted = false
-    root._trackCopyProcess(proc)
-    proc.exited.connect((code) => {
-      proc.destroy()
-      root._untrackCopyProcess(proc)
-      if (owner !== null && root._activeDelivery !== owner) {
-        if (root._fallbackTarget === target) {
-          root._fallbackTarget = ""
-          root._fallbackCommitted = false
-        }
-        Exec.rm(target)
-        return
-      }
-      if (code !== 0) {
-        if (root._fallbackTarget === target) {
-          root._fallbackTarget = ""
-          root._fallbackCommitted = false
-        }
-        Exec.rm(target)
-        if (typeof failed === "function") failed()
-        return
-      }
-      // The staged copy is now the file the URI will name, so the original
-      // one-shot is only removable once the offer has been published - and
-      // the offer is the next call. `committed` is what a cancel between
-      // here and there respects.
-      root._fallbackCommitted = true
-      root._copyImage(target, false, fileType, owner, () => {
-        if (root._fallbackTarget === target) {
-          root._fallbackTarget = ""
-          root._fallbackCommitted = false
-        }
-        Exec.rm(path)
-        if (typeof done === "function") done()
-      }, failed)
-    })
-    proc.running = true
-  }
-
-  // The paste itself: `sh -c 'printf <uri> | wl-copy --type text/uri-list'`.
-  // A URI list rather than an image, so the paste target gets a path it
-  // reopens; `wl-copy` exits once the offer is taken, so a zero exit means
-  // published and nothing more.
-  function _copyImage(path, deleteAfter, fileType, owner, done, failed) {
-    if (owner !== null && root._activeDelivery !== owner) return
-    if (deleteAfter === true) {
-      root._setClipboardFallback(path, deleteAfter, fileType, owner, done, failed)
-      return
-    }
     if (!SU.isUnder(String(path), root.runtimeDir)) root._forgetPath(path)
     const argv = Exec.setsidTimeoutCmd(ShotLib.copyImageCmd(path), 10)
     const proc = jobComp.createObject(root, { command: argv })
     if (proc === null) {
-      root._setClipboardFallback(path, deleteAfter, fileType, owner, done, failed)
+      if (typeof failed === "function") failed()
       return
     }
     root._trackCopyProcess(proc)
@@ -2010,13 +1908,14 @@ Singleton {
       root._untrackCopyProcess(proc)
       if (owner !== null && root._activeDelivery !== owner) return
       if (code === 0) {
+        if (deleteAfter === true) {
+          Exec.rm(path)
+          root._forgetPath(path)
+        }
         if (typeof done === "function") done()
         return
       }
-      // A non-zero wl-copy is the one case where the fallback earns its
-      // keep: the offer has not landed, but the capture is fine and a
-      // second mechanism is about to be tried.
-      root._setClipboardFallback(path, deleteAfter, fileType, owner, done, failed)
+      if (typeof failed === "function") failed()
     })
     proc.running = true
   }

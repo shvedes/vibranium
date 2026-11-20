@@ -86,10 +86,10 @@ and promotes it to the top of the history, regardless of its type.
 Use ++super+shift+v++ to clear the clipboard history without opening the
 window.
 
-External image data is snapshotted to `$VIBRANIUM_CACHE/clipboard-img` for
-previewing and is removed when its entry is deleted or trimmed. Path-backed
-image entries, including screenshots, are re-copied as `text/uri-list` file
-URIs.
+Image data, including screenshots, is snapshotted to
+`$VIBRANIUM_CACHE/clipboard-img` for previewing and is removed when its entry
+is deleted or trimmed. Snapshot entries are re-copied as raw image data;
+path-backed image entries are re-copied as `text/uri-list` file URIs.
 
 Deleting (or clearing) the entry the system clipboard currently serves also
 empties the system clipboard, so the content cannot resurrect itself after a
