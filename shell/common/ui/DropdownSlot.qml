@@ -280,8 +280,19 @@ Item {
   // that starts the fold. Measured with the bare flag: the row snapped
   // 329->47 in one frame and the close seat, reading that as a finished fold,
   // restored the whole scroll in a single write.
+  // A host's follow verdict describes the slot AFTER its own unfold, never
+  // during it. A nested body live on the first frame otherwise disables the
+  // Behavior at the height write and the slot snaps to full size before its
+  // content builds. Latched imperatively: a derived comparison can flip in
+  // the same tick as the write and lose that race.
+  property bool _unfoldDone: false
+  onHeightChanged: {
+    if (root.open && root.settledH > 0
+      && root.height >= root.settledH - 0.5) root._unfoldDone = true
+  }
+
   readonly property bool motion: MotionPolicy.enabled && !root._held
-    && !(root.followNested && root.open)
+    && !(root.followNested && root.open && root._unfoldDone)
 
   Behavior on height {
     enabled: root.motion
@@ -344,8 +355,8 @@ Item {
   }
 
   onOpenChanged: {
-
     if (root.open) {
+      root._unfoldDone = false
       root._closing = false
       root.closeGrace.stop()
     } else {

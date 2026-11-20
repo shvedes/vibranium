@@ -401,4 +401,30 @@ t_eq "the range row is current" "range" "$(probe_field 'd["rowType"]')"
 t_eq "its editor stays closed" "False" \
   "$(probe_field 'd["editorOpen"]')"
 
+# --- 12. a deep nested close keeps the page scroll it landed on -------------
+
+t_section "nested close keeps the page scroll"
+# "Heavy backlog warning" is two groups deep on the bar page. Its landing
+# reveal scrolls the top-level list; the nested fold must not undo that
+# scroll and leave the fit to correct it on the next frame.
+p close >/dev/null 2>&1
+p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#main" >/dev/null 2>&1
+sleep 0.7
+p debugType "heavy warning" >/dev/null 2>&1
+sleep 0.6
+p debugActivatePanel >/dev/null 2>&1
+sleep 1.3
+t_eq "the deep hit lands on its page" "bar" "$(probe_field 'd["page"]')"
+landed="$(probe_field 'd["contentY"]')"
+p debugEscape >/dev/null 2>&1
+sleep 0.18
+mid="$(probe_field 'd["contentY"]')"
+sleep 0.18
+t_eq "the nested fold does not yank the page scroll" "$landed" "$mid"
+t_eq "and the scroll holds through the fold" "$landed" \
+  "$(probe_field 'd["contentY"]')"
+sleep 0.4
+t_eq "the nested group folded" "False" \
+  "$(probe_field 'd["childExpanded"]')"
+
 t_summary

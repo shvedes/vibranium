@@ -2727,6 +2727,9 @@ Rectangle {
       // scroll offset: the claim is content-space, so a seat that does not
       // change the target can still change whether the region is short of it.
       list.growthH = panel._claimListH
+      // A slot opened in the same chain can find the region released while
+      // the claim this size already stands; re-derive it from the live row.
+      panel._followSlotRow()
       return
     }
     if (grown < 0 && panel._claimListH < 0 && panel._slotRegionH < 0) {
@@ -2744,6 +2747,21 @@ Rectangle {
         && list.revealNeedH >= panel._claimListH - 0.5) {
       list.growthH = panel._claimListH
       return
+    }
+    // The card height reads BOTH the claim and the region. Publishing the
+    // claim first left a frame with a grown claim and a stale -1 region: the
+    // card jumped to the claim's destination, then dropped to the resting
+    // region when _followSlotRow caught up, then grew back - the one-frame
+    // jump on a deep landing. Publish the region the row is actually showing
+    // before the claim goes live so the pair never disagrees.
+    if (grown > 0) {
+      const currentRow = list.currentItem
+      const liveH = currentRow && currentRow.height > currentRow.restHeight + 0.5
+        ? currentRow.height : -1
+      if (liveH > 0)
+        panel._slotRegionH = Math.max(base, Math.min(liveH, panel.screenMaxListH))
+      else if (panel._slotRegionH < 0)
+        panel._slotRegionH = base
     }
     panel._claimListH = grown
     list.growthH = grown
@@ -3477,7 +3495,17 @@ Rectangle {
     Menu.trace("panel.clear", { site: "nestedRestore", auto: list.autoRevealIndex })
     list.autoRevealIndex = -1
     _trackingCloseSeat = true
-    if (hadSeat && Math.abs(list.contentY - _nestedSeatY) > 0.5)
+    // A nested slot opened in the same chain as its parent's page reveal can
+    // capture the PRE-reveal offset: both seats are still 0 while the reveal
+    // is about to take the page row to 159. That scroll belongs to the parent,
+    // which restores it on its own close. Nothing in this nested fold owes a
+    // page-level seat, so scrolling to the captured offset here would yank
+    // the still-open parent out of view and make the fit wake up and correct
+    // it one frame later.
+    const sameAsPageOrigin = panel._revealOriginY >= 0
+      && Math.abs(panel._nestedSeatY - panel._revealOriginY) < 0.5
+    if (hadSeat && !sameAsPageOrigin
+      && Math.abs(list.contentY - _nestedSeatY) > 0.5)
       list.seatTo(_nestedSeatY, true, "nested-restore", paceMs)
   }
   property real _nestedCloseStartY: -1
