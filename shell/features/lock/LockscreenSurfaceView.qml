@@ -322,7 +322,7 @@ WlSessionLockSurface {
             scale = 1
             return
           }
-          scale = 1.06
+          scale = 1.05
           fitAnim.restart()
         }
 
@@ -331,7 +331,7 @@ WlSessionLockSurface {
 
           target: backdropImage
           property: "scale"
-          from: 1.08
+          from: 1.05
           to: 1
           duration: 700
           easing.type: Easing.OutCubic
