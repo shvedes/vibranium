@@ -3710,7 +3710,6 @@ Rectangle {
     const it = panel.pendingResult
     panel.pendingResult = null
     if (!it || !Menu.open || it.pageId === undefined) return
-    const capturedQ = (Menu.query || "").toLowerCase().trim()
     if (!Menu.jumpTo(it.pageId, it.row)) return
     // A selection leaves search behind: bar cleared, cursor on the row.
     Menu.clearQuery()
@@ -3757,11 +3756,10 @@ Rectangle {
     }
     if (it.type === "group") {
       // The hit names the row that opens the dropdown; the query can also name
-      // one of its children. Seat that child the way a select hit seats its
-      // option, so redirecting lands on the matching entry instead of leaving
-      // the arrow walk to the user. groupSearchResults resolves the child once
-      // for both display and landing; a hit that names none opens the group on
-      // its stored seed, like a select opened on its stored value.
+      // one of its children. Seat that child so redirecting lands on the
+      // matching entry instead of leaving the arrow walk to the user.
+      // groupSearchResults resolves the child once for both display and
+      // landing; a hit that names none opens the group on its first child.
       const targetUid = it.groupUid !== undefined && it.groupUid !== null
         ? String(it.groupUid) : ""
       if (targetUid !== "" && list) Qt.callLater(function() {
@@ -3820,10 +3818,10 @@ Rectangle {
         }, function(next) { return groupUidMatches(next, chain[n]) })
       }
       // Opening the group is a slot claim against the row's own geometry. Do
-      // it on the same settled gate the select and editor landings use: jumping
-      // here arrives mid page-transition/fit, and expanding into that window
-      // makes the slot land (snap) instead of easing, which both stiffens the
-      // resize and leaves the slot held so its later close snaps too.
+      // it on the settled gate every landing uses: jumping here arrives mid
+      // page-transition/fit, and expanding into that window makes the slot
+      // land (snap) instead of easing, which both stiffens the resize and
+      // leaves the slot held so its later close snaps too.
       panel.whenSettled(function() {
         const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
         if (idx >= 0 && list && list.currentIndex !== idx) list.seat(idx, "land")
@@ -3840,25 +3838,9 @@ Rectangle {
       }, function(row) { return groupUidMatches(row, targetUid) })
       return
     }
-    if (it.type === "select") {
-      // The option the query names, so the dropdown opens with the cursor
-      // on it instead of on whatever the row's stored value left there.
-      const exact = MenuLib.bestOptionIndex(it.options, capturedQ, it.label)
-      const targetUid = it.uid !== undefined && it.uid !== null ? String(it.uid) : ""
-      panel.whenSettled((row) => {
-        row.setExpanded(true)
-        if (exact >= 0) Qt.callLater(() => {
-          const r2 = panel.currentRow()
-          if (r2 && r2.isSelect && r2.itm && String(r2.itm.uid) === targetUid) r2.optionIndex = exact
-        })
-      }, (row) => row.isSelect)
-      return
-    }
-    if (it.type === "number" || it.type === "range" || it.type === "text") {
-      panel.whenSettled((row) => row.openEditor(), (row) => row.hasEditor)
-      return
-    }
-    // Non-action hits just teleport – second Enter will operate it.
+    // Input rows land focused like every other entry: the query selects the
+    // row, not its editor or dropdown. Both were opened on arrival before,
+    // which took focus off the row the hit named. A second Enter operates it.
   }
 
   function activateCurrent(shift) {

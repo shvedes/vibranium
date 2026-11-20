@@ -365,4 +365,40 @@ t_eq "the owning group opens" "True" \
 t_eq "the matching child is seated" "Signal strength" \
   "$(probe_field 'd["childLabel"]')"
 
+# --- 11. an input hit lands focused, not open -------------------------------
+
+t_section "search-result landing on input rows"
+# "Time format" is a direct select row on General, not a group child. The hit
+# names the row, so arrival must leave it current with its dropdown folded;
+# the option is opened by the next Enter, like any browsed row.
+p close >/dev/null 2>&1
+p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#main" >/dev/null 2>&1
+sleep 0.7
+p debugType "time format" >/dev/null 2>&1
+sleep 0.6
+p debugActivatePanel >/dev/null 2>&1
+sleep 1.2
+t_eq "a select hit lands on its page" "general" "$(probe_field 'd["page"]')"
+t_eq "the select row is current" "select" "$(probe_field 'd["rowType"]')"
+t_eq "its dropdown stays folded" "False" \
+  "$(probe_field 'd["dropdownOpen"]')"
+p debugActivatePanel >/dev/null 2>&1
+sleep 0.7
+t_eq "a second Enter opens the select" "True" \
+  "$(probe_field 'd["dropdownOpen"]')"
+
+# A number/range hit used to open its editor on arrival for the same reason.
+p close >/dev/null 2>&1
+p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#main" >/dev/null 2>&1
+sleep 0.7
+p debugType "brightness step" >/dev/null 2>&1
+sleep 0.6
+p debugActivatePanel >/dev/null 2>&1
+sleep 1.2
+t_eq "a number hit lands on its page" "brightness" \
+  "$(probe_field 'd["page"]')"
+t_eq "the range row is current" "range" "$(probe_field 'd["rowType"]')"
+t_eq "its editor stays closed" "False" \
+  "$(probe_field 'd["editorOpen"]')"
+
 t_summary
