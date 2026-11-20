@@ -198,9 +198,13 @@ hl.layer_rule({
 -- draws above the menus, the pickers and the ambient surfaces rather than
 -- closing them. The color pick keeps -2, one step above it, because a pick
 -- that samples pixels must not sample the editor's board.
+-- The editor owns its arrival in QML, where it can wait for the image to
+-- decode instead of starting when the surface maps. A compositor layer-in on
+-- the same surface would be a second, faster motion over that same entrance.
 hl.layer_rule({
   name = "Vibranium Annotation Editor",
   match = { namespace = "^vibranium:annotate$" },
+  no_anim = true,
   order = -1,
 })
 

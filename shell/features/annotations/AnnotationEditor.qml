@@ -100,7 +100,10 @@ LayerSurface {
   property int _copySeq: 0
   property var _childProcesses: []
   property bool _saveDialogOpen: false
-  readonly property bool interactionLocked: editor.exporting || editor._saveTargetPending || editor._saveDialogOpen
+  // The arrival fade is part of the lock: a stroke started on a half-revealed
+  // board would be committed at coordinates the user could not yet see.
+  readonly property bool interactionLocked: editor.exporting || editor._saveTargetPending
+    || editor._saveDialogOpen || editor.pushOpacity < 1
 
   // ---- blur (the picture only) ----
   // One GPU-blurred copy of the picture, grabbed to a PNG once per shot. The
@@ -247,11 +250,74 @@ LayerSurface {
   // "all motion".
   readonly property bool animOn: MotionPolicy.enabled
 
-  // True while the toolbar is sliding in. A plate grab and a full-size canvas
-  // repaint both render on the main thread, and both are scheduled a fraction
-  // of a second after the reveal starts - the middle of the slide - so each
-  // one stalls it where it lands. They wait for this to clear instead.
-  readonly property bool _revealing: slideAnim.running
+  // The boot wallpaper's entrance, applied to the whole overlay. The content
+  // spawns a little larger than the screen and eases back to fit while a
+  // linear alpha ramp reveals it. Alpha stays linear on purpose: an eased
+  // fade would be fully opaque early and leave the last of the push reading
+  // as a slow drift of an already-settled image. Alpha runs on its own,
+  // shorter clock so the desktop is uncovered quickly while the settle keeps
+  // going. Both start as the surface maps, not after the image decodes. With
+  // animations off they snap to rest.
+  readonly property int arrivalMs: 400
+  readonly property int fadeMs: Ui.normalMs
+  property real pushScale: 1
+  property real pushOpacity: 1
+
+  // True while the arrival or the toolbar slide is still running. A plate
+  // grab and a full-size canvas repaint both render on the main thread, and
+  // both are scheduled a fraction of a second after the reveal starts - the
+  // middle of the motion - so each one stalls it where it lands. They wait
+  // for this to clear instead.
+  readonly property bool _revealing: arrivalAnim.running || slideAnim.running
+
+  ParallelAnimation {
+    id: arrivalAnim
+
+    NumberAnimation {
+      target: editor
+      property: "pushScale"
+      from: 1.09
+      to: 1
+      duration: editor.arrivalMs
+      easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+      target: editor
+      property: "pushOpacity"
+      from: 0
+      to: 1
+      duration: editor.fadeMs
+      easing.type: Easing.Linear
+    }
+  }
+
+  // The arrival played backwards on close: the board shrinks back into the
+  // screen while the veil and the content fade out. The destroy waits for the
+  // animation, so the surface cannot disappear a frame into the exit.
+  ParallelAnimation {
+    id: exitAnim
+
+    // The scale must finish with the fade, not after it: a push that outlives
+    // the alpha ramp plays out on an already-invisible surface. Matching the
+    // fade clock keeps the whole zoom visible on the way out.
+    NumberAnimation {
+      target: editor
+      property: "pushScale"
+      from: 1
+      to: 1.09
+      duration: editor.fadeMs
+      easing.type: Easing.InCubic
+    }
+    NumberAnimation {
+      target: editor
+      property: "pushOpacity"
+      from: 1
+      to: 0
+      duration: editor.fadeMs
+      easing.type: Easing.Linear
+    }
+    onStopped: editor._finishClose()
+  }
 
   // Free view over the fitted document: zoom multiplier plus display
   // pan offset. The backing stays document pixels (save is unaffected);
@@ -308,6 +374,19 @@ LayerSurface {
 
   readonly property string fileUrl: Paths.toFileUrl(editor.shotPath)
 
+  // The fade has to start with the surface, not with the decode: the veil is
+  // painted from the first mapped frame, so holding the entrance until the
+  // image is ready would pop the whole overlay in and only then fade its
+  // contents. The image arriving mid-fade simply joins the reveal.
+  Component.onCompleted: {
+    if (editor.animOn) {
+      arrivalAnim.restart()
+    } else {
+      editor.pushScale = 1
+      editor.pushOpacity = 1
+    }
+  }
+
   onLoadStateChanged: {
     if (loadState === "ready") {
       panel.reveal()
@@ -327,7 +406,10 @@ LayerSurface {
     if (boardReady) board.requestPaint()
   }
 
-  color: Ui.solid("background_0")
+  // The veil is a child rectangle rather than the window color so it can
+  // share the arrival fade; the window color would paint at full strength on
+  // the first mapped frame and pop the overlay in before any animation runs.
+  color: "transparent"
   surface: "vibranium:annotate"
   // Modal: hotkeys must land regardless of prior focus, and the grab is
   // released when the editor is not mapped - a grab with no release branch
@@ -1103,6 +1185,27 @@ LayerSurface {
       editor._cleanupExportOutput(output)
       editor._cleanupPreservedOutput()
     board.unloadImage(editor.fileUrl)
+    // Stop the toolbar slide so it does not fight the exit scale, and play
+    // the reverse entrance. Animations off snaps straight to teardown.
+    slideAnim.stop()
+    panel.visible = false
+    if (editor.animOn) {
+      arrivalAnim.stop()
+      exitAnim.start()
+    } else {
+      editor._finishClose()
+    }
+  }
+
+  // Destroy only after the exit has cleared the screen. Reached from the
+  // animation's end (animated path) or directly when motion is off; _closed
+  // makes the two paths safe when stop() itself emits onStopped.
+  property bool _closed: false
+  function _finishClose() {
+    if (editor._closed) return
+    editor._closed = true
+    exitAnim.stop()
+    editor._stopProcesses()
     editor.visible = false
     editor.destroy()
   }
@@ -1138,6 +1241,15 @@ LayerSurface {
     onTriggered: editor.clearArmed = false
   }
 
+  // Full-screen veil behind everything else. Its opacity is the arrival
+  // fade, so the desktop stays visible through the overlay's first frames
+  // instead of being covered by a surface that appeared in one step.
+  Rectangle {
+    anchors.fill: parent
+    color: Ui.solid("background_0")
+    opacity: editor.pushOpacity
+  }
+
   Item {
     id: stage
 
@@ -1146,6 +1258,13 @@ LayerSurface {
     y: 0
     width: editor.width
     height: editor.height
+    opacity: editor.pushOpacity
+    transform: Scale {
+      origin.x: editor.width / 2 - stage.x
+      origin.y: editor.height / 2 - stage.y
+      xScale: editor.pushScale
+      yScale: editor.pushScale
+    }
 
     Text {
       anchors.centerIn: parent
@@ -2761,6 +2880,15 @@ LayerSurface {
      y: Math.round(editor.height - height - Ui.m + revealOffset)
     width: toolRow.width + midRow.width + actRow.width + Ui.m * 3 + Ui.s
     height: 44
+    // Same pivot as the board, so the toolbar is part of the one group zoom
+    // rather than scaling in place; its own slide rides on top of that.
+    opacity: editor.pushOpacity
+    transform: Scale {
+      origin.x: editor.width / 2 - panel.x
+      origin.y: editor.height / 2 - panel.y
+      xScale: editor.pushScale
+      yScale: editor.pushScale
+    }
     // Corners follow RoundingPolicy (hypr.decoration.rounding).
     radius: RoundingPolicy.radius
     color: Ui.solid("background_1")

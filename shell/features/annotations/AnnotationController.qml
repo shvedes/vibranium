@@ -223,14 +223,11 @@ Item {
     root._overlayId = 0
   }
 
-  // A cancel from the service kills the editor's children: the export it
-  // may be driving is abandoned with it.
+  // A cancel from the service plays the editor's reverse entrance before it
+  // goes, so a dismissed overlay closes like it opened instead of cutting.
   function _destroyEditor(id = 0) {
     const view = root._editor
-    if (view !== null && (id <= 0 || root._editorId === id)) {
-      view._stopProcesses()
-      view.destroy()
-    }
+    if (view !== null && (id <= 0 || root._editorId === id)) view._close()
     root._editor = null
     root._editorId = 0
   }
@@ -244,10 +241,7 @@ Item {
     if (view === null) return
     const id = root._editorId
     AnnotationActions.settle(id, { code: "closed" })
-    if (view._closing !== true) {
-      view._stopProcesses()
-      view.destroy()
-    }
+    if (view._closing !== true) view._close()
     if (root._editor === view) {
       root._editor = null
       root._editorId = 0
