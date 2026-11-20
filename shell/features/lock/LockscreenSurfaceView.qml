@@ -32,13 +32,31 @@ WlSessionLockSurface {
   readonly property bool autohideEnabled: Settings.lockscreenAutohide === true
   readonly property int autohideDelayMs: Settings.lockscreenAutohideDelay * 1000
   property real autohideK: 1
+  // The clock dims to half with the field, keeping one quiet focal point on
+  // the idle screen instead of two bright blocks.
+  property real clockIdleK: 1
 
   Behavior on autohideK {
     enabled: surface.anims
     NumberAnimation {
-      duration: 300
+      duration: 600
+      easing.type: Easing.Linear
+    }
+  }
+
+  // The clock dim runs on its own curve: it settles into the dimmed band
+  // softly while the field stays on a plain linear fade.
+  Behavior on clockIdleK {
+    enabled: surface.anims
+    NumberAnimation {
+      duration: 600
       easing.type: Easing.OutCubic
     }
+  }
+
+  function setIdleFade(faded) {
+    autohideK = faded ? 0 : 1
+    clockIdleK = faded ? 0.5 : 1
   }
 
   // Qualified: qs.services exports a Timer singleton that shadows QtQuick's.
@@ -53,14 +71,14 @@ WlSessionLockSurface {
         autohideTimer.restart()
         return
       }
-      surface.autohideK = 0
+      surface.setIdleFade(true)
     }
   }
 
   // Restores the field and restarts the idle countdown. When the option is
   // off or the surface is hidden the timer stops and the field stays shown.
   function resetAutohide() {
-    surface.autohideK = 1
+    surface.setIdleFade(false)
     if (!surface.autohideEnabled || !surface.visible) {
       autohideTimer.stop()
       return
@@ -442,7 +460,7 @@ WlSessionLockSurface {
     maxHeight: surface.clockMaxH
     withDate: Settings.lockscreenDate
     visible: Settings.lockscreenClock && surface.clockMaxH > 0
-    opacity: panel.appearK
+    opacity: panel.appearK * surface.clockIdleK
   }
 
   // The field itself sits dead center; indicators hang off it absolutely

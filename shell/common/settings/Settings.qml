@@ -290,7 +290,7 @@ Singleton {
   readonly property bool lockscreenAutohide: root.value("shell.lockscreen.autohide") === true
   readonly property int lockscreenAutohideDelay: {
     const v = root.value("shell.lockscreen.autohideDelay")
-    return typeof v === "number" && v >= 5 && v <= 300 ? Math.round(v) : 15
+    return typeof v === "number" && v >= 3 && v <= 300 ? Math.round(v) : 15
   }
   // The always-on copy of the capture dots for when the bar cannot be seen
   // (a fullscreen toplevel covers the bar's Bottom layer surface). Default
