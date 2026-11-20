@@ -33,7 +33,9 @@ Variants {
     visible: WallpaperPicker.visible
     overlayOpen: WallpaperPicker.isOpen
     primary: modelData === Ui.primaryScreen
-    dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
+    // The scrim is inseparable from these full-surface overlays: follow the
+    // dim level but ignore the menu scrim on/off toggle.
+    dim: Settings.menuDimLevel
     wlrNamespace: "vibranium:modal"
     onCloseRequested: WallpaperPicker.close()
 
