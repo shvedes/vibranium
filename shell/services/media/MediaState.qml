@@ -80,13 +80,47 @@ Singleton {
   property var _volumeCaps: Object.create(null)
 
   // True when the player declares a settable Volume (canControl +
-  // volumeSupported) and no verdict has said otherwise. A pure read, so a
-  // surface binds it: a player with no answer reads as capable, and a
-  // player whose recorded answer is "does not take the write" reads as
-  // not. Keyed per dbusName, so a client that leaves takes its answer
+  // volumeSupported), reports a real level, and no verdict has said otherwise.
+  // A pure read, so a surface binds it: a player with no answer reads as
+  // capable, and a player whose recorded answer is "does not take the write"
+  // reads as not. Keyed per dbusName, so a client that leaves takes its answer
   // with it.
+  //
+  // MPRIS reserves a NEGATIVE Volume for "this client does not know its
+  // volume", and NP.normalizeVolume collapses that to 0 - the right number to
+  // paint a bar with, the wrong one to hand back as the player's own level.
+  // NP.volumeKnown is the gate that refuses it (Q6): every writer asks
+  // volumeCapable first, so a wheel step or a slider fill taken off an unknown
+  // read cannot write 0 back and mute a client nobody asked to touch. Zero
+  // passes, because a muted player reporting 0 is reporting a real level.
   function volumeCapable(player) {
     if (!NP.canSetPlayerVolume(player)) return false
+    if (!NP.volumeKnown(player.volume)) return false
     return root._volumeCaps[NP.playerVolumeKey(player)] !== false
+  }
+
+  // The single writer of a player's Volume property. The bar wheel and the
+  // island's slider, wheel and mute pad all land here, so normalization, the
+  // mute-resume token and the transport resume are one implementation rather
+  // than a gesture path plus a second, policy-free writer (XPLAT-1). The
+  // player is explicit because the island can hold a client other than
+  // activePlayer. The gate above refuses a client reporting an unknown level.
+  function setPlayerVolume(player, ratio) {
+    if (!root.volumeCapable(player)) return false
+    if (!isFinite(Number(ratio))) return false
+    const current = NP.normalizeVolume(player.volume)
+    const next = NP.normalizeVolume(ratio)
+    const unmuted = NP.volumeUnmuted(current, next)
+    if (!unmuted && current > 0 && next === 0) NP.setMuteResumePending(player, false)
+    player.volume = next
+    // The mute-restore path is the one place transport starts as a side effect
+    // of a volume write: a client the user stopped stays stopped, and a paused
+    // one resumes - which is exactly the state the mute paused it from.
+    if (unmuted && NP.consumeMuteResume(player)
+      && player.playbackState !== MprisPlaybackState.Stopped
+      && player.canPlay === true) {
+      player.play()
+    }
+    return true
   }
 }

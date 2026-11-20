@@ -269,10 +269,11 @@ Item {
   readonly property bool canLoop: root.player !== null
     && root.player.canControl !== false
     && root.player.loopSupported !== false
-  // The volume gate is the one capability the bus cannot answer: a browser
-  // MPRIS client declares Volume and drops the write, and Quickshell caches
-  // the write the shell made, so both MPRIS flags stay true. MediaState owns
-  // the round trip that settles it; see its volume section.
+  // The volume gate lives in MediaState: the MPRIS flags plus the round trip
+  // that settles a browser client (which declares Volume and drops the write),
+  // and the volumeKnown refusal for a client reporting -1. Every writer in
+  // this card and in the bar goes through MediaState.setPlayerVolume, which
+  // asks the same gate; this property only dims the row.
   readonly property bool canSetVolume: Core.MediaState.volumeCapable(root.player)
   // The player's own length, through the shared accessor MediaState
   // reads. Reading `player.length` raw is what made a live
@@ -451,29 +452,14 @@ Item {
   //
   // A player whose Volume reads -1 means "this client does not know its
   // volume" (see the MPRIS spec), and `NP.normalizeVolume` clamps that to 0 -
-  // so the lane below renders an unknown level as a muted one, and a write
-  // taken from it would set a player to zero. The clamp is load-bearing for
-  // the fill, so it is kept; the log records the raw read instead, which is
-  // how a reader tells "muted" from "unknown".
+  // so the lane below renders an unknown level as a muted one. The clamp is
+  // load-bearing for the fill, so it is kept; MediaState's volumeCapable gate
+  // is what refuses a write derived from that read. The player is passed
+  // explicitly because the island can hold a client other than activePlayer.
   readonly property real playerVolume: root.player !== null ? NP.normalizeVolume(root.player.volume) : 0
 
   function setPlayerVolume(ratio) {
-    if (!root.canSetVolume || !isFinite(Number(ratio))) return false
-    const current = root.playerVolume
-    const next = NP.normalizeVolume(ratio)
-    const unmuted = NP.volumeUnmuted(current, next)
-    if (!unmuted && current > 0 && next === 0) NP.setMuteResumePending(root.player, false)
-    root.player.volume = next
-    // The mute-restore path is the one place that starts transport as a side
-    // effect of a volume write, so it is the one place that reads the
-    // transport state: a client the user has stopped stays stopped, and a
-    // paused one resumes - which is exactly the state the mute paused it from.
-    if (unmuted && NP.consumeMuteResume(root.player)
-      && root.player.playbackState !== MprisPlaybackState.Stopped
-      && root.player.canPlay === true) {
-      root.player.play()
-    }
-    return true
+    return Core.MediaState.setPlayerVolume(root.player, ratio)
   }
   function adjustPlayerVolume(direction) {
     const d = Number(direction)

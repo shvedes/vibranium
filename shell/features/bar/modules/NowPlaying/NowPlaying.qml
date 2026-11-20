@@ -9,7 +9,6 @@ import qs.features.bar
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/capture/ShotLib.js" as ShotLib
 import "../../../../common/text/Format.js" as Format
-import "../../../../common/math/Range.js" as Range
 
 // Now Playing bar module (opt-in, off by default). Shows the active
 // MPRIS track title in the bar; left click opens the island, right click
@@ -565,31 +564,23 @@ CollapsibleSlot {
 
   // Scroll adjusts the active player's own volume (never the system
   // sink) and stays silent: the tooltip already carries the live
-  // volume line, so an OSD for it would only be noise. The island
-  // has no player-volume control and the sink path (Volume.qml via
-  // the Audio service) keeps its own OSD.
+  // volume line, so an OSD for it would only be noise. The sink path
+  // (Volume.qml via the Audio service) keeps its own OSD.
   //
-  // The same gate the island's slider reads: a player that does not take
-  // a volume write would take the scroll and the tooltip line would move
-  // with nothing behind it. Unaccepted, so the scroll falls through to
-  // the module's own handling instead of being swallowed.
+  // The write goes through MediaState.setPlayerVolume - the same primitive
+  // the island's slider uses - so normalization, the mute-resume token and
+  // the transport resume are one implementation, not a gesture path plus a
+  // second policy-free writer. The shared gate also refuses a client that
+  // reports an unknown (-1) level, which a raw clamp would turn into "set
+  // volume to zero". Unaccepted, so the scroll falls through to the module's
+  // own handling instead of being swallowed.
   WheelHandler {
     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
     onWheel: event => {
-      if (!root.player) return
-      if (!root.canSetVolume) {
-        // The gate is MediaState's round trip, not an MPRIS flag, so this is
-        // the one refusal on this path the client never declared: a browser
-        // adapter answers a volume write with success and drops it, and the
-        // scroll would otherwise move the tooltip line with nothing behind it.
-        return
-      }
+      if (!root.canSetVolume) return
       const step = 0.05
       const d = event.angleDelta.y > 0 ? step : -step
-      const cur = Number(root.player.volume ?? 0)
-      if (isNaN(cur)) return
-      const nv = Range.clamp01(cur + d)
-      root.player.volume = nv
+      if (!Core.MediaState.setPlayerVolume(root.player, NP.normalizeVolume(root.player.volume) + d)) return
       event.accepted = true
     }
   }

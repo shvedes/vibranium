@@ -517,59 +517,88 @@ Singleton {
       { urgency: "normal", replaceId: 2, timeoutMs: 8000 })
   }
 
-  // --- actions ---
+  // --- actions ------------------------------------------------------------
+  //
+  // One owner per default-device fact. Every user-facing write of a sink or
+  // source level lands on setSinkVolume/setSourceVolume, and every write of
+  // a mute flag lands on setSinkMuted/setSourceMuted. The island sliders call
+  // the level setters directly so a drag stays synchronous - one node write
+  // per pointer move, no IPC hop - and the verbs below add OSD on top.
+  //
+  // Cancelling a boost fade is part of setSinkVolume, not a caller's job: a
+  // fade tick arriving after a drag would otherwise glide away from the level
+  // the user just chose (XPLAT-2). The mute-lift rule lives here too, so a
+  // step or a drag whose result is above zero is always a request to hear the
+  // device. A result of exactly zero keeps the current mute, which is what
+  // slider-to-zero has always done.
+  function setSinkVolume(v) {
+    if (!root.sink || !root.sink.audio) return
+    root._cancelFade("slider")
+    const next = Range.clamp(Number(v), 0, root.maxVolume)
+    if (!isFinite(next)) return
+    if (root.sink.audio.muted && next > 0) root.setSinkMuted(false)
+    root.sink.audio.volume = next
+  }
+
+  function setSourceVolume(v) {
+    if (!root.source || !root.source.audio) return
+    const next = Range.clamp(Number(v), 0, root.maxSourceVolume)
+    if (!isFinite(next)) return
+    if (root.source.audio.muted && next > 0) root.setSourceMuted(false)
+    root.source.audio.volume = next
+  }
+
+  function setSinkMuted(muted) {
+    if (!root.sink || !root.sink.audio) return
+    root.sink.audio.muted = !!muted
+  }
+
+  function setSourceMuted(muted) {
+    if (!root.source || !root.source.audio) return
+    root.source.audio.muted = !!muted
+  }
 
   function adjustSink(delta) {
     if (!root.sink || !root.sink.audio) return
-    root._cancelFade("adjust")
     // Clamp like bash: beyond the cap snaps to the cap instead of refusing.
-    const next = Range.clamp(root.sink.audio.volume + delta, 0, root.maxVolume)
-    // Any step that leaves the level above zero lifts the mute, whichever way
+    // A step that leaves the level above zero lifts the mute, whichever way
     // the step went: a decrease from a muted device is as much a request to
-    // hear it as an increase is, and it is the rule the sliders already use
-    // (`setOutputVolume`'s `v > 0`). A step down to zero keeps the mute,
-    // because there is nothing to hear and a 0% device should still read as
-    // muted.
-    if (root.sink.audio.muted && next > 0) root.sink.audio.muted = false
-    root.sink.audio.volume = next
+    // hear it as an increase is.
+    root.setSinkVolume(root.sink.audio.volume + delta)
     root._showSinkOSD()
   }
 
   function adjustSource(delta) {
     if (!root.source || !root.source.audio) return
-    // Same rule as adjustSink: any step that leaves the level above zero lifts
-    // the mute, in either direction.
-    const next = Range.clamp(root.source.audio.volume + delta, 0, root.maxSourceVolume)
-    if (root.source.audio.muted && next > 0) root.source.audio.muted = false
-    root.source.audio.volume = next
+    root.setSourceVolume(root.source.audio.volume + delta)
     root._showSourceOSD()
   }
 
   function toggleSinkMute() {
     if (!root.sink || !root.sink.audio) return
-    root.sink.audio.muted = !root.sink.audio.muted
+    root.setSinkMuted(!root.sink.audio.muted)
     root._showSinkOSD()
   }
 
   function toggleSourceMute() {
     if (!root.source || !root.source.audio) return
-    root.source.audio.muted = !root.source.audio.muted
+    root.setSourceMuted(!root.source.audio.muted)
     root._showSourceOSD()
   }
 
   // Absolute set in percent. 0 also mutes (bash set_volume parity);
-  // any other value unmutes.
+  // any other value unmutes. The mute-at-zero is deliberate and stays here:
+  // setSinkVolume(0) from the slider keeps the existing mute, while this verb
+  // explicitly mutes - both render the same off glyph (Q11).
   function setSinkPercent(pct) {
     const p = Math.round(Number(pct))
     if (!(p >= 0) || !(p <= 200)) return
     if (!root.sink || !root.sink.audio) return
-    root._cancelFade("set-percent")
     if (p === 0) {
-      root.sink.audio.volume = 0
-      root.sink.audio.muted = true
+      root.setSinkVolume(0)
+      root.setSinkMuted(true)
     } else {
-      root.sink.audio.volume = Math.min(root.maxVolume, p / 100)
-      root.sink.audio.muted = false
+      root.setSinkVolume(p / 100)
     }
     root._showSinkOSD()
   }
@@ -728,23 +757,20 @@ Singleton {
   // caller: this is the path a volume keypress and `qs ipc call audio volup`
   // both take, and it is the only one in this file whose failure is a return
   // value rather than a silent no-op.
+  //
+  // The rule belongs to adjustSink/adjustSource. This function only translates
+  // the device check and the verb's verdict; even the quiet branch calls the
+  // same primitive, without OSD, instead of restating clamp/mute/fade here.
   function _ipcAdjust(isSink, sign, quiet) {
     const device = isSink ? root.sink : root.source
     if (!device || !device.audio) return "error: no device"
     const d = sign * root.step
     if (isSink) {
-      root._cancelFade("ipc-adjust")
-      const next = Range.clamp(root.sinkVolume + d, 0, root.maxVolume)
-      // The same rule adjustSink applies: a step that leaves the level above
-      // zero lifts the mute, whichever way the step went.
-      if (root.sinkMuted && next > 0) root.sink.audio.muted = false
-      root.sink.audio.volume = next
-      if (!quiet) root._showSinkOSD()
+      if (quiet) root.setSinkVolume(root.sinkVolume + d)
+      else root.adjustSink(d)
     } else {
-      const next = Range.clamp(root.sourceVolume + d, 0, root.maxSourceVolume)
-      if (root.sourceMuted && next > 0) root.source.audio.muted = false
-      root.source.audio.volume = next
-      if (!quiet) root._showSourceOSD()
+      if (quiet) root.setSourceVolume(root.sourceVolume + d)
+      else root.adjustSource(d)
     }
     return "ok"
   }

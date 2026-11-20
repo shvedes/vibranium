@@ -270,23 +270,23 @@ Item {
   readonly property bool outputSilent: root.sink && root.sink.audio
     ? Core.Audio.silentFor(root.outputVolume, root.outputMuted) : false
 
-  // Shared step/max come from the Audio core singleton; sliders still
-  // write node values directly for 1:1 drag latency.
+  // Shared step/max come from the Audio core singleton. The default-device
+  // sliders write through Core.Audio's synchronous setters, so a drag keeps
+  // 1:1 latency (one node write per pointer move, no IPC hop) while the
+  // service remains the one owner of the sink/source facts - notably the
+  // boost-fade cancellation inside setSinkVolume. The stream sliders below
+  // address their own nodes and stay local to this island.
   readonly property real volumeStep: Core.Audio.step
   readonly property real maxVolume: Core.Audio.maxVolume
   readonly property real maxSourceVolume: Core.Audio.maxSourceVolume
   readonly property real streamMax: 1.5
 
   function setOutputVolume(v) {
-    if (!root.sink || !root.sink.audio) return
-    root.sink.audio.volume = Range.clamp(v, 0, root.maxVolume)
-    if (v > 0 && root.sink.audio.muted) root.sink.audio.muted = false
+    Core.Audio.setSinkVolume(v)
   }
 
   function setInputVolume(v) {
-    if (!root.source || !root.source.audio) return
-    root.source.audio.volume = Range.clamp(v, 0, root.maxSourceVolume)
-    if (v > 0 && root.source.audio.muted) root.source.audio.muted = false
+    Core.Audio.setSourceVolume(v)
   }
 
   // The device switch, unchanged: the backend's own preferred-device write
@@ -929,9 +929,7 @@ Item {
           MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              if (root.sink && root.sink.audio) root.sink.audio.muted = !root.sink.audio.muted
-            }
+            onClicked: Core.Audio.toggleSinkMute()
           }
         }
 
@@ -1020,9 +1018,7 @@ Item {
           MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              if (root.source && root.source.audio) root.source.audio.muted = !root.source.audio.muted
-            }
+            onClicked: Core.Audio.toggleSourceMute()
           }
         }
         Item {
