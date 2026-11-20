@@ -256,12 +256,16 @@ function fileUri(path) {
   return FileUri.toUri(path, { keepExisting: true, blankNull: true })
 }
 
-// Binary image offer: the file's own bytes go to wl-copy through a shell
-// redirection, so the paste target receives an image rather than a location.
-// wl-copy buffers stdin before it claims the selection, so a one-shot caller
-// may delete the source once the child exits successfully.
+// Chromium and Electron paste targets (browsers, Discord) only recognise
+// image/png on the Wayland clipboard, and wl-copy offers a single MIME type.
+// Offer PNG for every image: PNG files go straight through, other formats
+// are transcoded by magick streaming to stdout, so no intermediate file is
+// created and the source stays untouched. wl-copy buffers stdin before it
+// claims the selection, so a one-shot caller may delete the source on exit.
 function copyImageCmd(path) {
-  return ["sh", "-c", "wl-copy --type " + sq(mimeForPath(path)) + " < " + sq(path)]
+  if (mimeForPath(path) === "image/png")
+    return ["sh", "-c", "wl-copy --type image/png < " + sq(path)]
+  return ["sh", "-c", "magick " + sq(path) + " png:- | wl-copy --type image/png"]
 }
 
 // Label map identical to the bash tool's notify() case list.

@@ -1250,7 +1250,7 @@
                 {
                     "key": "shell.screenshots.fileType",
                     "type": "string",
-                    "default": "jpeg",
+                    "default": "png",
                     "label": "File type",
                     "sub": "Default filetype",
                     "desc": "Default filetype.",

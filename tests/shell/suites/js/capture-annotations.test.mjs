@@ -966,21 +966,24 @@ group('fileUri percent-encodes each segment and keeps one scheme', () => {
     (v) => decodeURIComponent(v.slice('file://'.length)) === '/tmp/a b.png', 'decodes to the input')
 })
 
-group('copyImageCmd offers the image bytes through wl-copy', () => {
-  eq('a png path', SL.copyImageCmd('/tmp/a.png'), ['sh', '-c', "wl-copy --type 'image/png' < '/tmp/a.png'"])
-  eq('a jpeg path', SL.copyImageCmd('/tmp/a.jpeg')[2], "wl-copy --type 'image/jpeg' < '/tmp/a.jpeg'")
-  eq('a jpg path', SL.copyImageCmd('/tmp/a.jpg')[2], "wl-copy --type 'image/jpeg' < '/tmp/a.jpg'")
-  eq('a path with a space is quoted', SL.copyImageCmd('/tmp/a b.png')[2], "wl-copy --type 'image/png' < '/tmp/a b.png'")
-  eq('a quote in the path is escaped for the shell', SL.copyImageCmd("/tmp/it's.png")[2], "wl-copy --type 'image/png' < '/tmp/it'\\''s.png'")
+group('copyImageCmd offers image/png to every paste target', () => {
+  eq('a png path is offered directly', SL.copyImageCmd('/tmp/a.png'), ['sh', '-c', "wl-copy --type image/png < '/tmp/a.png'"])
+  eq('a jpeg path is transcoded to png', SL.copyImageCmd('/tmp/a.jpeg')[2], "magick '/tmp/a.jpeg' png:- | wl-copy --type image/png")
+  eq('a jpg path is transcoded to png', SL.copyImageCmd('/tmp/a.jpg')[2], "magick '/tmp/a.jpg' png:- | wl-copy --type image/png")
+  eq('a webp path is transcoded to png', SL.copyImageCmd('/tmp/a.webp')[2], "magick '/tmp/a.webp' png:- | wl-copy --type image/png")
+  eq('a path with a space is quoted', SL.copyImageCmd('/tmp/a b.png')[2], "wl-copy --type image/png < '/tmp/a b.png'")
+  eq('a quote in the path is escaped for the shell', SL.copyImageCmd("/tmp/it's.png")[2], "wl-copy --type image/png < '/tmp/it'\\''s.png'")
+  eq('a quote in a transcoded path is escaped', SL.copyImageCmd("/tmp/it's.jpg")[2], "magick '/tmp/it'\\''s.jpg' png:- | wl-copy --type image/png")
   eq('exactly three argv entries', SL.copyImageCmd('/tmp/a.png').length, 3)
   eq('it runs through sh -c', SL.copyImageCmd('/tmp/a.png').slice(0, 2), ['sh', '-c'])
-  contains('the media type is named', SL.copyImageCmd('/tmp/a.png')[2], '--type \'image/png\'')
-  contains('the file is redirected into wl-copy', SL.copyImageCmd('/tmp/a.png')[2], " < '/tmp/a.png'")
+  contains('the media type is always png', SL.copyImageCmd('/tmp/a.jpg')[2], 'wl-copy --type image/png')
+  contains('a png file is redirected into wl-copy', SL.copyImageCmd('/tmp/a.png')[2], " < '/tmp/a.png'")
   // The path reaches the shell as one single-quoted word, so the
   // metacharacters stay literal arguments rather than shell syntax.
   const nasty = SL.copyImageCmd("/tmp/a'b\"c;d`e$f.png")[2]
-  eq('shell metacharacters stay inside single quotes', nasty, "wl-copy --type 'image/png' < '/tmp/a'\\''b\"c;d`e$f.png'")
-  eq('no pipe is used', nasty.split('|').length - 1, 0)
+  eq('shell metacharacters stay inside single quotes', nasty, "wl-copy --type image/png < '/tmp/a'\\''b\"c;d`e$f.png'")
+  eq('no pipe is used for a png', nasty.split('|').length - 1, 0)
+  eq('one pipe is used for a transcode', SL.copyImageCmd('/tmp/a.jpg')[2].split('|').length - 1, 1)
   eq('an empty path still yields a command', SL.copyImageCmd('').length, 3)
   eq('a null path still yields a command', SL.copyImageCmd(null).length, 3)
 })

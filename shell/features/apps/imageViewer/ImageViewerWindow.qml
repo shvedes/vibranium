@@ -676,16 +676,14 @@ QtObject {
     return true
   }
 
-  // The picture's own bytes, offered under the format's media type: a paste
-  // target that accepts an image receives the image, not a location. wl-copy
-  // reads the file through a redirection, so the bytes never pass through this
-  // process, and the MIME table is the same one the status dot colors from.
+  // The picture's bytes as image/png, so Chromium and Electron paste targets
+  // accept them too. ShotLib transcodes non-PNG formats through magick.
   function copyImage() {
     const path = root.currentPath
     const mime = Meta.mimeType(root.currentFileName)
     root.closeMenu()
     if (path === "" || mime === "") return false
-    Exec.run(["sh", "-c", "wl-copy --type " + ShotLib.sq(mime) + " < " + ShotLib.sq(path)])
+    Exec.run(ShotLib.copyImageCmd(path))
     return true
   }
 

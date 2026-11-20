@@ -14,7 +14,7 @@ The picker overlay (`super+shift+s`) still takes an exclusive claim and dismisse
 
 Because nothing is dismissed, anything open is recorded. Leave the pass and clipboard panels closed when you use it.
 
-Capture uses Quickshell screencopy for the frozen frame and Qt for PNG/JPEG encoding. ImageMagick performs the exact physical-pixel crop for selected regions, and `wl-copy` offers the finished image as raw `image/png` or `image/jpeg` data. Region selection crops the same pre-overlay frame the user selected, including at fractional display scales.
+Capture uses Quickshell screencopy for the frozen frame and Qt for PNG/JPEG encoding. ImageMagick performs the exact physical-pixel crop for selected regions, and `wl-copy` offers the finished image as raw `image/png` data, transcoding JPEG captures on the way out so browsers and Electron apps accept the paste. Region selection crops the same pre-overlay frame the user selected, including at fractional display scales.
 
 With **Save to disk** on, a screenshot without auto-annotate is saved to `~/Pictures/Screenshots` (respects `XDG_PICTURES_DIR`) and copied to the clipboard. With **Save to disk** off, it is kept only for the clipboard offer. With auto-annotate, no final file is created up front: Save always writes to the screenshots folder while auto-annotate is on, and the clipboard offer still applies. Cancelling drops it silently. **Save to disk** is listed under **Auto-annotate** in the settings and is disabled while auto-annotate is on; the stored choice applies again once auto-annotate is turned off.
 
@@ -24,7 +24,7 @@ With **Save to disk** on, a screenshot without auto-annotate is saved to `~/Pict
 
 | Setting | Options / notes |
 |---|---|
-| File type | `jpeg` (default), `png` |
+| File type | `png` (default), `jpeg` |
 | Notification | Notify when taking screenshots |
 | Auto-annotate | Open the annotation overlay after every capture (see below) |
 | Save to disk | On by default. Off = clipboard only. Listed under Auto-annotate and disabled while it is on, where Save always writes to the screenshots folder |
