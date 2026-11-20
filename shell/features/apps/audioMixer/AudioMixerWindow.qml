@@ -1534,6 +1534,13 @@ QtObject {
       // input at all, so a bubble under the cursor is still a click on whatever
       // is beneath it - a tooltip that swallowed the click would be the one
       // control on this window that takes a gesture and gives nothing back.
+      // The shadow is a sibling declared first: the bubble is a plain
+      // Rectangle that takes no input, and the halo must not dim its text.
+      SoftShadow {
+        host: tipBox
+        blur: 8
+      }
+
       Rectangle {
         id: tipBox
 

@@ -3011,8 +3011,16 @@ LayerSurface {
   }
 
   // Hover tooltip, declared last so it paints above the panel it
-  // describes. Positioned above the hovered control.
+  // describes. Positioned above the hovered control. The shared halo is
+  // declared with it so the bubble reads at the same depth as the other
+  // elevated surfaces, painting behind the tooltip's own fill.
+  SoftShadow {
+    host: tipBubble
+    blur: 8
+  }
+
   Rectangle {
+    id: tipBubble
 
     property var anchorItem: editor._tipAnchor
 

@@ -5,9 +5,10 @@ import QtQuick.Effects
 import qs.common
 
 // The shell's single soft elevation halo: a directionless shadow that copies
-// its host's geometry. Used by the menu's nested cursor bars and by inline
-// notices so both read at the same depth. Declare it before the host, as a
-// sibling, so the halo paints behind the surface rather than over it.
+// its host's geometry. Used by the menu's nested cursor bars, inline notices,
+// and the shell's tooltip bubbles so every hint reads at the same depth.
+// Declare it before the host, as a sibling, so the halo paints behind the
+// surface rather than over it.
 RectangularShadow {
   id: root
 

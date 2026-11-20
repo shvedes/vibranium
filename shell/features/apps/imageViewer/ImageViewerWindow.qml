@@ -255,7 +255,12 @@ QtObject {
     // Below the button, not above. Both bars are anchored near the top of the
     // window, so a hint above runs off the edge and is clipped; below, the
     // middle of the window is there to be drawn on.
+    SoftShadow {
+      host: btnHint
+      blur: 8
+    }
     HintBubble {
+      id: btnHint
       anchorItem: btn
       label: btn.tip
       open: ma.containsMouse
@@ -345,7 +350,12 @@ QtObject {
     // The hover hint, built the same way as `Btn`'s: plain items rather than
     // `QtQuick.Controls.ToolTip`, which this tree cannot import. Below the
     // button, for the reason on `Btn`'s.
+    SoftShadow {
+      host: ibtnHint
+      blur: 8
+    }
     HintBubble {
+      id: ibtnHint
       anchorItem: ibtn
       label: ibtn.tip
       open: ima.containsMouse

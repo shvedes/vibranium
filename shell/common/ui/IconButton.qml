@@ -239,7 +239,16 @@ Item {
   // viewport top and the island border. The row band is taller than the
   // bubble, so the leftward bubble never touches a clip boundary: it
   // briefly paints over the row's own text instead.
+  // The shared halo on the tighter tooltip profile lifts it off the row;
+  // declared first so it paints behind the surface, and the bubble is rounded
+  // so the two shapes agree.
+  SoftShadow {
+    host: tipBubble
+    blur: 8
+  }
+
   Rectangle {
+    id: tipBubble
 
     visible: root._tipShown && root.tipText !== "" && root.live
     anchors.right: parent.left
@@ -248,6 +257,7 @@ Item {
     width: Math.min(tipLabel.implicitWidth + 2 * Ui.s, 240)
     height: tipLabel.implicitHeight + Ui.s
     z: 100
+    radius: RoundingPolicy.radius
     color: Ui.solid("background_0")
     border.width: 1
     border.color: Ui.solid("background_3")

@@ -272,6 +272,17 @@ LayerSurface {
   surface: "vibranium:hud"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
+  // The shell's soft halo on the tighter tooltip profile: a shorter blur so
+  // it does not spread far past a small bubble. Its opacity tracks the bubble's
+  // placement gate so the unplaced frames at 0,0 paint neither the surface nor
+  // a stray smudge of shadow. Declared before the bubble so the halo sits
+  // behind it.
+  SoftShadow {
+    host: bubble
+    opacity: bubble.opacity
+    blur: 8
+  }
+
   Rectangle {
     id: bubble
 

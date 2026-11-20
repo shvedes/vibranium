@@ -159,6 +159,13 @@ Item {
   // self-contained picture of the vocabulary, it shares nothing with the canvas
   // but the row it hangs under, and a second copy here would be two
   // descriptions of one legend, free to disagree about a color or a gesture.
+  // It is a tooltip bubble, so it lifts off the canvas with the same halo the
+  // other hint surfaces use; declared first so the halo paints behind it.
+  SoftShadow {
+    host: legend
+    blur: 8
+  }
+
   GraphLegend {
     id: legend
 
