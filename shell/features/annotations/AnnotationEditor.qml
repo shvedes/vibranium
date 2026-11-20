@@ -258,8 +258,8 @@ LayerSurface {
   // shorter clock so the desktop is uncovered quickly while the settle keeps
   // going. Both start as the surface maps, not after the image decodes. With
   // animations off they snap to rest.
-  readonly property int arrivalMs: 400
-  readonly property int fadeMs: Ui.normalMs
+  readonly property int arrivalMs: 320
+  readonly property int fadeMs: 150
   property real pushScale: 1
   property real pushOpacity: 1
 
