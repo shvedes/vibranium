@@ -1441,6 +1441,17 @@
                 },
                 {
                     "type": "group",
+                    "id": "lockAutohide",
+                    "label": "Password field",
+                    "sub": "Idle fade and its delay",
+                    "icon": "lock",
+                    "children": [
+                        "shell.lockscreen.autohide",
+                        "shell.lockscreen.autohideDelay"
+                    ]
+                },
+                {
+                    "type": "group",
                     "id": "lockBackdrop",
                     "label": "Backdrop",
                     "sub": "Wallpaper, blur and dimming",
@@ -1608,6 +1619,34 @@
                     "label": "Pause music on lock",
                     "sub": "(un)pause media automatically",
                     "desc": "Automatically (un)pause music when (un)locking."
+                },
+                {
+                    "key": "shell.lockscreen.autohide",
+                    "type": "bool",
+                    "default": false,
+                    "label": "Autohide field",
+                    "sub": "Fade the password box when idle",
+                    "desc": "Fades the password box out after a period of inactivity. Typing brings it back."
+                },
+                {
+                    "key": "shell.lockscreen.autohideDelay",
+                    "type": "int",
+                    "default": 15,
+                    "label": "Autohide delay",
+                    "sub": "Seconds of inactivity before fading",
+                    "desc": "How long without typing before the password box fades away.",
+                    "showIf": [
+                        {
+                            "key": "shell.lockscreen.autohide",
+                            "eq": true
+                        }
+                    ],
+                    "range": {
+                        "min": 5,
+                        "max": 300
+                    },
+                    "step": 5,
+                    "unit": "s"
                 }
             ]
         },

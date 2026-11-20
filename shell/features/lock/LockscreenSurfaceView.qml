@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
+import QtQuick as QQ
 import QtQuick.Effects
 import Quickshell.Wayland
 import qs.common
@@ -23,6 +24,49 @@ WlSessionLockSurface {
   // chip and layout hint) animate unconditionally. Follows the global
   // animation switch.
   readonly property bool anims: MotionPolicy.enabled
+
+  // Password field autohide. Only opacity changes, so the input keeps focus
+  // and hit-testing while invisible and a fade can never swallow a keystroke.
+  // The countdown is re-armed by password edits, which Lockscreen mirrors to
+  // every surface, so typing on one screen keeps all of them revealed.
+  readonly property bool autohideEnabled: Settings.lockscreenAutohide === true
+  readonly property int autohideDelayMs: Settings.lockscreenAutohideDelay * 1000
+  property real autohideK: 1
+
+  Behavior on autohideK {
+    enabled: surface.anims
+    NumberAnimation {
+      duration: 300
+      easing.type: Easing.OutCubic
+    }
+  }
+
+  // Qualified: qs.services exports a Timer singleton that shadows QtQuick's.
+  QQ.Timer {
+    id: autohideTimer
+    interval: surface.autohideDelayMs
+    repeat: false
+
+    onTriggered: {
+      if (!surface.autohideEnabled || !surface.visible) return
+      if (Lockscreen.authenticating) {
+        autohideTimer.restart()
+        return
+      }
+      surface.autohideK = 0
+    }
+  }
+
+  // Restores the field and restarts the idle countdown. When the option is
+  // off or the surface is hidden the timer stops and the field stays shown.
+  function resetAutohide() {
+    surface.autohideK = 1
+    if (!surface.autohideEnabled || !surface.visible) {
+      autohideTimer.stop()
+      return
+    }
+    autohideTimer.restart()
+  }
 
   // Backdrop source for this surface. "none" is a deliberate absence: the
   // plain theme color paints and no backdrop layer is built at all.
@@ -102,7 +146,10 @@ WlSessionLockSurface {
   Component.onCompleted: surface.grabFocus()
 
   onVisibleChanged: {
-    if (!visible) return
+    if (!visible) {
+      autohideTimer.stop()
+      return
+    }
     // Fresh inhibitor registry for the sleep hint: covers a caffeine
     // toggle (or any other app grabbing/releasing a lock) since the
     // last periodic refresh.
@@ -113,6 +160,7 @@ WlSessionLockSurface {
 
   function grabFocus() {
     authBox.grabFocus()
+    surface.resetAutohide()
   }
 
   // Backdrop never animates: blur covers from its first captured frame, so
@@ -165,10 +213,22 @@ WlSessionLockSurface {
     }
 
     function onPasswordChanged() {
+      // A real keystroke reaches every surface through the mirrored password,
+      // so the field reappears and the idle countdown restarts everywhere.
+      surface.resetAutohide()
       // Programmatic assignment never fires edited, so sibling-screen syncs
       // and resets stay silent by construction.
       if (authBox.text === Lockscreen.password) return
       authBox.text = Lockscreen.password
+    }
+  }
+
+  Connections {
+    target: Settings
+
+    function onOptionChanged(key, _) {
+      if (key === "shell.lockscreen.autohide" || key === "shell.lockscreen.autohideDelay")
+        surface.resetAutohide()
     }
   }
 
@@ -406,7 +466,9 @@ WlSessionLockSurface {
     anchors.centerIn: parent
     width: authBox.width
     height: authBox.height
-    opacity: appearK
+    // The entry fade and the idle autohide multiply into one opacity; neither
+    // touches visibility or enabled, so the field stays interactive throughout.
+    opacity: appearK * surface.autohideK
     scale: 0.94 + 0.06 * appearK
 
     PasswordBox {
