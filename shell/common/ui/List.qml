@@ -123,17 +123,26 @@ ListView {
   // bar motion can never race or drift the scroll position (nothing writes
   // contentY from an estimate of where the cursor is).
   highlightFollowsCurrentItem: false
-  // Stillness gate: zero the bar's tween across a landing and while any live
-  // window owns the view. The hold is released by the live edges that end a
-  // landing - a user step or click, a swap window closing, a restore sweep
-  // ending - never by polling the layout or guessing at when a flight landed.
-  // It survives until one of those edges, so a consumer that pins the bar a
-  // few turns after the seat still reads a bar that has not glided away.
+  // Stillness gate: zero the bar's tween ONLY across a landing (and while a
+  // swap or restore sweep owns the view). The hold is released by the live
+  // edges that end a landing - a user step or click, a swap window closing,
+  // a restore sweep ending - never by polling the layout or guessing at when
+  // a flight landed.
+  //
+  // It must NOT also key off `scrollAnim.running` or `moving`. A user step
+  // starts its own content tween (the center-follow seat), so those live
+  // signals are high through every follow - including every leg of a held
+  // key. Zeroing the bar there snaps it a whole row the instant the index
+  // changes while the content still eases that row in, so the highlight
+  // jumps to the next target and then drifts with it instead of holding the
+  // viewport centre while the rows slide through it. _sweepMs and _holdLegMs
+  // give the bar the content's own duration and curve for exactly that motion;
+  // this gate is only for landings, which acquire _landHold explicitly
+  // (see seat()).
   property bool _landHold: false
   readonly property int _stillLease: root._landHold ? 1 : 0
   readonly property bool _seatsInstant: root._landHold
     || root._inSwap || root._sweeping
-    || scrollAnim.running || root.moving
   function _stillAcquire() {
     root._landHold = true
   }

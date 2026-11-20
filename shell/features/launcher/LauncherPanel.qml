@@ -691,9 +691,13 @@ PanelCard {
   property alias mode: focusCtrl.mode
 
   function currentRow() { return list.currentItem }
-  function moveSelection(direction) {
+  function moveSelection(direction, autoRepeat) {
     const prev = panel.currentRow()
-    if (!list.move(direction)) return
+    // A held key re-arms the follow before the last leg can land. Passing the
+    // repeat through lets List take one short leg with the bar, so the cursor
+    // stays pinned to the viewport centre while the rows slide through it
+    // (menu parity - without this the bar drifts off centre on a fast hold).
+    if (!list.move(direction, undefined, autoRepeat === true)) return
     if (prev && panel.currentRow() !== prev) panel.closeTrailingInfo()
   }
 
@@ -850,13 +854,13 @@ PanelCard {
           if (k !== Qt.Key_Tab) break
           panel.closeDelete()
         }
-        panel.moveSelection(1); event.accepted = true; return
+        panel.moveSelection(1, event.isAutoRepeat === true); event.accepted = true; return
       case "prev":
         if (panel._deleteIndex >= 0) {
           if (k !== Qt.Key_Backtab) break
           panel.closeDelete()
         }
-        panel.moveSelection(-1); event.accepted = true; return
+        panel.moveSelection(-1, event.isAutoRepeat === true); event.accepted = true; return
       case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
       case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
       case "first": panel.jumpEnd(false); event.accepted = true; return
