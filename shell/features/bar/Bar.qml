@@ -6,6 +6,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.common
+import qs.services as Core
 import qs.features.bar
 import qs.features.bar.modules.Clock
 import qs.features.bar.modules.KeyboardLayout
@@ -1014,6 +1015,7 @@ Singleton {
       ]
     })
     Registry.register(root.tag, root)
+    Registry.register("lyrics", root)
     // Modules render group members through memberComponent; the layout only
     // ever holds standalone slots + group keys.
     root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, archUpdates: archUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, logout: logoutComp, tray: trayComp, downloader: downloaderComp }
@@ -1075,6 +1077,7 @@ Singleton {
     root._releaseMenuProviders()
     for (const id of root._gatedIds) UnitGate.releaseOwner(root._gateOwner(id))
     DesktopLayoutState.releaseBarLayout(root)
+    Registry.unregister("lyrics")
     Registry.unregister(root.tag)
   }
 
@@ -1593,8 +1596,34 @@ Singleton {
     root.publishDesktopLayout()
     if (!root.effectiveEnabled) root.cancelBarMove()
   }
-  onEffectiveEnabledChanged: root.publishDesktopLayout()
+  onEffectiveEnabledChanged: {
+    root.publishDesktopLayout()
+    if (!root.effectiveEnabled) lyricsOverlay.close()
+  }
   onPositionChanged: root.publishDesktopLayout()
+
+  // The fullscreen lyrics window has one owner: the Now Playing module loads
+  // per bar and is absent while disabled, so neither it nor a keybind can be
+  // the target the Utilities menu calls. The singleton owns the surface and
+  // the `lyrics` Registry name, the same shape colorPicker uses below. A
+  // caller from the island hands in its client and screen; the menu hands in
+  // neither and gets the shell's active MPRIS client on the primary screen.
+  LyricsFullscreenOverlay {
+    id: lyricsOverlay
+
+    targetScreen: Ui.primaryScreen
+  }
+
+  function showLyrics(player, screen) {
+    const fromIsland = player !== null && player !== undefined
+    const p = fromIsland ? player : Core.MediaState.activePlayer
+    if (p === null || p === undefined) return false
+    if (!fromIsland && !Core.MediaState.hasActivePlayer) return false
+    lyricsOverlay.targetScreen = screen !== null && screen !== undefined
+      ? screen : Ui.primaryScreen
+    lyricsOverlay.open(p)
+    return true
+  }
 
   // --- per-module IPC bridge: colorPicker ---
   // The ColorPicker module instantiates once per bar window (per monitor),

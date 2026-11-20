@@ -42,6 +42,27 @@ Singleton {
     ? String(root.activePlayer.trackArtUrl ?? "")
     : ""
 
+  // A client that has stopped is still in the MPRIS set, but it has no track
+  // for a lyrics view to open. Playing and paused are the two states that
+  // carry one; the head of the sorted set is the client surfaces should use.
+  readonly property bool hasActivePlayer: {
+    const p = root.activePlayer
+    return p !== null && p !== undefined && p.playbackState !== MprisPlaybackState.Stopped
+  }
+
+  // Menu provider for the Utilities "Show Lyrics" row. The row stays listed
+  // and mutes while there is no usable client, the same shape every other
+  // state-gated row uses: reading hasActivePlayer inside the hook makes the
+  // delegate's availability binding follow MPRIS without a shell guard.
+  function _registerMenuProvider() {
+    ProviderHost.claimProvider("show.lyrics", {
+      visible: () => root.hasActivePlayer
+    }, root)
+  }
+
+  Component.onCompleted: root._registerMenuProvider()
+  Component.onDestruction: ProviderHost.unregisterProvider("show.lyrics", root)
+
   // --- external volume control -------------------------------------------
   //
   // Whether a player takes a volume write is the player's own declaration:

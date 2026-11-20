@@ -6115,6 +6115,15 @@
                     "disabled": "! { mpc status 2>/dev/null; playerctl status 2>/dev/null; } | grep -qiE '\\[playing\\]|^Playing'"
                 },
                 {
+                    "id": "show.lyrics",
+                    "type": "action",
+                    "label": "Show Lyrics",
+                    "sub": "Open the current track's lyrics",
+                    "icon": "music",
+                    "call": "lyrics showLyrics",
+                    "close": true
+                },
+                {
                     "type": "separator"
                 },
                 {

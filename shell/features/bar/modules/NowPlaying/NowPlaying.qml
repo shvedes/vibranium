@@ -554,7 +554,7 @@ CollapsibleSlot {
       // showing the same track with no way back to it.
       onLyricsFullscreenRequested: {
         root.closeIsland()
-        lyricsOverlay.open(island.player)
+        Bar.showLyrics(island.player, ShotLib.matchScreen(root.barScreen, Ui.validScreens))
       }
     }
   }
@@ -562,24 +562,6 @@ CollapsibleSlot {
   // The island this module opens, declared on the base so openIsland()
   // below is the single call every click handler makes.
   islandComponent: islandComp
-
-  // Fullscreen lyrics, owned here (sibling to the island, like the network
-  // QR overlay): the island's cover asks for it while its transcript is up.
-  // The surface outlives the island, so it is handed the client itself.
-  LyricsFullscreenOverlay {
-    id: lyricsOverlay
-
-    targetScreen: ShotLib.matchScreen(root.barScreen, Ui.validScreens)
-  }
-
-  // A hidden bar must not leave the fullscreen transcript floating on screen.
-  Connections {
-    target: Bar
-
-    function onEnabledChanged() {
-      if (!Bar.enabled) lyricsOverlay.close()
-    }
-  }
 
   // Scroll adjusts the active player's own volume (never the system
   // sink) and stays silent: the tooltip already carries the live

@@ -28,3 +28,7 @@ This works with both regular players (via playerctl) and **MPD** (via mpc, if in
 When something is playing, the "**Copy Current Track**" entry in the Utilities menu will appear.
 When selected, the URI, URL, or FILE of the currently playing track will be copied to clipboard,
 making it easy to share your music with friends.
+
+The "**Show Lyrics**" entry in the Utilities menu opens the fullscreen, synced lyrics view for the
+current track and closes the menu. It is usable whenever an MPRIS client is playing or paused,
+regardless of whether the Now Playing bar module is enabled.
