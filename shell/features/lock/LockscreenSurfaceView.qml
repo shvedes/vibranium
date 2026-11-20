@@ -234,6 +234,8 @@ WlSessionLockSurface {
       // theme color instantly, whatever the source resolution, and fades
       // the wallpaper in when it lands; with animations off it snaps.
       Image {
+        id: backdropImage
+
         anchors.fill: parent
         visible: surface.backgroundMode === "background"
         source: Lockscreen.backdropPath !== "" ? Paths.toFileUrl(Lockscreen.backdropPath) : ""
@@ -246,6 +248,33 @@ WlSessionLockSurface {
             duration: 500
             easing.type: Easing.OutCubic
           }
+        }
+        // The downloader preview's arrival, reversed: the frame spawns
+        // slightly zoomed and pushes itself back to fit, so a settled
+        // wallpaper keeps its real dimensions.
+        onStatusChanged: {
+          if (status !== Image.Ready || source.toString() === "") {
+            fitAnim.stop()
+            scale = 1
+            return
+          }
+          if (!surface.anims) {
+            scale = 1
+            return
+          }
+          scale = 1.06
+          fitAnim.restart()
+        }
+
+        NumberAnimation {
+          id: fitAnim
+
+          target: backdropImage
+          property: "scale"
+          from: 1.08
+          to: 1
+          duration: 700
+          easing.type: Easing.OutCubic
         }
         // A session lock surface is not a Quickshell window and carries no
         // devicePixelRatio of its own, so the ratio is the one Qt reports for
