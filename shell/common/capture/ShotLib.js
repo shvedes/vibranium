@@ -18,12 +18,7 @@
 
 .import "../collections/StoreGuards.js" as StoreGuards
 .import "../text/StringUtils.js" as SU
-.import "../text/Format.js" as Format
 .import "../text/FileUri.js" as FileUri
-
-function _pad(n) {
-  return Format.pad2(n)
-}
 
 // Qt's device pixel ratio, floored at 1 when the platform reports nothing
 // usable. Used to size a grab target, never to map coordinates.
@@ -196,16 +191,10 @@ function grabResultSize(targetW, targetH, windowDpr) {
   }
 }
 
-// "2026-09-11_14-22-05": manual Date math, identical shape to the bash
-// tool's %(%Y-%m-%d_%H-%M-%S)T. Never toLocaleString (locale-dependent).
-function timestamp() {
-  const d = new Date()
-  return d.getFullYear() + "-" + _pad(d.getMonth() + 1) + "-" + _pad(d.getDate())
-    + "_" + _pad(d.getHours()) + "-" + _pad(d.getMinutes()) + "-" + _pad(d.getSeconds())
-}
-
-function fileStem() {
-  return "screenshot-" + timestamp()
+// Epoch milliseconds keep capture names unique across sessions without a
+// counter. The clock is passed in by the caller when it has already read it.
+function fileStem(ms) {
+  return "screenshot-" + String(ms == null ? Date.now() : ms)
 }
 
 // Canvas.save() picks the encoder from the file suffix; "jpg" (not

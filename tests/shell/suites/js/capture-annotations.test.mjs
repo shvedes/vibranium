@@ -817,17 +817,12 @@ group('seedRegionIdentity additionally matches the seed by identity and url', ()
 // ---------------------------------------------------------------------------
 section('ShotLib - naming, suffixes and mimes')
 
-group('timestamp is manual Date math in the bash tool shape', () => {
-  // Never toLocaleString: the name has to sort identically in every locale.
-  match('the documented shape', SL.timestamp(), /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/)
-  match('the year matches the clock', SL.timestamp(), new RegExp(`^${new Date().getFullYear()}-`))
-  eq('two-digit padding', SL._pad(5), '05')
-  eq('two digits stay two digits', SL._pad(15), '15')
-  eq('a single digit is padded to two', SL._pad(0), '00')
-  eq('three digits are not truncated', SL._pad(100), '100')
-  match('fileStem is the timestamp behind a prefix', SL.fileStem(), /^screenshot-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/)
-  contains('fileStem carries the same timestamp', SL.fileStem(), SL.timestamp().slice(0, 4))
-  notMatch('no locale punctuation leaks in', SL.timestamp(), /[,\s]|AM|PM/)
+group('fileStem is a bare epoch millisecond identity', () => {
+  eq('the caller-supplied epoch is the whole stem', SL.fileStem(1795179127733), 'screenshot-1795179127733')
+  match('a default stem is the prefix plus epoch milliseconds', SL.fileStem(), /^screenshot-\d{13}$/)
+  eq('a zero epoch still yields a name', SL.fileStem(0), 'screenshot-0')
+  match('null falls back to the clock', SL.fileStem(null), /^screenshot-\d{13}$/)
+  notMatch('the epoch carries only digits', SL.fileStem().slice('screenshot-'.length), /[^\d]/)
 })
 
 group('the suffix is the one Canvas.save checks, and it is jpg not jpeg', () => {

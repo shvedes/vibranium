@@ -95,7 +95,6 @@ Singleton {
   property int _jobSeq: 0
   property int _activeJob: 0
   property int _editorUid: -1
-  readonly property string _sessionId: Quickshell.processId + "-" + Date.now()
 
   onSessionLockedChanged: {
     if (sessionLocked) root._cancelActiveFlow("session-locked")
@@ -832,13 +831,9 @@ Singleton {
     Registry.unregister("screenshots")
   }
 
-  // Monotonic capture sequence: fileStem() resolves seconds, so two
-  // captures within one second would share a name without this.
-  property int _shotSeq: 0
-
+  // Epoch milliseconds identify a capture without a per-session counter.
   function _nextStem() {
-    root._shotSeq++
-    return ShotLib.fileStem() + "-" + root._sessionId + "-" + root._shotSeq
+    return ShotLib.fileStem()
   }
 
   property var _activeShot: null
