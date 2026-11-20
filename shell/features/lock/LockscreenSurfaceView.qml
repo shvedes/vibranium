@@ -318,6 +318,8 @@ WlSessionLockSurface {
   // Vignette: radial edge darkening over any backdrop. Drawn outside the
   // captured/blurred layer so it stays crisp no matter the source or blur -
   // the dim rectangle and blur only ever touch the backdrop beneath it.
+  // "none" paints the plain theme color, so there is no backdrop to darken and
+  // the loader stays inactive regardless of the configured level.
   // Lazy: nothing instantiates while the level is off, and async load
   // keeps first paint off the Shape tessellation path - which is also why a
   // locked screen can paint one frame without the vignette and settle into it
@@ -334,7 +336,7 @@ WlSessionLockSurface {
   // slot in the paint order because its item is a child of the Loader.
   Loader {
     anchors.fill: parent
-    active: surface.vignetteK > 0
+    active: surface.backgroundMode !== "none" && surface.vignetteK > 0
     asynchronous: true
 
     // The shared vignette draws the gradient; the surface only decides how
