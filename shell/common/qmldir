@@ -78,6 +78,7 @@ Card 1.0 ui/Card.qml
 ContextMenu 1.0 ui/ContextMenu.qml
 Notice 1.0 ui/Notice.qml
 SoftShadow 1.0 ui/SoftShadow.qml
+MenuOverlayShadow 1.0 ui/MenuOverlayShadow.qml
 ProgressBar 1.0 ui/ProgressBar.qml
 RowHeightProbe 1.0 ui/RowHeightProbe.qml
 CheckBox 1.0 ui/CheckBox.qml

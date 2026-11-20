@@ -32,7 +32,7 @@ Variants {
     visible: Menu.visible
     overlayOpen: Menu.open
     primary: modelData === Ui.primaryScreen
-    dim: 0.45
+    dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
 
     wlrNamespace: "vibranium:modal"
 
@@ -51,6 +51,10 @@ Variants {
       // panel's width binding and its centerIn anchor. A plain Item takes
       // the Loader's size; the panel keeps its own sizing as a child.
       Item {
+
+        // Sibling before the card so the halo paints behind it. Its own row
+        // gates it, independent of the scrim.
+        MenuOverlayShadow { host: panel }
 
         MenuPanel {
           id: panel

@@ -33,7 +33,7 @@ Variants {
     visible: WallpaperPicker.visible
     overlayOpen: WallpaperPicker.isOpen
     primary: modelData === Ui.primaryScreen
-    dim: 0.55
+    dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
     wlrNamespace: "vibranium:modal"
     onCloseRequested: WallpaperPicker.close()
 

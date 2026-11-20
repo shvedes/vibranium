@@ -227,7 +227,7 @@ KEYS="$(awk -F'\t' '$1=="ok" {print $4}' "$PROBE_OUT_DIR/meta.tsv")"
 PAGEIDS="$(awk -F'\t' '$1=="ok" {print $5}' "$PROBE_OUT_DIR/meta.tsv")"
 MENUS="$(awk -F'\t' '$1=="ok" {print $6}' "$PROBE_OUT_DIR/meta.tsv")"
 t_eq "the catalog holds 42 settings pages" "42" "$PAGES"
-t_eq "the catalog holds 255 options" "255" "$OPTS"
+t_eq "the catalog holds 259 options" "259" "$OPTS"
 t_eq "every option has a distinct key" "$OPTS" "$KEYS"
 t_eq "every page has a distinct id" "$PAGES" "$PAGEIDS"
 t_eq "the catalog holds 7 menu pages" "7" "$MENUS"
@@ -318,11 +318,11 @@ t_eq "every module click hook resolves to an option" "0" "$(
 # --------------------------------------------------------------------------
 
 t_section "ownership split across the three stores"
-t_eq "Settings keeps 12 shell/env pages" "12" "$(cut -f1 "$PROBE_OUT_DIR/split.tsv")"
+t_eq "Settings keeps 14 shell/env pages" "14" "$(cut -f1 "$PROBE_OUT_DIR/split.tsv")"
 t_eq "HyprlandSettings keeps 28 hypr pages" "28" "$(cut -f2 "$PROBE_OUT_DIR/split.tsv")"
 t_eq "every page declares a group" "0" "$(cut -f3 "$PROBE_OUT_DIR/split.tsv")"
 t_eq "no page mixes hypr and non-hypr options" "0" "$(cut -f4 "$PROBE_OUT_DIR/split.tsv")"
-t_eq "shell options" "89" "$(awk -F'\t' '$5=="shell"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
+t_eq "shell options" "93" "$(awk -F'\t' '$5=="shell"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
 t_eq "env options" "11" "$(awk -F'\t' '$5=="env"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
 t_eq "hypr options" "153" "$(awk -F'\t' '$5=="hypr"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
 t_eq "misc options" "2" "$(awk -F'\t' '$5=="misc"' "$PROBE_OUT_DIR/opt.tsv" | wc -l | tr -d ' ')"
@@ -357,8 +357,8 @@ t_eq "every submenu target resolves to a menu or settings page" "0" "$( {
 # --------------------------------------------------------------------------
 
 t_section "the generated menu bundle, from the merged schema"
-t_eq "buildBundle emits 52 pages: the 51 catalog pages plus the settings index" \
-  "52" "$(awk -F'\t' '$1=="pages" {print $2}' "$PROBE_OUT_DIR/bundle.tsv")"
+t_eq "buildBundle emits 43 pages: the 42 catalog pages plus the settings index" \
+  "43" "$(awk -F'\t' '$1=="pages" {print $2}' "$PROBE_OUT_DIR/bundle.tsv")"
 t_eq "the synthetic index is page \"settings\"" "settings" \
   "$(awk -F'\t' '$1=="pages" {print $3}' "$PROBE_OUT_DIR/bundle.tsv")"
 t_eq "every bundle page carries at least one item" "0" \

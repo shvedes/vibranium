@@ -15,6 +15,10 @@
             "showItemCount": true,
             "items": [
                 {
+                    "type": "separator",
+                    "after": "shell.time.format"
+                },
+                {
                     "type": "group",
                     "id": "generalPrivacy",
                     "label": "Privacy dots",
@@ -46,6 +50,19 @@
                     "children": [
                         "misc.cursorTheme",
                         "misc.cursorSize"
+                    ]
+                },
+                {
+                    "type": "group",
+                    "id": "generalMenus",
+                    "label": "Menus",
+                    "sub": "Menu overlay appearance",
+                    "icon": "list",
+                    "children": [
+                        "shell.menu.dimBackground",
+                        "shell.menu.dimLevel",
+                        "shell.menu.dropShadow",
+                        "shell.menu.shadowIntensity"
                     ]
                 },
                 {
@@ -153,6 +170,58 @@
                             "eq": true
                         }
                     ]
+                },
+                {
+                    "key": "shell.menu.dimBackground",
+                    "type": "bool",
+                    "default": true,
+                    "label": "Dim background",
+                    "sub": "Darken behind the menu",
+                    "desc": "Draw a dimming scrim behind open menus."
+                },
+                {
+                    "key": "shell.menu.dimLevel",
+                    "type": "int",
+                    "default": 45,
+                    "label": "Dim level",
+                    "sub": "Scrim strength",
+                    "desc": "How dark the background scrim is while a menu is open.",
+                    "range": {
+                        "min": 15,
+                        "max": 75
+                    },
+                    "step": 5,
+                    "unit": "%",
+                    "showIf": {
+                        "key": "shell.menu.dimBackground",
+                        "eq": true
+                    }
+                },
+                {
+                    "key": "shell.menu.dropShadow",
+                    "type": "bool",
+                    "default": false,
+                    "label": "Drop shadow",
+                    "sub": "Lift the menu card",
+                    "desc": "Cast a soft shadow around the menu surface, independent of the dim."
+                },
+                {
+                    "key": "shell.menu.shadowIntensity",
+                    "type": "int",
+                    "default": 30,
+                    "label": "Shadow intensity",
+                    "sub": "Halo strength",
+                    "desc": "How dark the card's drop shadow reads, independent of the dim.",
+                    "range": {
+                        "min": 25,
+                        "max": 100
+                    },
+                    "step": 5,
+                    "unit": "%",
+                    "showIf": {
+                        "key": "shell.menu.dropShadow",
+                        "eq": true
+                    }
                 },
                 {
                     "key": "shell.privacy.overlay",
@@ -888,6 +957,10 @@
             }
         ],
             "items": [
+                {
+                    "type": "separator",
+                    "after": "shell.statusbar.position"
+                },
                 {
                     "type": "group",
                     "id": "moduleOptions",
@@ -1895,6 +1968,9 @@
             "showItemCount": true,
             "items": [
                 {
+                    "type": "separator"
+                },
+                {
                     "type": "action",
                     "label": "Calibrate DDC timeouts",
                     "sub": "External monitors only",
@@ -2044,20 +2120,6 @@
             "showItemCount": true,
             "items": [
                 {
-                    "type": "submenu",
-                    "label": "Touchpad",
-                    "sub": "Touchpad options",
-                    "icon": "hypr-touchpad",
-                    "page": "hyprland-input-touchpad"
-                },
-                {
-                    "type": "submenu",
-                    "label": "Keyboard Layouts",
-                    "sub": "Configure keyboard layouts",
-                    "icon": "keyboard",
-                    "page": "hyprland-input-layouts"
-                },
-                {
                     "type": "group",
                     "id": "inputMouse",
                     "label": "Mouse",
@@ -2078,11 +2140,28 @@
                     "id": "inputKeyboard",
                     "label": "Keyboard",
                     "sub": "Key repeat timing",
-                    "icon": "settings",
+                    "icon": "keyboard",
                     "children": [
                         "hypr.input.repeat_rate",
                         "hypr.input.repeat_delay"
                     ]
+                },
+                {
+                    "type": "separator"
+                },
+                {
+                    "type": "submenu",
+                    "label": "Keyboard Layouts",
+                    "sub": "Configure keyboard layouts",
+                    "icon": "keyboard",
+                    "page": "hyprland-input-layouts"
+                },
+                {
+                    "type": "submenu",
+                    "label": "Touchpad",
+                    "sub": "Touchpad options",
+                    "icon": "hypr-touchpad",
+                    "page": "hyprland-input-touchpad"
                 }
             ],
             "options": [
@@ -2250,20 +2329,7 @@
                     }
                 }
             ],
-            "items": [
-                {
-                    "type": "group",
-                    "id": "touchpadToggles",
-                    "label": "Additional options",
-                    "sub": "Control additional options",
-                    "icon": "list",
-                    "children": [
-                        "hypr.input.touchpad.disable_while_typing",
-                        "hypr.input.touchpad.natural_scroll",
-                        "hypr.input.touchpad.tap_to_click"
-                    ]
-                }
-            ]
+            "items": []
         },
         {
             "group": "hypr",
@@ -4406,6 +4472,10 @@
             "icon": "tool",
             "showItemCount": true,
             "items": [
+                {
+                    "type": "separator",
+                    "after": "hypr.general.layout"
+                },
                 {
                     "type": "group",
                     "id": "advancedRendering",

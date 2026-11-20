@@ -3,7 +3,9 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters duplicated-name
 import QtQml
 import QtQuick
-import QtCore
+// QtCore exports its own Settings, which shadows the shell singleton; keep it
+// qualified so the scrim binding below reads the shell's Settings unambiguously.
+import QtCore as QtCore
 import Quickshell
 import Quickshell.Io
 import qs.common
@@ -191,7 +193,7 @@ Item {
   // writableLocation. Only the verdict is kept; the path never leaves
   // this function.
   function probeBinary() {
-    root.passBinary = String(StandardPaths.findExecutable("pass")) !== "" ? "present" : "missing"
+    root.passBinary = String(QtCore.StandardPaths.findExecutable("pass")) !== "" ? "present" : "missing"
   }
 
   // --- discovery ---
@@ -1180,7 +1182,7 @@ Item {
       visible: Pass.visible
       overlayOpen: Pass.visible
       primary: modelData === Ui.primaryScreen
-      dim: 0.45
+      dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
 
       wlrNamespace: "vibranium:modal"
 
@@ -1196,7 +1198,12 @@ Item {
         id: passPanelComp
 
         Item {
+
+          // Halo follows the Drop shadow row, independent of the scrim.
+          MenuOverlayShadow { host: card }
+
           PassPanel {
+            id: card
             visible: win.primary
             maxHeight: ceiling.maxHeight
             hardMaxHeight: ceiling.hardMaxHeight

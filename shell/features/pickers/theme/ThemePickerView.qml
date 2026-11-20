@@ -33,7 +33,7 @@ Variants {
     visible: ThemePicker.visible
     overlayOpen: ThemePicker.isOpen
     primary: modelData === Ui.primaryScreen
-    dim: 0.55
+    dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
     wlrNamespace: "vibranium:modal"
     onCloseRequested: ThemePicker.close()
 

@@ -267,6 +267,19 @@ Singleton {
         const v = root.value("shell.lockscreen.dim")
     return typeof v === "number" && v >= 0 && v <= 100 ? v : 50
   }
+  // Shared scrim for the MenuLib overlays. The cap mirrors the catalog range:
+  // an out-of-band config never lands as an unreadable or invisible surface.
+  readonly property bool menuDimBackground: root.value("shell.menu.dimBackground") !== false
+  readonly property real menuDimLevel: {
+        const v = root.value("shell.menu.dimLevel")
+    return Math.max(15, Math.min(75, typeof v === "number" ? v : 45)) / 100
+  }
+  // Same floor idea for the card halo: an out-of-band value cannot dim it
+  // below a still-visible alpha.
+  readonly property int menuShadowIntensity: {
+        const v = root.value("shell.menu.shadowIntensity")
+    return Math.max(25, Math.min(100, typeof v === "number" ? v : 30))
+  }
   readonly property bool lockscreenClock: root.value("shell.lockscreen.clock") === true
   readonly property bool lockscreenDate: root.value("shell.lockscreen.date") === true
   readonly property bool lockscreenNowPlaying: root.value("shell.lockscreen.nowPlaying") !== false

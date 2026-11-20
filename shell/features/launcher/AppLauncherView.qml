@@ -29,7 +29,7 @@ Variants {
     visible: AppLauncher.visible
     overlayOpen: AppLauncher.visible
     primary: modelData === Ui.primaryScreen
-    dim: 0.45
+    dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
 
     wlrNamespace: "vibranium:modal"
 
@@ -61,11 +61,15 @@ Variants {
       // own width binding and centerIn anchor as a child.
       Item {
 
-      LauncherPanel {
-        visible: win.primary
-        maxHeight: ceiling.maxHeight
-        hardMaxHeight: ceiling.hardMaxHeight
-      }
+        // Halo follows the Drop shadow row, independent of the scrim.
+        MenuOverlayShadow { host: card }
+
+        LauncherPanel {
+          id: card
+          visible: win.primary
+          maxHeight: ceiling.maxHeight
+          hardMaxHeight: ceiling.hardMaxHeight
+        }
       }
     }
   }

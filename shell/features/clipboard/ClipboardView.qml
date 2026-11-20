@@ -28,7 +28,7 @@ Variants {
     visible: Clipboard.visible
     overlayOpen: Clipboard.open
     primary: modelData === Ui.primaryScreen
-    dim: 0.45
+    dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
 
     wlrNamespace: "vibranium:modal"
 
@@ -47,7 +47,11 @@ Variants {
       // own width binding and centerIn anchor as a child.
       Item {
 
+        // Halo follows the Drop shadow row, independent of the scrim.
+        MenuOverlayShadow { host: card }
+
         ClipboardPanel {
+          id: card
           visible: win.primary
           // The screen, not this window: the window is sized from the card, so
           // its height resolves in stages under a card that has already been
