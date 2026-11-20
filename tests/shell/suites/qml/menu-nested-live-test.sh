@@ -305,17 +305,21 @@ sleep 0.8
 open_child="$(probe_field 'd["childLabel"]')"
 
 # "Signal strength" lives inside the Devices group, not on the page's own row
-# set. A page-only filter answers "No matches"; a tree-aware one keeps the
-# group and narrows its child list to the matching branch.
+# set. The filter flattens the matching descendant into a regular top-level
+# result row - the same visual language as global search - instead of showing
+# the owning group. Selecting it still lands in the group's real nesting.
 p debugBeginScoped >/dev/null 2>&1
 sleep 0.3
 p debugType signal >/dev/null 2>&1
 sleep 0.7
-t_eq "a child label is filterable" "1" "$(probe_field 'd["count"]')"
-t_eq "the group is the result, not a detached child" "group" \
+t_eq "a nested child is filterable" "1" "$(probe_field 'd["count"]')"
+t_eq "the hit is a flat result row" "result" \
   "$(probe_field 'd["rowType"]')"
+t_eq "the result shows the child, not its group" "Signal strength" \
+  "$(probe_field 'd["rowLabel"]')"
 t_eq "the cursor stays on the top result" "0" "$(probe_field 'd["index"]')"
-t_eq "the group's children are narrowed" "1" "$(probe_field 'd["grpChildCount"]')"
+t_eq "no group chrome sits in the flat result" "0" \
+  "$(probe_field 'd["grpChildCount"]')"
 t_eq "the filter's bar matches the result row" "True" \
   "$(python3 -c "print(abs($(probe_field 'd["hlH"]') - $(probe_field 'd["curH"]')) < 1)")"
 
@@ -426,5 +430,227 @@ t_eq "and the scroll holds through the fold" "$landed" \
 sleep 0.4
 t_eq "the nested group folded" "False" \
   "$(probe_field 'd["childExpanded"]')"
+
+# --- 13. a programmatic 1 -> 7 jump seats through the page ------------------
+#
+# The IPC verb used to write currentIndex raw, so a jump teleported in one
+# frame with no scroll and no bar glide. It now delegates to the panel's seat
+# path, which gives it the same reveal as repeated debugAutoMove steps. Sample
+# consecutive probe frames, not a resting value after a sleep.
+
+# One snapshot -> contentY animRunning hlMoveMs seatsInstant followIdx index.
+probe_motion() {
+  p probe | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['contentY'], d['animRunning'], d['hlMoveMs'], d['seatsInstant'], d['followIdx'], d['index'])" 2>/dev/null
+}
+
+# motion_metrics <samples> -> animFrames cySpan hlMoveMax instantFrames followMax cyLast lastIdx
+motion_metrics() {
+  printf '%s\n' "$1" | python3 -c '
+import sys
+rows = []
+for line in sys.stdin:
+    f = line.split()
+    if len(f) != 6:
+        continue
+    rows.append((float(f[0]), f[1] == "True", int(f[2]), f[3] == "True", int(f[4]), int(f[5])))
+if not rows:
+    print(0, 0, 0, 0, -1, 0, -1)
+else:
+    ys = [r[0] for r in rows]
+    print(sum(1 for r in rows if r[1]),
+          round(max(ys) - min(ys), 1),
+          max(r[2] for r in rows),
+          sum(1 for r in rows if r[3]),
+          max(r[4] for r in rows),
+          round(ys[-1], 1),
+          rows[-1][5])
+'
+}
+
+t_section "programmatic jump seats through the page"
+open_fixture
+p debugSetCurrentIdx 1 >/dev/null 2>&1
+sleep 0.6
+t_eq "the jump starts at index one" "1" "$(probe_field 'd["index"]')"
+
+# The verb under test: one 1 -> 7 jump, sampled across consecutive frames.
+p debugSetCurrentIdx 7 >/dev/null 2>&1
+prog_samples=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  prog_samples+="$(probe_motion)"$'\n'
+done
+read -r p_anim p_span p_hl p_inst p_follow p_cy p_idx \
+  <<<"$(motion_metrics "$prog_samples")"
+
+t_eq "the jump lands on index seven" "7" "$p_idx"
+t_eq "the jump animates across consecutive frames" "True" \
+  "$(python3 -c "print($p_anim >= 2)")"
+t_eq "contentY changes across the frames" "True" \
+  "$(python3 -c "print($p_span > 5)")"
+t_eq "no frame takes an instant seat" "0" "$p_inst"
+t_eq "the seat follows index seven" "7" "$p_follow"
+t_eq "a highlight sweep is armed" "True" \
+  "$(python3 -c "print($p_hl > 0)")"
+
+# The same 1 -> 7 jump driven by the browsed step path. Non-selectable rows
+# are skipped, so step until the probe reaches 7, probing each leg.
+p debugSetCurrentIdx 1 >/dev/null 2>&1
+sleep 0.6
+auto_samples=""
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  p debugAutoMove 1 >/dev/null 2>&1
+  frame="$(probe_motion)"
+  auto_samples+="$frame"$'\n'
+  read -r _cy _anim _hl _inst _follow a_idx <<<"$frame"
+  [[ $a_idx == 7 ]] && break
+done
+for _ in 1 2 3 4 5; do
+  auto_samples+="$(probe_motion)"$'\n'
+done
+read -r a_anim a_span a_hl a_inst a_follow a_cy a_idx \
+  <<<"$(motion_metrics "$auto_samples")"
+
+t_eq "the browsed steps reach index seven" "7" "$a_idx"
+t_eq "the browsed path shows no instant seats" "0" "$a_inst"
+t_eq "both paths land on the same row" "$p_idx" "$a_idx"
+t_eq "both paths arm a cursor follow" "True" \
+  "$(python3 -c "print($p_follow >= 0 and $a_follow >= 0)")"
+t_eq "both paths land on the same offset" "True" \
+  "$(python3 -c "print(abs($p_cy - $a_cy) < 3)")"
+t_eq "both paths arm a highlight sweep" "True" \
+  "$(python3 -c "print($p_hl > 0 and $a_hl > 0)")"
+t_eq "the browsed path also scrolls over frames" "True" \
+  "$(python3 -c "print($a_span > 5)")"
+
+# --- 14. a scoped result re-derives the reveal claim on the restored page ---
+
+t_section "scoped result keeps the page claim"
+# A filtered group opens while it still carries the trimmed index. The full
+# rows come back underneath it; the reveal claim must be re-derived against
+# them or pursuit keeps fighting the page's scroll and fit.
+p close >/dev/null 2>&1
+p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#main" >/dev/null 2>&1
+sleep 0.7
+p debugSetCurrentIdx 0 >/dev/null 2>&1
+sleep 0.2
+p debugActivatePanel >/dev/null 2>&1
+sleep 0.5
+status_idx=$(p debugRows | python3 -c 'import json,sys; print(next((i for i,r in enumerate(json.load(sys.stdin)) if r["label"]=="Statusbar"),-1))')
+p debugSetCurrentIdx "$status_idx" >/dev/null 2>&1
+sleep 0.2
+p debugActivatePanel >/dev/null 2>&1
+sleep 0.6
+p debugBeginScoped >/dev/null 2>&1
+sleep 0.3
+p debugType backlog >/dev/null 2>&1
+sleep 0.6
+t_eq "the filter flattens the nested hit" "result" "$(probe_field 'd["rowType"]')"
+t_eq "the flat result is the matching child" "Heavy backlog warning" \
+  "$(probe_field 'd["rowLabel"]')"
+p debugActivatePanel >/dev/null 2>&1
+sleep 1.2
+landed_idx="$(probe_field 'd["index"]')"
+t_eq "the reveal claim follows the landed row" "$landed_idx" \
+  "$(probe_field 'd["autoRevealIndex"]')"
+t_eq "the page reveals the open slot" "True" \
+  "$(python3 -c "print($(probe_field 'd["contentY"]') > 0)")"
+t_eq "the group has its full child list back" "8" \
+  "$(probe_field 'd["grpChildCount"]')"
+
+# --- 15. a two-level filter hit lands flat, then unfolds its real nesting ----
+
+t_section "scoped flat result unfolds on selection"
+p close >/dev/null 2>&1
+p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#main" >/dev/null 2>&1
+sleep 0.7
+p debugSetCurrentIdx 0 >/dev/null 2>&1
+sleep 0.2
+p debugActivatePanel >/dev/null 2>&1
+sleep 0.5
+general_idx=$(p debugRows | python3 -c 'import json,sys; print(next((i for i,r in enumerate(json.load(sys.stdin)) if r["label"]=="General"),-1))')
+p debugSetCurrentIdx "$general_idx" >/dev/null 2>&1
+sleep 0.2
+p debugActivatePanel >/dev/null 2>&1
+sleep 0.6
+p debugBeginScoped >/dev/null 2>&1
+sleep 0.3
+p debugType "drop shadow" >/dev/null 2>&1
+sleep 0.7
+t_eq "one flat result" "1" "$(probe_field 'd["count"]')"
+t_eq "the result is rendered as a row" "result" "$(probe_field 'd["rowType"]')"
+t_eq "it shows the nested child" "Drop shadow" "$(probe_field 'd["rowLabel"]')"
+# Sample the handoff itself. The border must stay painted (a string-typed
+# palette colour used to make the blend transparent), and the card must grow
+# monotonically (a stale filter height latch used to collapse it for frames).
+p debugActivatePanel >/dev/null 2>&1
+hand_samples=""
+for _ in 1 2 3 4 5 6; do
+  hand_samples+="$(p probe | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("fieldBorder"), d.get("geom",{}).get("cardH",0), d.get("handoff"))' 2>/dev/null)"$'\n'
+  sleep 0.04
+done
+t_note "handoff samples: $(printf '%s\n' "$hand_samples" | tr '\n' '|')"
+t_eq "the field border stays painted through the handoff" "True" \
+  "$(printf '%s\n' "$hand_samples" | python3 -c 'import sys; rows=[l.split() for l in sys.stdin if l.strip() and len(l.split())==3]; print(all(r[0].lower() not in ("#00000000","#0000") for r in rows))')"
+t_eq "the card never collapses during the handoff" "True" \
+  "$(printf '%s\n' "$hand_samples" | python3 -c 'import sys; hs=[float(l.split()[1]) for l in sys.stdin if l.strip()]; print(all(b >= a - 1 for a,b in zip(hs,hs[1:])))')"
+sleep 0.9
+t_eq "it lands on the owning group" "group" "$(probe_field 'd["rowType"]')"
+t_eq "the owning group is open" "True" "$(probe_field 'd["expanded"]')"
+t_eq "the matching child is seated" "Drop shadow" \
+  "$(probe_field 'd["childLabel"]')"
+t_eq "the full child list is restored" "4" \
+  "$(probe_field 'd["grpChildCount"]')"
+t_eq "the reveal claim follows the landed row" "$(probe_field 'd["index"]')" \
+  "$(probe_field 'd["autoRevealIndex"]')"
+t_eq "the page revealed the open slot" "True" \
+  "$(python3 -c "print($(probe_field 'd["contentY"]') > 0)")"
+
+# --- 16. a filtered landing reveals the page like a manual expansion -------
+
+t_section "filtered landing matches manual page scroll"
+goto_general() {
+  p close >/dev/null 2>&1
+  p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#main" >/dev/null 2>&1
+  sleep 0.7
+  p debugSetCurrentIdx 0 >/dev/null 2>&1
+  sleep 0.2
+  p debugActivatePanel >/dev/null 2>&1
+  sleep 0.5
+  local gi
+  gi=$(p debugRows | python3 -c 'import json,sys; print(next((i for i,r in enumerate(json.load(sys.stdin)) if r["label"]=="General"),-1))')
+  p debugSetCurrentIdx "$gi" >/dev/null 2>&1
+  sleep 0.2
+  p debugActivatePanel >/dev/null 2>&1
+  sleep 0.7
+}
+goto_general
+mi=$(p debugRows | python3 -c 'import json,sys; print(next((i for i,r in enumerate(json.load(sys.stdin)) if r["label"]=="Menus"),-1))')
+p debugSetCurrentIdx "$mi" >/dev/null 2>&1
+sleep 0.2
+p debugActivatePanel >/dev/null 2>&1
+sleep 1.2
+manual_y="$(probe_field 'd["contentY"]')"
+goto_general
+p debugBeginScoped >/dev/null 2>&1
+sleep 0.2
+p debugType "drop shadow" >/dev/null 2>&1
+sleep 0.7
+p debugActivatePanel >/dev/null 2>&1
+filter_frames=""
+for _ in 1 2 3 4 5 6 7 8; do
+  filter_frames+="$(probe_field 'd["contentY"]')"$'\n'
+  sleep 0.04
+done
+sleep 0.8
+filter_y="$(probe_field 'd["contentY"]')"
+t_note "manual=$manual_y filter=$filter_y frames=$(printf '%s\n' "$filter_frames" | tr '\n' '|')"
+t_eq "the filtered landing uses the same page scroll" "True" \
+  "$(python3 -c "print(abs($manual_y - $filter_y) < 3)")"
+# The reveal is one motion: no frame may overshoot past the settled offset
+# and then come back (the old path parked at the row top before correcting).
+t_eq "no frame overshoots the reveal" "True" \
+  "$(printf '%s\n' "$filter_frames" | python3 -c 'import sys; ys=[float(x) for x in sys.stdin if x.strip()]; print(all(y <= max(float(sys.argv[1]), 0) + 3 for y in ys))' "$manual_y")"
+t_eq "the filtered landing seats the same child" "Drop shadow" \
+  "$(probe_field 'd["childLabel"]')"
 
 t_summary

@@ -72,7 +72,22 @@ ListView {
   // Read-only motion state for the consumer's live probe.
   readonly property bool debugAnimRunning: scrollAnim.running
   readonly property int debugSweepMs: root._sweepMs
+  // The tween's own live duration, for a probe that checks the bar derives
+  // its travel from this rather than from a copied scalar.
+  readonly property int debugTweenMs: scrollAnim.duration
+  // contentY writes that did not go through seatTo or the content tween.
+  // Structure keeps this at zero: seatTo is the one QML writer and the
+  // tween owns its own frames. A non-zero count is a second writer.
+  readonly property int debugRawWrites: root._rawWrites
+  property int _rawWrites: 0
+  property bool _insideSeatTo: false
   readonly property int debugPursuitIdx: root._pursuitIdx
+  // An owner that replaces the row set and owns the reveal itself can hold
+  // off the generic index follow: the swap's index echo is not a gesture, and
+  // following it before the target row's slot has grown seats against its
+  // collapsed geometry. Only this handler reads it; explicit seats and
+  // pursuit are unaffected.
+  property bool suppressIndexFollow: false
   readonly property int debugFollowIdx: root._followIdx
   readonly property bool debugSeatsInstant: root._seatsInstant
   readonly property int debugScrollEasing: scrollAnim.easing.type
@@ -167,6 +182,18 @@ ListView {
   // consumer whose viewport is still growing to it (see centerTarget). It
   // travels with the seat rather than sitting on the view, so it is the
   // height of THIS placement and nothing else can leave one behind.
+  // Put the cursor on a row the caller will reveal itself. The index echo is
+  // suppressed by _engineIndexWrite; no center-follow runs, so a landing that
+  // expands the row can compute its reveal from the settled slot instead of
+  // the collapsed one.
+  function landIndex(index) {
+    if (index < 0 || index >= root.count) return
+    root._stillAcquire()
+    root._engineIndexWrite = true
+    root.currentIndex = index
+    root._engineIndexWrite = false
+  }
+
   function seat(index, cause, snap, viewH) {
     var c = (cause === "step" || cause === "click") ? cause : "land"
     root._lastSeatCause = c
@@ -242,11 +269,15 @@ ListView {
       root.trackCursor(index, snap === true ? false : true)
     }
   }
-  // Sweep override: while a content tween runs, the bar uses the same
-  // duration and curve so both land together with a constant viewport
-  // offset (no end-of-glide wobble from mismatched 120ms-vs-distance
-  // timings). Set per animated seat in seatTo, cleared on land/grab/
-  // instant seat. -1 = off (default 120ms glide).
+  // Sweep pre-arm: a caller that knows the motion it is about to seat
+  // (a slot's own clock, a held key's repeat leg) publishes the duration
+  // the CONTENT tween must at least run so the bar and the rows land on
+  // the same edge. This is a request, not a copy of the tween - the bar
+  // itself never reads it as its duration (see _hlTravelMs). -1 = no
+  // request, cleared on land/grab/instant seat.
+  // Cycle breaker: the slot publishes its duration to the list before the
+  // seat exists, so the content tween can be armed to match. A binding
+  // from slot height to seat duration and back would loop.
   property int _sweepMs: -1
   // The bar eases on the same curve as the content seat so both land together
   // with a constant viewport offset. A held key switches both to one short
@@ -262,15 +293,22 @@ ListView {
   // up. Follow live geometry on both axes while a nested slot is open.
   readonly property bool _nestedSlotLive:
     root.currentItem && root.currentItem.nestedSlotLive === true
+  // The bar's travel is the content tween's own state, read live. While a
+  // seat tween runs the bar rides that tween's duration; with no tween it
+  // takes the fast glide, and a standing pre-arm before the tween starts
+  // is the caller's request (see _sweepMs). No duration is ever copied
+  // into the bar from the tween - scrollAnim is the one clock, so a
+  // stalled or restarted content motion cannot leave the bar finishing
+  // on a stale number.
+  readonly property int _hlTravelMs: scrollAnim.running
+    ? scrollAnim.duration : (root._sweepMs >= 0 ? root._sweepMs : Ui.fastMs)
   highlightMoveDuration: root._seatsInstant || root._nestedSlotLive
     ? 0
-    : (root.highlightMotion && root.selectionHighlight
-      ? (root._sweepMs >= 0 ? root._sweepMs : Ui.fastMs) : 0)
+    : (root.highlightMotion && root.selectionHighlight ? root._hlTravelMs : 0)
   highlightResizeDuration: root._seatsInstant || root._currentSlotMotionMs > 0
     || root._nestedSlotLive
     ? 0
-    : (root.highlightMotion && root.selectionHighlight
-      ? (root._sweepMs >= 0 ? root._sweepMs : Ui.fastMs) : 0)
+    : (root.highlightMotion && root.selectionHighlight ? root._hlTravelMs : 0)
   highlight: selectionHighlight ? selHighlight : null
 
   // Held selection geometry: the last real position and size of the bar,
@@ -509,7 +547,9 @@ ListView {
       // claim outlives its own tween and every following seek on the row
       // would seat geometrically.
       root._pursuitIdx = -1
-      root.contentY = root.clampY(root.contentY)
+      // Route the landing clamp through the one writer. In range this is
+      // a no-op: seatTo returns before arming, so the epoch is untouched.
+      root.seatTo(root.contentY, false, "land")
       // A running pursuit already bends to a destination that moves under it
       // (see pursue), so this is only a safety net for a destination that
       // changes on the landing edge itself. With nothing left to do the
@@ -921,6 +961,7 @@ ListView {
     // carries into a swap that follows this move.
     if (root.selectionHighlight && !root._inSwap) root._holdHighlight()
     if (root._engineIndexWrite) return
+    if (root.suppressIndexFollow) return
     if (root._inSwap || root._sweeping) return
     // A non-selectable list has no cursor to follow. The guard keys on
     // `selectionHighlight` alone, because `stableModel` defaults to
@@ -941,7 +982,23 @@ ListView {
     // geometry. Within one fastMs of a swap close the follow seats
     // instantly; a real cursor move re-follows animated on its next step.
     const freshSwap = (Date.now() - root._swapEndMs) < Ui.fastMs
-    root.trackCursor(root.currentIndex, !root._seatsInstant && root.smoothScroll && !freshSwap)
+    // An unguarded external write is still an index seat: route it through
+    // seat() so it pre-empts a standing land lease, publishes step
+    // provenance and spends the keep arm, instead of a bare center-follow
+    // that left stale hold state to swallow the motion. A gesture already
+    // went through seat() itself and was suppressed by _engineIndexWrite
+    // above, so this runs only for writes that skipped the contract.
+    //
+    // The pin is the ORIGIN a consumer armed for a motion it has not
+    // seated yet (see pinHighlight). A raw write here is the view's echo,
+    // not that motion: only an explicit gesture seat may take a pinned
+    // origin, so the reactive seat gives the pin back. This is the one
+    // cycle breaker in this handler - it keeps a model echo from starting
+    // the bar at the row the view happened to land on.
+    const pin = root._hlPin
+    const animate = !root._seatsInstant && root.smoothScroll && !freshSwap
+    root.seat(root.currentIndex, "step", !animate)
+    root._hlPin = pin
   }
 
   function _avg() {
@@ -1348,6 +1405,10 @@ ListView {
         const paced = Range.clamp(Math.round(paceMs), Ui.fastMs, root._sweepMaxMs)
         distanceMs = pacedReveal ? paced : Math.min(distanceMs, paced)
       }
+      // The caller's pre-arm is a floor, not a duration copied into the
+      // bar: a slot-driven handoff keeps the content tween on the slot's
+      // clock so both land on the same edge. The bar reads this tween's
+      // own live duration from _hlTravelMs.
       const handoffMs = root._highlightHandoff && root._sweepMs >= 0
         ? root._sweepMs : 0
       scrollAnim.duration = Math.max(distanceMs, handoffMs)
@@ -1371,15 +1432,17 @@ ListView {
         to: Math.round(target * 10) / 10, ms: scrollAnim.duration,
         sweep: root._sweepMs
       })
-      // Bar/content sync: the highlight tween runs the same duration on
-      // the same curve (see _sweepMs), so both land together with no
-      // end-of-glide wobble. Assigned after restart: a synchronously
-      // firing finish from the superseded run must not clear it first.
-      root._sweepMs = scrollAnim.duration
+      // No duration is copied into the bar. It binds to scrollAnim's own
+      // running duration (see _hlTravelMs), so a restart here moves both
+      // the rows and the bar on the same clock without a hand-write.
     } else {
       scrollAnim.stop()
       if (!root._highlightHandoff) root._sweepMs = -1
+      // The single QML writer of contentY. The flag lets the reconcile
+      // handler tell this write from a foreign one (debugRawWrites).
+      root._insideSeatTo = true
       root.contentY = target
+      root._insideSeatTo = false
     }
     return target
   }
@@ -1441,6 +1504,9 @@ ListView {
   // on every seat that is not a pursuit, so it describes the tween in
   // flight and never a past one.
   property int _pursuitIdx: -1
+  // A reveal of a just-opened slot waits on the row's live height edge; the
+  // claim still stands while it waits.
+  property bool _pursuitPending: false
   function followTarget(index, viewH) {
     if (index < 0 || index >= root.count) return -1
     // Never seat into a degenerate viewport (open path settles before
@@ -1910,6 +1976,7 @@ ListView {
   property int _swapHoldTurns: 0
   property int _swapHoldStable: 0
   property double _swapHoldH: -1
+  property int _swapSeenCount: -1
   property int _swapHoldWrites: 0
 
   function beginSwap() {
@@ -1965,6 +2032,7 @@ ListView {
     root._swapHoldTurns = 0
     root._swapHoldStable = 0
     root._swapHoldH = -1
+    root._swapSeenCount = -1
     root._swapHoldWrites = root._seatWrites
     swapWatch.restart()
   }
@@ -1975,13 +2043,47 @@ ListView {
     root._swapHold = false
     swapWatch.stop()
   }
-  // The hold's restore is event-driven - every contentY and contentHeight
-  // change re-asserts it, which is what puts the view where the content says
-  // it belongs on the same change, before the frame paints. The timer only
-  // decides when the hold gives contentY back, and it has to be a timer
-  // rather than a callLater chain: deferred turns drain inside a single
-  // frame, so a chain retires before the relayout the hold exists for has
-  // run at all. One tick a frame, bounded, never a spin.
+  // Read a live content edge (contentY or contentHeight change) while a
+  // hold stands. The re-assert is event-driven - the edge puts the view
+  // where the content says on the same change, before the frame paints.
+  // Release is derived from the edge too: two consecutive edges that see
+  // the same count and extent with the view already at the wanted offset
+  // mean the heal stopped moving, so the hold has nothing left to defend.
+  // An edge that changed either number retires the stability count - the
+  // heal cannot slip between two observations and be missed.
+  // Returns whether the hold still stands after this edge.
+  function _swapObserve() {
+    if (!root._swapHold) return false
+    if (!root._swapHoldsContentY()) {
+      root._swapRelease()
+      return false
+    }
+    root._swapRestore()
+    root._swapHoldWrites = root._seatWrites
+    const count = root.count
+    const h = root.contentHeight
+    const want = root._swapWant()
+    const settled = want >= 0 && Math.abs(want - root.contentY) < 0.5
+    if (settled && count === root._swapSeenCount && h === root._swapHoldH) {
+      root._swapHoldStable++
+    } else {
+      root._swapHoldStable = 0
+    }
+    root._swapSeenCount = count
+    root._swapHoldH = h
+    if (root._swapHoldStable >= 2) {
+      root._swapRelease()
+      return false
+    }
+    return true
+  }
+  // Bounded fallback for a model that legitimately never settles: a row
+  // set whose delegates are all born at final height and whose content
+  // fits emits no further content edge after the write, so no count/extent
+  // edge can release the hold. Time still passes here, so that case gives
+  // contentY back within one bounded window instead of holding forever.
+  // The normal release is _swapObserve's live edge; this only caps the
+  // no-edge case. One tick a frame, never a spin.
   Timer {
     id: swapWatch
     interval: Math.max(8, Math.round(Ui.fastMs / 8))
@@ -1992,35 +2094,13 @@ ListView {
   // running would keep this list waking once a frame for the rest of the
   // session to do nothing, and nothing else in the file would say so.
   readonly property bool _swapWatching: swapWatch.running
-  // Observed release. Absent another writer - see _swapHoldsContentY - the
-  // hold gives contentY back once the content has stopped measuring with
-  // the position it wanted, for two ticks running, so the heal cannot land
-  // between them and be missed.
   function _swapWatch() {
     if (!root._swapHold) return
-    if (!root._swapHoldsContentY()) {
-      root._swapRelease()
-      return
-    }
     root._swapHoldTurns++
-    root._swapRestore()
-    root._swapHoldWrites = root._seatWrites
-    const want = root._swapWant()
-    const settled = want >= 0 && Math.abs(want - root.contentY) < 0.5
-    if (settled && root.contentHeight === root._swapHoldH
-      && root._swapHoldTurns >= 3) {
-      root._swapHoldStable++
-    } else {
-      root._swapHoldStable = 0
-    }
-    root._swapHoldH = root.contentHeight
-    // The turn cap is what makes this self-healing: time passes whether or
-    // not anything else runs, so a hold nobody retires still cannot outlive
-    // its own swap by more than its own cap.
-    if (root._swapHoldStable >= 2 || root._swapHoldTurns >= 24) {
-      root._swapRelease()
-      return
-    }
+    // The cap is what makes this self-healing: time passes whether or not
+    // anything else runs, so a hold nobody retires still cannot outlive its
+    // own swap by more than its own cap.
+    if (root._swapHoldTurns >= 24) root._swapRelease()
   }
   // Shared model-swap choreography: begin, run the caller's seat
   // lambda inside the swap window, hold the scroll the write dropped,
@@ -2220,9 +2300,14 @@ ListView {
       root.autoRevealIndex = -1
       return
     }
-    if (root.moving || root._inSwap) return
+    if (root._inSwap) return
     const index = root.autoRevealIndex
     const mine = root._followIdx === index || root._pursuitIdx === index
+    // The view reports `moving` while OUR seat tween runs. A claimed row can
+    // still grow after that seat was armed (a filter landing reveals a group
+    // that expands on the next edge), so the owner must be allowed to bend
+    // its own flight. A foreign move still wins.
+    if (root.moving && !mine) return
     const it = root.autoRevealItem || root.itemAtIndex(index)
     if (!it) {
       const ry = root.rowTop(index)
@@ -2238,6 +2323,17 @@ ListView {
       }
       return
     }
+    // A freshly created delegate can arm its reveal on the same edge its slot
+    // opens: the row is expanded in state but its settled height has not
+    // published the dropdown yet. Seating now would reveal the COLLAPSED row
+    // and need a second corrective seat a frame later. Wait on the row's live
+    // height edge instead - the next onHeightChanged re-enters here with the
+    // destination, and this is the one seat the view makes.
+    if (it.expanded === true && it.settledHeight <= it.restHeight + 0.5) {
+      root._pursuitPending = true
+      return
+    }
+    root._pursuitPending = false
     const ry = it.y
     // A growth claim does NOT own this reveal on its own, and the list must
     // still chase it. The region is sized against where the content WILL sit
@@ -2301,14 +2397,23 @@ ListView {
     // will sit> + Ui.s` (MenuPanel.growForSlot), so a landed region satisfies
     // this with a whole pixel to spare and a short one fails the test above
     // instead. There is nothing left for the two writers to alternate over.
-    const owed = ry + rh + Ui.s - root.contentY - root.height
-    if (owed <= 0.5) return
+    // `owed <= 0` used to stop here. That is right when the view sits before
+    // the row, but a landing that seated before the slot grew can sit PAST
+    // the row's final reveal offset; the exact target check decides whether
+    // an upward correction is owed.
     let target = Range.clamp(
       ry + rh + Ui.s - root.height,
       0,
       root.clampY(Infinity))
     if (ry < target) target = ry
-    if (target <= root.contentY + 0.5) return
+    const owed = ry + rh + Ui.s - root.contentY - root.height
+    if (owed <= 0.5 && target <= root.contentY + 0.5) return
+    // The settled height can GROW after the first seat (a filter landing
+    // reveals a group that unfolds on the next edge), which REDUCES the
+    // offset needed to reveal the row. Scrolling back up is part of the
+    // reveal; refusing it left the view parked at the row's top while the
+    // manual path, which seated after the unfold, landed further up.
+    if (Math.abs(target - root.contentY) <= 0.5) return
 
     if (scrollAnim.running && !mine) return
     // A pursuit tween is NOT re-armed while it is in flight. seatTo always
@@ -2381,7 +2486,10 @@ ListView {
     // ownership of the tween in flight by the row that put it there, and a
     // claim that is gone owns nothing - the row closed its slot, so the
     // position it was chasing is not owed any more.
-    if (root.autoRevealIndex < 0) root._pursuitIdx = -1
+    if (root.autoRevealIndex < 0) {
+      root._pursuitIdx = -1
+      root._pursuitPending = false
+    }
     root.bindAutoRevealItem()
     root.pursue()
   }
@@ -2487,35 +2595,31 @@ ListView {
       total: Math.round(root.contentHeight * 10) / 10,
       anim: scrollAnim.running
     })
-    // A held swap offset answers its own writes and the engine's clamps
-    // alike, and answers them in the turn they happen - a clamp that lands
-    // after the content has stopped measuring is still the same event, and
-    // the reconcile below cannot repair it: that path only pulls a view
-    // that overshot back into range, never one left short of it.
-    if (root._swapHold) {
-      if (root._swapHoldsContentY()) {
-        root._swapRestore()
-        return
-      }
-      // Another writer owns contentY; the normal path below applies to it.
-      root._swapRelease()
-    }
+    // Any write that is neither seatTo's nor a tween frame is a second
+    // writer on contentY. Structure keeps this at zero; the probe reads it
+    // as debugRawWrites and asserts it does not move during a seat.
+    if (!root._insideSeatTo && !scrollAnim.running) root._rawWrites++
+    // A held swap offset answers its own writes and the engine's clamps on
+    // this live edge, in the turn they happen - a clamp that lands after
+    // the content has stopped measuring is still the same event, and the
+    // reconcile below only pulls a view that overshot back into range,
+    // never one left short of it. When the edge releases the hold, the
+    // normal path applies to the writer that took over.
+    if (root._swapHold && root._swapObserve()) return
     if (root._inSwap || root.moving || scrollAnim.running) return
     const maxY = Math.max(0, root.contentHeight - root.height)
     const oor = root.contentY < -0.5 || root.contentY > maxY + 0.5
     if (oor) {
-      // The one direct contentY write outside seatTo, and the only place
-      // the view can move without a tween. It fires whenever the bound
-      // drops under the current position - which is what a CLOSING slot
-      // does frame by frame as the content it displaced shrinks back, so
-      // it can walk the view down in instant steps.
+      // A CLOSING slot shrinks the bound frame by frame; the view is left
+      // short of range and has to walk down with it. Route that instant
+      // seat through seatTo like every other write - seatTo(false) is an
+      // immediate clamp, so the one-writer invariant holds here too.
       if (root.traceDebug) root._trace("list.clamp", {
         tag: root._lastWriteTag, from: Math.round(root.contentY * 10) / 10,
         to: Math.round(root.clampY(root.contentY) * 10) / 10,
         contentH: Math.round(root.contentHeight * 10) / 10
       })
-      scrollAnim.stop()
-      root.contentY = root.clampY(root.contentY)
+      root.seatTo(root.contentY, false, "reconcile")
     }
   }
 
@@ -2536,29 +2640,26 @@ ListView {
     // into range, so it is blind to a swap that left the view SHORT of the
     // healed bound, which is exactly what a write under a half-built content
     // leaves behind. The heal moves the bound, and the hold walks the view
-    // to it on this same change, before the frame paints.
-    if (root._swapHold) {
-      if (root._swapHoldsContentY()) {
-        root._swapRestore()
-        return
-      }
-      // Another writer owns contentY; the normal path below applies to it.
-      root._swapRelease()
-    }
+    // to it on this same change, before the frame paints. A count/extent
+    // edge that stops changing releases the hold (see _swapObserve).
+    if (root._swapHold && root._swapObserve()) return
     if (root._inSwap) return
     // Follow retarget: while a follow tween runs, layout shifts under
     // it (collapsing slots above the cursor) invalidate its fixed
     // target. Re-derive from live geometry instead of preserving a stale
     // position - the tween bends toward the moving target instead of
     // landing off and jumping back. Non-follow tweens keep the preserve
-    // path below (their targets are absolute).
+    // path below (their targets are absolute). The retarget goes through
+    // seatTo: this engine captures a tween's endpoints when it starts, so
+    // mutating `to` in place is ignored, and only a reseat actually bends
+    // the flight.
     if (scrollAnim.running && root._followIdx >= 0) {
       // Collapsing viewport (panel closing under a tween): freeze, never
       // re-derive into degenerate geometry.
       if (root.height <= 0) { scrollAnim.stop(); return }
       const t = root.centerTarget(root._followIdx)
       if (t >= 0) {
-        scrollAnim.to = root.clampY(t)
+        root.seatTo(t, true, "follow")
         return
       }
     }

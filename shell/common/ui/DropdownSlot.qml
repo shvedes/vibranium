@@ -219,12 +219,21 @@ Item {
   // height -> revealNeedH -> MenuPanel._latchClaim, which Qt answers by
   // dropping the value. `callLater` puts the write in the next event-loop
   // turn, still before the next frame is rendered, so the tween is disabled
-  // in time and the slot is never seen part-way open.
+  // in time and the slot is never seen part-way open. This is the cycle
+  // breaker: the one imperative latch that stops that binding loop.
+  //
+  // The epoch is the second half of the contract. `callLater` is a promise
+  // about the NEXT turn, not about which hold is still current when it runs;
+  // land() followed by release() before the turn leaves a queued write that
+  // would otherwise pin a released slot to a target from a fold that is over.
+  property int _landEpoch: 0
+
   function land() {
     if (root._held) return
     root._held = true
     root.settle = true
-    Qt.callLater(root._writeLanded)
+    const epoch = ++root._landEpoch
+    Qt.callLater(function() { root._writeLanded(epoch) })
   }
 
   // Landing swaps to equivalent Binding objects instead of assigning the
@@ -235,15 +244,23 @@ Item {
   // tracking contentHost.height for the rest of the unfold.
   property bool _landedHold: false
 
-  function _writeLanded() {
+  function _writeLanded(epoch) {
+    // A second land cannot land a stale target: the epoch must still be the
+    // one this write was queued for, and the hold it belongs to must still be
+    // live. Without both checks a deferred write from a released hold sets
+    // _landedHold while _held is false, so the landed Binding and the
+    // re-armed Behavior become two writers on height.
+    if (epoch !== root._landEpoch || !root._held) return
     root._landedHold = true
   }
 
   // Release the hold, so the NEXT unfold on this slot can ease. The host
   // calls it when the current unfold is over - `_held` is the gate both
   // Behaviors read, so leaving it set would freeze the slot for good rather
-  // than for the one dropdown.
+  // than for the one dropdown. Bumping the epoch retires any deferred write
+  // the hold queued but that has not run yet.
   function release() {
+    root._landEpoch++
     root._held = false
     root.settle = false
     root._landedHold = false
@@ -312,7 +329,7 @@ Item {
   // The unfold, per frame. Both the height and the fade are driven by
   // animation clones that carry no signal, so the frame loop on the slot is
   // the only place the curve is legible - and the two do not land together,
-  // which is the reason the grace timer below exists.
+  // which is the reason the grace window below exists.
 
   default property alias content: contentHost.data
 
@@ -332,15 +349,27 @@ Item {
 
   property bool _closing: false
 
-  // Keeps the fade-out visible: deferred content must survive a little
-  // longer than the animation itself, and the animation is whichever of
-  // the two runs longest. The height tween is paced by slotMs, the opacity
-  // tween is the fixed Ui.normalMs, and slotMs is floored at Ui.fastMs -
-  // so a short slot (content height plus gap under the floor) fades out
-  // for longer than its height takes to land, and a grace window derived
-  // from slotMs alone would clear `closing` mid-fade and tear the deferred
-  // content out of a slot that is still visible. A property, not a child
-  // - the default property routes children into the content host.
+  // The grace window is genuinely time-based; there is no clean live edge
+  // for this release. Two reasons, both load-bearing.
+  //
+  // One: the fold is TWO tweens. Height runs slotMs, opacity runs Ui.normalMs,
+  // and slotMs is floored at Ui.fastMs, so a short slot fades out longer than
+  // its height lands and a tall slot folds longer than it fades. Releasing on
+  // either value reaching its target would tear deferred content out of a
+  // still-visible fold. The interval takes the longer of the two plus a
+  // frame, which is exactly the window before the whole fold is over.
+  //
+  // Two: the release must land AFTER the list has reconciled the height-zero
+  // layout. The consumer's close restore (MenuPanel._closeSeatDone) snaps the
+  // scroll to the pre-open origin when `closing` clears, but the list also
+  // runs a separate `reconcile` pass one frame after the slot's height hits
+  // zero. Clearing `closing` on that height edge puts the restore snap BEFORE
+  // the reconcile, so the reconcile wins and leaves the scroll one row short.
+  // The window puts the release strictly after that pass, so the restore is
+  // the last writer. Neither fold value exposes the reconcile as an edge in
+  // this component, so a terminal-value observation cannot replace it.
+  // A property, not a child - the default property routes children into the
+  // content host.
   property Timer closeGrace: Timer {
     interval: Math.max(root.slotMs, Ui.normalMs) + 20
 

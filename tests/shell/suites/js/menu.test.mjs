@@ -149,7 +149,7 @@ const SURFACE = [
   'uidKey', 'requiresExpr', 'requiresGuard', 'hideLine', 'guardLine', 'buildIndex',
   'buildPageIndex', 'fuzzyScore', 'search',
   'filterCounter', 'scopedFilter', 'substitute', 'substituteQuoted',
-  'groupSearchResults',
+  'groupSearchResults', 'scopedResultRows',
   'hookValue', 'hookBool', 'resolveConfirm', 'isFlow', 'flowStep', 'flowCount',
   'nextFlowIndex', 'stageText', 'stageUnitSuffix', 'stageSeedText', 'restKind', 'numberDisplay', 'valueSlotW',
   'optionLabelFor', 'optionSeedIndex', 'optionColumnCount', 'optionRowCount',
@@ -180,13 +180,13 @@ suite('menu/MenuLib', 'the menu framework\'s pure layer - 73 functions')
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // The 74-name ledger plus ten top-level declarations the suite reads
+  // The 75-name ledger plus ten top-level declarations the suite reads
   // separately: the three filter-hay builders and the seven cache `var`s (the
   // six search caches and the scoped-filter hay cache), which the loader picks
   // up because a `.pragma library` namespace is its top-level declarations.
-  eq('84 declarations', Object.keys(M).length, 84)
+  eq('85 declarations', Object.keys(M).length, 85)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 74 named functions are callable', missing, [])
+  eq('all 75 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -206,12 +206,50 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 84 names', Object.keys(F).length, 84)
+  eq('the live view publishes the same 85 names', Object.keys(F).length, 85)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
   eq('and on behavior', M.fuzzyScore('power', ['power'], 'power'), F.fuzzyScore('power', ['power'], 'power'))
   eq('the live view starts with a null index', F._searchCacheIndex, null)
+})
+
+group('scopedResultRows: nested filter hits are flat rows with a landing chain', () => {
+  const pg = {
+    id: 'general',
+    items: [
+      { uid: 'g-cursor', label: 'Cursor', type: 'group', selectable: true, children: [
+        { uid: 'g-cursor/theme', label: 'Theme', type: 'select', selectable: true },
+        { uid: 'g-cursor/size', label: 'Size', type: 'range', selectable: true }
+      ]},
+      { uid: 'g-menus', label: 'Menus', type: 'group', selectable: true, children: [
+        { uid: 'g-menus/dim', label: 'Dim', type: 'toggle', selectable: true },
+        { uid: 'g-menus/shadow', label: 'Drop shadow', type: 'range', selectable: true,
+          children: [
+            { uid: 'g-menus/shadow/deep', label: 'Deep option', type: 'toggle', selectable: true }
+          ] }
+      ]},
+      { uid: 'plain', label: 'Plain row', type: 'toggle', selectable: true }
+    ]
+  }
+  const flat = M.scopedResultRows(pg, 'shadow')
+  eq('one nested hit', flat.length, 1)
+  eq('it shows the child, not the group', flat[0].label, 'Drop shadow')
+  eq('it is a flat result row', flat[0].scopedResult, true)
+  eq('it carries the owning group for the landing', flat[0].groupUid, 'g-menus')
+  eq('and the child uid chain', flat[0].childUids, ['g-menus/shadow'])
+  eq('the page and owning row are named', [flat[0].pageId, flat[0].row], ['general', 1])
+
+  const deep = M.scopedResultRows(pg, 'deep option')
+  eq('a grandchild hit is one row', deep.length, 1)
+  eq('it shows the grandchild', deep[0].label, 'Deep option')
+  eq('its chain walks both levels', deep[0].childUids,
+    ['g-menus/shadow', 'g-menus/shadow/deep'])
+
+  const direct = M.scopedResultRows(pg, 'cursor')
+  eq('a group matched by its own label stays a group', direct.length, 1)
+  eq('and keeps its subtree', direct[0].label, 'Cursor')
+  eq('an empty query keeps the page rows', M.scopedResultRows(pg, '').length, 3)
 })
 
 group('SHELL_DIR from the assertion kit resolves this library', () => {
@@ -4158,8 +4196,8 @@ group('every one of the 71 functions was exercised above', () => {
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 74 long', SURFACE.length, 74)
-  eq('with no duplicates', new Set(SURFACE).size, 74)
+  eq('the surface list is 75 long', SURFACE.length, 75)
+  eq('with no duplicates', new Set(SURFACE).size, 75)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

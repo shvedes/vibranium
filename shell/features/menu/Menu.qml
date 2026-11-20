@@ -2395,11 +2395,15 @@ Singleton {
     }
 
     function debugSetCurrentIdx(idx: int): string {
-      const list = root._debugList()
-      if (list) {
-        list.currentIndex = idx
-        return "set to " + idx + " now " + list.currentIndex
+      // Route the IPC verb through the panel's seat so a programmatic jump
+      // gets lease preemption, a highlight sweep and a live follow like a
+      // browsed step. The panel's debugSetCurrentIdx owns list.seat(idx,"step").
+      const panel = root.panel || root.probeSource
+      if (panel && typeof panel.debugSetCurrentIdx === "function") {
+        const now = panel.debugSetCurrentIdx(idx)
+        return "set to " + idx + " now " + now
       }
+      // Headless probe callers without a panel still get a raw seat.
       if (root.probeSource && root.probeSource.list) {
         root.probeSource.list.currentIndex = idx
         return "set to " + idx + " now " + root.probeSource.list.currentIndex
@@ -2411,6 +2415,13 @@ Singleton {
       const list = root._debugList()
       if (!list || list.count === undefined) return "no probeSource"
       const next = list.count > 0 ? Range.clamp(list.currentIndex + dir, 0, list.count - 1) : 0
+      // The relative step keeps its clamp but seats through the panel so the
+      // cursor glides with the same contract as debugSetCurrentIdx.
+      const panel = root.panel || root.probeSource
+      if (panel && typeof panel.debugSetCurrentIdx === "function") {
+        panel.debugSetCurrentIdx(next)
+        return "moved to " + next
+      }
       list.currentIndex = next
       return "moved to " + next
     }

@@ -957,15 +957,18 @@ Item {
             Menu.handleConfirm({ id: "timer" })
             return
           }
-          if (itm.call !== "")
-            Menu.runCall(itm.call, itm.value !== undefined ? itm.value : "")
-          else
-            Menu.runCommand(itm.command, itm.value !== undefined ? itm.value : "")
+          // Dismiss before dispatching: a command that restarts the shell
+          // (Reload Vibranium) would otherwise kill it mid close animation,
+          // leaving the transform visible until the new session maps.
           // keepOpen: the row summons something in place (a picker page
           // pushed onto this stack, a refresh) and the menu must survive
           // so Esc can walk back - the classic close would kill the chain
           // the summon was made from.
           if (!(itm && itm.keepOpen === true)) Menu.close()
+          if (itm.call !== "")
+            Menu.runCall(itm.call, itm.value !== undefined ? itm.value : "")
+          else
+            Menu.runCommand(itm.command, itm.value !== undefined ? itm.value : "")
           break
         case "select":
           setExpanded(!expanded)
@@ -997,7 +1000,12 @@ Item {
           break
       }
     } finally {
-      if (_wasFiltered && Menu.scopedActive) {
+      // A flat scoped result leaves the filter ARMED: the handoff fades its
+      // rows out and clears the filter at the page-switch edge, then walks
+      // the chain. Clearing here would swap the filtered rows for the full
+      // page before the fade even starts.
+      if (_wasFiltered && Menu.scopedActive
+        && !(itm && itm.scopedResult === true)) {
         if (Menu.panel) Menu.panel._scopedClearByAction = true
         Menu.clearScoped()
       }

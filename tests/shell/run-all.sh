@@ -148,7 +148,7 @@ discover
 # sees, so they need a live vibranium-shell and spend seconds per step. The
 # default run is CLI-only; --ui opts in. An explicit --only still runs a named
 # UI suite, since naming one is already an explicit request for it.
-declare -A UI_SUITE=(["menu-nested-live"]=1)
+declare -A UI_SUITE=(["menu-nested-live"]=1 ["menu-result-fade"]=1)
 
 ui_suite() {
   [[ -n ${UI_SUITE[$1]:-} ]]
@@ -195,6 +195,7 @@ describe() {
   clipboard) printf 'ClipboardLib' ;;
   menu) printf 'MenuLib' ;;
   menu-nested-live) printf 'reveal restore, layered Escape and staged swaps on the live shell' ;;
+  menu-result-fade) printf 'one handoff progress behind four result presentations on the live shell' ;;
   dropdown-land) printf 'a landed DropdownSlot keeps following its content height' ;;
   list-follow-curve) printf 'keyboard follow keeps the centre on a held key' ;;
   list-hold) printf 'held-key centre lock: a pinned bar and sliding rows' ;;

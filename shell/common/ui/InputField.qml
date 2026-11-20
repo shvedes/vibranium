@@ -44,6 +44,16 @@ Rectangle {
   // that drives the query while another item keeps focus (the theme deck's
   // type-to-filter) sets this so the field still reads as active.
   property bool engaged: false
+  // Presentation input from a host that owns one shared progress value (the
+  // menu's result handoff). 0 is the shipped default: every other consumer
+  // leaves it untouched and keeps the border and ghost timing it has today.
+  // The menu binds this once from its single handoff value; nothing here
+  // writes it. Positive values blend the lit border toward the idle colour
+  // and hold the ghost back until the handoff has crossed its midpoint.
+  property real handoff: 0
+  // Typed so the handoff blend can read .r/.g/.b/.a. Theme.color() returns a
+  // STRING; reading channels off it yields undefined and a transparent border.
+  readonly property color idleBorderColor: Theme.color("background_3")
   // Plain Up/Down and Tab/Backtab are consumed ahead of editing and emitted
   // as navigationRequested, for a consumer whose field owns the caret but a
   // deck around it still owns those keys. Left/Right keep their text-caret
@@ -309,7 +319,21 @@ Rectangle {
   radius: RoundingPolicy.radius
   color: Theme.color("background_1")
   border.width: 1
-  border.color: input.activeFocus || root.engaged ? root.focusColor : Theme.color("background_3")
+  // The blend is a function of the host's handoff, not a second tween: the
+  // ColorAnim below still owns the colour's motion, exactly as it does for a
+  // focus flip in every other consumer. At handoff 0 this is byte-for-byte
+  // the old expression.
+  border.color: {
+    const lit = input.activeFocus || root.engaged
+      ? root.focusColor : root.idleBorderColor
+    const k = Math.min(Math.max(root.handoff * 2, 0), 1)
+    if (k <= 0) return lit
+    const idle = root.idleBorderColor
+    return Qt.rgba(lit.r + (idle.r - lit.r) * k,
+      lit.g + (idle.g - lit.g) * k,
+      lit.b + (idle.b - lit.b) * k,
+      lit.a + (idle.a - lit.a) * k)
+  }
 
   Behavior on border.color {
     ColorAnim {}
@@ -443,7 +467,12 @@ Rectangle {
     height: parent.height
     clip: true
     visible: opacity > 0.01
-    opacity: root._ghostShown ? 1 : 0
+    // The host's handoff gates the ghost without owning its fade: the
+    // Behavior below still animates this opacity with Ui.fastMs, as it has
+    // for every focus flip. Handoff 0 keeps the shipped show rule; a handoff
+    // in flight holds the hint back until the page switch at the midpoint.
+    opacity: root._ghostShown
+      && (root.handoff === 0 || root.handoff >= 0.5) ? 1 : 0
 
     // The synchronous show state underneath the animated paint above,
     // for tests and readers that must not sample a tween mid-flight.

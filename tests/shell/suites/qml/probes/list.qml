@@ -448,6 +448,27 @@ Item {
     delegate: Component { Item { width: ListView.view.width; height: Ui.rowMinH } }
   }
 
+  // One-frame-teleport fixture: thirty rows in a short viewport, so an end
+  // seat crosses many rows. Every frame of that seat is sampled below; a
+  // single writer that teleports would move the whole distance in one
+  // sample, while a tween spreads it over consecutive frames.
+  List {
+    id: flight
+    width: 300
+    height: 120
+    smoothScroll: true
+    model: root.rows30
+    // A literal 34 is Ui.rowMinH, written qualified here so this new
+    // fixture adds no unqualified-access warning to the probe's lint count.
+    delegate: Component { Item { width: ListView.view.width; height: 34 } }
+  }
+  property var flightCys: []
+  property var flightHl: []
+  property var flightTween: []
+  property var flightAnim: []
+  property real flightDistance: 0
+  property int flightRawStart: 0
+
   // Swap-scroll fixture: thirty rows in a 120px viewport, so the view has
   // somewhere to be that is not the top.
   List {
@@ -560,7 +581,9 @@ Item {
     "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
     "stablePark", "", "stableSample", "", "stableSample", "",
     "stableSample", "", "stableCheck", "", "stableShortCheck",
-    "animLanded", "animRest", "final", "finish"
+    "animLanded", "animRest", "final",
+    "flightStart", "flightSample", "flightSample", "flightSample",
+    "flightSample", "flightEnd", "finish"
   ]
 
   Timer {
@@ -2027,6 +2050,56 @@ Item {
     kv("ar.seatsInstant", smooth._seatsInstant)
     kv("ar.y", smooth.contentY)
     kv("ar.exactRestore", smooth.contentY === 100)
+  }
+
+  // One-frame teleport regression. A single end seat is sampled on five
+  // consecutive turns. The checks are on the SHAPE of the motion, not on
+  // its end state: a direct contentY write would put the whole distance
+  // into one sample and satisfy a sleep-then-read assertion while failing
+  // these. The bar's duration is read on those same frames and compared
+  // with the running tween's own duration, which is what proves the
+  // travel is derived from the tween rather than copied into a scalar.
+  function flightStart() {
+    flight.settle(0, false)
+    flight._stillPreempt()
+    root.flightCys = [flight.contentY]
+    root.flightHl = []
+    root.flightTween = []
+    root.flightAnim = []
+    root.flightDistance = flight.clampY(Infinity) - flight.contentY
+    root.flightRawStart = flight.debugRawWrites
+    flight.seatTo(flight.clampY(Infinity), true, "probe")
+  }
+  function flightSample() {
+    root.flightCys.push(flight.contentY)
+    root.flightHl.push(flight.highlightMoveDuration)
+    root.flightTween.push(flight.debugTweenMs)
+    root.flightAnim.push(flight.debugAnimRunning)
+  }
+  function flightEnd() {
+    const c = root.flightCys
+    const h = root.flightHl
+    const t = root.flightTween
+    const a = root.flightAnim
+    let maxStep = 0
+    for (let i = 1; i < c.length; i++) {
+      maxStep = Math.max(maxStep, Math.abs(c[i] - c[i - 1]))
+    }
+    kv("of.distance", Math.round(root.flightDistance))
+    kv("of.samples", c.length)
+    kv("of.maxStep", Math.round(maxStep * 10) / 10)
+    kv("of.first", Math.round(c[1] * 10) / 10)
+    kv("of.last", Math.round(c[c.length - 1] * 10) / 10)
+    kv("of.multiFrame", c.length >= 5)
+    kv("of.noTeleport", maxStep < root.flightDistance / 2)
+    kv("of.advances", c[1] > c[0] && c[2] > c[1] && c[3] > c[2])
+    kv("of.distinct", c[1] !== c[2] && c[2] !== c[3] && c[3] !== c[4])
+    kv("of.inFlight", a[1] === true && a[2] === true && a[3] === true)
+    kv("of.hlTracksTween", h[1] === t[1] && h[2] === t[2] && h[3] === t[3])
+    kv("of.sweepOff", flight.debugSweepMs === -1)
+    kv("of.tweenMs", t[1])
+    kv("of.hlMs", h[1])
+    kv("of.rawWrites", flight.debugRawWrites - root.flightRawStart)
   }
 
   // Layout: what the view derives from the model, and the row height floor.

@@ -740,6 +740,66 @@ function substituteQuoted(command, value) {
 // entry-only row is keyed from the entry. A row that can be neither drawn nor
 // keyed does not belong in the result.
 //
+// Scoped "/" filter projection. The filter stays on one page, and a nested
+// match used to surface as its OWNING GROUP row - which hid the entry the
+// user actually typed ("drop shadow" showed "Menus"). This flattens matched
+// descendants into top-level result rows in the same visual language as
+// global search, while carrying the group chain the landing walks to open
+// their real nesting. A row that matches in its own right keeps its whole
+// subtree, so browsing a group by its own name is unchanged.
+function scopedResultRows(page, text) {
+  const out = []
+  if (!page || !Array.isArray(page.items)) return out
+  const q = String(text === undefined || text === null ? "" : text).toLowerCase().trim()
+  const tokens = q === "" ? [] : q.split(/\s+/).filter(function(t) { return t !== "" })
+  const matches = function(it) {
+    const hay = hayForFilter(it)
+    for (let t = 0; t < tokens.length; t++)
+      if (hay.indexOf(tokens[t]) < 0) return false
+    return true
+  }
+  const seen = Object.create(null)
+  const push = function(item, owner, ownerIndex, chain) {
+    const uid = item.uid !== undefined && item.uid !== null ? String(item.uid) : ""
+    if (uid !== "" && seen[uid] === true) return
+    if (uid !== "") seen[uid] = true
+    if (!owner) {
+      out.push(item)
+      return
+    }
+    const flat = Object.assign({}, item)
+    flat.type = "group"
+    flat.groupUid = owner.uid
+    flat.childUid = uid
+    flat.childUids = chain.slice()
+    flat.pageId = page.id
+    flat.row = ownerIndex
+    flat.scopedResult = true
+    if (flat.uid === undefined || flat.uid === null) flat.uid = uid
+    out.push(flat)
+  }
+  function scan(list, owner, ownerIndex, chain) {
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i]
+      if (!it || typeof it !== "object" || Array.isArray(it)) continue
+      if (tokens.length === 0 || matches(it)) {
+        push(it, owner, ownerIndex, chain.concat(
+          it.uid !== undefined && it.uid !== null ? [String(it.uid)] : []))
+        continue
+      }
+      if (!Array.isArray(it.children) || it.children.length === 0) continue
+      if (owner) {
+        scan(it.children, owner, ownerIndex, chain.concat(
+          it.uid !== undefined && it.uid !== null ? [String(it.uid)] : []))
+      } else {
+        scan(it.children, it, i, [])
+      }
+    }
+  }
+  scan(page.items, null, -1, [])
+  return out
+}
+
 function groupSearchResults(hits, lookup, isVisible, query) {
   const rows = []
   const buckets = []

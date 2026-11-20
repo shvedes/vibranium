@@ -17,6 +17,15 @@ Item {
   // its focus, and drives the word-editing helpers through this alias.
   property alias field: barInput
 
+  // The one handoff value from the panel, fanned out to the field's border
+  // and ghost. The query text is its complement: it is gone by the midpoint
+  // where the page switch commits, and the OutCubic curve is preserved here
+  // rather than given a second clock of its own.
+  property real handoff: 0
+  // The query's opacity is the panel's eased complement of the same value;
+  // the field owns no text-fade clock of its own.
+  property real queryOpacity: 1
+
   // True while the "/" scoped filter is armed. The chip must stay put in
   // that mode, focused or not: the default (false) hid it on the first Esc
   // and glided the query left, which read as a flash. The ghost hint moves
@@ -41,10 +50,19 @@ Item {
     filterIconAlways: true
     clearable: false
     placeholder: root.scoped ? "Filter..." : "Search..."
+    handoff: root.handoff
     onEdited: text => root.edited(text)
     onAccepted: text => root.accepted(text)
     onEscaped: root.escaped()
     onBackspaceEmpty: root.backspaceEmpty()
     onFocusedChanged: root.fieldFocusChanged()
+  }
+
+  // A Binding keeps the writer here rather than animating the field from
+  // the panel: the query's faded presentation is one derived value.
+  Binding {
+    target: barInput.input
+    property: "opacity"
+    value: root.queryOpacity
   }
 }

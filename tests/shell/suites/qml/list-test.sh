@@ -438,7 +438,10 @@ qp_assert "a seat that does not move releases both claims" st.claimAfterNoopSeat
 # let pursue() mistake a foreign tween for its own and re-aim it on the next
 # height step. _seatEpoch is still bumped, which the deferred retries guard on.
 qp_assert "and the probe sees the release" st.noopSeatReleasesClaims true
-qp_assert "and the epoch was still bumped" st.noopSeatEpoch 19
+# The count includes the two out-of-range reconcile clamps from scrollModel:
+# those used to write contentY directly and now go through seatTo, the one
+# writer. The no-op seat still bumps the epoch on top of them.
+qp_assert "and the epoch was still bumped" st.noopSeatEpoch 21
 
 t_section "seat(): one entry where an index write meets the highlight policy"
 qp_assert "seat() is a callable entry" st.seatFn true
@@ -944,6 +947,22 @@ qp_assert "of the length it started with" nm.rows8.length 8
 qp_assert "with its first element intact" nm.rows8.first row0
 qp_assert "and its last" nm.rows8.last row7
 qp_assert "carrying no keys but its indices" nm.noExtraKeys true
+
+t_section "a one-frame teleport fails a frame-level assertion"
+t_note "A single end seat over 958px is sampled on five consecutive turns. The checks read the shape of the motion, not its end state: a direct contentY write would put the whole distance in one sample and still land on the right row after a sleep."
+qp_assert "the seat really crosses many rows" of.distance 958
+qp_assert "five consecutive frames were sampled" of.samples 5
+qp_assert "no frame carried half the distance" of.noTeleport true
+qp_assert "the content advanced on each of the first frames" of.advances true
+qp_assert "the sampled positions are distinct" of.distinct true
+qp_assert "the tween was running on those frames" of.inFlight true
+t_note "largest single-frame step $(qp_get of.maxStep)px; first $(qp_get of.first)px, last $(qp_get of.last)px"
+t_section "the highlight's travel is the content tween's live duration"
+qp_assert "the bar's duration equals the tween's on every sampled frame" of.hlTracksTween true
+qp_assert "the copied sweep scalar is off, so nothing was handed to the bar" of.sweepOff true
+qp_assert "the live tween duration is 160ms" of.tweenMs 160
+qp_assert "and the bar reads exactly that" of.hlMs 160
+qp_assert "no raw contentY write escaped seatTo during the seat" of.rawWrites 0
 
 t_section "everything is released once the run is over"
 qp_assert "the wall's cursor is inside its model" fin.wallIndexInRange true

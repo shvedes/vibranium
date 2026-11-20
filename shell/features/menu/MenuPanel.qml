@@ -274,10 +274,11 @@ Rectangle {
     list.autoRevealIndex = -1
     list._followIdx = -1
     pageHost.x = 0
-    pageHost.opacity = 1
+    panel._pageSlideOpacity = 1
   }
 
   function beginPageTransition(summon) {
+    panel._handoffReveal = false
     const gen = ++panel._transitionGen
     // The place owed to the page being left: it belongs to the row set that
     // page had, and the page on screen now is a different one. The new
@@ -319,7 +320,7 @@ Rectangle {
     panel._transitionActive = true
     panel._pendingSlideDepth = Menu.stack.length
     pageHost.x = 0
-    pageHost.opacity = 0
+    panel._pageSlideOpacity = 0
     if (summon === true) listBox.lastDepth = Menu.stack.length
     return gen
   }
@@ -432,7 +433,12 @@ Rectangle {
     }
     panel._heightAnimating = false
     panel._animatedListH = target
-    panel._committedListH = target
+    // The fit that just landed owns the resting size. Re-deriving from the
+    // model here can read a filter's old latch and collapse the card even
+    // though the tween delivered the restored page's height.
+    panel._committedListH = panel._handoffReveal && target > 0
+      ? target : panel._modelListH()
+    panel._handoffReveal = false
     if (gen >= 0) Qt.callLater(() => panel._finishPageTransition(gen))
   }
 
@@ -586,11 +592,12 @@ Rectangle {
       // filed under the page it lives on, after the rows it opens.
       candidate = MenuLib.groupSearchResults(Menu.results, Menu.pageById, Menu.isVisible, Menu.query)
     } else if (panel.scopedSearching) {
-      // "/" quick-filter: already scoped by the lib to the current page's
-      // visible fields. A trim, not the cross-page search - grid chrome
-      // stays woven on grid pages.
-
-      candidate = Menu.scopedRows.slice()
+      // "/" quick-filter stays on this page, but a nested match now renders
+      // as a flat top-level result row - the same visual language as global
+      // search - carrying the group chain its landing walks to open the real
+      // nesting. A row that matched in its own right keeps its subtree.
+      candidate = MenuLib.scopedResultRows(
+        panel.installedPage, Menu.scopedQuery)
       if (!panel.searching)
         candidate = panel.composeGridRows(candidate)
     } else {
@@ -1545,7 +1552,7 @@ Rectangle {
         if (!panel.searching && Menu.open) {
           // A result selection fades the query on its own clock; clearing it
           // here would drop the text in one frame before that fade lands.
-          if (searchField.text !== "" && !panel._resultFadeActive)
+          if (searchField.text !== "" && !panel.handoffActive)
             searchField.text = ""
           if (panel.mode === "filter") focusCtrl.grabList()
         }
@@ -1650,6 +1657,10 @@ Rectangle {
     // A nested close holds the claim clear until its restore has settled;
     // re-arming sooner chases a shrinking target and moves the view again.
     if (panel._nestedSeatPending) return
+    // A result handoff owns the claim: its group arms it on the expansion
+    // edge, when the settled height already includes the dropdown. Re-arming
+    // here against the trimmed row would reveal its collapsed top instead.
+    if (panel._handoffReveal) return
     let revealIdx = panel._trackedOpenIdx()
     if (revealIdx === -2) revealIdx = panel._scanOpenSlot()
     if (Menu.traceEnabled) {
@@ -1760,6 +1771,11 @@ Rectangle {
         panel._scopedReturnChild = -1
         if (panel._scopedClearByAction) {
           panel._scopedClearByAction = false
+          // A flat result's landing owns the reveal: its group expands AFTER
+          // the rows are restored and Entry arms the claim on that edge,
+          // when the row's settled height already includes the dropdown.
+          // Re-arming here would pursue the still-collapsed row's top and
+          // leave the page scrolled short of the manual reveal.
           return
         }
         if (Menu.scopedActive || !Menu.open || !samePage) return
@@ -2573,7 +2589,15 @@ Rectangle {
       panel._slotRegionH = -1
       return
     }
-    const base = panel._restingFallbackH()
+    // During a result handoff the filter's old one-row latch can still be the
+    // resting answer when the group's claim arms, so the region would drop to
+    // the trimmed height for a frame before the group unfolds. The page fit
+    // that the handoff is revealing is the real base on that edge.
+    const base = panel._handoffReveal && panel._animatedListH > 0
+      ? panel._animatedListH : panel._restingFallbackH()
+    // The group's claim is the handoff's landing: from here on the normal
+    // resting base applies and the reveal flag can retire.
+    if (panel._claimListH > 0) panel._handoffReveal = false
     // The claim arms a tick before the row's first slot step. The row is
     // still at its rest height on that edge, so there is no live height to
     // follow - but clearing the region there let the height chain fall
@@ -3741,21 +3765,46 @@ Rectangle {
     }
   }
 
-  // A result selection is a two-phase handoff. First the search results
-  // fade out while the query text and the field's focus border fade on the
-  // same edge; only then does the page switch and fade in. The old rows stay
-  // on screen for phase one, so there is no empty card between the two.
-  property bool _resultFadeActive: false
+  // A result selection is a two-phase handoff. ONE value drives it: 0 is
+  // the search results in focus, 0.5 is the page-switch edge, 1 is the
+  // target page revealed. Four presentations read this value; none of them
+  // owns a clock of its own. The two phases keep the L1 edge for the page
+  // switch (commitResultFade runs in the first animation's onFinished), but
+  // every derived presentation is L2: a function of the one live value.
+  //
+  // Start just above zero so the guards that read `handoffActive` are true
+  // on the very first frame, before the animation has advanced.
+  property real handoff: 0
+  readonly property bool handoffActive: panel.handoff > 0
+  // A filtered result reveals a restored page with a fit; that fit's target
+  // is the committed resting size, not the filter's old one-row latch.
+  property bool _handoffReveal: false
+  // Phase progress in [0,1]; both are pure normalisations of the one value.
+  readonly property real handoffOutK: Math.min(panel.handoff * 2, 1)
+  readonly property real handoffInK: Math.max(0, (panel.handoff - 0.5) * 2)
+  // The old phase-one Linear 1->0 and phase-two OutCubic 0.3->1 shapes,
+  // expressed as functions of handoff. There is no pageHost tween left.
+  readonly property real handoffPageOpacity: panel.handoff <= 0.5
+    ? 1 - panel.handoffOutK
+    : 0.3 + 0.7 * (1 - Math.pow(1 - panel.handoffInK, 3))
+  // Query text is the eased complement: the old 1->0 OutCubic textFadeAnim.
+  readonly property real handoffTextOpacity: Math.pow(1 - panel.handoffOutK, 3)
+  // Non-handoff page motion (submenu slide, open seat) keeps its own value;
+  // the handoff presentation overlays it without either writing the other.
+  property real _pageSlideOpacity: 1
+
   property var _resultPending: null
 
   function beginResultFade(it) {
-    if (panel._resultFadeActive) panel.finishResultFade()
+    if (panel.handoffActive) panel.finishResultFade()
     if (!MotionPolicy.enabled) return
-    panel._resultFadeActive = true
     panel._resultPending = it
+    // Cycle breaker: the deferred text clear, focus reassert and slide guard
+    // all read this value on the start edge; a pure edge cannot start its own
+    // clock, so the first frame is written here before they run.
+    panel.handoff = 0.0001
     focusCtrl.grabList()
-    textFadeAnim.restart()
-    resultOutAnim.restart()
+    handoffOutAnim.restart()
   }
 
   // Phase two: the query still names this hit, so commit the landing while
@@ -3763,8 +3812,12 @@ Rectangle {
   function commitResultFade() {
     const it = panel._resultPending
     panel._resultPending = null
-    if (!panel._resultFadeActive) return
-    if (!Menu.open || Menu.query === "") {
+    if (!panel.handoffActive) return
+    // The L1 edge is here: the page switches only when phase one finishes.
+    // The non-handoff fallback is already the revealed value, so the frame
+    // where handoff reaches 1 cannot fall back to a hidden page.
+    panel._pageSlideOpacity = 1
+    if (!Menu.open || (Menu.query === "" && !(it && it.scopedResult))) {
       panel.finishResultFade()
       return
     }
@@ -3772,26 +3825,28 @@ Rectangle {
   }
 
   function finishResultFade() {
-    if (!panel._resultFadeActive) return
-    panel._resultFadeActive = false
+    if (panel.handoff <= 0) return
+    handoffOutAnim.stop()
+    handoffInAnim.stop()
     panel._resultPending = null
-    resultOutAnim.stop()
-    resultInAnim.stop()
-    textFadeAnim.stop()
-    // A submenu hit can push another page inside this fade; its own
-    // transition owns pageHost opacity from then on.
-    if (!panel._transitionActive) pageHost.opacity = 1
-    searchField.input.opacity = 1
-    // The query is cleared at the start of phase two, so the ghost hint's
-    // own Ui.fastMs fade rides in with the page reveal, not after it.
+    // The revealed end state is handoff 1. On this edge the driver returns
+    // to its idle origin so ordinary submenu slides own pageHost again;
+    // handing the fallback the revealed value keeps that swap seamless.
+    panel.handoff = 0
+    panel._pageSlideOpacity = 1
+    // The group branch releases the index-follow hold on its expansion
+    // edge; clearing it here would let the row-set echo follow the still
+    // collapsed group to the viewport top.
+    // A close or a superseded selection is retired here too: leaving a
+    // partial value behind would hold the handoff guards shut forever.
   }
 
   NumberAnimation {
-    id: resultOutAnim
-    target: pageHost
-    property: "opacity"
-    from: 1
-    to: 0
+    id: handoffOutAnim
+    target: panel
+    property: "handoff"
+    from: 0.0001
+    to: 0.5
     // Linear over a full clock: OutCubic spent most of its duration already
     // at zero, which read as a few still frames before the page switched.
     duration: Ui.fastMs
@@ -3800,26 +3855,14 @@ Rectangle {
   }
 
   NumberAnimation {
-    id: resultInAnim
-    target: pageHost
-    property: "opacity"
-    // Not zero: the first frame of the reveal would be an empty card while
-    // the new delegates build.
-    from: 0.3
+    id: handoffInAnim
+    target: panel
+    property: "handoff"
+    from: 0.5
     to: 1
     duration: Ui.fastMs
-    easing.type: Easing.OutCubic
+    easing.type: Easing.Linear
     onFinished: panel.finishResultFade()
-  }
-
-  NumberAnimation {
-    id: textFadeAnim
-    target: searchField.input
-    property: "opacity"
-    from: 1
-    to: 0
-    duration: Ui.fastMs
-    easing.type: Easing.OutCubic
   }
 
   function consumePendingResult() {
@@ -3828,17 +3871,37 @@ Rectangle {
     if (!it || !Menu.open || it.pageId === undefined) return
     if (!Menu.hasPage(it.pageId)) return
     panel.beginResultFade(it)
-    if (panel._resultFadeActive) return
+    if (panel.handoffActive) return
     panel.applyResult(it)
   }
 
   function applyResult(it) {
-    if (!Menu.jumpTo(it.pageId, it.row)) return
-    if (panel._resultFadeActive) {
-      pageHost.opacity = 0.3
-      resultInAnim.restart()
+    if (it.scopedResult) {
+      // A filtered nested entry stays on this page. Entry left the filter
+      // armed so its rows could fade out; clearing it here restores the full
+      // rows under the masked page, then the group branch below walks the
+      // chain to the entry's real nesting. No stack reset, no page jump.
+      panel._scopedClearByAction = true
+      // The filtered card latched the trimmed one-row height. Dropping that
+      // latch makes the region read the size actually on screen while the
+      // restored rows measure, instead of snapping back to the trimmed size
+      // for a frame when the fit lands.
+      panel._latchedListH = -1
+      panel._handoffReveal = true
+      // The restored row set echoes a currentIndex change that is not a
+      // gesture; its generic follow would precede the group's own reveal.
+      if (list) list.suppressIndexFollow = true
+      Menu.clearScoped()
+    } else if (!Menu.jumpTo(it.pageId, it.row)) {
+      return
+    } else {
+      Menu.clearQuery()
     }
-    Menu.clearQuery()
+    if (panel.handoffActive) {
+      // The same value continues from the switch edge to 1; the page's
+      // 0.3-to-1 reveal is a derivation of it, not a second animation.
+      handoffInAnim.restart()
+    }
     // Emptying the field here starts the placeholder's own Ui.fastMs fade
     // on the same edge as the page reveal; the text control stays
     // transparent until that reveal lands.
@@ -3893,7 +3956,12 @@ Rectangle {
       if (targetUid !== "" && list) Qt.callLater(function() {
         const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
         Menu.trace("result.seatPage", { idx: idx, uid: targetUid })
-        if (idx >= 0) list.seat(idx, "land")
+        if (idx < 0) return
+        // A scoped flat result restores the page rows under the handoff; the
+        // generic land-follow would seat the collapsed row at the viewport
+        // top before its slot grows. The expansion below owns that reveal.
+        if (it.scopedResult) list.landIndex(idx)
+        else list.seat(idx, "land")
       })
       Menu.trace("result.group", {
         label: String(it.label ?? ""), type: String(it.type ?? ""),
@@ -3940,10 +4008,12 @@ Rectangle {
         const childRow = r2._focusedChildRow ? r2._focusedChildRow() : null
         if (!childRow || !childRow.isGroup) return
         childRow.setExpanded(true)
-        panel.whenSettled(function(next) {
-          rows[n + 1] = next
-          seatLevel(n + 1, rows)
-        }, function(next) { return groupUidMatches(next, chain[n]) })
+        // A nested group row is hosted inside its parent's loader, never in
+        // the page list, so panel.currentRow() cannot name it. Walk the live
+        // delegate we just expanded instead of waiting for a page row that
+        // never arrives.
+        rows[n + 1] = childRow
+        seatLevel(n + 1, rows)
       }
       // Opening the group is a slot claim against the row's own geometry. Do
       // it on the settled gate every landing uses: jumping here arrives mid
@@ -3955,6 +4025,7 @@ Rectangle {
         if (idx >= 0 && list && list.currentIndex !== idx) list.seat(idx, "land")
         seatRows[0] = panel.currentRow()
         if (!groupUidMatches(seatRows[0], targetUid)) return
+        if (list) list.suppressIndexFollow = false
         seatRows[0].setExpanded(true)
         if (chain.length === 0) return
         // The row may have been pulled back while the query cleared; wait for
@@ -4497,7 +4568,7 @@ Rectangle {
     // A result handoff keeps the query alive through the results' fade-out.
     // Reasserting filter focus here would put the border back on the field
     // until the page switch, fading it with the reveal instead of the fold.
-    if (!panel._resultFadeActive
+    if (!panel.handoffActive
       && (searchField.focused || focusCtrl.mode === "filter" || panel.searching)) {
       focusCtrl.mode = "filter"
       if (!searchField.focused) searchField.grabFocus()
@@ -4523,6 +4594,16 @@ Rectangle {
     const igv = cr && cr._groupView ? cr._groupView : null
     const next = list && list.currentIndex >= 0
       ? list.itemAtIndex(list.currentIndex + 1) : null
+    // The ghost is shell-painted inside InputField and already carries an
+    // objectName, so the probe need not add a property to the shared field.
+    let ghostOpacity = -1
+    const fieldKids = searchField.children
+    for (let i = 0; i < fieldKids.length; ++i) {
+      if (fieldKids[i].objectName === "ghost") {
+        ghostOpacity = Math.round(fieldKids[i].opacity * 1000) / 1000
+        break
+      }
+    }
     const opts = cr && cr.optionList ? cr.optionList : []
     const optVal = cr && cr.st && cr.st.value !== undefined
       ? String(cr.st.value) : ""
@@ -4559,7 +4640,18 @@ Rectangle {
       gridCols: panel.gridCols,
       gridCell: panel.gridSide,
       searchFocused: searchField.focused,
+      // Result-handoff ground truth: the one progress value and the four
+      // presentations derived from it, sampled together for frame-level
+      // assertions that they cannot drift into separate tweens.
+      handoff: Math.round(panel.handoff * 1000) / 1000,
+      handoffActive: panel.handoffActive,
+      pageOpacity: Math.round(pageHost.opacity * 1000) / 1000,
+      textOpacity: Math.round(searchField.input.opacity * 1000) / 1000,
+      fieldHandoff: Math.round(searchField.handoff * 1000) / 1000,
+      fieldBorder: String(searchField.border.color),
+      ghostOpacity: ghostOpacity,
       rowType: row ? row.ptype : "",
+      rowLabel: row && row.itm ? String(row.itm.label ?? "") : "",
       expanded: row ? row.expanded === true : false,
       dropdownOpen: row ? row.dropdownOpen === true : false,
       editorOpen: row ? row.editorOpen === true : false,
@@ -4749,6 +4841,9 @@ Rectangle {
     anchors.margins: Ui.outerPad
     height: Ui.filterH
     scoped: panel.scopedSearching
+    // The same value fans out into the field's border/ghost and query text.
+    handoff: panel.handoff
+    queryOpacity: panel.handoffTextOpacity
 
     onEdited: text => panel.onFieldEdited(text)
     // TextInput consumes Enter to emit accepted; route it here since it
@@ -4792,10 +4887,10 @@ Rectangle {
       // so any page-id churn it sees must not consume the first-open
       // seat or start the tween off-screen.
       if (!Menu.open) return
-      // A search-result handoff fades the page in on its own clock. Keep the
-      // depth bookkeeping current but leave pageHost opacity to that fade;
-      // a same-depth snap here would show the whole swap in one frame.
-      if (panel._resultFadeActive) {
+      // A search-result handoff derives pageHost opacity from handoff. Keep
+      // the depth bookkeeping current but leave that value alone; a
+      // same-depth snap here would show the whole swap in one frame.
+      if (panel.handoffActive) {
         listBox.lastDepth = depth
         return
       }
@@ -4810,7 +4905,7 @@ Rectangle {
         listBox.lastDepth = depth
         slideAnim.stop()
         pageHost.x = 0
-        pageHost.opacity = 1
+        panel._pageSlideOpacity = 1
         return
       }
       // Same depth, no navigation (summon-time page switch after the
@@ -4818,7 +4913,7 @@ Rectangle {
       if (depth === listBox.lastDepth) {
         slideAnim.stop()
         pageHost.x = 0
-        pageHost.opacity = 1
+        panel._pageSlideOpacity = 1
         return
       }
       // Every navigation tweens, including the first: seating the first
@@ -4834,11 +4929,11 @@ Rectangle {
       if (!MotionPolicy.enabled) {
         slideAnim.stop()
         pageHost.x = 0
-        pageHost.opacity = 1
+        panel._pageSlideOpacity = 1
         return
       }
       pageHost.x = dir * 48
-      pageHost.opacity = 0
+      panel._pageSlideOpacity = 0
       slideX.from = dir * 48
       slideX.to = 0
       slideFade.from = 0
@@ -4869,8 +4964,8 @@ Rectangle {
         }
         NumberAnimation {
           id: slideFade
-          target: pageHost
-          property: "opacity"
+          target: panel
+          property: "_pageSlideOpacity"
           to: 1
           duration: Ui.fastMs + 20
           easing.type: Easing.OutCubic
@@ -4884,6 +4979,10 @@ Rectangle {
       y: 0
       width: listBox.width
       height: listBox.height
+      // One presentation of the shared handoff value. Outside a handoff the
+      // ordinary submenu slide value shows through unchanged.
+      opacity: panel.handoffActive
+        ? panel.handoffPageOpacity : panel._pageSlideOpacity
 
       List {
         id: list
@@ -5022,6 +5121,7 @@ Rectangle {
           itm: modelData
           sel: list.currentIndex === index
           searchResult: panel.searching
+            || (modelData && modelData.scopedResult === true)
           // The card is mid-width for as long as the width glide runs; the
           // row uses it to reveal its copy with the growth.
           cardSettling: panel.widthSettling

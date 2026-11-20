@@ -99,7 +99,13 @@ GridView {
 
     target: root
     property: "contentY"
-    duration: Ui.fastMs
+    // The wrap tween's travel is derived from its own live endpoints, not
+    // handed in as a copied scalar. List's highlight binds to its content
+    // tween the same way: one clock per engine, no duration passed between
+    // components. A restart re-reads this binding from the current sweep.
+    duration: Math.min(650,
+      Math.round(Ui.fastMs
+        + (Math.abs(root.sweepTo - root.sweepY0) / Math.max(1, root.height)) * 140))
     easing.type: Easing.OutCubic
   }
 
@@ -116,11 +122,9 @@ GridView {
     // Pre-snap position: gotoCell's Contain snap lands on next polish.
     const y0 = root.contentY
     if (Math.abs(target - y0) < root.height) return
-    const pages = Math.abs(target - y0) / Math.max(1, root.height)
     root.sweepY0 = y0
     root.sweepTo = target
     root.sweeping = true
-    sweep.duration = Math.min(650, Math.round(Ui.fastMs + pages * 140))
     Idle.run(() => {
       if (!root.sweeping) return
       root.sweeping = false
@@ -302,12 +306,12 @@ GridView {
     root.contentY = target
   }
 
-  // List.jumpEnd pre-arms the highlight bar's sweep duration from the
-  // follow target and then calls trackCursor. Grid seating has no twin
-  // for either, and the reasons differ: the pre-arm exists to hand a
-  // bar tween the same duration as a content tween, and trackCursor is
-  // the center-lock follow seat, which is not where a jump belongs -
-  // the end cell itself, seated at the viewport edge, is.
+  // List.jumpEnd still pre-arms a content-tween FLOOR from the follow
+  // target (see _sweepMs), but its highlight no longer takes a copied
+  // duration: the bar reads the content tween's own live duration. Grid
+  // seating has no bar twin, and the reason for the other half differs:
+  // trackCursor is the center-lock follow seat, which is not where a
+  // jump belongs - the end cell itself, seated at the viewport edge, is.
   function jumpEnd(last) {
     const n = root.count
     if (n === 0) return
