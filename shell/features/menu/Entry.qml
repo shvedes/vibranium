@@ -1344,8 +1344,6 @@ Item {
     Qt.callLater(grabEditorFocus)
   }
 
-  // Sub copy updates instantly with no slide or fade: live countdowns
-  // re-evaluate every second and any motion would replay on each tick.
   function grabEditorFocus() {
     if (!editorOpen) return
     const shell = expLoader.item
@@ -1703,7 +1701,14 @@ Item {
             textFormat: Text.PlainText
           }
 
-          Text {
+          // The muted copy and the trailing accent are the two sub-line
+          // fields that change live: Menu.rev re-evaluates subText and
+          // subAccent on every state write, so a countdown or a flow stage
+          // flips them without rebuilding the row. Both ride SlideSwap's
+          // bottom-to-top slidefade; its triple buffer keeps a flip that
+          // lands mid-tween from stealing a live layer. The host clips so
+          // the travel stays inside the pinned line.
+          SlideSwap {
             id: subMain
             // The Row pins the sub-line height; the copy keeps its natural
             // line height and centres inside it, so a short Latin line does
@@ -1715,7 +1720,7 @@ Item {
             // whole; without a lead the formula below is untouched.
             //
             // Natural width while the Row has none yet: labelColH measures
-            // this Text's height, and an elided Text at zero width measures
+            // this box's height, and an elided layer at zero width measures
             // zero, which is a row reading as one line before its anchors
             // have resolved.
             width: subLeadEl.implicitWidth > 0
@@ -1736,26 +1741,27 @@ Item {
             // Search hits read the default muted copy: the group header
             // above already carries the section in accent.
             color: Ui.tint("foreground_1", 0.55)
-            font.pixelSize: Ui.fontXs
-            font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+            fontSize: Ui.fontXs
+            fontFamily: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+            duration: Ui.normalMs
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
-            clip: row.textReveal < 1
+            clip: true
             opacity: row.textReveal
             textFormat: Text.StyledText
           }
 
-          Text {
+          SlideSwap {
             id: subTail
             width: Math.min(implicitWidth, (parent.width - parent.spacing) / 2)
             anchors.verticalCenter: parent.verticalCenter
             text: row.subAccent
             color: Ui.solid("accent")
-            font.pixelSize: Ui.fontXs
-            font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+            fontSize: Ui.fontXs
+            fontFamily: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+            duration: Ui.normalMs
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
-            clip: row.textReveal < 1
+            clip: true
             opacity: row.textReveal
-            textFormat: Text.PlainText
           }
         }
 

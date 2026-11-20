@@ -29,6 +29,36 @@ Item {
 
   readonly property string descText: String(modelData?.desc ?? "")
   readonly property string subText: modelData ? String(modelData.sub ?? "") : ""
+
+  // A Ctrl-D/Delete on a row with no delete behind it gets a 1.5s red notice
+  // in the line the row actually shows: the description when inline
+  // descriptions are on, the title when they are off. The panel owns the
+  // notice state and its timers so a close can clear both before reopening.
+  property bool showDescriptions: true
+  property bool noticeTarget: false
+  property bool noticeOn: false
+  property bool noticeMotion: false
+
+  readonly property bool noticeActive: row.noticeTarget && row.noticeOn
+  readonly property string noticeText: "This app is not deletable"
+  readonly property string titleSwapText: row.noticeActive && !row.showDescriptions
+    ? row.noticeText : row.labelText
+  readonly property string subSwapText: row.noticeActive && row.showDescriptions
+    ? row.noticeText : row.subText
+  readonly property string labelText: modelData ? String(modelData.label ?? "") : ""
+
+  // Color travels with the string, not with the swap event: resolving from
+  // the layer's own text keeps the outgoing normal copy in its resting
+  // color while it slides out, and paints only the incoming notice red.
+  function titleColorFor(s) {
+    return s === row.noticeText ? Theme.color("red") : Ui.tint("foreground_0", 1)
+  }
+  function subColorFor(s) {
+    if (s === row.noticeText) return Theme.color("red")
+    return row.modelData && row.modelData.alert === true
+      ? Theme.color("red") : Ui.tint("foreground_1", 0.55)
+  }
+
   // Separator rows (clipboard-suggestion divider) collapse to a slim
   // centered hairline - menu-family look, but slimmer than the menu's.
   readonly property bool isSep: modelData ? String(modelData.kind ?? "") === "separator" : false
@@ -358,57 +388,60 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       spacing: 1
 
-      // Title row: the row label.
-      // Hiding via `visible` alone (no explicit height): the Column's
-      // implicit height already skips invisible children, and binding
-      // height to implicitHeight on a Text self-loops.
-      Text {
+      // Title row: the row label, or the refused-delete notice when
+      // descriptions are off and there is no sub line to carry it.
+      // Both lines are SlideSwaps so the notice slides in from below in
+      // red and slides back out to the original copy. Motion is armed only
+      // while a notice is live, so ordinary keystroke-driven text changes
+      // on engine rows still snap instead of replaying a tween per key.
+      SlideSwap {
         width: parent.width
-        text: row.modelData ? String(row.modelData.label ?? "") : ""
-        color: Ui.tint("foreground_0", 1)
-        font.pixelSize: Ui.fontL
-        font.family: Ui.fontFamily
+        text: row.titleSwapText
+        colorFor: row.titleColorFor
+        fontSize: Ui.fontL
+        fontFamily: Ui.fontFamily
         // Plain rows must never shape: the system font is often a
         // programming face whose `calt`/`liga` turns `->` into an arrow.
         // A launcher row shows literal text, so freeze the glyphs.
-        font.features: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
+        fontFeatures: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
         // Middle-elide for the engines whose label is a whole equation
         // wrapped around a value ("100 USD = 87.84 EUR"): the ends carry
         // the operands, and either end alone is unreadable.
         elide: (row.modelData && (row.modelData.kind === "calc" || row.modelData.kind === "unit" || row.modelData.kind === "constants" || row.modelData.kind === "fx")) ? Text.ElideMiddle : Text.ElideRight
-        textFormat: Text.PlainText
+        duration: row.noticeMotion ? Ui.normalMs : 0
+        clip: true
       }
 
-      Text {
+      SlideSwap {
         width: parent.width
         // Subtitle ownership lives in the row data: the service decides
         // what (if anything) the sub line shows - an app description in
         // inline mode, its placeholder for apps without one, or nothing
-        // at all when descriptions are off. Rows with no sub collapse to
-        // a single title line; positioners skip invisible children, so
-        // the height simply folds away.
-        visible: row.subText !== ""
-        text: row.subText
-        // Alert rows (an offline fx row) paint the sub red. PlainText by
-        // design, so the color rides a row flag rather than markup in the
-        // string - a description must never inject its own styling.
-        color: (row.modelData && row.modelData.alert === true) ? Theme.color("red") : Ui.tint("foreground_1", 0.55)
-        font.pixelSize: Ui.fontXs
-        font.family: Ui.fontFamily
+        // at all when descriptions are off. The notice takes it over while
+        // descriptions are on. Rows with no sub collapse to a single title
+        // line; positioners skip invisible children, so the height folds.
+        visible: row.subSwapText !== ""
+        text: row.subSwapText
+        // Alert rows (an offline fx row) and the refused-delete notice
+        // paint the sub red. The resolver keys off each layer's string so
+        // neither one leaks its color onto the other mid-fade; markup stays
+        // out of the copy, so a description cannot inject its own styling.
+        colorFor: row.subColorFor
+        fontSize: Ui.fontXs
+        fontFamily: Ui.fontFamily
         // Same ligature freeze as the title: `->` in a row must read as
         // two characters, never as the font's arrow substitute.
-        font.features: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
+        fontFeatures: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
         // Calc sub is "Copy <large> to clipboard", fx and unit sub are the
         // conversion as a sentence ("100 US Dollars is 2,543,000.00 Vietnamese
         // Dong") - middle-elide keeps the source and the tail of a very long
         // amount on screen, which are the two ends a reader needs.
-        // Clipboard suggestions elide natively: Text.ElideRight on this same
-        // Text, so ElideNone becomes ElideRight and text reads subText direct.
-        // Truncation stays right-anchored on one line and ends in the font
-        // ellipsis.
+        // Clipboard suggestions elide right, and truncation stays
+        // right-anchored on one line and ends in the font ellipsis.
         elide: ((row.modelData && (row.modelData.kind === "calc" || row.modelData.kind === "unit" || row.modelData.kind === "constants" || row.modelData.kind === "fx") && !row.modelData.incomplete) ? Text.ElideMiddle : Text.ElideRight)
         wrapMode: Text.NoWrap
-        textFormat: Text.PlainText
+        duration: row.noticeMotion ? Ui.normalMs : 0
+        clip: true
       }
     }
   }

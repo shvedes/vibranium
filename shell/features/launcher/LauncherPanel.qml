@@ -146,6 +146,7 @@ PanelCard {
 
     function onVisibleChanged() {
       if (!AppLauncher.visible) {
+        panel.closeNotice()
         // Arm the open-time snap while hidden: the next open's first
         // sizing instant lands in the same turn as the show gate closing,
         // and a Behavior reads the gate's pre-turn value - so a height
@@ -158,6 +159,9 @@ PanelCard {
         return
       }
       AppLauncher.pendingDelete = null
+      // A notice left live by a close that outran its timer would otherwise
+      // repaint on the first frame of this open with its remaining time.
+      panel.closeNotice()
       // sizeSnap stays as the close armed it: the open sizes itself
       // under that snap and never inherits a glide from the gate.
       panel.show()
@@ -720,6 +724,52 @@ PanelCard {
     return !!rec && rec.kind === "app" && rec.removable === true
   }
 
+  // The row uses this to decide whether the refused-delete notice covers the
+  // inline description or the title. Same key the controller reads to put
+  // the description in `sub` versus the expandable `desc` slot.
+  readonly property bool showDescriptions: Settings.value("shell.launcher.showDescriptions") === true
+
+  // A refused Delete still gets an answer: the row at this index shows a red
+  // "not deletable" notice for 1.5s. The notice owns its state and timers here
+  // in the resident panel rather than in a delegate, so a close can clear it
+  // before the next summon paints - a delegate reused across opens kept the
+  // notice and its remaining time alive otherwise.
+  property int _noticeIndex: -1
+  property bool _noticeOn: false
+  property bool _noticeMotion: false
+
+  function flashNotDeletable(idx) {
+    // Arm motion before the text changes: SlideSwap reads `duration` in the
+    // same turn its `text` flips, so setting _noticeOn first would snap the
+    // notice in and only animate its return.
+    panel._noticeMotion = true
+    panel._noticeIndex = idx
+    panel._noticeOn = true
+    noticeTimer.restart()
+  }
+  function closeNotice() {
+    noticeTimer.stop()
+    noticeMotionTimer.stop()
+    panel._noticeIndex = -1
+    panel._noticeOn = false
+    panel._noticeMotion = false
+  }
+
+  Timer {
+    id: noticeTimer
+    interval: 1500
+    onTriggered: {
+      panel._noticeOn = false
+      // Keep motion armed through the return swap, then release it.
+      noticeMotionTimer.restart()
+    }
+  }
+  Timer {
+    id: noticeMotionTimer
+    interval: Ui.normalMs + 40
+    onTriggered: panel._noticeMotion = false
+  }
+
   // Three-step delete: hint -> armed -> confirm.
   function toggleDeleteCurrent() {
     const idx = list.currentIndex
@@ -743,7 +793,12 @@ PanelCard {
       _deleteStage = 1
       AppLauncher.requestDelete(rec)
       list.autoRevealIndex = idx
+      return
     }
+    // A regular app has no delete to arm. Say so in the row rather than
+    // swallowing the key into a no-op the user cannot distinguish from a
+    // dropped keypress.
+    if (rec && rec.kind === "app") panel.flashNotDeletable(idx)
   }
   property int _deleteIndex: -1
   property int _deleteStage: 0
@@ -1117,7 +1172,17 @@ PanelCard {
         // (autoRevealIndex >= 0).
         autoRevealEnabled: true
         pursuitAnimated: true
-        delegate: LauncherEntry { infoOpen: panel._infoIndex >= 0 && panel._infoIndex === index; deleteOpen: panel._deleteIndex >= 0 && panel._deleteIndex === index; deleteStage: panel._deleteIndex >= 0 && panel._deleteIndex === index ? panel._deleteStage : 0; onActivated: () => panel.activateCurrent(); onDeleteConfirm: () => panel.toggleDeleteCurrent() }
+        delegate: LauncherEntry {
+          infoOpen: panel._infoIndex >= 0 && panel._infoIndex === index
+          deleteOpen: panel._deleteIndex >= 0 && panel._deleteIndex === index
+          deleteStage: panel._deleteIndex >= 0 && panel._deleteIndex === index ? panel._deleteStage : 0
+          showDescriptions: panel.showDescriptions
+          noticeTarget: panel._noticeIndex >= 0 && panel._noticeIndex === index
+          noticeOn: panel._noticeOn
+          noticeMotion: panel._noticeMotion
+          onActivated: () => panel.activateCurrent()
+          onDeleteConfirm: () => panel.toggleDeleteCurrent()
+        }
       }
     }
     Text {

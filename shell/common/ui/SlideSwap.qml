@@ -33,6 +33,23 @@ Item {
   // Rise travel and tween duration; design tokens by default.
   property real slide: Ui.s
   property int duration: Ui.fastMs
+  // Text presentation forwarded to every layer. Defaults keep the plain,
+  // un-elided copy the existing consumers paint; a host swapping styled
+  // subtext or elided rows sets these once at construction. The enums are
+  // ints so the library needs no Text-specific property type here.
+  property int textFormat: Text.PlainText
+  property int elide: Text.ElideNone
+  property int wrapMode: Text.NoWrap
+  property var fontFeatures: ({})
+  // Optional per-string color resolver. A swap that changes color with the
+  // string (a red notice replacing normal copy) sets this instead of
+  // reassigning `color`: each layer resolves its OWN text, so the outgoing
+  // copy keeps its color while it fades and only the incoming string lands
+  // in the new one. Without it every layer reads `color`, as before.
+  property var colorFor: null
+  function colorOf(s) {
+    return typeof root.colorFor === "function" ? root.colorFor(s) : root.color
+  }
 
   // The string currently fading (or faded) in, for readers that must
   // not sample a tween mid-flight.
@@ -145,10 +162,13 @@ Item {
     width: parent.width
     y: (parent.height - implicitHeight) / 2 + rise
     text: root._a
-    color: root.color
+    color: root.colorOf(root._a)
     font.pixelSize: root.fontSize
     font.family: root.fontFamily
-    textFormat: Text.PlainText
+    textFormat: root.textFormat
+    elide: root.elide
+    wrapMode: root.wrapMode
+    font.features: root.fontFeatures
     // Owned by fadeOutA/fadeIn, not bound: the tweens hand off at rest
     // values (0 out, 1 in), so nothing reasserts on landing.
     opacity: 1
@@ -164,10 +184,13 @@ Item {
     width: parent.width
     y: (parent.height - implicitHeight) / 2 + rise
     text: root._b
-    color: root.color
+    color: root.colorOf(root._b)
     font.pixelSize: root.fontSize
     font.family: root.fontFamily
-    textFormat: Text.PlainText
+    textFormat: root.textFormat
+    elide: root.elide
+    wrapMode: root.wrapMode
+    font.features: root.fontFeatures
     opacity: 0
     Behavior on rise {
       enabled: MotionPolicy.enabled
@@ -181,10 +204,13 @@ Item {
     width: parent.width
     y: (parent.height - implicitHeight) / 2 + rise
     text: root._c
-    color: root.color
+    color: root.colorOf(root._c)
     font.pixelSize: root.fontSize
     font.family: root.fontFamily
-    textFormat: Text.PlainText
+    textFormat: root.textFormat
+    elide: root.elide
+    wrapMode: root.wrapMode
+    font.features: root.fontFeatures
     opacity: 0
     Behavior on rise {
       enabled: MotionPolicy.enabled
