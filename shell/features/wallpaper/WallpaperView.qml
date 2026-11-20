@@ -108,6 +108,11 @@ LayerSurface {
   property real discCenterYFrac: 0.5
   // Every kind follows the selected speed preset; curves stay fixed.
   readonly property int transMs: Trans.durationFor(Trans.normalizeSpeed(Settings.value("shell.wallpaper.transitionSpeed")))
+  // The boot paint fades its frame in while that frame is also doing its scale
+  // push. A swap-speed fade would leave it fully opaque early, with the rest
+  // of the push reading as a slow drift of an already-settled image, so the
+  // first paint gets a longer reveal. Later swaps keep their configured time.
+  readonly property int bootFadeMs: 1000
 
   // Theme background shows through while disabled and before the first
   // image decodes, so the surface never flashes plain black.
@@ -274,6 +279,19 @@ LayerSurface {
     // applying from:0 before the first frame, and a stale 1 would flash a
     // full mask for one frame on masked kinds.
     win.transProgress = 0
+    // Boot's first paint fades up over the theme fill rather than an outgoing
+    // frame. Give it the same push the lockscreen gives a ready backdrop:
+    // baseImg is still empty until finishTrans promotes frontImg into it, so
+    // that is the gate for "first appearance" - later swaps never re-arm it.
+    // The snap path above already returned with animations off, so the image
+    // snaps straight to fit here too.
+    if (baseImg.source.toString() === "") {
+      imageLayer.scale = 1.06
+      fitAnim.restart()
+    } else {
+      fitAnim.stop()
+      imageLayer.scale = 1
+    }
     // Same hand-back the row slide makes: the tween released its target when
     // it stopped, and a window swaps more than once, so every swap hands the
     // target back before it asks for a run.
@@ -298,6 +316,8 @@ LayerSurface {
   // Fades like a wallpaper swap instead of cutting; drops out of rendering
   // only once fully transparent. Gated by the global animation switch.
   Item {
+    id: imageLayer
+
     anchors.fill: parent
     visible: opacity > 0
     opacity: Wallpaper.enabled ? 1 : 0
@@ -307,6 +327,25 @@ LayerSurface {
       NumberAnimation {
         duration: win.fadeMs
       }
+    }
+
+    // The lockscreen's ready-wallpaper push, reused for the boot paint: the
+    // first decoded frame spawns slightly zoomed and eases back to fit, so the
+    // wallpaper reads as arriving over the theme fill. It rides this shared
+    // layer rather than frontImg, because finishTrans clears frontImg when it
+    // promotes into baseImg - scaling the layer keeps a half-run push from
+    // snapping to rest on that hand-off.
+    // Tuned slower than the lockscreen for now: the longer clock keeps the
+    // last stretch of the approach from reading as linear.
+    NumberAnimation {
+      id: fitAnim
+
+      target: imageLayer
+      property: "scale"
+      from: 1.08
+      to: 1
+      duration: 1000
+      easing.type: Easing.OutCubic
     }
 
     Image {
@@ -679,7 +718,10 @@ LayerSurface {
     property: "transProgress"
     from: 0
     to: 1
-    duration: MotionPolicy.duration(win.transMs)
+    // baseImg only holds a url after the first promote, so it stays empty for
+    // exactly the boot reveal. The binding is re-read on restart, before the
+    // promote in finishTrans changes it.
+    duration: MotionPolicy.duration(baseImg.source.toString() === "" ? win.bootFadeMs : win.transMs)
     easing.type: win.easingFor(win.transKind, win.circleGrow)
     onStopped: win.finishTrans()
   }
