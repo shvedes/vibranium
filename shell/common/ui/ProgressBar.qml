@@ -34,9 +34,12 @@ Rectangle {
   // down so repeated hints retarget quickly.
   property int glideMs: Ui.normalMs
   // Kill switch: disables the fill glide and the indeterminate sweep;
-  // the fill still jumps to the target and the sweep halts. Defaults on
-  // for standalone consumers off the menu.
-  property bool animationsEnabled: true
+  // the fill still jumps to the target and the sweep halts. Defaults to
+  // the global motion policy so standalone consumers off the menu (the
+  // calendar's year bar, the network island's speed bars) honour it too.
+  // An explicit assignment replaces this binding, so OSDCard, VolumeSlider,
+  // NotificationCard and the menu Entry keep their own gates unchanged.
+  property bool animationsEnabled: MotionPolicy.enabled
 
   implicitWidth: 160
   height: 6

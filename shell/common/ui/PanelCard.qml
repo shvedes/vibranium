@@ -367,7 +367,13 @@ Rectangle {
     if (Math.abs(h - root._restingFitH) < 0.5) return
     root._restingFitH = h
   }
-  onExactListHChanged: root._latchRestingFit()
+  onExactListHChanged: {
+    root._latchRestingFit()
+    // A committed height is also the show gate's release edge. Deferred a
+    // turn and generation-guarded in _armShownOnFit, so the first sizing
+    // write of an open still snaps.
+    root._armShownOnFit(root._gateGen)
+  }
   Component.onCompleted: {
     root._latchRestingFit()
   }
@@ -389,6 +395,7 @@ Rectangle {
     // model and the resting buffer instead of from the measurement - one
     // frame of an over-estimated region on every row-set change.
     root._latchRestingFit()
+    root._armShownOnFit(root._gateGen)
   }
 
   // The resting region: what the row set is worth with nothing open. An
@@ -476,7 +483,7 @@ Rectangle {
   // while refusing a rising one. Both travel together because the recovery
   // only exists to stop a rising fit from re-latching a stale row set.
 
-  // Show gate - animations disabled until first layout settles.
+  // Show gate - animations disabled until the first committed fit lands.
   property bool shown: false
   // Escape hatch for the gate, and the answer to "why is a card I just typed
   // into teleporting instead of resizing". The gate exists so the FIRST
@@ -512,13 +519,43 @@ Rectangle {
   // glides. Default false: no consumer that never sets it can observe any
   // change.
   property bool sizeSnap: false
+  // Bumped by show() so a fit edge deferred from the previous open cannot
+  // open this one's gate, and so a card that was never shown opens never -
+  // its timer is never started either. Invariant 5: the newer intent
+  // retires the older deferred reaction.
+  property int _gateGen: 0
+  // The gate's normal release is the committed-fit edge, not time: show()
+  // drops _restingFitH to -1, so the first commit is the same transition to
+  // >= 0 the resting region reads above. Deferred a turn because an open's
+  // first sizing write shares the turn with the fit - a Behavior reads the
+  // gate's pre-turn value, so the snap must already be in force when that
+  // write lands. A measurement still in flight is not a committed fit.
+  function _armShownOnFit(gen): void {
+    if (gen !== root._gateGen || root._gateGen <= 0 || root.shown) return
+    Qt.callLater(() => {
+      if (gen !== root._gateGen || root._gateGen <= 0 || root.shown) return
+      if (root.fitPending || !(root._restingFitH >= 0)) return
+      root.shown = true
+      showGate.stop()
+    })
+  }
   Timer {
     id: showGate
     interval: Ui.resizeMs + Ui.fastMs
-    onTriggered: root.shown = true
+    // Bounded fail-safe for a row set that never produces a fit at all - a
+    // card with no exactListH source, where time is the only edge there is.
+    // The List.swapWatch pattern: the live fit edge is the normal release;
+    // this timer only caps the no-edge case. A fit in flight or already
+    // committed stands it down, so a slow first fit can no longer open the
+    // gate before it lands.
+    onTriggered: {
+      if (root.fitPending || root._restingFitH >= 0) return
+      root.shown = true
+    }
   }
   function show() {
     root.shown = false
+    root._gateGen++
     // The measured fit is dropped, deliberately, and against a "latch it at
     // open" reading: a fit latched at open survives the close. Five views
     // keep their card alive across open/close - `active: win.primary` in
