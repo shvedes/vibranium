@@ -275,7 +275,6 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: mainLine.bottom
-    topGap: Ui.m
     open: row.deleteOpen && (row.pinned || row.missing)
     stage: row.deleteStage
     hintText: row.missing ? "Press Delete to remove this missing entry" : "Press Delete to remove this pinned entry"

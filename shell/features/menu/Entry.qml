@@ -3446,6 +3446,8 @@ Item {
       // Loader heights come from implicitHeight; mirror the live slot
       // height so the expansion shell tracks the open animation 1:1.
       implicitHeight: height
+      // Hosted by the expansion slot, which owns the lead and the gap.
+      embedded: true
       readonly property var cf: row.activeConfirm
       open: true
       // Single-stage confirms (recording) arm immediately: map them to

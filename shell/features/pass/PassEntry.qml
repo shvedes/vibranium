@@ -234,7 +234,6 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: mainLine.bottom
-    topGap: Ui.m
     open: row.deleteOpen && !row.isSep
     stage: row.deleteStage
     confirmText: "Delete"

@@ -695,7 +695,6 @@ PanelCard {
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.top: mainLine.bottom
-          topGap: Ui.m
           open: panel._confirmIndex === row.index
             && PowerMenu.isDestructive(row.modelData ? row.modelData.action : "")
           stage: panel._confirmIndex === row.index ? panel._confirmStage : 0

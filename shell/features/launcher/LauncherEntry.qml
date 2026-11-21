@@ -488,15 +488,11 @@ Item {
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: descSlot.bottom
-    // Stacked below descSlot: no top gap while desc is live (open or
-    // easing shut) since that slot already ends in its own gap, but the
-    // full top padding when desc is shut - otherwise a delete opened alone
-    // touches the row line with no breathing room. The switch rides the
-    // height tween, so the rare toggle-desc-while-delete-open case glides
-    // instead of snapping.
-    topGap: (descSlot.open || descSlot.closing) ? 0 : Ui.m
+    // Stacked below descSlot: no lead while desc is live (open or easing
+    // shut) since that slot already ends in its own gap, but the full top
+    // breathing when desc is shut.
+    lead: (descSlot.open || descSlot.closing) ? 0 : Ui.m
     open: row.deleteOpen
-    gap: Ui.m
     stage: row.deleteStage
     hintText: "Press Delete to remove this app"
     armedText: "<b><u>Press again to confirm deletion</u></b>"

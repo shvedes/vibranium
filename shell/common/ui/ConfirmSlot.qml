@@ -5,6 +5,14 @@ import qs.common
 // Drop-in staged confirmation slot: hint -> armed -> confirmed.
 // Replaces the 3-step Rectangle+MouseArea triplicated in Entry and
 // LauncherEntry. Panels track stage externally; this is pure view.
+//
+// PLACEMENT is owned here, not by each host. A confirm either hangs off a row
+// line (owns its lead and its trailing gap) or is a view inside another
+// DropdownSlot, in which case the host slot owns both. Hosts set `lead` and
+// `embedded`; no host has to know how DropdownSlot splits topGap, gap and
+// anchor margins. The lead is an ANCHOR margin so the row's own bottom
+// padding is never counted twice - a topGap inside the slot's height was the
+// original reason the button sat far above the bar's lower edge.
 DropdownSlot {
   id: root
 
@@ -12,6 +20,16 @@ DropdownSlot {
   property string confirmText: "Delete"
   property string hintText: "Press Delete to remove"
   property string armedText: "<b><u>Press again to confirm</u></b>"
+
+  // Space between the row (or the slot above) and the hint text.
+  property real lead: Ui.m
+  // True when a host DropdownSlot wraps this body: its trailing gap is the
+  // one the bar and the neighbour push read, so this body adds none.
+  property bool embedded: false
+
+  anchors.topMargin: root.lead
+  topGap: 0
+  gap: root.embedded ? 0 : Ui.m
 
   signal confirmed()
   // Declared and never raised by the component; ui-rest's probe connects
