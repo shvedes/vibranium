@@ -165,11 +165,94 @@ BarModule {
     Core.Audio.adjustSource(delta)
   }
 
+  // --- default-output name flash ---
+  //
+  // The same one-shot window the Network and Bluetooth modules use for a new
+  // connection name, without their green color blink: here only the name
+  // pill moves. The event is PipeWireState's counter, which bumps once per
+  // default-output move the shell did not initiate itself - island and mixer
+  // picks are recorded at the write and swallowed there - so every output's
+  // bar reveals on the same event. The window's settle gate keeps the graph
+  // arriving at boot quiet.
+  FlashReveal {
+    id: sinkFlash
+  }
+
+  // A device switch rebuilds the node/link graph: the source can be
+  // withdrawn for a moment, and AudioNodes reports a link count of zero for
+  // a handle whose node is gone, which takes micInUse with it. The mic pill
+  // would slide away and straight back while the name reveals. Hold it for
+  // the announcement, but only if it was visible when the change arrived -
+  // an idle mic must not pop out on an unrelated output switch.
+  property bool _micHold: false
+  Timer {
+    id: micHoldTimer
+    // Covers the reveal window and the graph settling after it.
+    interval: sinkFlash.durationMs + 1000
+    onTriggered: root._micHold = false
+  }
+
+  function _pulseSinkFlash() {
+    if (root.micVisible) {
+      root._micHold = true
+      micHoldTimer.restart()
+    }
+    sinkFlash.pulse()
+  }
+
+  property bool _sinkFlashPending: false
+  function _fireSinkFlash() {
+    if (root.sinkLabel === "" || root.sinkLabel === "Unknown") return
+    if (root.fullscreenActive) {
+      root._sinkFlashPending = true
+      return
+    }
+    root._pulseSinkFlash()
+  }
+  onFullscreenActiveChanged: {
+    if (root.fullscreenActive) {
+      if (sinkFlash.active) {
+        if (root.sinkLabel !== "") root._sinkFlashPending = true
+        sinkFlash.clear()
+      }
+      return
+    }
+    if (root._sinkFlashPending) {
+      root._sinkFlashPending = false
+      if (root.sinkLabel !== "") root._pulseSinkFlash()
+    }
+  }
+
+  property int _lastSinkChangeSeq: -1
+  Connections {
+    target: Core.PipeWireState
+    function onSinkChangeSeqChanged() {
+      const seq = Core.PipeWireState.sinkChangeSeq
+      if (root._lastSinkChangeSeq < 0) {
+        root._lastSinkChangeSeq = seq
+        return
+      }
+      root._lastSinkChangeSeq = seq
+      root._fireSinkFlash()
+    }
+  }
+
+  // Only the name pill moves; the volume glyph keeps its normal color. The
+  // slide is the 0..1 form the Behavior needs, so nothing else is involved.
+  property real sinkNameSlide: sinkFlash.active
+    && root.sinkLabel !== "" && root.sinkLabel !== "Unknown" ? 1 : 0
+  Behavior on sinkNameSlide {
+    Glide { duration: Ui.slowMs }
+  }
+
   // Volume and mute stay live because the ONE tracker set that keeps the
   // default devices' PipeWire properties observed is the Audio service's
   // (see the state block above), not because this module subscribed to
   // them per output.
-  Component.onCompleted: root._audioTrack = AudioNodes.observe("bar/volume", root.source)
+  Component.onCompleted: {
+    root._audioTrack = AudioNodes.observe("bar/volume", root.source)
+    root._lastSinkChangeSeq = Core.PipeWireState.sinkChangeSeq
+  }
   // A device switch follows the observation: the handle is re-pointed at
   // the new default source, which moves it onto that node's single shared
   // link tracker.
@@ -193,8 +276,9 @@ BarModule {
       // The pill owns its hover/click areas below, like the module root.
       builtinFill: false
       // Cold-boot settle: at creation the pill starts parked (no slide-in
-      // churn before the first layout pass).
-      collapseShown: root.micVisible
+      // churn before the first layout pass). The hold keeps it parked open
+      // while a device switch rebuilds the graph the mic state is read from.
+      collapseShown: root.micVisible || root._micHold
       collapseFull: root.slotWidth
       collapseArmed: root.bootSettled
 
@@ -288,6 +372,34 @@ BarModule {
           var d = event.angleDelta.y > 0 ? st : (event.angleDelta.y < 0 ? -st : 0)
           if (d !== 0) root.adjustOutput(d)
         }
+      }
+    }
+
+    // New-output name reveal, docked AFTER the volume icon - never after the
+    // mic pill. The animated `sinkNameSlide` grows the width from zero so the
+    // label glides out with the pill and back when the window closes; clip
+    // keeps it inside while it collapses. Only a named output reveals
+    // anything, so an unknown device leaves no gap.
+    Item {
+      id: sinkNamePill
+
+      width: Math.round(root.sinkNameSlide * (Math.min(sinkNameLabel.implicitWidth, 200) + 4))
+      height: volumeBox.height
+      clip: true
+      visible: root.sinkNameSlide > 0
+
+      Title {
+        id: sinkNameLabel
+
+        anchors.left: parent.left
+        anchors.leftMargin: 2
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.sinkNameSlide > 0
+        level: 3
+        width: Math.min(implicitWidth, 200)
+        font.pixelSize: Bar.pillFontSize
+        text: root.sinkLabel
+        elide: Text.ElideRight
       }
     }
   }

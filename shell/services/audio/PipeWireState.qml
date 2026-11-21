@@ -468,11 +468,30 @@ Singleton {
   // yet ready is accepted: the write is a hint carrying the node's identity,
   // not a read of the node's incomplete state.
   //
-  // The volume island still performs this write itself (Spec 08 left the one
-  // backend write a per-output view owns untouched); routing it here is the
-  // follow-up that needs shell/features, which this change does not touch.
+  // Both shell callers route through here: the volume island and the mixer
+  // used to write the backend directly, which left the bar unable to tell a
+  // switch the user made in the shell from one the world made. The write is
+  // the only place that origin is known - the backend reports the resulting
+  // default change later and with no marker of who caused it.
+  property var _sinkRequest: null
+  Timer {
+    id: sinkRequestExpiry
+    interval: 4000
+    onTriggered: root._sinkRequest = null
+  }
+
+  // One bump per default-output move that did NOT come from a shell write.
+  // The counter lives here rather than in any bar module so every output
+  // sees the same event; none of them has to decide on its own what is ours.
+  property int sinkChangeSeq: 0
+  // Identity of the last output we reported, so a backend that rebuilds its
+  // node wrappers for the same device cannot flash a second time.
+  property string _lastSinkKey: ""
+
   function setDefaultSink(node) {
     if (!root.graphReady || node === null || node === undefined) return false
+    root._sinkRequest = node
+    sinkRequestExpiry.restart()
     Pipewire.preferredDefaultAudioSink = node
     return true
   }
@@ -482,6 +501,30 @@ Singleton {
     Pipewire.preferredDefaultAudioSource = node
     return true
   }
+
+  // Match the node that came back against the pending shell request. A null
+  // is the brief "no default while switching" state, not a device change, so
+  // it is ignored and leaves the request alive. A matching node is the
+  // request landing and is swallowed. Anything else - a physical plug, a
+  // second app, the compositor re-routing, or a switch that beat ours - is
+  // external and bumps the counter the bar flashes on.
+  function _onDefaultSinkChanged(node) {
+    if (node === null || node === undefined) return
+    const key = AudioNodes.identity(node)
+    if (key !== "" && key === root._lastSinkKey) return
+    root._lastSinkKey = key
+    const pending = root._sinkRequest
+    if (pending !== null && pending !== undefined) {
+      const pendingKey = AudioNodes.identity(pending)
+      const same = pendingKey !== "" && key !== ""
+        ? pendingKey === key : pending === node
+      root._sinkRequest = null
+      sinkRequestExpiry.stop()
+      if (same) return
+    }
+    root.sinkChangeSeq++
+  }
+  onSinkChanged: root._onDefaultSinkChanged(root.sink)
 
   // --- diagnostics -----------------------------------------------------
   //

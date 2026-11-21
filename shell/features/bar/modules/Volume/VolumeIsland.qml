@@ -289,18 +289,17 @@ Item {
     Core.Audio.setSourceVolume(v)
   }
 
-  // The device switch, unchanged: the backend's own preferred-device write
-  // is the one thing this island is the owner of, and it is where a switch
-  // from any output's island has to land. It touches the backend and
-  // nothing this island holds - in particular not its node-set
-  // observation - so a switch issued as the last island is being torn down
-  // reaches the same place a switch from a first one does, and cannot write
-  // to a tracker that is going with it. The new default arrives back
-  // through Core.Audio on the next change, and the trackers that follow it
-  // are the audio service's one pair.
+  // The device switch goes through the audio service, which records it as a
+  // shell-owned change so the bar does not flash the device name for a pick
+  // the user just made here. The write touches the backend and nothing this
+  // island holds - in particular not its node-set observation - so a switch
+  // issued as the last island is being torn down reaches the same place a
+  // switch from a first one does, and cannot write to a tracker that is
+  // going with it. The new default arrives back through Core.Audio on the
+  // next change, and the trackers that follow it are the service's one pair.
   function setDefaultSink(node) {
     if (!node) return
-    Pipewire.preferredDefaultAudioSink = node
+    Core.PipeWireState.setDefaultSink(node)
     root.popOpen = ""
   }
 
