@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQml
+import QtQml as QQ
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -18,12 +19,16 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 // Session lock. The IPC handler answers "lockscreen" and
 // the session lock engages synchronously in that call - no stabilization
 // timers - while auth state lives here so every screen's surface stays in
-// sync. A PAM completion reporting Success is the only path that clears the
-// lock, so the unit publishes no unlock verb and the neutral request contract
-// can only engage one. Backdrop frames come from ScreencopyView inside the
-// surface; a throwaway view below warms the capture backend at boot because
-// compositors refuse the first request made from an already-locked session.
+// sync. The lock is cleared either by a PAM completion reporting Success or
+// by input inside the optional grace window; no unlock verb is published and
+// the neutral request contract can only engage one. Backdrop frames come from
+// ScreencopyView inside the surface; a throwaway view below warms the capture
+// backend at boot because compositors refuse the first request made from an
+// already-locked session.
 // Keyboard state (caps, layout) lives in the shared Keyboard singleton.
+// An optional grace window (Settings.lockscreenGrace) releases a fresh lock
+// on the first real input inside that window, so an idle-triggered lock does
+// not demand a password from a user who is already back.
 Singleton {
   id: root
 
@@ -101,6 +106,35 @@ Singleton {
     Keyboard.sync()
     root.requested = true
     root._pauseMusic()
+    root._armGrace()
+  }
+
+  // Arm the grace window for this lock. A zero setting leaves no timer
+  // running, which keeps the surface activity hooks inert.
+  function _armGrace() {
+    root._endGrace()
+    if (Settings.lockscreenGrace <= 0) return
+    graceTimer.restart()
+  }
+
+  function _endGrace() {
+    graceTimer.stop()
+  }
+
+  // Called by every lock surface on real mouse or keyboard input. Only the
+  // first input inside the armed window releases; once the timer expired
+  // this is inert, so grace can never bypass a password afterwards.
+  function graceActivity() {
+    if (!graceTimer.running) return
+    root._endGrace()
+    root.finishRelease()
+  }
+
+  QQ.Timer {
+    id: graceTimer
+    interval: Settings.lockscreenGrace * 1000
+    repeat: false
+    onTriggered: root._endGrace()
   }
 
   // Stable identity for the neutral request contract: adopt() and release()
@@ -119,9 +153,10 @@ Singleton {
   }
 
   onRequestedChanged: {
-    // requested falls only on a PAM completion reporting Success, so this is
-    // the single resume point. Pause is handled in lock() to keep the
-    // lock request synchronous; resume runs when requested flips false.
+    // Every release routes through finishRelease(), whether a PAM success or
+    // input inside the grace window, so this is the single resume point. Pause is
+    // handled in lock() to keep the lock request synchronous; resume runs
+    // when requested flips false.
     if (!root.requested) {
       root._resumeMusic()
     }
@@ -136,8 +171,9 @@ Singleton {
 
   onLockedChanged: {
     // The far end of the transition lock() opened. `requested` is the only
-    // input that can move `locked` back down, and finishRelease is the only
-    // caller, so the release is handled there and never here.
+    // input that can move `locked` back down; finishRelease is its only
+    // writer, reached from a successful PAM answer or real input inside the
+    // grace window, so the release is handled there and never here.
     OSD.desktopSuppressed = root.locked
     root._publishState()
   }
@@ -237,10 +273,11 @@ Singleton {
     }
   }
 
-  // Reachable only from a PAM completion reporting Success, so a release is
-  // always an authentication result. Runs after the surfaces are gone, so
-  // resetting here never paints through.
+  // The single release point, reached from a PAM success or a grace-window
+  // input edge. Runs after the surfaces are gone, so resetting here never
+  // paints through.
   function finishRelease() {
+    root._endGrace()
     root.requested = false
     root.backdropPath = ""
     root.resetAuth("release")
@@ -333,7 +370,9 @@ Singleton {
         dim: Settings.lockscreenDim,
         nowPlaying: Settings.lockscreenNowPlaying,
         blurPower: Settings.lockscreenBlurPower,
-        pauseMusic: Settings.lockscreenPauseMusic
+        pauseMusic: Settings.lockscreenPauseMusic,
+        grace: Settings.lockscreenGrace,
+        graceArmed: graceTimer.running
       })
     }
 

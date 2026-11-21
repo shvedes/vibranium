@@ -292,6 +292,13 @@ Singleton {
     const v = root.value("shell.lockscreen.autohideDelay")
     return typeof v === "number" && v >= 3 && v <= 300 ? Math.round(v) : 15
   }
+  // Seconds after locking in which a real input edge releases the lock
+  // without a password; 0 disables it. The bounds mirror the catalog range,
+  // so an edited store cannot arm an unbounded or unreachable grace window.
+  readonly property int lockscreenGrace: {
+    const v = root.value("shell.lockscreen.grace")
+    return typeof v === "number" && v >= 0 && v <= 60 ? Math.round(v) : 5
+  }
   // The always-on copy of the capture dots for when the bar cannot be seen
   // (a fullscreen toplevel covers the bar's Bottom layer surface). Default
   // on: an indicator that vanishes under a fullscreen app is the case the

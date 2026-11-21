@@ -513,6 +513,10 @@ WlSessionLockSurface {
 
       onSubmitted: Lockscreen.tryUnlock()
 
+      // Any real key press is activity for the grace window, including keys
+      // the field swallows or that do not edit its text.
+      onKeyPressed: Lockscreen.graceActivity()
+
       onEdited: text => Lockscreen.setPassword(text)
       onCancelled: Lockscreen.setPassword("")
       onCapsToggled: Keyboard.toggleCaps()
@@ -654,5 +658,15 @@ WlSessionLockSurface {
     hoverEnabled: true
     acceptedButtons: Qt.NoButton
     cursorShape: Qt.BlankCursor
+
+    // Pointer motion over the surface is the other half of grace-window
+    // activity; acceptedButtons does not gate hover events. Qt synthesizes
+    // one hover event when the surface first appears under the pointer, so
+    // the first report per surface is recorded but never treated as input.
+    property bool pointerSeen: false
+    onPositionChanged: {
+      if (pointerSeen) Lockscreen.graceActivity()
+      pointerSeen = true
+    }
   }
 }
