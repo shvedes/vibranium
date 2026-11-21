@@ -293,12 +293,15 @@ Singleton {
     const v = root.value("shell.lockscreen.autohideDelay")
     return typeof v === "number" && v >= 3 && v <= 300 ? Math.round(v) : 15
   }
-  // Seconds after locking in which a real input edge releases the lock
-  // without a password; 0 disables it. The bounds mirror the catalog range,
-  // so an edited store cannot arm an unbounded or unreachable grace window.
-  readonly property int lockscreenGrace: {
-    const v = root.value("shell.lockscreen.grace")
-    return typeof v === "number" && v >= 0 && v <= 60 ? Math.round(v) : 5
+  // Grace is a master switch over a window length. The lock surface consumes
+  // one effective seconds value, so a disabled switch folds it to zero. The
+  // bounds mirror the catalog range, so an edited store cannot arm an
+  // unbounded or unreachable window.
+  readonly property bool lockscreenGrace: root.value("shell.lockscreen.grace") !== false
+  readonly property int lockscreenGraceSeconds: {
+    if (!root.lockscreenGrace) return 0
+    const v = root.value("shell.lockscreen.graceSeconds")
+    return typeof v === "number" && v >= 1 && v <= 60 ? Math.round(v) : 5
   }
   // The always-on copy of the capture dots for when the bar cannot be seen
   // (a fullscreen toplevel covers the bar's Bottom layer surface). Default

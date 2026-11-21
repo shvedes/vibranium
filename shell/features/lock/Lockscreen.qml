@@ -26,9 +26,9 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 // backend at boot because compositors refuse the first request made from an
 // already-locked session.
 // Keyboard state (caps, layout) lives in the shared Keyboard singleton.
-// An optional grace window (Settings.lockscreenGrace) releases a fresh lock
-// on the first real input inside that window, so an idle-triggered lock does
-// not demand a password from a user who is already back.
+// An optional grace window (Settings.lockscreenGraceSeconds) releases a fresh
+// lock on the first real input inside that window, so an idle-triggered lock
+// does not demand a password from a user who is already back.
 Singleton {
   id: root
 
@@ -113,7 +113,7 @@ Singleton {
   // running, which keeps the surface activity hooks inert.
   function _armGrace() {
     root._endGrace()
-    if (Settings.lockscreenGrace <= 0) return
+    if (Settings.lockscreenGraceSeconds <= 0) return
     graceTimer.restart()
   }
 
@@ -132,7 +132,7 @@ Singleton {
 
   QQ.Timer {
     id: graceTimer
-    interval: Settings.lockscreenGrace * 1000
+    interval: Settings.lockscreenGraceSeconds * 1000
     repeat: false
     onTriggered: root._endGrace()
   }
@@ -371,7 +371,7 @@ Singleton {
         nowPlaying: Settings.lockscreenNowPlaying,
         blurPower: Settings.lockscreenBlurPower,
         pauseMusic: Settings.lockscreenPauseMusic,
-        grace: Settings.lockscreenGrace,
+        grace: Settings.lockscreenGraceSeconds,
         graceArmed: graceTimer.running
       })
     }

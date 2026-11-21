@@ -1429,10 +1429,6 @@
             "showItemCount": true,
             "items": [
                 {
-                    "type": "separator",
-                    "after": "shell.lockscreen.grace"
-                },
-                {
                     "type": "group",
                     "id": "lockClock",
                     "label": "Clock and date",
@@ -1471,6 +1467,17 @@
                 },
                 {
                     "type": "group",
+                    "id": "lockGrace",
+                    "label": "Grace",
+                    "sub": "Unlock with input after locking",
+                    "icon": "hourglass",
+                    "children": [
+                        "shell.lockscreen.grace",
+                        "shell.lockscreen.graceSeconds"
+                    ]
+                },
+                {
+                    "type": "group",
                     "id": "lockMedia",
                     "label": "Media",
                     "sub": "Now playing and playback",
@@ -1484,13 +1491,27 @@
             "options": [
                 {
                     "key": "shell.lockscreen.grace",
-                    "type": "int",
-                    "default": 5,
+                    "type": "bool",
+                    "default": true,
                     "label": "Grace",
                     "sub": "Unlock on activity after locking",
-                    "desc": "Seconds after locking in which keyboard or mouse activity unlocks the screen without a password. 0 disables.",
+                    "desc": "Allow keyboard or mouse activity within the grace window to unlock the screen without a password."
+                },
+                {
+                    "key": "shell.lockscreen.graceSeconds",
+                    "type": "int",
+                    "default": 5,
+                    "label": "Grace duration",
+                    "sub": "Seconds of activity window after locking",
+                    "desc": "Seconds after locking in which keyboard or mouse activity unlocks the screen without a password.",
+                    "showIf": [
+                        {
+                            "key": "shell.lockscreen.grace",
+                            "eq": true
+                        }
+                    ],
                     "range": {
-                        "min": 0,
+                        "min": 1,
                         "max": 60
                     },
                     "step": 1,
