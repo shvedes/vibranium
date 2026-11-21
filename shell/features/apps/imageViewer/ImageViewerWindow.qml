@@ -63,6 +63,21 @@ QtObject {
   // itself rather than a second opinion about whether it is up.
   readonly property Window window: root.win
 
+  // The controller that built this holder. The window owns all of its
+  // navigation state (currentFile, the folder, the zoom); the ONE fact it reads
+  // from the controller is the URL the `openPath` verb requested before this
+  // window existed. That is the APP-1 handoff: the request is live state on the
+  // controller, and this holder derives its initial content from it at the real
+  // build edge below. After construction the window owns the file outright and
+  // never reads this property again.
+  property var controller: null
+
+  Component.onCompleted: {
+    const requested = root.controller === null || root.controller === undefined
+      ? "" : String(root.controller.requestedPath ?? "")
+    if (requested !== "") root.openPath(requested)
+  }
+
   // Open a file the viewer can show. `url` is either a url (`file:///...`) or a
   // bare absolute filesystem path; the path form is prefixed here rather than at
   // each caller, because `Image.source` does not resolve a scheme-less string
@@ -761,13 +776,20 @@ QtObject {
     // and a forceActiveFocus then is a request recorded against a surface that
     // does not hold focus. One turn after the map is the earliest point at
     // which it can land.
+    // APP-2: the deferred claims re-check the live surface state when they run,
+    // the same pattern LyricsFullscreenOverlay uses. The schedule-time guards
+    // below only avoid scheduling obvious misses; only the lambda's own re-check
+    // knows whether the window is still mapped/active when the claim actually
+    // lands, so a claim queued before a teardown cannot fire on the next holder.
     onVisibleChanged: {
       if (!visible) return
-      Qt.callLater(() => requestActivate())
+      Qt.callLater(function() { if (visible) requestActivate() })
     }
     onActiveChanged: {
       if (!active) return
-      Qt.callLater(() => keyHandler.forceActiveFocus())
+      Qt.callLater(function() {
+        if (active && ImageViewer.visible) keyHandler.forceActiveFocus()
+      })
     }
 
     // A close that arrives from outside this file goes back through the facade.
