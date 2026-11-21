@@ -113,7 +113,9 @@ QtObject {
     root.player = p
     root.reanchor()
     root.opened = true
-    Qt.callLater(function() { if (root.opened) content.forceActiveFocus() })
+    // LYR-2: focus is claimed on the window's real activation edge below, not
+    // here. A speculative claim at open time fires before the toplevel is
+    // active and was a second writer of the same focus fact.
   }
 
   function close() {
@@ -305,11 +307,21 @@ QtObject {
     // give: `requestActivate` asks on the map and this moves the keys into the
     // transcript once they land. A layer surface got this from its
     // `keyboardFocus`; a window gets it from being the active one.
+    // LYR-2: this is the ONE writer of active focus. `requestActivate` is the
+    // activation request; the claim waits for the real active edge and is
+    // re-checked inside the deferred lambda. `open()` makes no focus claim.
     onVisibleChanged: if (visible) Qt.callLater(function() { requestActivate() })
     onActiveChanged: {
       if (!active) return
       Qt.callLater(function() { if (root.opened) content.forceActiveFocus() })
     }
+
+    // A platform close (titlebar X / Alt+F4) hides the Window without touching
+    // `opened`. The next open() would then assign true to an already-true
+    // property, so the `visible` binding never re-evaluates and the overlay
+    // could only ever be shown once per shell process. Translate the close
+    // into our own state change so the binding stays in charge of visibility.
+    onClosing: root.close()
 
   // The transcript follows the shared playback clock the way the island does:
   // one position advance per second while the client plays, plus the daemon's

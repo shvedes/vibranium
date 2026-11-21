@@ -70,9 +70,10 @@ Variants {
     // request exists.
     //
     // The binding is strictly narrower than `Polkit.visible && !Lockscreen.locked`:
-    // it adds the "and has something to put on the card" test
-    // (`win.wanted`, below) and keeps the `closing` exclusion, both of which
-    // that pair got wrong in ways that showed as a bare box on screen.
+    // it adds the "and has something to put on the card" test (`win.wanted`,
+    // below), which that pair got wrong in ways that showed as a bare box on
+    // screen. It deliberately does NOT exclude `closing`: the surface stays
+    // mapped through hideAnim so the exit fade can actually render (POL-3/Q4).
     visible: win.showRequested
 
     // ---- the window is the SCREEN. Everything below is why. ---------------
@@ -131,12 +132,16 @@ Variants {
     //
     // Both this and `state` are given `win.wanted`, so the behavior and the
     // diagnostic can never disagree about whether a request is pending.
+    // `closing` is intentionally absent: it used to order the window hidden
+    // on the first closing frame, ~170 ms before hideAnim had drawn anything,
+    // which killed the fade. `wanted`/`populated` stay so the original
+    // empty-card bug remains fixed. `state` below still reports `closing`
+    // for diagnostics — cause here, report there.
     readonly property bool showRequested: PolkitTrace.shouldShow({
       requested: win.wanted,
       locked: Lockscreen.locked,
       screens: Ui.validScreens.length,
-      primary: win.primaryName !== "",
-      closing: Polkit.closing
+      primary: win.primaryName !== ""
     })
 
     // Everything the suppression decision is made from, as one record, and the
@@ -172,11 +177,20 @@ Variants {
     // triggers below (and only these) call it, so the policy lives once.
     function fade(open) {
       if (MotionPolicy.enabled) {
-        if (open) showAnim.restart()
-        else hideAnim.restart()
+        // One clock owns showK: stop the opposing tween so a supersession
+        // mid-fade cannot leave the card easing down under a live request.
+        if (open) {
+          hideAnim.stop()
+          showAnim.restart()
+        } else {
+          showAnim.stop()
+          hideAnim.restart()
+        }
         return
       }
       win.showK = open ? 1 : 0
+      // No animation to give us the edge, so release teardown here.
+      if (!open) Polkit.noticeFadeFinished()
     }
 
     // The vignette's entrance, the lockscreen's: the factor ramps from
@@ -193,14 +207,12 @@ Variants {
     }
 
     onVisibleChanged: {
-      if (!visible) {
-        win.showK = 0
-        win.vigK = 0
-        return
-      }
-      if (Polkit.closing) return
-      // A request reopening inside a previous failure's feedback window
-      // must not inherit the red border.
+      if (!visible || Polkit.closing) return
+      // showK and vigK belong to the animations alone: no snap here. Snapping
+      // showK on the hide edge is exactly what killed the exit fade. The next
+      // show resets vigK in appearVignette(), so there is nothing to clear on
+      // the way out. A request reopening inside a previous failure's feedback
+      // window must not inherit the red border.
       authBox.clearFailure()
       win.fade(true)
       win.appearVignette()
@@ -213,7 +225,9 @@ Variants {
       NumberAnimation {
         target: win
         property: "showK"
-        from: 0
+        // No `from`: derive the start from the live showK. A request that
+        // supersedes a still-running exit fade resumes from wherever the
+        // hide tween had got to instead of snapping to 0 first.
         to: 1
         duration: 200
         easing.type: Easing.OutCubic
@@ -230,16 +244,28 @@ Variants {
         duration: 170
         easing.type: Easing.InCubic
       }
+      // Real edge: teardown is released from the GROUP's finished signal,
+      // not from a timer guessing when the fade ended. On the child
+      // NumberAnimation this signal never fires - the group owns it. Polkit
+      // restarts its 200 ms late-outcome grace at this point.
+      onFinished: Polkit.noticeFadeFinished()
     }
 
     Connections {
       target: Polkit
 
-      // Teardown waits in the singleton (closeTimer) so the fade finishes
-      // before the window unmaps.
+      // The exit animation owns the teardown edge: Polkit starts its 200 ms
+      // late-outcome grace from hideAnim.onFinished, not from a fade guess.
       function onClosingChanged() {
-        if (!Polkit.closing) return
-        win.fade(false)
+        if (Polkit.closing) {
+          win.fade(false)
+          return
+        }
+        // Supersession: a new request cleared `closing` while the exit fade
+        // was still playing. Bring the card back for the new conversation
+        // instead of leaving it faded out under a live prompt. A normal
+        // teardown clears `active` first, so it cannot take this branch.
+        if (Polkit.active) win.fade(true)
       }
 
       // Fresh prompt after failure or in multi-turn PAM conversations.
@@ -278,12 +304,17 @@ Variants {
     // The vignette, over the scrim and under the card. Its level is fixed
     // here rather than configurable, but the fade is the lockscreen's: the
     // factor ramps 0 -> level over a second, and the shape scales with it.
+    // The `showK` factor is the exit: the card's own 170 ms hide clock takes
+    // the vignette out with the dim and veil, so it does not linger under an
+    // already-hidden dialog until the late-outcome grace unmaps the surface.
+    // On the way in showK reaches 1 long before vigK finishes its 1000 ms
+    // ramp, so the entrance is the vignette's own clock alone (POL-3/Q4).
     Vignette {
       id: vignette
 
       anchors.fill: parent
       intensity: win.vignetteK
-      progress: win.vignetteK > 0 ? win.vigK / win.vignetteK : 1
+      progress: (win.vignetteK > 0 ? win.vigK / win.vignetteK : 1) * win.showK
     }
 
     // The vignette's ramp, the lockscreen's: 1000ms, OutCubic, running
@@ -427,6 +458,17 @@ Variants {
         maximumLineCount: 4
         elide: Text.ElideRight
       }
+    }
+
+    // Same pointer policy as the lockscreen: the modal covers the screen, so
+    // no cursor belongs on it, including over the password field's native
+    // I-beam. Declared last to be the topmost hover handler; NoButton lets
+    // every press reach the card's field and the refocus net underneath.
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+      cursorShape: Qt.BlankCursor
     }
   }
 }

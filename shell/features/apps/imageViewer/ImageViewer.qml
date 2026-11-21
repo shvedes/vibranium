@@ -158,15 +158,18 @@ Singleton {
       return "refused: a relative path has no base - pass an absolute path or a file: URL"
     }
     if (lease.demand() === null) return "unavailable: " + root._refusal()
-    // The show is what makes the window exist: the controller builds it behind
-    // the facade's own `visible`, and it is `visible` that this line sets. So
-    // the handoff below can rely on there being a window to hand to - and if the
-    // controller's screen gate is still closed there is not one, which is what
-    // the `refused:` branch below says rather than an `opened:` nothing is on.
+    // The show arms the controller's screen gate: it sets the facade's
+    // `visible`, but on a cold shell `Ui.primaryScreen` may still be null, so
+    // there is no window to hand to yet. APP-1: that is no longer a dropped
+    // request. The controller publishes the URL as live state (`requestedPath`)
+    // before it looks for a window, and the window derives its initial content
+    // from it when the screen gate finally lets it build.
     if (!root.show()) return "unavailable: " + root._refusal()
-    // The controller answers whether the window took it. A false here is the
+    // The controller answers whether the request was accepted. A false is the
     // window's own refusal - an unreadable file, a decode it would not start -
-    // and it is not the facade's to second-guess.
+    // and it is not the facade's to second-guess. A true from a controller that
+    // is still waiting for a screen is honest in this model: the open is
+    // committed to live state and will converge when the window builds.
     if (lease.controller.openPath(url) !== true) return "refused: " + url
     return "opened: " + url
   }

@@ -655,7 +655,11 @@ Item {
         gradient: Gradient {
           orientation: Gradient.Horizontal
 
-          GradientStop { position: 0; color: Qt.alpha(Color.hsvToRgb(root.hue, 1, 1), 0) }
+          // Qt.alpha() does not coerce a JS {r,g,b,a} object the way a plain
+          // `color:` property does - handed the object directly it returns
+          // opaque black. Serialize first so the transparent stop keeps the
+          // picked hue instead of shading the ramp to black.
+          GradientStop { position: 0; color: Qt.alpha(Color.hex6(Color.hsvToRgb(root.hue, 1, 1)), 0) }
           GradientStop { position: 1; color: Color.hsvToRgb(root.hue, 1, 1) }
         }
       }

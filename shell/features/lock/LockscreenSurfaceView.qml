@@ -156,9 +156,14 @@ WlSessionLockSurface {
   readonly property real vignetteK: surface._vignetteFactor(
     String(Settings.lockscreenVignette === undefined || Settings.lockscreenVignette === null
       ? "" : Settings.lockscreenVignette))
-  // Animated vignette factor, driven by appear(): ramps 0 -> vignetteK
-  // on lock when animations run, snaps instantly otherwise.
-  property real vigK: 0
+  // Normalized entry-fade driver: 0 before lock, ramps 0 -> 1 on lock when
+  // animations run, snaps to 1 otherwise. This is the only animated value for
+  // the vignette. Painted darkness is derived from it and the LIVE vignetteK
+  // (Vignette.qml computes opacity = intensity * progress), so a level change
+  // while locked changes the darkness without touching this driver. Keeping
+  // the driver normalized also decouples the shape scale from the level:
+  // Vignette scales by progress alone, so changing the level cannot jump it.
+  property real appearFade: 0
   color: Theme.color("background_0")
 
   Component.onCompleted: surface.grabFocus()
@@ -183,19 +188,25 @@ WlSessionLockSurface {
 
   // Backdrop never animates: blur covers from its first captured frame, so
   // neither lock nor unlock ever exposes the plain surface color underneath.
+  // Only the normalized fade is written here. The vignette level is read live
+  // from vignetteK, so a level change while locked is picked up by Vignette's
+  // own derivation instead of needing another animation or a re-run of appear().
   function appear() {
     if (!surface.anims) {
       panel.appearK = 1
-      surface.vigK = surface.vignetteK
+      surface.appearFade = 1
       return
     }
     panel.appearK = 0
-    surface.vigK = 0
+    surface.appearFade = 0
     appearAnim.restart()
   }
 
-  // The entry fade: panel opacity and the vignette factor ramp together, 500ms
-  // and 1300ms, so the vignette settles behind the card rather than with it.
+  // The entry fade: panel opacity and the normalized vignette fade ramp
+  // together, 500ms and 1300ms, so the vignette settles behind the card
+  // rather than with it. The vignette animation tweens only the 0 -> 1 fade;
+  // darkness is derived in Vignette as intensity * progress from that fade
+  // and the live level, never snapshotted into an absolute factor here.
   ParallelAnimation {
     id: appearAnim
 
@@ -210,9 +221,9 @@ WlSessionLockSurface {
 
     NumberAnimation {
       target: surface
-      property: "vigK"
+      property: "appearFade"
       from: 0
-      to: surface.vignetteK
+      to: 1
       duration: 1300
       easing.type: Easing.OutCubic
     }
@@ -401,7 +412,8 @@ WlSessionLockSurface {
   // Lazy: nothing instantiates while the level is off, and async load
   // keeps first paint off the Shape tessellation path - which is also why a
   // locked screen can paint one frame without the vignette and settle into it
-  // a frame later.
+  // a frame later. The level gate is live: "off" removes the vignette, and a
+  // later level change re-instantiates it at the current normalized fade.
   //
   // A plain Loader, not a LazyLoader: LazyLoader is a QObject and hands its
   // payload no visual parent, so the payload is never in the scene graph and
@@ -417,23 +429,16 @@ WlSessionLockSurface {
     active: surface.backgroundMode !== "none" && surface.vignetteK > 0
     asynchronous: true
 
-    // The shared vignette draws the gradient; the surface only decides how
-    // dark it is and how far the fade has run. The ratio is the fade
-    // progress, which is what the component scales the shape by.
+    // The shared vignette draws the gradient. The surface passes the LIVE
+    // level as intensity and the normalized entry fade as progress; Vignette
+    // derives opacity = intensity * progress and scales the shape by progress
+    // alone. Neither input is a snapshot, so a level change while locked
+    // changes darkness with no scale discontinuity.
     sourceComponent: Vignette {
       anchors.fill: parent
       intensity: surface.vignetteK
-      progress: surface.vignetteK > 0 ? surface.vigK / surface.vignetteK : 1
+      progress: surface.appearFade
     }
-  }
-
-  // Hides the pointer across the whole lockscreen. NoButton keeps clicks
-  // falling through to the input field underneath.
-  MouseArea {
-    anchors.fill: parent
-    hoverEnabled: true
-    acceptedButtons: Qt.NoButton
-    cursorShape: Qt.BlankCursor
   }
 
   // Clock band: a block above the auth field with real air around it, capped at
@@ -637,5 +642,17 @@ WlSessionLockSurface {
         }
       }
     }
+  }
+
+  // Hides the pointer across the WHOLE surface, including the password box.
+  // Declared last so it is above the field: Qt gives the cursor shape to the
+  // topmost hover handler, and a field painted above this area re-shows its
+  // native I-beam whenever the pointer sits over it. `NoButton` still lets
+  // every press fall through to the field underneath.
+  MouseArea {
+    anchors.fill: parent
+    hoverEnabled: true
+    acceptedButtons: Qt.NoButton
+    cursorShape: Qt.BlankCursor
   }
 }

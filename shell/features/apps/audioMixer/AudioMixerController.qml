@@ -393,7 +393,11 @@ Item {
     }
     if (!root._routingQueued) return
     root._routingQueued = false
-    Qt.callLater(() => root.refreshRouting())
+    // APP-3: defer through a next-turn timer, not a closure. The timer is a
+    // child of this controller, so a teardown destroys it and the queued
+    // refresh dies with its owner instead of forking another pactl child
+    // against a dead controller. The queue-collapse flag above is unchanged.
+    root.routingRefreshTimer.restart()
   }
 
   property bool _routingQueued: false
@@ -408,6 +412,25 @@ Item {
     id: routeTimer
     interval: 5000
     repeat: true
+    running: false
+    onTriggered: root.refreshRouting()
+  }
+
+  // APP-3 - the three next-turn refresh hops.
+  //
+  // These used to be `Qt.callLater(() => root.refreshX())` in job callbacks.
+  // A callLater closure is owned by the event loop, not by this object, so it
+  // outlives a teardown that cancels the children: the lambda then runs against
+  // a controller that is already gone and can fork a fresh pactl/pw-link child
+  // for a window nobody is looking at. A Timer is a child of this controller,
+  // so destroying it cancels the hop with its owner. `restart()` on a
+  // non-repeating Timer only moves the deadline, so a burst of callbacks still
+  // collapses to one refresh - the same coalescing callLater gave us, without
+  // the retained closure. This is the pattern GraphTab.qml:399-403 uses.
+  Timer {
+    id: routingRefreshTimer
+    interval: 0
+    repeat: false
     running: false
     onTriggered: root.refreshRouting()
   }
@@ -464,7 +487,10 @@ Item {
     // five seconds for a closed window, which is exactly the cost the open-gate
     // exists to avoid.
     if (root.wanted) routeTimer.restart()
-    Qt.callLater(() => root.refreshRouting())
+    // APP-3: teardown-safe deferral (see _adoptRouting). A move the daemon
+    // answered still re-reads the map, but only if this controller is alive to
+    // own the read.
+    root.routingRefreshTimer.restart()
   }
 
   // --- device configuration ---
@@ -547,7 +573,9 @@ Item {
     }
     if (!root._configQueued) return
     root._configQueued = false
-    Qt.callLater(() => root.refreshConfiguration())
+    // APP-3: teardown-safe deferral - the timer is destroyed with this
+    // controller, so a card read cannot be re-queued after teardown.
+    root.configRefreshTimer.restart()
   }
 
   // One retry for a read that finished without an answer. `configReady` is
@@ -571,6 +599,17 @@ Item {
     id: configTimer
 
     interval: root.configRetryDelayMs
+    repeat: false
+    running: false
+    onTriggered: root.refreshConfiguration()
+  }
+
+  // APP-3: teardown-safe next-turn hop for the card re-read (see the group at
+  // routingRefreshTimer). The retry above is a separate, labelled deadline and
+  // is deliberately left as it is.
+  Timer {
+    id: configRefreshTimer
+    interval: 0
     repeat: false
     running: false
     onTriggered: root.refreshConfiguration()
@@ -679,7 +718,8 @@ Item {
     }
     // The daemon owns the result: which profiles exist and which one is active
     // both move under us, and the read is the only place either is published.
-    Qt.callLater(() => root.refreshConfiguration())
+    // APP-3: teardown-safe deferral (see _adoptConfig).
+    root.configRefreshTimer.restart()
   }
 
   // The node's own `PwNodeAudio`, or null.
@@ -795,6 +835,16 @@ Item {
   readonly property string linkOwner: "audioMixer:graphLink"
   readonly property int linkTimeoutMs: 5000
 
+  // APP-3: teardown-safe next-turn hop for the port re-read (see the group at
+  // routingRefreshTimer).
+  Timer {
+    id: portsRefreshTimer
+    interval: 0
+    repeat: false
+    running: false
+    onTriggered: root.refreshPorts()
+  }
+
   function refreshPorts() {
     if (root._portsPending > 0) {
       root._portsQueued = true
@@ -841,7 +891,9 @@ Item {
     if (root._portsPending > 0) return
     if (!root._portsQueued) return
     root._portsQueued = false
-    Qt.callLater(() => root.refreshPorts())
+    // APP-3: teardown-safe deferral - a queued port re-read dies with this
+    // controller rather than outliving the window that asked for it.
+    root.portsRefreshTimer.restart()
   }
 
   // --- connecting, disconnecting and rerouting ---
@@ -1470,6 +1522,12 @@ Item {
     root._backstopMonitor()
     routeTimer.stop()
     configTimer.stop()
+    // APP-3: cancel the next-turn refresh hops too. Child destruction would
+    // stop them anyway; stopping them here keeps every deferred path named in
+    // the one place that owns all teardown.
+    routingRefreshTimer.stop()
+    configRefreshTimer.stop()
+    portsRefreshTimer.stop()
     rowsTimer.stop()
     linksTimer.stop()
     // cancelOwner covers the routing refresh, the move, the card read, the

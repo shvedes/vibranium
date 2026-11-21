@@ -300,6 +300,16 @@ LayerSurface {
     }
     height: (bubble.hasLines ? root._linesH : label.implicitHeight) + 2 * Ui.s
 
+    // A live text/lines feed can resize the bubble while it is shown. The
+    // snapshot's own place() (on_ReqChanged) may run before this re-measure,
+    // so x/y would keep the old width/height and the bubble would drift off
+    // its anchor. Re-place synchronously on the live size instead: place()
+    // writes only x/y, so there is no size loop, and one call per actual size
+    // change is the tightest coupling (no coalescer needed). Gated on _placed
+    // so the first-present pre-configure passes above own the initial place.
+    onWidthChanged: if (root._placed) root.place()
+    onHeightChanged: if (root._placed) root.place()
+
     Title {
       id: label
       level: 5
@@ -493,10 +503,11 @@ LayerSurface {
     }
   }
 
-  // Park the bubble next to the served module on every appearance and
-  // when the surface maps/configures (the first pass runs pre-configure,
-  // so the same settle hooks as the island re-run it at real
-  // coordinates).
+  // Park the bubble next to the served module on every appearance, whenever
+  // the surface maps/configures, and whenever the bubble's live size changes
+  // (a text/lines feed updating while shown). The first pass runs
+  // pre-configure, so the same settle hooks as the island re-run it at real
+  // coordinates.
   function place() {
     if (!root._req || !root._req.anchor || !root._req.barWindow) return
     // The settle is the SCREEN's, not the surface's. A mapping surface is still

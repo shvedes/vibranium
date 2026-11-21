@@ -177,6 +177,19 @@ LayerSurface {
     return Math.ceil(v / 256) * 256
   }
 
+  // The one writer of the outgoing frame when a swap supersedes an in-flight
+  // fade. The front image is the frame the user is actually looking at: by
+  // the time a new show() arrives it may be partially revealed over baseImg,
+  // so it has to become the new base before frontImg is re-staged for the
+  // next decode. finishTrans() owns the *completion* promote, but it early-
+  // returns once fading was cleared for an interruption, so every show()
+  // branch that clears fading must promote here first. Keeping this in one
+  // helper is what makes the interrupted frame have exactly one owner.
+  function _promoteFront() {
+    const mid = frontImg.source.toString()
+    if (mid !== "") baseImg.source = mid
+  }
+
   function show(url) {
     if (!win.animKnown) {
       win.pendingUrl = url
@@ -216,6 +229,7 @@ LayerSurface {
       if (win.fading) {
         win.fading = false
         transAnim.stop()
+        win._promoteFront()
       }
       win.transKind = ""
       win.painted = true
@@ -245,8 +259,7 @@ LayerSurface {
     if (win.fading) {
       win.fading = false
       transAnim.stop()
-      const mid = frontImg.source.toString()
-      if (mid !== "") baseImg.source = mid
+      win._promoteFront()
     }
     win.transKind = kind
     win.pendingFade = true

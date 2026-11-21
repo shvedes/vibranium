@@ -438,13 +438,27 @@ QtObject {
   // The hand-back is gated on the window still being the active one: an unmapped
   // window has no keyboard to put focus into, and asking an item inside one
   // that is going away is a request against a tree that is already closing.
+  // APP-2: the guards are re-checked INSIDE the deferred lambda, and each
+  // handoff captures a monotonic generation. A newer popKey - including an ABA
+  // reopen of the same key - retires the older claim (invariant 5), and a close
+  // before the lambda runs leaves neither with a live target. The single-open
+  // path still claims focus exactly once. One writer: this handler.
+  property int _popFocusSeq: 0
+
   onPopKeyChanged: {
-    if (mixer.popKey !== "") {
-      Qt.callLater(() => pop.forceActiveFocus())
+    const seq = ++mixer._popFocusSeq
+    const claimed = mixer.popKey
+    if (claimed !== "") {
+      Qt.callLater(function() {
+        if (mixer._popFocusSeq === seq && mixer.popKey === claimed) pop.forceActiveFocus()
+      })
       return
     }
     if (!mixer.active) return
-    Qt.callLater(() => tabBar.forceActiveFocus())
+    Qt.callLater(function() {
+      if (mixer._popFocusSeq === seq && mixer.popKey === "" && mixer.active)
+        tabBar.forceActiveFocus()
+    })
   }
 
   // --- the one status line ---
@@ -991,9 +1005,13 @@ QtObject {
     // client decision: requestActivate() asks for it on the map, `active` is the
     // answer, and the focus handoff below runs off that answer rather than off
     // the surface appearing.
+    // APP-2: the deferred claims re-check the live surface state when they run,
+    // the same pattern LyricsFullscreenOverlay uses. A close between the signal
+    // and the lambda leaves `visible`/`mixer.active` false, so a claim scheduled
+    // for a window that is going away does not fire on the tree that replaces it.
     onVisibleChanged: {
       if (!visible) return
-      Qt.callLater(() => requestActivate())
+      Qt.callLater(function() { if (visible) requestActivate() })
     }
     onActiveChanged: {
       if (!mixer.active) return
@@ -1002,8 +1020,11 @@ QtObject {
       // focused item nobody can see the focus in is a keyboard that appears dead.
       // Qt.callLater because the compositor grants keyboard focus a beat after the
       // map, and a forceActiveFocus before that is a request recorded against a
-      // surface that does not hold focus yet.
-      Qt.callLater(() => tabBar.forceActiveFocus())
+      // surface that does not hold focus yet. The live re-check above it is what
+      // retires a claim whose window was torn down in that beat.
+      Qt.callLater(function() {
+        if (mixer.active && visible) tabBar.forceActiveFocus()
+      })
     }
     // A toplevel is closeable from outside this file - a keybinding, a
     // windowrule, a switcher - and a layer-shell surface never was. Routing the

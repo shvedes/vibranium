@@ -268,11 +268,13 @@ LayerSurface {
   }
 
   // Notification-pile clearance, published as plain data per screen (see
-  // DesktopLayoutState.publishIsland): target geometry from positionCard
-  // below - the parked x/y/w/h - never the animated card props, so a
-  // mid-glide park can never freeze a half footprint in. `open` rides along as the
-  // showing flag, so close() clears the pile through the requestPark above
-  // it, and resizes repark through the existing size/content triggers.
+  // DesktopLayoutState.publishIsland): the parked x/y/w/h from positionCard
+  // below. For a bottom bar the parked y - and so the published bottom edge -
+  // is derived from the card's LIVE animated height, and positionCard re-runs
+  // on every height-tween frame, so the pile tracks the card instead of
+  // freezing a half footprint. For a top bar y is height-independent. `open`
+  // rides along as the showing flag, so close() clears the pile through the
+  // requestPark above it, and resizes repark through the existing triggers.
   // `_islandKey` is the last published screen: a rewired anchor evicts the
   // old key, so a host never clears two screens at once. Teardown releases
   // it, so a destroyed-while-open host cannot hold the pile down.
@@ -435,8 +437,11 @@ LayerSurface {
       // `_sizedForOpen` latch keeps the first size of each open (during the
       // fade-in, right after the content incubated) a snap instead of a
       // grow: the window then maps at its final size, and every later change
-      // tweens. Position is unaffected: positionCard() owns card.x/y and the
-      // vertical park does not depend on the height, so the card stays put.
+      // tweens. positionCard() owns card.x/y. For a top bar y is independent of
+      // the height, so the card stays put. For a bottom bar the park measures up
+      // from the bar by this LIVE height, and onHeightChanged below re-parks on
+      // every frame of the tween so the bottom edge stays pinned - one clock,
+      // never a park from the destination followed by a slide into place.
       Behavior on height {
         enabled: root.animationsEnabled && root._sizedForOpen
           && !(root.content && root.content.islandSelfAnimating)
@@ -448,7 +453,15 @@ LayerSurface {
       // which a Behavior on opacity has not necessarily reached when the
       // content's first size lands - is what makes the first change a snap
       // deterministically.
-      onHeightChanged: if (root.open) root._sizedForOpen = true
+      onHeightChanged: {
+        if (!root.open) return
+        root._sizedForOpen = true
+        // For a bottom bar y is derived from this live height. Re-park
+        // synchronously (no callLater coalescer) so y follows the height tween
+        // frame by frame and the card's bottom edge stays at a fixed gap above
+        // the bar. A top bar's y is height-independent, so it needs no follow.
+        if (root.barPosition === "bottom") root.positionCard()
+      }
 
 
       Loader {
@@ -531,9 +544,19 @@ LayerSurface {
     // Perpendicular axis: hug the bar surface's edge (the bar is aligned to
     // its screen edge regardless of the bar's internal layout), dropping
     // below a top bar or above a bottom one.
-    let y = root.barPosition === "bottom" ? screenH - barH - h - root.margin : barH + root.margin
+    //
+    // A bottom bar measures UP from the bar by the card's LIVE height, not by
+    // the content's destination `h`: the height Behavior tweens toward `h`,
+    // and parking from the destination would jump y up front and slide the
+    // card down over the tween. cardItem.height is the same clock as that
+    // tween, and onHeightChanged re-runs this park every frame. A top bar's y
+    // is height-independent, so it keeps using `h` throughout (no behaviour
+    // change there).
+    const parkH = root.barPosition === "bottom" && cardItem.height > 0
+      ? cardItem.height : h
+    let y = root.barPosition === "bottom" ? screenH - barH - parkH - root.margin : barH + root.margin
     x = Range.clamp(x, root.margin, screenW - w - root.margin)
-    y = Range.clamp(y, root.margin, screenH - h - root.margin)
+    y = Range.clamp(y, root.margin, screenH - parkH - root.margin)
     cardItem.x = Math.round(x)
     cardItem.y = Math.round(y)
     root._parked = true
@@ -554,7 +577,7 @@ LayerSurface {
     if (islandName !== "") root._islandKey = islandName
     if (islandName !== "") {
       if (screenW > 100 && screenH > 100) {
-        DesktopLayoutState.publishIsland(islandName, root.open, y, y + h, x, x + w)
+        DesktopLayoutState.publishIsland(islandName, root.open, y, y + parkH, x, x + w)
       } else if (!root.open) {
         DesktopLayoutState.publishIsland(islandName, false, 0, 0)
       }

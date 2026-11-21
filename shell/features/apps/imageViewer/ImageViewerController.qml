@@ -46,15 +46,39 @@ Item {
   // `Window` it holds is one level down from here.
   readonly property var window: windowLoader.item
 
+  // The URL the facade's `openPath` verb asked for, published as live state
+  // instead of handed to a window that may not exist yet.
+  //
+  // APP-1: on a cold shell the facade shows before `Ui.primaryScreen` resolves,
+  // so `windowLoader` is still inactive when the verb arrives. The old code
+  // handed the URL straight to a null window and reported `refused:`, and when
+  // the screen gate opened the window built empty. The request now waits here:
+  // the facade is the only writer, and the window DERIVES its initial content
+  // from this property at construction (the real build edge), so an early
+  // request is honoured rather than dropped. A later request overwrites this
+  // one, which is exactly the supersession we want - the newest intent wins.
+  property string requestedPath: ""
+
   // Hand a URL to the window. The URL, not the path: the facade has already
   // resolved the argument and the window puts it straight into an `Image`
   // source, which is what a `file:` URL is for. Fixed arity, because the `app`
   // host forwards what it was given and Quickshell's IpcHandler enforces exact
   // arity.
+  //
+  // APP-1: publish the request BEFORE looking for a window. If the screen gate
+  // has not opened there is no window to hand to, but the intent is no longer
+  // lost: it is live state above and the window reads it when it is built. The
+  // verdict stays honest - an existing window answers for itself, and a
+  // controller still waiting for a screen reports that the request has been
+  // accepted into live state (it will converge) rather than refusing a valid
+  // path. Validation remains the facade's job and is unchanged.
   function openPath(path) {
-    if (root.window === null || root.window === undefined) return false
-    if (typeof root.window.openPath !== "function") return false
-    return root.window.openPath(path) === true
+    const asked = path === undefined || path === null ? "" : String(path)
+    if (asked === "") return false
+    root.requestedPath = asked
+    if (root.window === null || root.window === undefined) return true
+    if (typeof root.window.openPath !== "function") return true
+    return root.window.openPath(asked) === true
   }
 
   // Close the viewer, through the facade and not around it. The window's
@@ -104,12 +128,13 @@ Item {
   Component {
     id: windowComp
 
-    // No handoff and no required property. The window reads the facade's
-    // `visible` for its own map and unmap, which is the entire lifecycle, so
-    // there is nothing here the controller would have to pass in; handing the
-    // facade in as well would be a second reference to one object for no gain.
-    // The mixer does pass its controller in, and the reason is that its rows
-    // read the graph through one owner - nothing here reads this object.
-    ImageViewerWindow {}
+    // The window reads the facade's `visible` for its own map and unmap, so the
+    // controller is not its lifecycle owner. It is handed in for one thing only
+    // (APP-1): the `requestedPath` live state the window uses to seed its
+    // content when it is built after a cold start. One reference, one reader,
+    // and no second copy of the request on the window side.
+    ImageViewerWindow {
+      controller: root
+    }
   }
 }

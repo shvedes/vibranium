@@ -44,17 +44,24 @@ Singleton {
   // anything but an explicit true must render dots.
   property bool responseVisible: false
 
-  // Feedback state: checking covers submit -> verdict, attempts drives the
-  // failure flash and shake in each view's PasswordBox (fail() on the
-  // attempts change), resetToken tells the view when to wipe and refocus
-  // the field.
-  property bool checking: false
-  property int attempts: 0
+  // Feedback state. `checking` and `attempts` are READ-ONLY projections of
+  // `conv` (declared below): the conversation state machine is their only
+  // writer, so a submit or a rejection can never leave a second copy out of
+  // step with the record. `checking` covers submit -> verdict and `attempts`
+  // drives the failure flash and shake in each view's PasswordBox (fail() on
+  // the attempts change). `resetToken` tells the view when to wipe and
+  // refocus the field.
+  readonly property bool checking: root.conv.checking
+  readonly property int attempts: root.conv.attempts
   property int resetToken: 0
 
-  // Flow object currently wired; guards against duplicate connections if a
-  // backend ever hands the same instance back.
+  // The flow currently wired and the generation it was wired in. A newer
+  // request retires every deferred closure of the old flow: each observer
+  // captures both values and discards an event unless they still match. The
+  // upstream `deleteLater()` leaves old QML connects alive by design, so
+  // identity + epoch checking (not disconnecting) is the guard.
   property var wiredFlow: null
+  property int flowEpoch: 0
 
   // ---- the conversation, as a record ---------------------------------------
   //
@@ -125,19 +132,38 @@ Singleton {
   // cosmetic change: it moves a pinned per-kind count in the qmllint suite.
   // So the connect calls below stay single-expression arrows, and the bodies
   // that need more than one statement live here, as functions.
-  function observePromptText(f) {
+  // Every flow observer takes the flow it was wired to and the epoch captured
+  // at connect time and discards the event unless both still match the live
+  // seat. A retired flow's late outcome must never be applied to the request
+  // that replaced it (POL-1 / Q3). The guard lives here, NOT in the connect
+  // call: a braced arrow there changes qmllint's whole-file type inference
+  // and moves the pinned unresolved-type count.
+  function isCurrentFlow(f, epoch) {
+    return f === root.wiredFlow && epoch === root.flowEpoch
+  }
+
+  function observePromptText(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
     root.syncFromFlow(f)
   }
 
-  function observeEcho(f) {
+  function observeEcho(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
     root.syncFromFlow(f)
   }
 
-  function observeSupplementary(f) {
+  function observeSupplementary(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
     root.syncFromFlow(f)
   }
 
-  function observeResponseRequired(f) {
+  function observeSupplementaryError(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
+    root.syncFromFlow(f)
+  }
+
+  function observeResponseRequired(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
     // Fresh prompt after a failed attempt or in multi-turn PAM: waiting is over
     // even though no explicit success signal arrives.
     root.syncFromFlow(f)
@@ -145,28 +171,29 @@ Singleton {
     // it hands the response over, so it is the backend saying "I have it"
     // rather than a turn ending.
     if (!f.isResponseRequired) return
-    root.checking = false
+    // `checking` is derived from conv; _apply("prompt") clears it there.
     root.onTurn()
   }
 
-  // Flow signals are wired imperatively instead of via Connections { target:
-  // agent.flow }: the backend nulls isActive/flow BEFORE emitting the
-  // outcome signals, which would retarget the Connections away and swallow
-  // authenticationSucceeded. Direct connects to the flow object survive.
-  //
-  // The sync-only observers stay single-expression arrows on purpose; see the
-  // note above the observer functions for why.
+  // Every observer stays a single-expression arrow here, for the qmllint
+  // reason recorded above; the multi-statement bodies live in the named
+  // functions, which also carry the epoch guard.
   function wireFlow(f) {
-    if (!f || root.wiredFlow === f) return
+    if (!f) return
+    // Captured at connect time, after beginRequest() has advanced flowEpoch.
+    // Do NOT skip rewiring when the backend hands back the same object: the
+    // old connects stay alive (deleteLater) and only this epoch separates
+    // them from the new ones. Identity + epoch, not disconnect, retire a flow.
+    const epoch = root.flowEpoch
     root.wiredFlow = f
-    f.inputPromptChanged.connect(() => root.observePromptText(f))
-    f.responseVisibleChanged.connect(() => root.observeEcho(f))
-    f.supplementaryMessageChanged.connect(() => root.observeSupplementary(f))
-    f.supplementaryIsErrorChanged.connect(() => root.syncFromFlow(f))
-    f.isResponseRequiredChanged.connect(() => root.observeResponseRequired(f))
-    f.authenticationFailed.connect(root.handleAuthFailed)
-    f.authenticationSucceeded.connect(root.handleAuthSucceeded)
-    f.authenticationRequestCancelled.connect(root.handleRequestCancelled)
+    f.inputPromptChanged.connect(() => root.observePromptText(f, epoch))
+    f.responseVisibleChanged.connect(() => root.observeEcho(f, epoch))
+    f.supplementaryMessageChanged.connect(() => root.observeSupplementary(f, epoch))
+    f.supplementaryIsErrorChanged.connect(() => root.observeSupplementaryError(f, epoch))
+    f.isResponseRequiredChanged.connect(() => root.observeResponseRequired(f, epoch))
+    f.authenticationFailed.connect(() => root.handleAuthFailed(f, epoch))
+    f.authenticationSucceeded.connect(() => root.handleAuthSucceeded(f, epoch))
+    f.authenticationRequestCancelled.connect(() => root.handleRequestCancelled(f, epoch))
   }
 
   // A PAM turn is outstanding. The only place a turn is counted into the
@@ -175,17 +202,49 @@ Singleton {
     root._apply("prompt")
   }
 
+  // The mirrored flow fields have one clear path, shared by the normal
+  // teardown and by supersession. `active`, `closing` and `inFlight` stay
+  // with the callers: supersession keeps the surface up, whereas finishClose
+  // takes it down.
+  function clearMirroredState() {
+    root.message = ""
+    root.prompt = ""
+    root.supplementary = ""
+    root.supplementaryIsError = false
+    root.responseRequired = false
+    root.responseVisible = false
+  }
+
   function beginRequest() {
     // The one read of `agent.flow` this function needs. The `wiredFlow`
     // snapshot is the PREVIOUS request's object, so reading it here would sync
     // this request's snapshot from the last one.
     const incoming = agent.flow
-    // A request arriving during the previous one's exit fade must disarm
-    // the pending teardown or it would wipe this request's state mid-flight.
-    closeTimer.stop()
-    root.closing = false
+    // A new request takes the seat from whatever conversation is still on
+    // screen. When the previous one is active or was already on its way out,
+    // retire it BEFORE arming this one: run the same "close" transition the
+    // normal teardown uses, drop its inFlight seat and its mirrored fields.
+    // Without this, a request arriving during the exit fade leaves the old
+    // seat counted and inFlight climbs to 2 and never returns to 0 (POL-2/Q2).
+    // `refused(..., "close") === ""` is true exactly when a conversation is
+    // still active or closing — i.e. there is an old one to retire — which
+    // also covers the (backend-anomalous) request arriving with no fade.
+    //
+    // "close" clears conv.active before _apply("request"), so PolkitTrace
+    // computes supersedes="" here. That is deliberate: the old conversation
+    // was properly retired through its close path, not abandoned, so calling
+    // it "superseded" would misreport it. There is no surface claim to
+    // release: polkit is a system-summoned modal excluded from SurfaceClaim.
+    if (PolkitTrace.refused(root.conv, "close") === "") {
+      closeTimer.stop()
+      root._apply("close")
+      root.closing = false
+      clearMirroredState()
+      root.inFlight = Math.max(0, root.inFlight - 1)
+    }
+    // Tokens: a newer request retires every deferred closure of the old flow.
+    root.flowEpoch += 1
     root.active = true
-    root.checking = false
     root.inFlight += 1
     root.wireFlow(incoming)
     root.syncFromFlow(incoming)
@@ -212,9 +271,9 @@ Singleton {
   function submitPassword(text) {
     const f = agent.flow
     if (!root.active || !f || !f.isResponseRequired || root.checking || text === "") return
-    root.checking = true
     // `text` goes from here straight into the backend; nothing derived from it
-    // is kept anywhere in this component.
+    // is kept anywhere in this component. `checking` is derived from conv:
+    // _apply("submit") is its single writer.
     root._apply("submit")
     f.submit(text)
     root.resetToken++
@@ -222,7 +281,6 @@ Singleton {
 
   function cancelRequest() {
     const f = agent.flow
-    root.checking = false
     if (f && root.active) {
       // Note what the backend does NOT do here: `cancelAuthenticationRequest`
       // sets `isCancelled` and cancels the session, and unlike
@@ -236,9 +294,9 @@ Singleton {
   }
 
   // Exit path always goes through here so the overlay fades instead of
-  // popping; finishClose() then drops all state once the fade has played.
-  // The 200ms window also gives late outcome signals room to land, since
-  // the backend retires isActive before emitting them.
+  // popping. Teardown is NOT on a timer guessing when the fade ended: the
+  // view releases it from hideAnim.onFinished (a real edge), where the 200 ms
+  // late-outcome grace is started. finishClose() then drops the state.
   function beginClose() {
     if (root.closing || !root.active) return
     // Legal by the guard above, so assigned directly rather than through
@@ -246,21 +304,25 @@ Singleton {
     // machine, and the guard is the one that decides.
     root.conv = PolkitTrace.apply(root.conv, { type: "begin-close", at: Date.now() })
     root.closing = true
-    closeTimer.restart()
+  }
+
+  // Called by the view at hideAnim.onFinished (or immediately when motion is
+  // disabled). The 200 ms is a grace for late outcome signals - the backend
+  // retires isActive before emitting them - NOT a guess at when the fade
+  // finishes: by the time this runs the fade has already finished (POL-3/Q4).
+  function noticeFadeFinished() {
+    if (root.closing) closeTimer.restart()
   }
 
   function finishClose() {
     if (PolkitTrace.refused(root.conv, "close") === "") root._apply("close")
-    root.closing = false
+    // active before closing, so the view's closing=false edge cannot mistake
+    // a normal teardown for a supersession and bring the card back.
     root.active = false
-    root.checking = false
-    root.attempts = 0
-    root.message = ""
-    root.prompt = ""
-    root.supplementary = ""
-    root.supplementaryIsError = false
-    root.responseRequired = false
-    root.responseVisible = false
+    root.closing = false
+    clearMirroredState()
+    // checking/attempts are derived from conv and are NOT written here:
+    // conv.attempts is retained so `outcome()` can still report locked-out.
     root.inFlight = Math.max(0, root.inFlight - 1)
   }
 
@@ -282,6 +344,9 @@ Singleton {
 
   PolkitView {}
 
+  // 200 ms grace for late outcome signals, started at hideAnim.onFinished.
+  // It is NOT a "wait for the fade to finish" timer - the fade is already
+  // over when this is armed. See noticeFadeFinished() and POL-3 / Q4.
   Timer {
     id: closeTimer
 
@@ -305,20 +370,22 @@ Singleton {
 
   }
 
-  function handleAuthFailed() {
-    root.checking = false
+  function handleAuthFailed(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
+    // _apply("rejected") is the single writer: it increments conv.attempts
+    // (the `attempts` projection) and clears conv.checking.
     if (!root._apply("rejected")) return
-    root.attempts += 1
     root.resetToken++
   }
 
-  function handleAuthSucceeded() {
-    root.checking = false
+  function handleAuthSucceeded(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
     root._apply("granted")
     root.beginClose()
   }
 
-  function handleRequestCancelled() {
+  function handleRequestCancelled(f, epoch) {
+    if (!root.isCurrentFlow(f, epoch)) return
     // Emitted ONLY by `cancelFromAgent`, which is what quickshell calls when
     // polkitd cancels through the request's cancellable. A TIMEOUT arrives the
     // same way - polkitd's `polkit.requested.timeout` expiry cancels the
