@@ -147,6 +147,12 @@ PanelCard {
     function onVisibleChanged() {
       if (!AppLauncher.visible) {
         panel.closeNotice()
+        // A staged delete belongs to the summon that opened it. The
+        // results-change path also closes it, but a close need not publish a
+        // different row set (idle rows are unchanged) and a quick reopen
+        // cancels the close settle before it recomputes, so the confirmation
+        // would otherwise greet the next open on a row it may not even name.
+        panel.closeDelete()
         // Arm the open-time snap while hidden: the next open's first
         // sizing instant lands in the same turn as the show gate closing,
         // and a Behavior reads the gate's pre-turn value - so a height
@@ -158,7 +164,9 @@ PanelCard {
         panel.sizeSnap = true
         return
       }
-      AppLauncher.pendingDelete = null
+      // Clears the panel's delete state and the facade's staged row together,
+      // so a reload replay that skips the hidden edge cannot carry either in.
+      panel.closeDelete()
       // A notice left live by a close that outran its timer would otherwise
       // repaint on the first frame of this open with its remaining time.
       panel.closeNotice()
