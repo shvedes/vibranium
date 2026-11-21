@@ -459,5 +459,16 @@ Variants {
         elide: Text.ElideRight
       }
     }
+
+    // Same pointer policy as the lockscreen: the modal covers the screen, so
+    // no cursor belongs on it, including over the password field's native
+    // I-beam. Declared last to be the topmost hover handler; NoButton lets
+    // every press reach the card's field and the refocus net underneath.
+    MouseArea {
+      anchors.fill: parent
+      hoverEnabled: true
+      acceptedButtons: Qt.NoButton
+      cursorShape: Qt.BlankCursor
+    }
   }
 }
