@@ -205,6 +205,15 @@ Item {
   readonly property real barWidth: nested ? Math.round(Ui.barW * 0.6) : Ui.barW
   readonly property real barGap: nested ? Ui.s : Ui.barGap
   readonly property real chevronWidth: nested ? 12 : Ui.chevronW
+  // Ceiling for this row's open slots. A page row reads the card's screen cap
+  // off its List; a child gets the host group's cap explicitly. A dropdown
+  // that outgrows it scrolls inside its own viewport rather than pushing its
+  // lower children past the window. -1 keeps an unhosted row unbounded.
+  property real slotCeilingH: -1
+  readonly property real dropdownCeilingH: row.slotCeilingH > 0
+    ? row.slotCeilingH
+    : (ListView.view && ListView.view.slotCeilingH > 0
+      ? ListView.view.slotCeilingH : -1)
   // The host reads this to grow its selection bar and push the neighbours.
   readonly property real nestedSlotH: descSlot.height + expandSlot.height
   // Breathing room below an open slot, scaled by the slot's live height. The
@@ -2876,14 +2885,88 @@ Item {
 
       property alias focusBar: focusBar
       property alias groupCol: groupCol
+      readonly property alias fadeTop: fadeTop
+      readonly property alias fadeBottom: fadeBottom
 
       width: parent.width
       // The nested slot is an overlay, excluded from this box, so opening it
       // cannot resize the card. Rows below slide inside the clipped box.
       // The box grows only by the shortfall the child could not push into.
-      // A group that still fits the card viewport keeps the window size.
-      implicitHeight: groupCol.height + groupRoot.boxNeed
+      // A group that still fits the card viewport keeps the window size. A
+      // taller one is capped to what the card can show and scrolls behind this
+      // clipped box with the cursor held dead centre.
+      readonly property real naturalH: groupCol.height + groupRoot.boxNeed
+      // The row's own chrome is subtracted from the card's slot ceiling, so
+      // the row the group publishes back is never taller than the card can
+      // grow. All terms are static geometry: `row.dropdownPad` is NOT used
+      // here because it reads the live slot height, which this value feeds -
+      // Ui.dropdownBarPad is its ceiling, so subtracting the maximum keeps
+      // the bound valid without closing the loop.
+      readonly property real ceilingH: row.dropdownCeilingH > 0
+        ? Math.max(0, row.dropdownCeilingH - row.staticRowH - Ui.dropdownBarPad
+          - expandSlot.topGap - expandSlot.gap)
+        : -1
+      readonly property bool capped: ceilingH > 0 && naturalH > ceilingH + 0.5
+      readonly property real viewportH: capped ? ceilingH : naturalH
+      implicitHeight: viewportH
       clip: true
+
+      // In-dropdown scroll, ONE clock. `cursorRowY` is the only animated
+      // value: it follows the child under the cursor in content space. The
+      // column offset and the focus bar are both DERIVED from it, so a fast
+      // held key cannot put two tweens out of phase - the bar is pinned to
+      // the centre by algebra and the rows glide underneath it, the way the
+      // launcher and the page List pin theirs.
+      property real cursorRowY: 0
+      property real cursorRowH: 0
+      readonly property real maxScrollY: Math.max(0, naturalH - viewportH)
+      // Centre the cursor's row. At the two ends the clamp gives the bar back
+      // to the real first/last row instead of inventing scroll space. A
+      // FUNCTION, not a stored binding: as a property it re-evaluated a frame
+      // after the row step and the bar flickered on every new glide.
+      function scrollY() {
+        return capped
+          ? Math.max(0, Math.min(cursorRowY + cursorRowH / 2 - viewportH / 2,
+            maxScrollY)) : 0
+      }
+      // A repeat re-arms before the last leg lands, so the single row step
+      // takes a short linear leg at the key's cadence.
+      property int scrollLegMs: Ui.fastMs
+      property int scrollEasing: Easing.OutCubic
+      // The first child is snapped on open; steps only ease after that.
+      property bool barReady: false
+      Behavior on cursorRowY {
+        enabled: groupRoot.barReady && MotionPolicy.enabled
+          && !groupEnter.running && groupRoot.liveExtra <= 0
+        NumberAnimation {
+          id: rowStepAnim
+          duration: groupRoot.scrollLegMs
+          easing.type: groupRoot.scrollEasing
+          onFinished: Menu.trace("grp.rowDone", {
+            y: Math.round(groupRoot.cursorRowY * 10) / 10,
+            idx: row.childIndex
+          })
+        }
+      }
+
+      // Diagnostic-only sampler. Off unless Menu.traceEnabled is armed, so it
+      // costs nothing in normal use. Unlike onYChanged it reports every frame
+      // even when the bar holds still, which is what makes a small jump visible.
+      Timer {
+        interval: 16
+        repeat: true
+        running: Menu.traceEnabled && groupRoot.barReady
+        onTriggered: Menu.trace("grp.sample", {
+          nested: row.nested, idx: row.childIndex,
+          y: Math.round(focusBar.y * 10) / 10,
+          h: Math.round(focusBar.height * 10) / 10,
+          row: Math.round(groupRoot.cursorRowY * 10) / 10,
+          rowH: Math.round(groupRoot.cursorRowH * 10) / 10,
+          scroll: Math.round(groupRoot.scrollY() * 10) / 10,
+          overflow: Math.round(groupRoot.overflow * 10) / 10,
+          view: Math.round(groupRoot.viewportH * 10) / 10
+        })
+      }
 
       readonly property real focusRestH: cursorItem ? cursorItem.restH : 0
       readonly property real focusBarH: cursorItem ? cursorItem.barH : 0
@@ -2958,9 +3041,28 @@ Item {
         // it vanishes before its collapse fade can play.
         if (row.childIndex < 0) return
         const it = groupRepeater.itemAt(row.childIndex)
-        if (it) groupRoot.cursorItem = it
+        if (it) {
+          groupRoot.cursorItem = it
+          // The one animated source. The derived scrollY and the bar's y both
+          // read it, so a step moves all three as a single motion.
+          groupRoot.cursorRowY = it.y
+          groupRoot.cursorRowH = it.height
+        }
       }
-      onCursorIndexChanged: groupRoot.trackCursor()
+      onCursorIndexChanged: {
+        // A step that arrives before the last row leg lands is a repeat: take
+        // the short linear cadence so a held key stays pinned to its row.
+        const held = rowStepAnim.running
+        groupRoot.scrollLegMs = held ? Math.round(Ui.fastMs / 4) : Ui.fastMs
+        groupRoot.scrollEasing = held ? Easing.Linear : Easing.OutCubic
+        if (Menu.traceEnabled) Menu.trace("grp.step", {
+          idx: row.childIndex, held: held,
+          row: Math.round(groupRoot.cursorRowY * 10) / 10,
+          scroll: Math.round(groupRoot.scrollY() * 10) / 10,
+          leg: groupRoot.scrollLegMs, ease: groupRoot.scrollEasing
+        })
+        groupRoot.trackCursor()
+      }
       Connections {
         target: groupRepeater
 
@@ -2981,6 +3083,9 @@ Item {
           groupRoot.opacity = 0
           groupEnter.restart()
         }
+        // cursorRowY was snapped while barReady was false; steps only ease
+        // from here on, and the derived scroll starts centred for this child.
+        groupRoot.barReady = true
       }
       Component.onDestruction: {
         if (row._groupView === groupRoot) row._groupView = null
@@ -3035,7 +3140,19 @@ Item {
         border.width: 1
         border.color: Ui.solid("background_3")
         x: Ui.m
-        y: groupRoot.cursorItem ? groupRoot.cursorItem.y + groupCol.y : 0
+        // Read the animated row ONCE and derive the column offset locally from
+        // that same value. Two separate bindings (bar.y and groupCol.y) each
+        // reading scrollY re-evaluated a frame apart and showed as a one-frame
+        // jump at the start of every glide. One expression with one read cannot
+        // disagree with itself: in the free range it reduces to the viewport
+        // centre, and at the two ends it hands the bar back to the real row.
+        y: {
+          const row = groupRoot.cursorRowY
+          const centred = row + groupRoot.cursorRowH / 2 - groupRoot.viewportH / 2
+          const scroll = groupRoot.capped
+            ? Math.max(0, Math.min(centred, groupRoot.maxScrollY)) : 0
+          return row - groupRoot.overflow - scroll
+        }
         width: groupRoot.width - 2 * Ui.m
         // The focused row and its nested description share one continuous
         // background: the bar grows by exactly the overlay's height.
@@ -3047,23 +3164,14 @@ Item {
         height: Math.max(0, Math.min(groupRoot.focusBarH,
           row.expandSlotH - y - expandSlot.gap))
 
-        // Glide only between children at rest. During a reveal y follows
-        // groupCol directly; a second glide on top of the bar's own tween
-        // desynchronises the two and breaks the shared edge on collapse.
-        Behavior on y {
-          enabled: MotionPolicy.enabled && !groupEnter.running
-            && groupRoot.liveExtra <= 0
-          NumberAnimation {
-            duration: Ui.fastMs
-            easing.type: Easing.OutCubic
-            onFinished: Menu.trace("grp.barDone", {
-              y: Math.round(focusBar.y * 10) / 10,
-              idx: row.childIndex, liveExtra: groupRoot.liveExtra
-            })
-          }
-        }
         onYChanged: if (Menu.traceEnabled) Menu.trace("grp.barY", {
-          y: Math.round(focusBar.y * 10) / 10, idx: row.childIndex,
+          y: Math.round(focusBar.y * 10) / 10, h: Math.round(focusBar.height * 10) / 10,
+          idx: row.childIndex, row: Math.round(groupRoot.cursorRowY * 10) / 10,
+          rowH: Math.round(groupRoot.cursorRowH * 10) / 10,
+          scroll: Math.round(groupRoot.scrollY() * 10) / 10,
+          col: Math.round(groupCol.y * 10) / 10,
+          leg: groupRoot.scrollLegMs, ease: groupRoot.scrollEasing,
+          moving: rowStepAnim.running,
           liveExtra: Math.round(groupRoot.liveExtra * 10) / 10,
           glide: groupRoot.liveExtra <= 0
         })
@@ -3114,9 +3222,14 @@ Item {
 
         x: Ui.m
         width: parent.width - 2 * Ui.m
-        y: -groupRoot.overflow
+        // The nested push and the in-dropdown scroll are the two additive
+        // translations of one column. The focus bar already reads this y, so
+        // the cursor stays painted on the child it names while the column
+        // glides under it.
+        y: -groupRoot.overflow - groupRoot.scrollY()
 
-        // No Behavior: overflow is the same frame's slot growth the bar reads.
+        // No Behavior: the nested push and the derived scroll both move the
+        // column directly, with no second tween to hand off to.
 
         Repeater {
           id: groupRepeater
@@ -3129,12 +3242,67 @@ Item {
             // without this every nested row reports depth 1 and the fill and
             // edge hue never change past the first dropdown.
             nestedDepth: row.nestedDepth
+            // A deeper dropdown is drawn inside this clipped box, so its cap
+            // is the parent's STATIC ceiling, not the live viewport: the live
+            // height feeds nested slot geometry, which feeds boxNeed back into
+            // the viewport and closes a binding loop.
+            slotCeilingH: groupRoot.ceilingH
             // The slot's growth plus the room below the focused child carry
             // the following rows past the box edge.
             slideY: index > row.childIndex && groupRoot.liveExtra > 0
               ? groupRoot.liveExtra : 0
             onPicked: row.childIndex = index
           }
+        }
+      }
+
+      // Edge hints for the clipped viewport. Both read the same live scroll
+      // position that moves the column, so a fade appears the moment there is
+      // content beyond its edge and retires at the seat that exhausts it. They
+      // are declared last and lifted above the column, bar and depth strip so
+      // every layer fades under them together.
+      // Fixed size; only the alpha is faint. A short viewport must not also
+      // shrink the hint into invisibility.
+      readonly property real edgeFadeH: Ui.m * 2
+      readonly property bool moreAbove: capped && groupRoot.scrollY() > 0.5
+      readonly property bool moreBelow: capped
+        && groupRoot.scrollY() < groupRoot.maxScrollY - 0.5
+      Rectangle {
+        id: fadeTop
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: groupRoot.edgeFadeH
+        z: 2
+        visible: groupRoot.capped
+        opacity: groupRoot.moreAbove ? 1 : 0
+        gradient: Gradient {
+          orientation: Gradient.Vertical
+          GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 0.14) }
+          GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0) }
+        }
+        Behavior on opacity {
+          enabled: MotionPolicy.enabled
+          NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+        }
+      }
+      Rectangle {
+        id: fadeBottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: groupRoot.edgeFadeH
+        z: 2
+        visible: groupRoot.capped
+        opacity: groupRoot.moreBelow ? 1 : 0
+        gradient: Gradient {
+          orientation: Gradient.Vertical
+          GradientStop { position: 0; color: Qt.rgba(0, 0, 0, 0) }
+          GradientStop { position: 1; color: Qt.rgba(0, 0, 0, 0.14) }
+        }
+        Behavior on opacity {
+          enabled: MotionPolicy.enabled
+          NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
         }
       }
     }

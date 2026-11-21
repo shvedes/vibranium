@@ -26,7 +26,10 @@ Variants {
       id: ceiling
       screen: win.modelData
       fraction: 0.7
-      growthFraction: 0.92
+      // A slot that opens may grow past the resting share, but a card that
+      // almost covers the display reads as a broken window rather than a
+      // dropdown. 80% leaves the desktop visible around a fully opened list.
+      growthFraction: 0.8
     }
 
     visible: Menu.visible

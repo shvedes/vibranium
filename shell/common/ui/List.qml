@@ -2157,6 +2157,14 @@ ListView {
   // whether it took the claim; this is it saying so.
   property real growthH: -1
 
+  // Absolute height a surface's card can give an OPEN slot in this view.
+  // Published once by the card-owning surface from its screen ceiling; -1
+  // keeps plain lists unbounded. A delegate that hosts its own scrollable
+  // dropdown reads this to cap its viewport, so the row it publishes back is
+  // one the card can actually show. Reading the view's live height here would
+  // close the row-height -> card-height loop SlotGrowth.js exists to avoid.
+  property real slotCeilingH: -1
+
   // "The reveal is the region's, not mine": true once a region has LANDED at
   // a target that satisfies the claim on its own. The surface sizes its
   // region to `claim - <where the content will sit> + Ui.s`

@@ -16,6 +16,10 @@ Rectangle {
   required property var modelData
   required property int index
   property int nestedDepth: 0
+  // The host group's STATIC ceiling, passed to the child so a dropdown opened
+  // deeper cannot grow past the box that clips it. Passing the live viewport
+  // would feed nested slot geometry back into the host's own height.
+  property real slotCeilingH: -1
 
   // Rows below a focused child slide down inside the clipped dropdown while
   // one of its slots is open. A transform, not y: the Column owns y. It reads
@@ -61,6 +65,7 @@ Rectangle {
       itm: child.modelData,
       nested: true,
       nestedDepth: child.nestedDepth + 1,
+      slotCeilingH: child.slotCeilingH,
       width: child.width
     })
     Connections {

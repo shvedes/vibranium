@@ -4729,6 +4729,27 @@ Rectangle {
       grpImplicitH: gv ? Math.round(gv.implicitHeight * 10) / 10 : 0,
       grpHeight: gv ? Math.round(gv.height * 10) / 10 : 0,
       grpColH: gv && gv.groupCol ? Math.round(gv.groupCol.height * 10) / 10 : 0,
+      // In-dropdown scrolloff ground truth. `capped` is the decision to stop
+      // growing the row and scroll behind the clipped box; `scrollY` is the
+      // column's live translation. A long group must show capped true, a
+      // scrollY that changes with the cursor, and a bar that stays in view.
+      slotCeilingH: list.slotCeilingH,
+      grpCeilingH: gv ? Math.round(gv.ceilingH * 10) / 10 : -1,
+      grpNaturalH: gv ? Math.round(gv.naturalH * 10) / 10 : -1,
+      grpViewportH: gv ? Math.round(gv.viewportH * 10) / 10 : -1,
+      grpCapped: gv ? gv.capped : false,
+      grpScrollY: gv ? Math.round(gv.scrollY() * 10) / 10 : -1,
+      grpFadeTop: gv ? gv.moreAbove : false,
+      grpFadeBottom: gv ? gv.moreBelow : false,
+      grpFadeTopOpacity: gv && gv.fadeTop ? Math.round(gv.fadeTop.opacity * 100) / 100 : -1,
+      grpFadeBottomOpacity: gv && gv.fadeBottom
+        ? Math.round(gv.fadeBottom.opacity * 100) / 100 : -1,
+      // Same ground truth one level down, for a nested group dropdown.
+      innerGroupScrollY: igv ? Math.round(igv.scrollY() * 10) / 10 : -1,
+      innerGroupViewportH: igv ? Math.round(igv.viewportH * 10) / 10 : -1,
+      innerGroupNaturalH: igv ? Math.round(igv.naturalH * 10) / 10 : -1,
+      innerGroupCapped: igv ? igv.capped : false,
+      innerGroupChildIndex: igv && cr ? cr.childIndex : -1,
       grpChildCount: gv && gv.childrenRepeater ? gv.childrenRepeater.count : 0,
       childIndex: gv ? row.childIndex : -1,
       childLabel: cr && cr.itm ? String(cr.itm.label ?? "") : "",
@@ -4989,6 +5010,11 @@ Rectangle {
 
         traceDebug: Menu.traceEnabled
         visible: !panel.gridMode
+        // The card's own screen ceiling, published for delegates that host a
+        // scrollable dropdown. A long group caps its viewport against this so
+        // the row it publishes back is one the card can grow to show, instead
+        // of a column whose lower children are clipped by the window.
+        slotCeilingH: panel.screenMaxListH
         // Unbound while the grid shows: the grid renders the same row set,
         // so Entry delegates (Texts, TextMetrics, icons, slots) built here
         // would be shaped, measured and tracked for rows nobody sees -
