@@ -309,6 +309,14 @@ Singleton {
   // user's confirmation and this unit can never satisfy the check with a value
   // it holds. A missing or failing authority fails closed instead of falling
   // back to Session.dispatch.
+  //
+  // XPLAT-4: the view is dismissed - visible false, stage retired and the
+  // surface claim released - before the teardown is dispatched, and the
+  // dispatch itself is deferred one tick, exactly as activate() does for a
+  // non-destructive row. A session that ends inside requestDestructive must
+  // not have to clean this view up by destroying it. The verdict is published
+  // to Bus in _dispatchConfirmed, so a refusal stays readable after the panel
+  // is gone (Bus.latest replays it to a later binder) and in status().
   function confirmPending() {
     const action = root._confirmationAction
     if (action === "") {
@@ -316,6 +324,17 @@ Singleton {
       return
     }
     root._clearConfirmation()
+    // Dismiss first: close() drops visible, the armed stage and the claim in
+    // that order, all before any command that can end the session runs.
+    root.close()
+    // Same shape as activate(): close now, dispatch on a later tick.
+    Qt.callLater(() => root._dispatchConfirmed(action))
+  }
+
+  // Runs only on the tick after the view is gone. The verdict - including a
+  // refusal - is published here, after dismissal, so it is never lost with
+  // the panel that asked for it.
+  function _dispatchConfirmed(action) {
     let wired = false
     try {
       wired = typeof Session.requestDestructive === "function"
@@ -335,7 +354,6 @@ Singleton {
     if (verdict === "ok") {
       root._dispatchFault = ""
       root._publishState()
-      root.close()
       return
     }
     root._recordDispatchFault(verdict === "" ? "dispatch_error" : verdict, action)

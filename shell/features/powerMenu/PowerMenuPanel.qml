@@ -330,11 +330,23 @@ PanelCard {
   // it (see landPendingActivate, which the install calls).
   property var _pendingActivate: null
   property string _pendingActivateKey: ""
-  // The dropdown is armed once the card has finished its own resize to the
-  // restored row set. The slot override owns the height for as long as the
-  // dropdown is open, so arming inside that tween replaces the re-expand the
-  // user is watching with a snap. The interval is the tween's own length plus
-  // the turn the install takes to arm it.
+  // Q12: the card exposes no "resize finished" signal, but the two numbers
+  // that define that edge are public: PanelCard.height is eased by its own
+  // `Behavior on height` Glide toward PanelCard.cardHeight (PanelCard.qml:
+  // 459-460, 580-596). Agreement between them IS the settle edge. Arming
+  // inside that tween replaces the re-expand the user is watching with a snap
+  // - the early-arm defect measured at closeConfirm above.
+  readonly property bool cardSettled: Math.abs(panel.height - panel.cardHeight) < 0.5
+  // Watch the live height, not a guessed duration. Every tick asks the derived
+  // predicate; only the edge that lands on the target releases the held row.
+  onHeightChanged: {
+    if (panel.cardSettled && panel._pendingActivateKey !== "") panel.armPendingActivate()
+  }
+  // Bounded fallback for a card that never produces a settle edge - e.g. its
+  // height Behavior stands down mid-tween because a slot override arrived, or
+  // the motion policy flips, leaving height short of cardHeight with no
+  // further edge. Same shape as List.swapWatch: the normal release is the
+  // live edge above; this only caps the no-edge case. One tick, never a spin.
   Timer {
     id: landTimer
     interval: Ui.resizeMs + Ui.fastMs
@@ -363,6 +375,14 @@ PanelCard {
       return false
     }
     list.settle(idx, true)
+    // If the card has no resize to make - motion disabled, or the restored
+    // row set came back at the same height - the predicate already holds and
+    // no height edge can arrive. Arm now; otherwise the onHeightChanged edge
+    // releases it, with the timer above as the capped no-edge fallback.
+    if (panel.cardSettled) {
+      panel.armPendingActivate()
+      return true
+    }
     landTimer.restart()
     return true
   }
@@ -370,7 +390,12 @@ PanelCard {
     const it = panel._pendingActivate
     panel._pendingActivate = null
     panel._pendingActivateKey = ""
-    if (!it || !PowerMenu.visible) return
+    landTimer.stop()
+    // Guards are read here, at release time, not when the wait was armed:
+    // the surface can close or a confirm slot can open while the card
+    // resizes, and a held activation must not fire into a view that is no
+    // longer there or over a slot that owns the card's geometry.
+    if (!it || !PowerMenu.visible || panel.slotOpen) return
     const idx = panel.indexOfAction(String(it.id ?? ""))
     if (idx < 0) return
     PowerMenu.activate(it)
