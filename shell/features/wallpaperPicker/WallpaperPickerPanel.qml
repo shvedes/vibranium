@@ -47,6 +47,10 @@ Item {
 
   readonly property var rows: WallpaperPicker.filtered
 
+  // A wallpaper that is globally disabled still opens this picker, but it has
+  // no list to browse: the deck is replaced by a single disabled-state mark.
+  readonly property bool featureDisabled: !Wallpaper.enabled
+
   // Selected row. The deck's whole geometry is a function of this index.
   property int selIndex: 0
   // How many rows on each side of the selection the deck instantiates. The
@@ -517,6 +521,12 @@ Item {
   function handleKey(event) {
     const k = event.key
     const ctrl = event.modifiers & Qt.ControlModifier
+    // With no list on screen, browsing and applying would pick a picture blind.
+    // Only the close verb remains while the feature is disabled.
+    if (panel.featureDisabled) {
+      if (k === Qt.Key_Escape) { WallpaperPicker.close(); event.accepted = true }
+      return
+    }
     // The confirm is modal: Enter or Space decides, Esc backs out, everything
     // else waits for one of those. Space confirms here because the deck has no
     // text entry, so the key has no other meaning on this surface.
@@ -622,7 +632,8 @@ Item {
     // theme held still has to fade out over an empty deck.
     // Departing rows outlive the listing they came from, so the deck stays up
     // while they fade out even when the last row has already left `rows`.
-    visible: panel.rows.length > 0 || panel._leavingFile !== "" || deck.count > 0
+    visible: !panel.featureDisabled
+      && (panel.rows.length > 0 || panel._leavingFile !== "" || deck.count > 0)
     opacity: panel._fade ? 1 : 0
 
     Behavior on opacity {
@@ -780,7 +791,7 @@ Item {
     width: Math.min(panel.bigW, Math.max(0, panel.width - 2 * Ui.outerPad))
     // No name to show until a listing offers one; an empty island would be a
     // lone pill under the deck.
-    visible: stage.visible && panel._currentFile() !== ""
+    visible: stage.visible && !panel.featureDisabled && panel._currentFile() !== ""
     opacity: panel._fade ? 1 : 0
 
     Behavior on opacity {
@@ -829,11 +840,28 @@ Item {
   EmptyState {
     anchors.centerIn: parent
     width: Math.max(0, panel.width - 64)
-    visible: panel.rows.length === 0 && deck.count === 0
+    visible: !panel.featureDisabled && panel.rows.length === 0 && deck.count === 0
     opacity: panel._fade ? 1 : 0
     text: "No wallpapers"
     iconName: "image"
     iconColorKey: "foreground_1"
+  }
+
+  // Stand-in for the deck while the feature is off: a large glyph over copy
+  // naming the disabled state. The picker stays openable so its close chain is
+  // intact; no picture is offered and the list keys are inert.
+  EmptyState {
+    anchors.centerIn: parent
+    anchors.verticalCenterOffset: -20
+    width: Math.max(0, panel.width - 64)
+    visible: panel.featureDisabled
+    opacity: panel._fade ? 1 : 0
+    text: "Wallpapers are disabled"
+    iconName: "eye-closed"
+    iconColorKey: "foreground_1"
+    iconSize: 128
+    textSize: 18
+    maxTextWidth: 360
   }
 
   // The footer legend: navigation and acceptance in the accent, the removal
@@ -894,6 +922,7 @@ Item {
     color: Qt.rgba(0, 0, 0, 0.62)
     border.width: 1
     border.color: Qt.rgba(1, 1, 1, 0.18)
+    visible: !panel.featureDisabled
     opacity: panel._fade ? 1 : 0
 
     Accessible.role: Accessible.StaticText
