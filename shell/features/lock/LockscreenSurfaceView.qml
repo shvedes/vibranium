@@ -441,15 +441,6 @@ WlSessionLockSurface {
     }
   }
 
-  // Hides the pointer across the whole lockscreen. NoButton keeps clicks
-  // falling through to the input field underneath.
-  MouseArea {
-    anchors.fill: parent
-    hoverEnabled: true
-    acceptedButtons: Qt.NoButton
-    cursorShape: Qt.BlankCursor
-  }
-
   // Clock band: a block above the auth field with real air around it, capped at
   // a fifth of the surface rather than the whole upper third. Every term is
   // measured here, so a short or fractionally-scaled output shrinks the clock
@@ -651,5 +642,17 @@ WlSessionLockSurface {
         }
       }
     }
+  }
+
+  // Hides the pointer across the WHOLE surface, including the password box.
+  // Declared last so it is above the field: Qt gives the cursor shape to the
+  // topmost hover handler, and a field painted above this area re-shows its
+  // native I-beam whenever the pointer sits over it. `NoButton` still lets
+  // every press fall through to the field underneath.
+  MouseArea {
+    anchors.fill: parent
+    hoverEnabled: true
+    acceptedButtons: Qt.NoButton
+    cursorShape: Qt.BlankCursor
   }
 }
