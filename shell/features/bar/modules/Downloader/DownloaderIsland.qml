@@ -26,7 +26,13 @@ Item {
   // every side, so the live body height plus two pads leaves a real gap
   // below the action row instead of clipping it against the card border.
   property int islandContentHeight: Math.ceil(body.implicitHeight) + 2 * Ui.outerPad
-  property bool islandSelfAnimating: false
+  // sectionSwap.height is this card's one height clock: its Ui.fastMs tween
+  // feeds body.implicitHeight -> islandContentHeight. Tell IslandHost to step
+  // its own Ui.resizeMs Behavior aside so the card follows that single clock
+  // frame by frame, the way Network and Volume do. Removing the sectionSwap
+  // Behavior instead would land the block opacity fades in a card that had
+  // already snapped to the new size - "wrong, then right" on every switch.
+  property bool islandSelfAnimating: true
   property var islandHost: null
   readonly property bool blockedNavKeys: urlField.focused
   // Arrows and Enter walk the format table. The list answers moveBy() and
@@ -174,6 +180,12 @@ Item {
   // Every fetch carries the epoch it started in: a Clear bumps it, so a reply
   // that was already in flight when the island was emptied lands nowhere.
   property int _fetchEpoch: 0
+
+  // Every model write (history, formats, playlist, table sort) bumps this
+  // epoch. A deferred cursor seat or scroll landing retires itself when it
+  // wakes up in a newer epoch, so an older intent cannot unseat the row a
+  // newer table just claimed (invariant 5).
+  property int _seatEpoch: 0
 
   // The module owns the runtime art warmer because this island is torn down
   // on close. Demand the visible URL, release it on close: that is the whole
@@ -448,35 +460,43 @@ Item {
   // seatTo is the list's only scroll writer: a direct contentY write would be
   // overwritten in the same turn by the offset the model swap preserves, and
   // the view would land back where it was scrolled to. The deferred repeat
-  // catches the swap's own restore retries once they are past the epoch bump.
+  // catches the swap's own restore retries, and is retired by a newer model
+  // write rather than scrolling a newer table to the top.
   function landTop() {
     formatList.seatTo(0, false, "sort")
   }
 
   // A header click on a new column starts ascending; on the sorted column it
   // flips. The order is a preference, so it is handed back to outlive the
-  // island.
+  // island. The epoch is retired here (not in a list handler) because a sort
+  // rewrites formatList's model without touching root.formats.
   function toggleSort(key) {
+    root._seatEpoch++
     root.sortDir = TableSort.nextDirection(root.sortKey, root.sortDir, key)
     root.sortKey = key
     if (formatList.currentIndex !== -1) formatList.seat(-1, "land")
     root.landTop()
-    Qt.callLater(root.landTop)
+    const epoch = root._seatEpoch
+    Qt.callLater(() => {
+      if (epoch === root._seatEpoch) root.landTop()
+    })
     if (typeof root.rememberSort === "function")
       root.rememberSort(root.sortKey, root.sortDir)
   }
 
   // The size column is shared with the history table, so a change there can
-  // move it too. The list also seats row 0 by itself when its model grows from
-  // empty, so a cold open put the cursor band on the newest entry before
-  // anyone had pointed at it. Recent rows are picks, not a selection: the
-  // cursor is parked again once the rows land, and the second pass catches the
-  // view's own placement retry after the model swap.
+  // move it too. The view seats row 0 during the model assignment itself;
+  // histList.onModelChanged parks it again in that same synchronous edge, so
+  // no frame paints a band on a row nobody pointed at (Q14). The one guarded
+  // deferral covers only the view's own placement retry after the swap; a
+  // newer history write retires it before it can unseat anything.
   onHistoryChanged: {
+    root._seatEpoch++
     root.measureTable()
+    const epoch = root._seatEpoch
     Qt.callLater(() => {
-      histList.seat(-1, "land")
-      Qt.callLater(() => histList.seat(-1, "land"))
+      if (epoch === root._seatEpoch && histList.currentIndex !== -1)
+        histList.seat(-1, "land")
     })
   }
 
@@ -516,19 +536,34 @@ Item {
 
   // The playlist list seats row 0 on its own when its model arrives, so a
   // freshly listed playlist would open with a focused band on the first entry.
-  // Ticks are the selection here; the list is unseated once the rows land.
-  onPlaylistChanged: Qt.callLater(() => { plList.currentIndex = -1 })
+  // Ticks are the selection here; plList.onModelChanged parks the cursor in
+  // the model's own synchronous edge, and the guarded deferral covers the
+  // view's later placement retry (retired by a newer playlist write).
+  onPlaylistChanged: {
+    root._seatEpoch++
+    const epoch = root._seatEpoch
+    Qt.callLater(() => {
+      if (epoch === root._seatEpoch && plList.currentIndex !== -1)
+        plList.seat(-1, "land")
+    })
+  }
 
   onFormatsChanged: {
+    root._seatEpoch++
     root.measureTable()
     // The keyboard cursor is an index into the previous row set. A new set
-    // makes index 0 name a different format, so unseat rather than leave
-    // the cursor band on a row nobody pointed at.
+    // makes index 0 name a different format, so unseat synchronously rather
+    // than leave the cursor band on a row nobody pointed at; formatList's
+    // onModelChanged repeats the unseat after the view's own index-0 seat.
     if (formatList.currentIndex !== -1) formatList.seat(-1, "land")
     // A fresh table is read from its first row. The remembered pick still
     // gets its cursor, but seating it must not drag the view down to it: a
     // reopened island shows the rows in the remembered order, from the top.
+    // This single deferred landing is epoch-guarded: a newer fetch retires
+    // it instead of letting a stale pick seat itself in the newer table.
+    const epoch = root._seatEpoch
     Qt.callLater(() => {
+      if (epoch !== root._seatEpoch) return
       root.settleCursor()
       root.landTop()
     })
@@ -758,10 +793,10 @@ Item {
   // filled in and fetched, anything else is left alone. A remembered load
   // outranks the clipboard, so this is only reached on a fresh island.
   //
-  // The read can land a beat after the first frame, so a miss arms a short
-  // retry rather than leaving the island empty over a race with the clipboard
-  // owner. The retry stands down the moment the field holds anything, typed
-  // or pasted.
+  // This is the ONE paste path. The pane click, the open-time auto-load and
+  // Ctrl+V all call it, so clipboardLink validation, the last-load / last-auto
+  // dedupe, the _pasteTrying stand-down, the auto-load note and the fetch all
+  // agree no matter which gesture asked (ISL-3).
   function pasteFromClipboard() {
     // Opening the card while a job runs is not a request to replace that job.
     if (root.downloading) return true
@@ -789,22 +824,38 @@ Item {
     return true
   }
 
-  property int _pasteTries: 0
+  // One-shot arm for the open-time clipboard race. `Quickshell.clipboardText`
+  // is a real notifying property, so the retry is released by its signal, not
+  // by a 160 ms wall-clock guess (Q15). The timer below is a bounded window
+  // for that race and only DISARMS - it never performs a speculative read.
   property bool _pasteTrying: false
 
-  Timer {
-    id: pasteRetry
+  Connections {
+    target: Quickshell
 
-    interval: 160
-    repeat: true
-    running: root._pasteTrying
-    onTriggered: {
-      if (urlField.text.trim() !== "" || root.pasteFromClipboard()) {
+    function onClipboardTextChanged() {
+      if (!root._pasteTrying) return
+      // A typed or pasted field is a newer intent than the clipboard race.
+      if (urlField.text.trim() !== "") {
         root._pasteTrying = false
         return
       }
-      if (++root._pasteTries >= 4) root._pasteTrying = false
+      // pasteFromClipboard() clears the arm on a handled link or a dedupe;
+      // a non-link change leaves it armed for the next real clipboard edge.
+      root.pasteFromClipboard()
     }
+  }
+
+  Timer {
+    id: pasteWaitDeadline
+
+    // The former pasteRetry budget (160 ms x 4), now a grace window for the
+    // clipboard-owner race rather than a readiness poll: no callback reads
+    // the clipboard, it only ends the wait when no signal ever arrived.
+    interval: 640
+    repeat: false
+    running: root._pasteTrying
+    onTriggered: root._pasteTrying = false
   }
 
   function fetchAll() {
@@ -1103,10 +1154,9 @@ Item {
     if (root.initialUrl !== "" && DL.isPlaylistUrl(root.initialUrl)
       && root.playlist.length === 0) root.fetchAll()
     if (root.initialUrl === "") {
-      if (!root.pasteFromClipboard()) {
-        root._pasteTries = 0
-        root._pasteTrying = true
-      }
+      // One initial read covers a clipboard already published. A miss arms
+      // the one-shot waiter on clipboardTextChanged (Q15), not a poll.
+      root._pasteTrying = !root.pasteFromClipboard()
     }
     root.measureTable()
     root.refresh()
@@ -1140,12 +1190,12 @@ Item {
   Keys.onPressed: event => {
     if (event.key !== Qt.Key_V || !(event.modifiers & Qt.ControlModifier)
       || (event.modifiers & Qt.MetaModifier) || urlField.focused) return
-    const text = String(Quickshell.clipboardText || "").trim()
-    if (text !== "") {
-      urlField.text = text
-      root.fetchAll()
-      urlField.forceActiveFocus()
-    }
+    // Same function the pane click and the open-time auto-load call: no raw
+    // clipboard write, no bypass of validation, dedupe or noteAutoLoaded.
+    const handled = root.pasteFromClipboard()
+    // Focus is a keyboard-only nicety, not part of paste semantics: keep the
+    // key path's old "ready to edit" behaviour after a real fill.
+    if (handled && urlField.text.trim() !== "") urlField.forceActiveFocus()
     event.accepted = true
   }
 
@@ -1774,6 +1824,13 @@ Item {
               isSelectable: i => !root._blank && !DL.isFiller(root._rows[i])
               delegate: formatRow
               onActivated: index => root.pickIndex(index)
+              // The view seats index 0 synchronously as part of the model
+              // assignment, before this edge fires. Unseating here (rather
+              // than a turn later) means the unpointed band never reaches a
+              // frame - the same synchronous gate ArchUpdates uses.
+              onModelChanged: {
+                if (formatList.currentIndex !== -1) formatList.seat(-1, "land")
+              }
             }
 
             // The placeholder rows stay perfectly still and one wash breathes
@@ -1927,6 +1984,11 @@ Item {
               Behavior on opacity {
                 enabled: MotionPolicy.enabled
                 NumberAnimation { duration: Ui.fastMs }
+              }
+              // Recent rows are picks, not a selection: the view's own
+              // index-0 seat is undone in this synchronous model edge.
+              onModelChanged: {
+                if (histList.currentIndex !== -1) histList.seat(-1, "land")
               }
             }
 
@@ -2217,6 +2279,11 @@ Item {
               interactive: contentHeight > height
               wheelSteps: false
               delegate: playlistRow
+              // Ticks, not the list cursor, are the playlist's selection:
+              // clear the view's synchronous index-0 seat in the same edge.
+              onModelChanged: {
+                if (plList.currentIndex !== -1) plList.seat(-1, "land")
+              }
             }
 
             ScrollBar {
