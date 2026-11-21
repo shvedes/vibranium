@@ -550,9 +550,10 @@ CollapsibleSlot {
       // away from the module's own pick, and the lyrics window must follow it.
       // The card closes as the window opens: the window is a toplevel and
       // covers the bar, so an island left open behind it is a second surface
-      // showing the same track with no way back to it.
+      // showing the same track with no way back to it. That close now lives in
+      // Bar.showLyrics (LYR-1) so the pad and the menu/keybind verb share one
+      // owner - this handler no longer closes the island itself.
       onLyricsFullscreenRequested: {
-        root.closeIsland()
         Bar.showLyrics(island.player, ShotLib.matchScreen(root.barScreen, Ui.validScreens))
       }
     }

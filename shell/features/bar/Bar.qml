@@ -1614,11 +1614,39 @@ Singleton {
     targetScreen: Ui.primaryScreen
   }
 
+  // LYR-1: the ONE owner of "close the bar surface showing this player".
+  // Both entry paths converge on showLyrics below - the island pad used to
+  // close its own host before delegating, which the menu/keybind verb could
+  // not do. Resolving the player first matters: the programmatic path has no
+  // explicit client, so the close is keyed on the player the overlay will
+  // actually open, never on "whatever island happens to be up".
+  //
+  // The per-bar hosts are reached through the existing registered bar views
+  // (one islandHost each). Only a NowPlaying island publishes `player`, so
+  // every other island is skipped; the defensive read mirrors IslandHost's
+  // own guarded property probes.
+  function _closeIslandShowingPlayer(p) {
+    if (p === null || p === undefined) return
+    const views = root._moveViews
+    for (const key in views) {
+      const view = views[key]
+      const host = view && view.islandHost ? view.islandHost : null
+      if (!host || !host.open) continue
+      let shown = null
+      try { shown = host.content ? host.content.player : null } catch (e) { shown = null }
+      if (shown === null || shown === undefined || shown !== p) continue
+      host.close()
+    }
+  }
+
   function showLyrics(player, screen) {
     const fromIsland = player !== null && player !== undefined
     const p = fromIsland ? player : Core.MediaState.activePlayer
     if (p === null || p === undefined) return false
     if (!fromIsland && !Core.MediaState.hasActivePlayer) return false
+    // Close the duplicate surface for this track on EITHER path, before the
+    // overlay maps. The gesture wrapper no longer does this itself.
+    root._closeIslandShowingPlayer(p)
     lyricsOverlay.targetScreen = screen !== null && screen !== undefined
       ? screen : Ui.primaryScreen
     lyricsOverlay.open(p)
