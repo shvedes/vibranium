@@ -30,6 +30,9 @@ Item {
   property color color: Ui.solid("foreground_0")
   property int fontSize: Ui.fontM
   property string fontFamily: Ui.fontFamily
+  property int fontWeight: Font.Normal
+  property real letterSpacing: 0
+  property int horizontalAlignment: Text.AlignLeft
   // Rise travel and tween duration; design tokens by default.
   property real slide: Ui.s
   property int duration: Ui.fastMs
@@ -54,6 +57,9 @@ Item {
   // The string currently fading (or faded) in, for readers that must
   // not sample a tween mid-flight.
   readonly property string currentText: root._front === 0 ? root._a : root._front === 1 ? root._b : root._c
+  // The resting layer's baseline, for hosts that align a sibling against this
+  // same line of type.
+  readonly property real baselineOffset: slideA.baselineOffset
   // The three slide layers, A first: each carries .text, .rise
   // (0 at rest, +slide staged below, -slide exiting above) and
   // .opacity for drivers that sample the travel itself.
@@ -165,6 +171,9 @@ Item {
     color: root.colorOf(root._a)
     font.pixelSize: root.fontSize
     font.family: root.fontFamily
+    font.weight: root.fontWeight
+    font.letterSpacing: root.letterSpacing
+    horizontalAlignment: root.horizontalAlignment
     textFormat: root.textFormat
     elide: root.elide
     wrapMode: root.wrapMode
@@ -187,6 +196,9 @@ Item {
     color: root.colorOf(root._b)
     font.pixelSize: root.fontSize
     font.family: root.fontFamily
+    font.weight: root.fontWeight
+    font.letterSpacing: root.letterSpacing
+    horizontalAlignment: root.horizontalAlignment
     textFormat: root.textFormat
     elide: root.elide
     wrapMode: root.wrapMode
@@ -207,6 +219,9 @@ Item {
     color: root.colorOf(root._c)
     font.pixelSize: root.fontSize
     font.family: root.fontFamily
+    font.weight: root.fontWeight
+    font.letterSpacing: root.letterSpacing
+    horizontalAlignment: root.horizontalAlignment
     textFormat: root.textFormat
     elide: root.elide
     wrapMode: root.wrapMode
