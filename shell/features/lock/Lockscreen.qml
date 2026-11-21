@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQml
-import QtQml as QQ
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -26,9 +25,12 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 // backend at boot because compositors refuse the first request made from an
 // already-locked session.
 // Keyboard state (caps, layout) lives in the shared Keyboard singleton.
-// An optional grace window (Settings.lockscreenGraceSeconds) releases a fresh
-// lock on the first real input inside that window, so an idle-triggered lock
-// does not demand a password from a user who is already back.
+// An optional grace window (Settings.lockscreenGraceSeconds) releases an
+// idle-triggered lock on the first real input inside that window, so a user
+// already back after an idle timeout is not asked for a password. It is armed
+// only for idle locks and measured against the wall clock: a suspend advances
+// that clock but freezes a QML timer, so time asleep always consumes the grace
+// and wake input can never ride a window that was armed before sleep.
 Singleton {
   id: root
 
@@ -106,35 +108,41 @@ Singleton {
     Keyboard.sync()
     root.requested = true
     root._pauseMusic()
-    root._armGrace()
+    root._armGrace(requestReason)
   }
 
-  // Arm the grace window for this lock. A zero setting leaves no timer
-  // running, which keeps the surface activity hooks inert.
-  function _armGrace() {
+  // Wall-clock deadline for the armed grace window, 0 when unarmed. A suspend
+  // advances this clock but freezes a QML timer, so the deadline is the only
+  // authority on whether input still counts as grace activity.
+  property double _graceDeadlineMs: 0
+
+  // Grace belongs only to an idle-triggered lock. A suspend locks first with
+  // a "suspend" reason and its wake input must not be mistaken for a user who
+  // never left; an explicit lock is held on purpose. The wall-clock deadline
+  // also expires a grace that a later suspend carries past its window.
+  function _armGrace(reason) {
     root._endGrace()
+    if (reason !== "idle") return
     if (Settings.lockscreenGraceSeconds <= 0) return
-    graceTimer.restart()
+    root._graceDeadlineMs = Date.now() + Settings.lockscreenGraceSeconds * 1000
   }
 
   function _endGrace() {
-    graceTimer.stop()
+    root._graceDeadlineMs = 0
   }
 
   // Called by every lock surface on real mouse or keyboard input. Only the
-  // first input inside the armed window releases; once the timer expired
-  // this is inert, so grace can never bypass a password afterwards.
+  // first input inside the armed window releases; once the wall-clock window
+  // is past this is inert, so grace can never bypass a password after a
+  // suspend even while a monotonic countdown would still have time left.
   function graceActivity() {
-    if (!graceTimer.running) return
+    if (root._graceDeadlineMs === 0) return
+    const armed = root._graceDeadlineMs
     root._endGrace()
+    // A deadline in the past means the window elapsed, possibly across a
+    // suspend; no password is bypassed in that case.
+    if (Date.now() >= armed) return
     root.finishRelease()
-  }
-
-  QQ.Timer {
-    id: graceTimer
-    interval: Settings.lockscreenGraceSeconds * 1000
-    repeat: false
-    onTriggered: root._endGrace()
   }
 
   // Stable identity for the neutral request contract: adopt() and release()
@@ -372,7 +380,7 @@ Singleton {
         blurPower: Settings.lockscreenBlurPower,
         pauseMusic: Settings.lockscreenPauseMusic,
         grace: Settings.lockscreenGraceSeconds,
-        graceArmed: graceTimer.running
+        graceArmed: root._graceDeadlineMs > 0 && Date.now() < root._graceDeadlineMs
       })
     }
 
