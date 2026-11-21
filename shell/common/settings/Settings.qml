@@ -282,6 +282,7 @@ Singleton {
   }
   readonly property bool lockscreenClock: root.value("shell.lockscreen.clock") === true
   readonly property bool lockscreenDate: root.value("shell.lockscreen.date") === true
+  readonly property bool lockscreenSeconds: root.value("shell.lockscreen.seconds") === true
   readonly property bool lockscreenNowPlaying: root.value("shell.lockscreen.nowPlaying") !== false
   readonly property bool lockscreenPauseMusic: root.value("shell.lockscreen.pauseMusic") !== false
   // Idle fade of the password field. Deliberately off by default: the delay

@@ -464,6 +464,7 @@ WlSessionLockSurface {
       Math.min(surface.width * 0.86, surface.width - 2 * Ui.outerPad))
     maxHeight: surface.clockMaxH
     withDate: Settings.lockscreenDate
+    showSeconds: Settings.lockscreenSeconds
     visible: Settings.lockscreenClock && surface.clockMaxH > 0
     opacity: panel.appearK * surface.clockIdleK
   }

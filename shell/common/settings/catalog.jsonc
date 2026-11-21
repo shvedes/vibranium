@@ -1440,7 +1440,8 @@
                     "icon": "clock",
                     "children": [
                         "shell.lockscreen.clock",
-                        "shell.lockscreen.date"
+                        "shell.lockscreen.date",
+                        "shell.lockscreen.seconds"
                     ]
                 },
                 {
@@ -1508,6 +1509,19 @@
                     "default": false,
                     "label": "Show date",
                     "sub": "Short date line below the time",
+                    "showIf": [
+                        {
+                            "key": "shell.lockscreen.clock",
+                            "eq": true
+                        }
+                    ]
+                },
+                {
+                    "key": "shell.lockscreen.seconds",
+                    "type": "bool",
+                    "default": false,
+                    "label": "Show seconds",
+                    "sub": "Seconds in the large clock",
                     "showIf": [
                         {
                             "key": "shell.lockscreen.clock",

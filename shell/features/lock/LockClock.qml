@@ -15,11 +15,11 @@ import "../../common/text/Clock.js" as ClockFmt
 //
 // Every changing value uses the same bottom-to-top slidefade: the outgoing
 // string rises and fades out while the incoming one rises from below and
-// fades in. Each hour and minute DIGIT owns a swap, so 11 -> 12 moves only the
-// ones digit while 09 -> 10 moves both; the AM/PM initial owns its own swap
-// too. The date is one line, so a day change slides the weekday, comma, day
-// and month together; the comma cannot be left behind by a separate box
-// resizing.
+// fades in. Each hour, minute and second DIGIT owns a swap, so 11 -> 12 moves
+// only the ones digit while 09 -> 10 moves both; seconds ride the same cells
+// when the option is on, and the AM/PM initial owns its own swap too. The date
+// is one line, so a day change slides the weekday, comma, day and month
+// together; the comma cannot be left behind by a separate box resizing.
 // The suffix's `M` is static - only `A`/`P` alternates, the way a
 // bedroom clock flips just the one flap. Each swap clips to one line, so a
 // mid-swap string cannot paint into the digits above.
@@ -35,11 +35,12 @@ Item {
   // both into the same space.
   property bool withDate: false
 
-  // Preview hooks: a fixed date replaces the wall clock and the format can be
-  // pinned, so the demo surface can swap every part on demand instead of
-  // waiting a day for the date to change. A null date reads the live clock.
+  // `showSeconds` follows the lockscreen setting; the preview pins it so the
+  // extra movement can be watched on demand. The fixed date and format hooks
+  // are the preview's other way to drive the same derivation as the live clock.
   property var fixedDate: null
   property bool use12h: TimeFormat.use12h
+  property bool showSeconds: Settings.lockscreenSeconds
 
   readonly property var sourceDate: root.fixedDate !== null ? root.fixedDate : clock.date
 
@@ -52,12 +53,15 @@ Item {
     return Qt.formatDateTime(d, "hh")
   }
   readonly property string minuteText: Qt.formatDateTime(root.sourceDate, "mm")
+  readonly property string secondsText: Qt.formatDateTime(root.sourceDate, "ss")
   // Each position owns its own swap: 11 -> 12 moves only the ones digit, while
   // 09 -> 10 moves both. A whole-field swap would animate both on every tick.
   readonly property string hourTens: root.hourText.charAt(0)
   readonly property string hourOnes: root.hourText.charAt(1)
   readonly property string minuteTens: root.minuteText.charAt(0)
   readonly property string minuteOnes: root.minuteText.charAt(1)
+  readonly property string secondTens: root.secondsText.charAt(0)
+  readonly property string secondOnes: root.secondsText.charAt(1)
   // Only the first letter alternates; the trailing `M` is a static glyph.
   readonly property string suffixInitialText: {
     if (!root.use12h) return ""
@@ -85,9 +89,20 @@ Item {
     font.weight: Font.Black
     font.pixelSize: 100
     font.letterSpacing: -2
-    // A fixed reference, never the live dials: a glyph's advance must not
-    // resize the clock.
+    // Fixed references, never the live dials: a glyph's advance must not
+    // resize the clock. The second metrics is the same line with seconds.
     text: "88:88"
+  }
+
+  TextMetrics {
+    id: secondsMetrics
+
+    font.family: Ui.fontFamily
+    font.bold: true
+    font.weight: Font.Black
+    font.pixelSize: 100
+    font.letterSpacing: -2
+    text: "88:88:88"
   }
 
   // A colon at the probe size splits the full measurement into digit cells.
@@ -101,8 +116,18 @@ Item {
     font.letterSpacing: -2
     text: ":"
   }
+  readonly property int digitCount: root.showSeconds ? 6 : 4
+  readonly property int colonCount: root.showSeconds ? 2 : 1
+  readonly property real refLineW: root.showSeconds
+    ? secondsMetrics.width : timeMetrics.width
+  // Adding seconds adds cells, not screen space: the whole clock scales by
+  // the ratio of the two fixed reference lines, so the extra digits make the
+  // line denser instead of larger. Derived, not a tuned magic number.
+  readonly property real lineScale: root.showSeconds
+    ? timeMetrics.width / secondsMetrics.width : 1
   readonly property real digitW: Math.max(1, Math.ceil(
-    (timeMetrics.width - colonMetrics.width) * root.timePx / 400))
+    (root.refLineW - root.colonCount * colonMetrics.width)
+      * root.timePx / (100 * root.digitCount)))
 
   // The date hangs just under the digits' baseline, not under the time's line
   // box: that box carries the font's descent, which at display sizes left a
@@ -142,7 +167,7 @@ Item {
     const reserve = root.use12h ? 0.46 : 0
     const byWidth = root.maxWidth / (w + reserve)
     const byHeight = root.timeH / h
-    return Math.max(1, Math.floor(Math.min(byWidth, byHeight)))
+    return Math.max(1, Math.floor(Math.min(byWidth, byHeight) * root.lineScale))
   }
   readonly property real suffixPx: Math.max(Ui.fontS, Math.round(root.timePx * 0.26))
   readonly property real suffixGap: Math.round(root.timePx * 0.05)
@@ -183,7 +208,7 @@ Item {
 
       x: 0
       y: 0
-      width: 4 * root.digitW + colonLabel.width
+      width: root.digitCount * root.digitW + root.colonCount * colonLabel.width
       height: digitsRow.implicitHeight
       spacing: 0
 
@@ -269,6 +294,55 @@ Item {
         duration: root.flipDuration
       }
 
+      Text {
+        id: secondColonLabel
+
+        visible: root.showSeconds
+        width: root.digitW
+        text: ":"
+        color: Theme.color("foreground_0")
+        font.family: Ui.fontFamily
+        font.weight: Font.Black
+        font.pixelSize: root.timePx
+        font.letterSpacing: -Math.round(root.timePx * 0.018)
+        horizontalAlignment: Text.AlignHCenter
+      }
+
+      SlideSwap {
+        id: secondTensSwap
+
+        visible: root.showSeconds
+        width: root.digitW
+        height: implicitHeight
+        clip: true
+        text: root.secondTens
+        color: Theme.color("foreground_0")
+        fontFamily: Ui.fontFamily
+        fontWeight: Font.Black
+        fontSize: root.timePx
+        letterSpacing: -Math.round(root.timePx * 0.018)
+        horizontalAlignment: Text.AlignHCenter
+        slide: timeGroup.height
+        duration: root.flipDuration
+      }
+
+      SlideSwap {
+        id: secondOnesSwap
+
+        visible: root.showSeconds
+        width: root.digitW
+        height: implicitHeight
+        clip: true
+        text: root.secondOnes
+        color: Theme.color("foreground_0")
+        fontFamily: Ui.fontFamily
+        fontWeight: Font.Black
+        fontSize: root.timePx
+        letterSpacing: -Math.round(root.timePx * 0.018)
+        horizontalAlignment: Text.AlignHCenter
+        slide: timeGroup.height
+        duration: root.flipDuration
+      }
     }
 
     // Only the initial alternates; the trailing M is one glyph painted once.
