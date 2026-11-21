@@ -191,8 +191,14 @@ Singleton {
     root.password = text
   }
 
-  property int _exchange: 0
-
+  // Auth is single-flight without an exchange counter: `authenticating` is the
+  // one seat (set in tryUnlock, cleared only in finishAuth/resetAuth) and
+  // `submitted` is one-shot (cleared immediately before pam.respond), so a
+  // terminal answer is consumed once per attempt and a second tryUnlock is
+  // refused until that attempt settles. PamContext's signals carry no
+  // per-exchange identity that a generation could be checked against, so a
+  // write-only counter would be a guard that only looks like one; the former
+  // `_exchange` counter was removed rather than left dead. (LOCK-2)
   function tryUnlock() {
     if (!root.requested) return
     if (root.authenticating) return
@@ -201,7 +207,6 @@ Singleton {
     // Field keeps its dots through the check and the release fade; wiping
     // here would flash the empty prompt before the screen unlocks.
     root.submitted = root.password
-    root._exchange = 0
     if (!pam.start()) {
       root.finishAuth(false)
       return
@@ -212,7 +217,6 @@ Singleton {
   function pumpResponse() {
     if (!root.authenticating || !pam.active || !pam.responseRequired || root.submitted === "") return
     // The one call in the component that hands the field to PAM.
-    root._exchange += 1
     pam.respond(root.submitted)
     root.submitted = ""
   }
@@ -334,7 +338,10 @@ Singleton {
     }
 
     // A user toggling an effect while the session sits locked is changing a
-    // running effect, and the surfaces re-resolve on the next frame.
+    // running effect: surfaces read Settings live and re-resolve on the next
+    // frame - dim, blur and vignette darkness alike. The vignette's entry
+    // fade is normalized, so a level change only changes darkness (intensity)
+    // and never re-runs the fade or shifts the shape's scale.
     function toggleAnimations(): string {
       // The lockscreen does not own an animation option; this toggle
       // flips the global switch instead.
