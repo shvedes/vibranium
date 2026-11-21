@@ -26,13 +26,14 @@ Item {
   // every side, so the live body height plus two pads leaves a real gap
   // below the action row instead of clipping it against the card border.
   property int islandContentHeight: Math.ceil(body.implicitHeight) + 2 * Ui.outerPad
-  // sectionSwap.height is this card's one height clock: its Ui.fastMs tween
-  // feeds body.implicitHeight -> islandContentHeight. Tell IslandHost to step
-  // its own Ui.resizeMs Behavior aside so the card follows that single clock
-  // frame by frame, the way Network and Volume do. Removing the sectionSwap
-  // Behavior instead would land the block opacity fades in a card that had
-  // already snapped to the new size - "wrong, then right" on every switch.
-  property bool islandSelfAnimating: true
+  // IslandHost owns this card's one height clock: its Glide (OutCubic,
+  // Ui.resizeMs) tweens card.height while sectionSwap snaps straight to its
+  // destination, so all three block opacity crossfades ride a single resize
+  // curve - the same arrangement as the other islands. Self-animating (the old
+  // Stage 4 arrangement) disabled the host Glide and left only sectionSwap's
+  // default-Linear NumberAnimation, which read as a linear grow and a shrink
+  // that did not animate at all.
+  property bool islandSelfAnimating: false
   property var islandHost: null
   readonly property bool blockedNavKeys: urlField.focused
   // Arrows and Enter walk the format table. The list answers moveBy() and
@@ -1702,10 +1703,6 @@ Item {
         height: root.fileMode ? 0
           : root.playlist.length > 0 ? playlistBlock.height
             : root._showHistory ? historyBlock.height : tableBlock.height
-        Behavior on height {
-          enabled: MotionPolicy.enabled
-          NumberAnimation { duration: Ui.fastMs }
-        }
 
         readonly property bool showPlaylist: root.playlist.length > 0
         readonly property bool showHistory: root._showHistory
