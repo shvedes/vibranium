@@ -57,8 +57,8 @@ import vm from 'node:vm'
 
 import { loadLib, libSource, setEnv } from '../../lib/qmlloader.mjs'
 import {
-  suite, section, group, eq, ne, is, notMatch, contains, throws, noThrow, approx,
-  show, finish, blocked, SHELL_DIR,
+  suite, section, group, eq, ne, is, notMatch, contains, notContains, throws,
+  noThrow, approx, show, finish, blocked, SHELL_DIR,
 } from '../../lib/assert.mjs'
 
 const SETTINGS = path.join(SHELL_DIR, 'common/settings')
@@ -2905,6 +2905,53 @@ group('conditionsMet accepts a resolver as well as a table', () => {
   eq('and satisfies neq',
     SL.conditionsMet(byKey, values, [{ var: 'shell.nope', op: 'neq', arg: 1 }]), true)
   noThrow('a null byKey resolver terminates', () => SL.conditionsMet(() => null, values, list))
+})
+
+// ===========================================================================
+section('MiscSettings.update*Options - fresh option records, not in-place edits')
+// ===========================================================================
+// The misc option records come from the one SettingsCatalog parse and are
+// shared with Settings._schema and the menu builder. A scan must publish a new
+// record through this store's index and schema rather than mutate the shared
+// one. Lifted by brace matching so the assertions read the shipped QML.
+const MISC_QML = fs.readFileSync(
+  path.join(SHELL_DIR, 'common', 'settings', 'MiscSettings.qml'), 'utf8')
+function miscBody(name) {
+  const at = MISC_QML.indexOf(`function ${name}(`)
+  if (at < 0) return ''
+  let depth = 0
+  const open = MISC_QML.indexOf('{', at)
+  for (let i = open; i < MISC_QML.length; i++) {
+    if (MISC_QML[i] === '{') depth++
+    if (MISC_QML[i] === '}') {
+      depth--
+      if (depth === 0) return MISC_QML.slice(open + 1, i)
+    }
+  }
+  return ''
+}
+const THEME_BODY = miscBody('updateThemeOptions')
+const SIZE_BODY = miscBody('updateSizeOptions')
+const PUBLISH_BODY = miscBody('_publishOption')
+const BRIDGE_BODY = miscBody('_replaceBoundOptions')
+
+group('a scan publishes a fresh record instead of mutating the catalog', () => {
+  for (const [label, body] of [['theme', THEME_BODY], ['size', SIZE_BODY]]) {
+    notContains(`${label}: no values mutation`, body, 'opt.values =')
+    notContains(`${label}: no labels mutation`, body, 'opt.valueLabels =')
+    notContains(`${label}: no min/max mutation`, body, 'opt.min =')
+    contains(`${label}: the fresh record is published`, body, 'root._publishOption(')
+  }
+  contains('the publish helper builds a new record', PUBLISH_BODY,
+    'Object.assign({}, old, patch)')
+  contains('the publish helper republishes _byKey', PUBLISH_BODY, 'root._byKey = byKey')
+  contains('the publish helper republishes _schema', PUBLISH_BODY, 'root._schema =')
+})
+
+group('_replaceBoundOptions stays a thin bridge over the new record', () => {
+  contains('the bridge reads the current indexed record', BRIDGE_BODY, 'root._byKey[key]')
+  contains('the bridge calls OptionHost', BRIDGE_BODY, 'OptionHost.replaceBoundOptions(')
+  notContains('the bridge owns no cache', BRIDGE_BODY, 'Cache')
 })
 
 finish()

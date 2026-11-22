@@ -255,6 +255,39 @@ Singleton {
         return true
     }
 
+    // The option records are parsed once by SettingsCatalog and shared with
+    // Settings._schema and the menu builder. A scan that changes an enum must
+    // publish a fresh record through this store's index and schema; editing
+    // the shared object would change every reader of the catalog at once.
+    // _replaceBoundOptions below is only the imperative bridge to OptionHost.
+    function _publishOption(key, patch) {
+        const old = root._byKey[key]
+        if (!old) return null
+        const next = Object.assign({}, old, patch)
+        const byKey = Object.assign({}, root._byKey)
+        byKey[key] = next
+        root._byKey = byKey
+        const schema = root._schema
+        if (schema) {
+            const schemaByKey = Object.assign({}, schema.byKey || {})
+            schemaByKey[key] = next
+            const secs = schema.sections || []
+            const sections = []
+            for (let i = 0; i < secs.length; i++) {
+                const sec = secs[i]
+                if (Array.isArray(sec.options) && sec.options.indexOf(old) >= 0) {
+                    const options = sec.options.slice()
+                    options[options.indexOf(old)] = next
+                    sections.push(Object.assign({}, sec, { options: options }))
+                } else sections.push(sec)
+            }
+            root._schema = Object.assign({}, schema, {
+                sections: sections, pages: sections, byKey: schemaByKey,
+            })
+        }
+        return next
+    }
+
     function _replaceBoundOptions(key) {
         const opt = root._byKey[key]
         if (!opt || !Array.isArray(opt.values)) return false
@@ -273,18 +306,19 @@ Singleton {
     }
 
     function updateThemeOptions(themes) {
-        const opt = root._byKey["misc.cursorTheme"]
-        if (!opt) return
+        if (!root._byKey["misc.cursorTheme"]) return
         const values = themes.map(t => t.folder)
         const labels = {}
         for (let t of themes) labels[t.folder] = t.pretty
-        opt.values = values
-        opt.valueLabels = labels
         const cur = root.values["misc.cursorTheme"]
+        let allValues = values
         if (values.indexOf(cur) < 0) {
-            opt.values = [cur].concat(values)
-            if (!opt.valueLabels[cur]) opt.valueLabels[cur] = cur
+            allValues = [cur].concat(values)
+            if (labels[cur] === undefined) labels[cur] = cur
         }
+        root._publishOption("misc.cursorTheme", {
+            values: allValues, valueLabels: labels,
+        })
         root.rev++
         root._replaceBoundOptions("misc.cursorTheme")
     }
@@ -292,14 +326,15 @@ Singleton {
     function updateSizeOptions(sizes, theme) {
         if (theme !== undefined && String(theme) !== String(root.values["misc.cursorTheme"])) return false
         if (!Array.isArray(sizes) || sizes.length === 0) return false
-        const opt = root._byKey["misc.cursorSize"]
-        if (!opt) return false
-        opt.values = sizes.slice()
-        opt.min = Math.min.apply(null, sizes)
-        opt.max = Math.max.apply(null, sizes)
+        if (!root._byKey["misc.cursorSize"]) return false
         const labels = {}
         for (let s of sizes) labels[String(s)] = String(s) + " px"
-        opt.valueLabels = labels
+        root._publishOption("misc.cursorSize", {
+            values: sizes.slice(),
+            min: Math.min.apply(null, sizes),
+            max: Math.max.apply(null, sizes),
+            valueLabels: labels,
+        })
         root.rev++
         root._replaceBoundOptions("misc.cursorSize")
         return true

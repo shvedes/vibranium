@@ -18,7 +18,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  suite, section, group, eq, contains, notContains, match, finish, SHELL_DIR,
+  suite, section, group, eq, contains, notContains, match, notMatch, finish,
+  SHELL_DIR,
 } from '../../lib/assert.mjs'
 
 const QML = fs.readFileSync(
@@ -82,6 +83,17 @@ const TEST_EXIT_BODY = liftProcessHandler(QML, 'animTestLProc', 'onExited')
 const MV_EXIT_BODY = liftProcessHandler(QML, 'animMvProc', 'onExited')
 const LN_EXIT_BODY = liftProcessHandler(QML, 'lnProc', 'onExited', false)
 const PRESET_DRAIN_BODY = liftFunction(QML, '_drainPresetQueue', false)
+
+// SET-6 / SET-7: the store surface whose write paths and option records this
+// suite pins. An absent body is an empty string so the assertions below fail
+// as assertions on the unfixed tree.
+const VALUE_BODY = liftFunction(QML, 'value', false)
+const COMMIT_BODY = liftFunction(QML, '_commitHypr', false)
+const SCHEMA_DONE_BODY = liftFunction(QML, '_schemaDone', false)
+const PROBE_GAPS_BODY = liftFunction(QML, '_probeSmartGaps', false)
+const FALLBACK_BODY = liftFunction(QML, '_fallbackToFiles', false)
+const READLINK_EXIT_BODY = liftProcessHandler(QML, 'readlinkProc', 'onExited', false)
+const REFRESH_PRESET_BODY = liftFunction(QML, '_refreshAnimPresetValues', false)
 
 // Two different _byKey orders. A batch launched under ORDER_A and answered
 // with the int/string pair must not be merged under ORDER_B's slots: that is
@@ -167,6 +179,39 @@ function makeSim() {
     },
   })
   root._values = { [K_SIZE]: 1, [K_COLOR]: '0x22' }
+
+  // Eight shards with the same funnel the QML store has. The merge body under
+  // test calls _replaceAllShards, which publishes one fresh map through the
+  // setter above, so "one exit, one publish" keeps its meaning.
+  root._shards = [{}, {}, {}, {}, {}, {}, {}, {}]
+  root._shardMemo = Object.create(null)
+  root._shardOf = (k) => {
+    const s = String(k)
+    const hit = root._shardMemo[s]
+    if (hit !== undefined) return hit
+    let h = 0
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 7
+    root._shardMemo[s] = h
+    return h
+  }
+  const mergedValues = (shards) => {
+    let m = {}
+    for (const shard of shards) m = Object.assign(m, shard)
+    return m
+  }
+  root._putShard = (k, v) => {
+    const s = root._shardOf(k)
+    const m = Object.assign({}, root._shards[s])
+    m[k] = v
+    root._shards[s] = m
+    root.values = mergedValues(root._shards)
+  }
+  root._replaceAllShards = (map) => {
+    const shards = [{}, {}, {}, {}, {}, {}, {}, {}]
+    for (const k in map) shards[root._shardOf(k)][k] = map[k]
+    root._shards = shards
+    root.values = mergedValues(shards)
+  }
 
   root._expandFile = (p) => String(p)
     .replace('$XDG_CONFIG_HOME', '/home/u/.config')
@@ -409,6 +454,44 @@ group('the preset chain carries src, target and generation per run', () => {
     /animMvProc\.presetGen !== root\._presetGen/)
   contains('the ln handler drains the queued pick', LN_EXIT_BODY, '_drainPresetQueue()')
   notContains('the global pending source slot is gone', QML, '_animPendingSrc')
+})
+
+// ---------------------------------------------------------------------------
+section('SET-6: the whole map is derived, single-key writes use one shard')
+
+group('value() reads one shard, not the whole map or the coarse rev', () => {
+  notMatch('values is not a writable property', QML, /\n\s*property var values:/)
+  contains('values is a derived view of the shards', QML, 'readonly property var values:')
+  contains('value() reads the key shard', VALUE_BODY, '_shardOfMap(key)[key]')
+  notContains('value() does not depend on rev', VALUE_BODY, 'root.rev')
+})
+
+group('single-key writers use _putShard, bulk publishers use _replaceAllShards', () => {
+  contains('_commitHypr writes one shard', COMMIT_BODY, 'root._putShard(key, v)')
+  notContains('_commitHypr no longer replaces the map', COMMIT_BODY, 'root.values = next')
+  contains('the schema seed replaces all shards', SCHEMA_DONE_BODY, 'root._replaceAllShards(init)')
+  contains('the fetch merge replaces all shards', MERGE_BODY, 'root._replaceAllShards(next)')
+  contains('the file fallback replaces all shards', FALLBACK_BODY, 'root._replaceAllShards(next)')
+  contains('the readlink exit writes one shard', READLINK_EXIT_BODY, 'root._putShard(key, check.value)')
+})
+
+group('smart gaps has one write path and one emission', () => {
+  contains('_probeSmartGaps writes through _putShard', PROBE_GAPS_BODY, 'root._putShard(key, enabled)')
+  match('_probeSmartGaps emits rev once', PROBE_GAPS_BODY, /root\.rev\+\+/)
+  contains('_probeSmartGaps emits optionChanged once', PROBE_GAPS_BODY, 'root.optionChanged(key, enabled)')
+  notContains('the file view no longer bumps rev itself', QML,
+    'root._probeSmartGaps(); root.rev++')
+})
+
+// ---------------------------------------------------------------------------
+section('SET-7: the preset refresh republishes a fresh option record')
+
+group('the dynamic enum never mutates the shared catalog record', () => {
+  notContains('no in-place values write', REFRESH_PRESET_BODY, 'opt.values =')
+  notContains('no in-place labels write', REFRESH_PRESET_BODY, 'opt.valueLabels =')
+  contains('a fresh record is built', REFRESH_PRESET_BODY, 'Object.assign({}, opt,')
+  contains('the fresh record is republished through the index and schema',
+    REFRESH_PRESET_BODY, 'root._republishOption(')
 })
 
 finish()

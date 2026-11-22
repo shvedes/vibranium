@@ -37,7 +37,116 @@ Singleton {
     property bool ready: false
     property int rev: 0
 
-    property var values: ({})
+    // Resolved values, sharded by key so a one-key write does not re-evaluate
+    // every reader of the store.
+    //
+    // A binding captures every property its expression reads. A value(key)
+    // that reads only `values` replaces the whole map on a one-key write and
+    // re-evaluates all ~64 value readers - measured at 30ms of synchronous
+    // UI-thread stall before the menu hears the toggle. That is O(readers) per
+    // write, the wrong shape for a keyed lookup.
+    //
+    // The map is split eight ways and value() reads only the shard its key
+    // hashes to: a write replaces one shard and re-evaluates roughly an eighth
+    // of the readers. The shards must be eight SEPARATE properties - an indexed
+    // read into one `var` array captures the whole array and every shard would
+    // invalidate together, which is the cost this split removes.
+    //
+    // Hash collisions cost a little redundant work and can never miss an
+    // update, which is the right way round for an invalidation scheme.
+    property var _shard0: ({})
+
+    property var _shard1: ({})
+
+    property var _shard2: ({})
+
+    property var _shard3: ({})
+
+    property var _shard4: ({})
+
+    property var _shard5: ({})
+
+    property var _shard6: ({})
+
+    property var _shard7: ({})
+
+    // The whole map, for the few readers that iterate it (dump, conditionsMet,
+    // menuPages). Derived from the shards, so the shards stay the single source
+    // of truth and this cannot drift from them. It notifies whenever any shard
+    // does, which is what whole-store readers need.
+    readonly property var values: {
+      const m = {}
+      for (const k in root._shard0) m[k] = root._shard0[k]
+      for (const k in root._shard1) m[k] = root._shard1[k]
+      for (const k in root._shard2) m[k] = root._shard2[k]
+      for (const k in root._shard3) m[k] = root._shard3[k]
+      for (const k in root._shard4) m[k] = root._shard4[k]
+      for (const k in root._shard5) m[k] = root._shard5[k]
+      for (const k in root._shard6) m[k] = root._shard6[k]
+      for (const k in root._shard7) m[k] = root._shard7[k]
+      return m
+    }
+
+    // key -> shard index. The hash walks every character of the key and the
+    // keys are catalog literals, so the mapping is a pure function of a string
+    // that never changes; computing it again on every binding re-evaluation
+    // would be wasted work. Mutated in place, not published: this is a lookup
+    // table, not state a binding observes.
+    property var _shardMemo: Object.create(null)
+
+    function _shardOf(key) {
+      const s = String(key)
+      const hit = root._shardMemo[s]
+      if (hit !== undefined) return hit
+      let h = 0
+      for (let i = 0; i < s.length; i++)
+        h = (h * 31 + s.charCodeAt(i)) & 7
+      root._shardMemo[s] = h
+      return h
+    }
+
+    // Reading the shard a key lives in is what a caller's binding ends up
+    // depending on - no separate touch is needed, because the read that
+    // fetches the value is the dependency.
+    function _shardOfMap(key) {
+      const s = root._shardOf(key)
+      if (s === 0) return root._shard0
+      if (s === 1) return root._shard1
+      if (s === 2) return root._shard2
+      if (s === 3) return root._shard3
+      if (s === 4) return root._shard4
+      if (s === 5) return root._shard5
+      if (s === 6) return root._shard6
+      return root._shard7
+    }
+
+    function _putShard(key, v) {
+      const s = root._shardOf(key)
+      const m = Object.assign({}, root._shardOfMap(key))
+      m[key] = v
+      if (s === 0) root._shard0 = m
+      else if (s === 1) root._shard1 = m
+      else if (s === 2) root._shard2 = m
+      else if (s === 3) root._shard3 = m
+      else if (s === 4) root._shard4 = m
+      else if (s === 5) root._shard5 = m
+      else if (s === 6) root._shard6 = m
+      else root._shard7 = m
+    }
+
+    function _replaceAllShards(map) {
+      const s = [ {}, {}, {}, {}, {}, {}, {}, {} ]
+      for (const k in map) s[root._shardOf(k)][k] = map[k]
+      root._shard0 = s[0]
+      root._shard1 = s[1]
+      root._shard2 = s[2]
+      root._shard3 = s[3]
+      root._shard4 = s[4]
+      root._shard5 = s[5]
+      root._shard6 = s[6]
+      root._shard7 = s[7]
+    }
+
     property var _schema: null
     readonly property var pages: root._schema ? root._schema.pages : []
     readonly property var sections: root.pages
@@ -78,8 +187,11 @@ Singleton {
     // --- generic store API ---
 
     function value(key) {
-        root.rev
-        return root.values[key]
+        // Reads the key's shard, NOT `values`: that read is the dependency the
+        // caller's binding takes, and it is narrow on purpose - see the note on
+        // _shard0. Reading `rev` here would re-evaluate every value reader on
+        // every write and undo the split.
+        return root._shardOfMap(key)[key]
     }
 
     function byKey(key) {
@@ -132,9 +244,10 @@ Singleton {
             root.optionError(key, "write failed")
             return false
         }
-        const next = Object.assign({}, root.values)
-        next[key] = v
-        root.values = next
+        // One key changes, so one shard is replaced. The derived `values`
+        // follows; nothing here rebuilds the whole map for the readers that
+        // iterate it.
+        root._putShard(key, v)
         root.rev++
         const written = Object.assign({}, root._writtenKeys)
         written[key] = true
@@ -207,10 +320,11 @@ Singleton {
         root._hyprCollected = []
         root._hyprByKey = {}
 
-        // Seed values from defaults
+        // Seed values from defaults. A schema load moves every key, so this is
+        // the rare path that replaces all eight shards.
         const init = {}
         for (const k in byKey) init[k] = byKey[k].default
-        root.values = init
+        root._replaceAllShards(init)
         root.rev++
 
         // Three external sources, probed where each is opened rather than where
@@ -291,12 +405,16 @@ Singleton {
         const exists = probeSmart.waitForJob() && probeSmart.text().trim() !== ""
         // Also check file existence via probe success - waitForJob false means missing
         const enabled = exists
-        // smartGaps key is hypr.general.smart_gaps if present
+        // smartGaps key is hypr.general.smart_gaps if present. This probe is
+        // the one write path for the key: it writes a shard and emits the rev
+        // and change signals itself, so the file view does not bump rev beside
+        // it. A watch echo of an unchanged file is a no-op rather than a
+        // spurious invalidation.
         const key = "hypr.general.smart_gaps"
-        if (root._byKey[key] !== undefined) {
-            const next = Object.assign({}, root.values)
-            next[key] = enabled
-            root.values = next
+        if (root._byKey[key] !== undefined && root._shardOfMap(key)[key] !== enabled) {
+            root._putShard(key, enabled)
+            root.rev++
+            root.optionChanged(key, enabled)
         }
     }
 
@@ -335,6 +453,32 @@ Singleton {
         }
         return out
     }
+    // One catalog parse feeds Settings and the menu builder. A dynamic enum
+    // must publish a fresh record through this store's index and schema;
+    // editing the shared catalog object would change every reader of it.
+    function _republishOption(key, old, next) {
+        const byKey = Object.assign({}, root._byKey)
+        byKey[key] = next
+        root._byKey = byKey
+        const schema = root._schema
+        if (!schema) return
+        const schemaByKey = Object.assign({}, schema.byKey || {})
+        schemaByKey[key] = next
+        const secs = schema.sections || []
+        const sections = []
+        for (let i = 0; i < secs.length; i++) {
+            const sec = secs[i]
+            if (Array.isArray(sec.options) && sec.options.indexOf(old) >= 0) {
+                const options = sec.options.slice()
+                options[options.indexOf(old)] = next
+                sections.push(Object.assign({}, sec, { options: options }))
+            } else sections.push(sec)
+        }
+        root._schema = Object.assign({}, schema, {
+            sections: sections, pages: sections, byKey: schemaByKey,
+        })
+    }
+
     function _refreshAnimPresetValues() {
         const key = "hypr.animations.preset"
         const opt = root._byKey[key]
@@ -360,8 +504,10 @@ Singleton {
             if (labels[extra[i]] === undefined)
                 labels[extra[i]] = extra[i].charAt(0).toUpperCase() + extra[i].slice(1)
         }
-        opt.values = names.concat(extra)
-        opt.valueLabels = labels
+        root._republishOption(key, opt, Object.assign({}, opt, {
+            values: names.concat(extra),
+            valueLabels: labels,
+        }))
         root.rev++
         root._probeAnimPreset()
     }
@@ -769,7 +915,8 @@ Singleton {
         // Re-probe special kinds (smartGaps already, anim preset via earlier process)
         // smartGaps value from file probe already in next; keep
         // For anim preset, if process already set, keep; else default remains
-        root.values = next
+        // One answer may move any key, so all eight shards are replaced.
+        root._replaceAllShards(next)
         // A key that fell back to disk is a compositor option hyprctl did not
         // answer - usually `gaps_in`, which hyprctl reports as a CSS string
         // - and it stays correct until something moves.
@@ -814,7 +961,7 @@ Singleton {
                 if (check.ok) next[k] = check.value
             }
         }
-        root.values = next
+        root._replaceAllShards(next)
     }
 
     Process {
@@ -833,9 +980,7 @@ Singleton {
             if (root._byKey[key]) {
                 const check = SL.validateValue(root._byKey[key], preset)
                 if (check.ok) {
-                    const next = Object.assign({}, root.values)
-                    next[key] = check.value
-                    root.values = next
+                    root._putShard(key, check.value)
                     root.rev++
                     root.optionChanged(key, check.value)
                 }
@@ -911,8 +1056,8 @@ Singleton {
         path: Paths.hyprSmartGapsFile
         watchChanges: true
         printErrors: false
-        onFileChanged: { root._probeSmartGaps(); root.rev++ }
-        onLoaded: { root._probeSmartGaps(); root.rev++ }
+        onFileChanged: root._probeSmartGaps()
+        onLoaded: root._probeSmartGaps()
     }
     FileView {
         path: Paths.hyprAnimationsFile
