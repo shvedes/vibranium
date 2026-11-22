@@ -1274,7 +1274,17 @@ Singleton {
     // the exception: re-serving its URI list as text/uri-list drops the
     // x-special/gnome-copied-files marker and cancels the cut, so the source
     // keeps its own selection until the paste.
-    if (live && !root._captureHasFileCopyMime) Qt.callLater(() => root._takeOwnership(live.id))
+    if (live && !root._captureHasFileCopyMime) {
+      const capturedHash = hash
+      Qt.callLater(() => {
+        // Re-check the newest content INSIDE the deferral: a second capture
+        // landing in this turn replaced _lastHash, and serving the older one
+        // now would put its bytes on a selection the user already moved past.
+        // The newer capture owns its own re-serve closure.
+        if (capturedHash !== root._lastHash) return
+        root._takeOwnership(live.id)
+      })
+    }
   }
 
   function _onReadText(text, types) {
