@@ -65,6 +65,10 @@ Item {
   property bool _fade: false
   property bool _settled: false
   readonly property bool _sized: width > 0 && height > 0
+  // The whole deck rises into place as the layer opens, the way the theme
+  // picker's stage glides up into its settled y. The stage reads this offset;
+  // the deck's own geometry still has only its deckPos clock.
+  property real stageSlideY: MotionPolicy.enabled ? Ui.m * 2 : 0
   // One fade for the WHOLE overlay, inherited by every child. Nothing inside
   // animates its own presence. Deck glides wait until that fade has landed so
   // the first painted frame is already at its final geometry.
@@ -74,6 +78,18 @@ Item {
     Glide { duration: Ui.fastMs }
   }
   readonly property bool _deckLive: !MotionPolicy.enabled || opacity >= 0.99
+
+  // One stage-sized rise per visit, from just below the resting position.
+  // A dedicated tween keeps this layer motion off the deck's single clock.
+  NumberAnimation {
+    id: stageRise
+    target: panel
+    property: "stageSlideY"
+    from: Ui.m * 2
+    to: 0
+    duration: Ui.slowMs
+    easing.type: Easing.OutCubic
+  }
   // The file the user is on across a row-set change (a filter keystroke, a
   // removal, a theme swap), so the deck does not jump to the top.
   property string _keepFile: ""
@@ -526,6 +542,16 @@ Item {
     panel._syncWindow()
   }
 
+  function _armStageRise() {
+    if (!MotionPolicy.enabled) {
+      panel.stageSlideY = 0
+      return
+    }
+    // The size edge and the deferred settle can both land on the same open;
+    // a second arm would pull the stage back down after it started rising.
+    if (!stageRise.running) stageRise.restart()
+  }
+
   function reveal() {
     panel._fade = false
     panel._settled = false
@@ -536,6 +562,7 @@ Item {
       if (!WallpaperPicker.visible || !panel._sized) return
       panel._settled = true
       panel._fade = true
+      panel._armStageRise()
     })
   }
 
@@ -543,6 +570,7 @@ Item {
     if (!panel._sized || !WallpaperPicker.visible || panel._fade) return
     panel._settled = true
     panel._fade = true
+    panel._armStageRise()
   }
 
   Connections {
@@ -552,6 +580,9 @@ Item {
       if (!WallpaperPicker.visible) {
         panel._fade = false
         panel._settled = false
+        // Re-arm the offset so the next open has a start point to glide from.
+        stageRise.stop()
+        panel.stageSlideY = MotionPolicy.enabled ? Ui.m * 2 : 0
         return
       }
       panel.cancelDelete()
@@ -681,11 +712,11 @@ Item {
     id: stage
 
     anchors.horizontalCenter: parent.horizontalCenter
-    anchors.verticalCenter: parent.verticalCenter
-    anchors.verticalCenterOffset: -28
+    y: Math.round((panel.height - panel.bigH) / 2 - 28 + panel.stageSlideY)
     width: panel.width
     height: panel.bigH
     clip: true
+    // The footer is anchored to the stage, so it travels with the list.
     // A departing tile outlives the row set it came from: the last wallpaper a
     // theme held still has to fade out over an empty deck.
     // Departing rows outlive the listing they came from, so the deck stays up
