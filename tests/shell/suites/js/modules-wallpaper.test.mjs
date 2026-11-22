@@ -4497,4 +4497,28 @@ group('WAL-11 - the deferred delete carries a RequestGate handle', () => {
 skip('the armed slide and rm job under a live picker',
   'needs FolderListModel and ProcessRegistry; the handle decisions are pinned above')
 
+// ======================================================================
+section('WallpaperEntry - a decoded preview fades in on the shared clock')
+// ======================================================================
+// Source-level only. A headless probe cannot render a real asynchronous
+// decode, so there is no Image.Ready transition to sample; the binding and
+// its single Behaviour are asserted in the real file instead.
+const ENTRY_QML = fs.readFileSync(
+  path.join(SHELL_DIR, 'features', 'wallpaperPicker', 'WallpaperEntry.qml'), 'utf8')
+const previewAt = ENTRY_QML.indexOf('id: preview')
+const iconAt = previewAt < 0 ? -1 : ENTRY_QML.indexOf('\n    Icon {', previewAt)
+const PREVIEW = previewAt < 0 || iconAt < 0 ? '' : ENTRY_QML.slice(previewAt, iconAt)
+
+group('the decoded picture arrives on one shared clock', () => {
+  contains('opacity still binds to Image.Ready', PREVIEW,
+    'opacity: status === Image.Ready ? 1 : 0')
+  eq('exactly one Behaviour on the preview opacity',
+    count(PREVIEW, /Behavior on opacity/g), 1)
+  contains('the Behaviour uses the shared Glide token', PREVIEW,
+    'Glide { duration: Ui.fastMs }')
+  contains('the Behaviour honours the global motion switch', PREVIEW,
+    'enabled: MotionPolicy.enabled')
+  eq('no per-tile timer', count(PREVIEW, /Timer/g), 0)
+})
+
 finish()

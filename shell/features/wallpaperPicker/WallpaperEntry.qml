@@ -107,10 +107,16 @@ Rectangle {
       asynchronous: true
       cache: false
       smooth: true
-      // No decode fade: the overlay's single fade shows the card as one flat
-      // picture. A per-image fade made a tile announce itself after the rest
-      // of the deck had already arrived.
+      // The decoded picture arrives over the card's flat placeholder on the
+      // shared short clock. The overlay still owns the entrance; this only
+      // softens the moment a cached or freshly decoded image replaces the
+      // fill, so no tile snaps from one frame to the next. With motion off the
+      // Behavior is disabled and the picture lands immediately.
       opacity: status === Image.Ready ? 1 : 0
+      Behavior on opacity {
+        enabled: MotionPolicy.enabled
+        Glide { duration: Ui.fastMs }
+      }
     }
 
     Icon {
