@@ -223,6 +223,18 @@ Item {
     easing.type: Easing.OutCubic
   }
 
+  // The reveal is started from the visible, completed and has-track edges,
+  // none of which keep watching the gate. A flip off mid-reveal must stop the
+  // tween and snap its driver so the fill stops growing with motion off.
+  Connections {
+    target: MotionPolicy
+    function onEnabledChanged() {
+      if (MotionPolicy.enabled) return
+      progressAppearAnim.stop()
+      root.progressAppear = 1
+    }
+  }
+
   // Static card frame: fill, keyline, pause dim. The dim and its 200ms
   // fade cover the whole card for pause.
   Rectangle {

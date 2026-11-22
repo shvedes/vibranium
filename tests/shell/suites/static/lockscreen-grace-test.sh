@@ -140,3 +140,123 @@ t_eq "an idle lock with grace off arms no window" "false" "${R[offArmed]}"
 t_eq "input with grace off does not release" "0" "${R[offReleased]}"
 
 t_note "The deadline is wall-clock, not a QML timer: monotonic timers freeze during suspend, so the old timer-based window survived sleep and the wake input unlocked the session. Date.now() advances across suspend, so a window armed before sleep is expired on wake."
+
+# --- LCK-5: a policy flip mid-tween must stop the tween and snap its driver ---
+# appearAnim, fitAnim and progressAppearAnim each sample the animation gate once
+# when they start. A global switch flipped off mid-reveal left the tween running
+# to completion, so every derived reader kept moving after motion was off. The
+# fix is a handler on the gate edge that stops the active tween and snaps its
+# driver to the settled value.
+#
+# SOURCE suite: a WlSessionLockSurface and a NowPlaying with MPRIS/LyricsPane
+# cannot be built headlessly, so lift the three gate handler bodies out of the
+# real QML and evaluate them against stubs, as the grace block does above.
+
+SURFACE="$SHELL_DIR/features/lock/LockscreenSurfaceView.qml"
+NP="$SHELL_DIR/features/lock/NowPlaying.qml"
+t_file "the lock surface source exists" "$SURFACE"
+t_file "the lock now-playing source exists" "$NP"
+
+GATE="$(SURFACE="$SURFACE" NP="$NP" node - <<'NODE'
+const fs = require("fs")
+const surface = fs.readFileSync(process.env.SURFACE, "utf8")
+const nowPlaying = fs.readFileSync(process.env.NP, "utf8")
+
+// Body of a handler, balanced to its closing brace, located by its signature
+// in the real source. A change to the logic is what this suite measures.
+function body(src, signature) {
+  const at = src.indexOf(signature)
+  // A missing handler is an empty body: every behavior assertion below then
+  // fails on the current tree, which is the RED this finding pins.
+  if (at < 0) return "\n"
+  const open = src.indexOf("{", at + signature.length)
+  let depth = 0
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "{") depth++
+    else if (src[i] === "}") { depth--; if (depth === 0) return src.slice(open + 1, i) }
+  }
+  throw new Error("unbalanced handler " + signature)
+}
+
+const appearBody = body(surface, "onAnimsChanged:")
+const fitBody = body(surface, "function onAnimsChanged()")
+const progressBody = body(nowPlaying, "function onEnabledChanged()")
+
+// Drive one handler against stubs. When the gate is on it must be a no-op; when
+// off it must stop its tween and snap its driver to the settled value.
+function drive(bodyText, on) {
+  const calls = []
+  const panel = {}
+  const surfaceStub = { anims: on }
+  const backdropImage = {}
+  const root = {}
+  const stubs = {
+    calls,
+    anims: on,
+    appearAnim: { stop: () => calls.push("appear") },
+    fitAnim: { stop: () => calls.push("fit") },
+    progressAppearAnim: { stop: () => calls.push("progress") },
+    panel,
+    surface: surfaceStub,
+    backdropImage,
+    root,
+    MotionPolicy: { enabled: on },
+  }
+  const names = Object.keys(stubs)
+  const fn = new Function(...names, bodyText)
+  fn(...names.map(n => stubs[n]))
+  // The gate-on branch returns early, so read the mutated stubs rather than a
+  // return value injected into the body.
+  return { calls, panel, surface: surfaceStub, backdropImage, root }
+}
+
+const out = {}
+const appearOff = drive(appearBody, false)
+out.appearStopped = appearOff.calls.includes("appear")
+out.appearKSnapped = appearOff.panel.appearK === 1
+out.appearFadeSnapped = appearOff.surface.appearFade === 1
+
+const appearOn = drive(appearBody, true)
+out.appearOnNoop = appearOn.calls.length === 0
+  && appearOn.panel.appearK === undefined
+  && appearOn.surface.appearFade === undefined
+
+const fitOff = drive(fitBody, false)
+out.fitStopped = fitOff.calls.includes("fit")
+out.fitScaleSnapped = fitOff.backdropImage.scale === 1
+
+const fitOn = drive(fitBody, true)
+out.fitOnNoop = fitOn.calls.length === 0 && fitOn.backdropImage.scale === undefined
+
+const progressOff = drive(progressBody, false)
+out.progressStopped = progressOff.calls.includes("progress")
+out.progressSnapped = progressOff.root.progressAppear === 1
+
+const progressOn = drive(progressBody, true)
+out.progressOnNoop = progressOn.calls.length === 0
+  && progressOn.root.progressAppear === undefined
+
+for (const k of Object.keys(out)) process.stdout.write(k + "=" + out[k] + "\n")
+NODE
+)" || { t_block "node could not evaluate the animation gate handlers"; }
+
+declare -A G
+while IFS='=' read -r key value; do
+  [[ -n $key ]] && G["$key"]="$value"
+done <<<"$GATE"
+
+t_section "the entry fade handler snaps both drivers when motion flips off"
+t_eq "the gate edge stops appearAnim" "true" "${G[appearStopped]}"
+t_eq "the gate edge snaps panel.appearK to 1" "true" "${G[appearKSnapped]}"
+t_eq "the gate edge snaps surface.appearFade to 1" "true" "${G[appearFadeSnapped]}"
+t_eq "the gate edge does nothing when motion stays on" "true" "${G[appearOnNoop]}"
+
+t_section "the backdrop fit handler snaps its scale when motion flips off"
+t_eq "the gate edge stops fitAnim" "true" "${G[fitStopped]}"
+t_eq "the gate edge snaps backdropImage.scale to 1" "true" "${G[fitScaleSnapped]}"
+t_eq "the fit gate does nothing when motion stays on" "true" "${G[fitOnNoop]}"
+
+t_section "the progress handler snaps its driver when motion flips off"
+t_eq "the gate edge stops progressAppearAnim" "true" "${G[progressStopped]}"
+t_eq "the gate edge snaps root.progressAppear to 1" "true" "${G[progressSnapped]}"
+t_eq "the progress gate does nothing when motion stays on" "true" "${G[progressOnNoop]}"

@@ -202,6 +202,17 @@ WlSessionLockSurface {
     appearAnim.restart()
   }
 
+  // appear() samples the gate once when it starts the tween. If the global
+  // switch flips off mid-reveal the tween would keep writing these drivers, so
+  // stop it and snap both to their settled value at the gate edge. The
+  // backdrop's fit tween listens for the same edge inside its own component.
+  onAnimsChanged: {
+    if (anims) return
+    appearAnim.stop()
+    panel.appearK = 1
+    surface.appearFade = 1
+  }
+
   // The entry fade: panel opacity and the normalized vignette fade ramp
   // together, 500ms and 1300ms, so the vignette settles behind the card
   // rather than with it. The vignette animation tweens only the 0 -> 1 fade;
@@ -364,6 +375,18 @@ WlSessionLockSurface {
           to: 1
           duration: 700
           easing.type: Easing.OutCubic
+        }
+
+        Connections {
+          target: surface
+          // onStatusChanged samples the gate once when the fit tween starts.
+          // A flip off mid-fit must stop it and snap the scale to 1; the Loader
+          // keeps this item out of reach of the surface-level gate handler.
+          function onAnimsChanged() {
+            if (surface.anims) return
+            fitAnim.stop()
+            backdropImage.scale = 1
+          }
         }
         // A session lock surface is not a Quickshell window and carries no
         // devicePixelRatio of its own, so the ratio is the one Qt reports for
