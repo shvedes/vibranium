@@ -116,7 +116,8 @@ PanelCard {
   // again from here (typing, late arrivals). Fires a full gate interval
   // after the open, so no sizing instant shares its turn.
   onShownChanged: {
-    if (panel.shown) panel.sizeSnap = false
+    // The generation-guarded form of `if (panel.shown) panel.sizeSnap = false`.
+    if (panel.shown) panel.setSnap("shown", panel._snapGen)
   }
 
   Component.onCompleted: { AppLauncher._attachPanel(panel); panel.syncRows(); panel.queueFit() }
@@ -157,10 +158,11 @@ PanelCard {
         // and a Behavior reads the gate's pre-turn value - so a height
         // delta to a new row set (a fresh clipboard suggestion, a changed
         // pool) would glide instead of spawning. Armed here, a turn early,
-        // the snap is already in force when the height changes. Released
-        // by input while visible (onEntryChanged) or when the gate opens
-        // (onShownChanged), so typing still glides.
-        panel.sizeSnap = true
+        // the snap is already in force when the height changes. A fresh
+        // generation makes only this open's gate or visible input able to
+        // release it; a hidden recompute that republishes rows in between
+        // runs the fade path but never touches the arm.
+        panel.setSnap("close-arm", ++panel._snapGen)
         return
       }
       // Clears the panel's delete state and the facade's staged row together,
@@ -186,10 +188,11 @@ PanelCard {
     function onEntryChanged() {
       if (searchField.text !== AppLauncher.entry) searchField.text = AppLauncher.entry
       // User input while visible ends the open-time snap: the resize the
-      // typing drives glides like any other. Guarded on visible so the
-      // close-path reset (which runs hidden) cannot disarm the snap the
-      // close just armed.
-      if (AppLauncher.visible) panel.sizeSnap = false
+      // typing drives glides like any other. The generation-guarded form of
+      // `if (AppLauncher.visible) panel.sizeSnap = false` - guarded on visible
+      // so the close-path reset (which runs hidden) cannot disarm the snap
+      // the close just armed.
+      if (AppLauncher.visible) panel.setSnap("input", panel._snapGen)
     }
     function onModeChanged() {
       panel.closeTrailingInfo()
@@ -212,6 +215,20 @@ PanelCard {
   // Model-swap generation: burst swaps must not re-arm on a stale
   // frame (see both re-arms in the deferred swap below).
   property int _swapGen: 0
+  // The open-time sizing snap is one labelled state with a single writer.
+  // close() mints a fresh arm generation; the gate and visible input release
+  // only that generation, so a late release from an older open cannot clear
+  // the snap the close just armed for this one.
+  property int _snapGen: 0
+  property string _snapReason: ""
+  function setSnap(reason, gen) {
+    if (gen !== panel._snapGen) return
+    panel._snapReason = reason
+    // Both raw writes live here and nowhere else: close arms the open's
+    // first sizing, the gate and visible input release it for typing.
+    if (reason === "close-arm") panel.sizeSnap = true
+    else panel.sizeSnap = false
+  }
   // Open-seat flag: armed on visible open, forces a first-normal
   // seat so a stale cursor never survives a summon.
   property bool _openSeat: false
@@ -539,15 +556,19 @@ PanelCard {
     // deferred install instead of bailing behind it: the facade computes
     // before the visible flip, which schedules exactly such an install
     // while hidden, and bailing would paint the stale set first and land
-    // the fresh one a turn later - the post-open growth. The stolen flag
-    // only cancels the deferral: the scheduled callback still fires and
-    // reinstalls the same set, which is a sequence-identical no-op. The
-    // open-seat path below never calls _maybeSwapFade, so the
-    // close-armed sizeSnap stays in force across the stolen install.
+    // the fresh one a turn later - the post-open growth. The generation
+    // bump below is what really cancels the deferral: its closure captured
+    // the previous one and retires on the mismatch instead of reinstalling
+    // and settling a second row set over this seat. The open-seat path never
+    // calls _maybeSwapFade, so the close-armed snap stays in force.
     if (panel._rowsPending) {
       if (panel._openSeat !== true) return false
       panel._rowsPending = false
     }
+    // Both branches own the install from here. Mint the generation before
+    // either beginSwap so a deferred syncRows from the hidden recompute is
+    // retired by the same counter its own live check reads.
+    panel._swapGen++
     // Open seat: never reuse the cursor, install with zeroed durations,
     // first-normal selection, origin scroll. The diff keeps the delegates
     // a previous summon already built, which is the table the List would
@@ -629,15 +650,11 @@ PanelCard {
     const skip = panel._modeExitFade === true || panel._modeEnterFade === true
     panel._modeExitFade = false
     panel._modeEnterFade = false
-    // A mode transition and a cross-regime flip both keep the card gliding
-    // to its fitted size while the content motion masks the delegate
-    // rebuild underneath: snapping the edge here is what read as a jump
-    // with animations on, since the resize tween never ran. Same-regime
-    // installs keep gliding, so every row-set change resizes
-    // the same way.
-    // Set on every sync before the install it governs, so no stale value can
-    // outlive the row set it was decided for.
-    panel.sizeSnap = false
+    // Glide enablement belongs to PanelCard: its size Behaviors run when
+    // `shown || sizeMotionDuringGate`, so a regime flip while visible keeps
+    // gliding without a write here. This same path runs from a hidden sync
+    // after close (a recompute republishing rows), where writing the snap
+    // would disarm the open's first sizing - leave the arm to its own gate.
     if (skip) return
     // The fade still masks a delegate rebuild - regime flip or same-regime
     // kind switch (calc<->web) - while the card glides underneath it, so
@@ -648,7 +665,12 @@ PanelCard {
   function syncRows() {
     if (panel._rowsPending) return
     panel._rowsPending = true
+    // Captured at schedule time, not read at fire time: the open seat (or a
+    // newer sync) can bump _swapGen in between, and this deferred install
+    // must retire instead of settling a second row set over the seat.
+    const scheduledGen = panel._swapGen
     Qt.callLater(() => {
+      if (scheduledGen !== panel._swapGen) return
       panel._rowsPending = false
       // A row set that grows under a seated list (the application list
       // arriving from DesktopEntries after a cold open) resets the

@@ -68,6 +68,37 @@ Item {
     return ""
   }
 
+  // A handler block (`onShownChanged: { ... }`) as a brace-balanced slice.
+  function extractBlock(src, anchor) {
+    const idx = src.indexOf(anchor)
+    if (idx < 0) return ""
+    const open = src.indexOf("{", idx + anchor.length)
+    if (open < 0) return ""
+    let depth = 0
+    let quote = ""
+    let comment = false
+    for (let j = open; j < src.length; j++) {
+      const ch = src[j]
+      if (comment) {
+        if (ch === "\n") comment = false
+        continue
+      }
+      if (quote) {
+        if (ch === "\\") { j++; continue }
+        if (ch === quote) quote = ""
+        continue
+      }
+      if (ch === "/" && src[j + 1] === "/") { comment = true; j++; continue }
+      if (ch === "'" || ch === '"' || ch === "`") { quote = ch; continue }
+      if (ch === "{") depth++
+      else if (ch === "}") {
+        depth--
+        if (depth === 0) return src.slice(open, j + 1)
+      }
+    }
+    return ""
+  }
+
   function strings() {
     return {
       candidate: extract(root.source, "_fitCandidate"),
@@ -78,6 +109,20 @@ Item {
       giveup: extract(root.source, "_fitGiveUp"),
       commit: extract(root.source, "_fitCommit"),
       queue: extract(root.source, "queueFit")
+    }
+  }
+
+  // LNC-4 and LNC-5: the snap state machine and the swap generation, read
+  // out of the same source bytes as the fit functions above.
+  function snapStrings() {
+    return {
+      setSnap: extract(root.source, "setSnap"),
+      fade: extract(root.source, "_maybeSwapFade"),
+      syncNow: extract(root.source, "syncRowsNow"),
+      sync: extract(root.source, "syncRows"),
+      visible: extract(root.source, "onVisibleChanged"),
+      entry: extract(root.source, "onEntryChanged"),
+      shown: extractBlock(root.source, "onShownChanged:")
     }
   }
 
@@ -130,6 +175,89 @@ Item {
       '}'
     ]
     return Qt.createQmlObject(lines.join("\n"), root, "launcher_fit_slice.qml")
+  }
+
+  // The snap/swap slice evaluated in a headless QtObject. Only component
+  // boundaries are rewritten; the control flow and the generation guards are
+  // the file's own bytes. `later` is a queue so a frame sequence can be
+  // pumped one turn at a time instead of sampling end states.
+  function buildSnapMachine(bodies) {
+    const names = ["setSnap", "fade", "syncNow", "sync", "visible", "entry", "shown"]
+    let parts = ""
+    for (const name of names) {
+      const body = bodies[name]
+      if (body === "") continue
+      if (name === "shown") parts += "\nfunction onShown()" + body + "\n"
+      else if (name === "fade") parts += "\n"
+        + body.replace(/function _maybeSwapFade\s*\(/, "function _fadeImpl(") + "\n"
+      else parts += "\n" + body + "\n"
+    }
+    parts = parts.replace(/\bpanel\./g, "m.")
+      .replace(/\bAppLauncher\./g, "m.app.")
+      .replace(/\bQt\.callLater\(/g, "m.later(")
+      .replace(/\blist\./g, "m.list.")
+      .replace(/\bfocusCtrl\./g, "m.focus.")
+      .replace(/\bsearchField\./g, "m.field.")
+
+    const lines = [
+      'import QtQml',
+      'QtObject {',
+      '  id: m',
+      '  property bool sizeSnap: false',
+      '  property int _snapGen: 0',
+      '  property string _snapReason: ""',
+      '  property bool shown: false',
+      '  property bool _modeExitFade: false',
+      '  property bool _modeEnterFade: false',
+      '  property int _swapGen: 0',
+      '  property bool _rowsPending: false',
+      '  property bool _openSeat: false',
+      '  property var rows: []',
+      '  property var _records: []',
+      '  property int installCalls: 0',
+      '  property int settleCalls: 0',
+      '  property int swapRunCalls: 0',
+      '  property int fadeCalls: 0',
+      '  property var pending: []',
+      '  property QtObject app: QtObject {',
+      '    property bool visible: false',
+      '    property string entry: ""',
+      '    property var results: []',
+      '  }',
+      '  property QtObject field: QtObject { property string text: "" }',
+      '  property QtObject focus: QtObject {',
+      '    function grabList() {}',
+      '    function grabFilter() {}',
+      '    function reassert() {}',
+      '  }',
+      '  property QtObject list: QtObject {',
+      '    property int count: 2',
+      '    property int currentIndex: 0',
+      '    function beginSwap() {}',
+      '    function endSwap() {}',
+      '    function seat(i, how) {}',
+      '    function seatTo(y, a, why) {}',
+      '    function settle(i, now) { m.settleCalls++ }',
+      '    function swapRun(g, live, fn) { m.swapRunCalls++; if (live(g)) fn() }',
+      '  }',
+      '  function later(fn) { m.pending.push(fn) }',
+      '  function drainLater() { const p = m.pending.splice(0); for (const fn of p) fn() }',
+      '  function show() { m.shown = false }',
+      '  function closeNotice() {}',
+      '  function closeDelete() {}',
+      '  function recalcWidth() {}',
+      '  function closeTrailingInfo() {}',
+      '  function _firstNormalIndex() { return 0 }',
+      '  function _rowKey(rec) { return rec ? String(rec.uid ?? "") : "" }',
+      '  function installRows() { m.installCalls++; m._records = m.rows }',
+      '  function queueFit() {}',
+      '  function _needsSwapFade() { return false }',
+      '  function playSwapFade() {}',
+      '  function _maybeSwapFade() { m.fadeCalls++; return m._fadeImpl() }',
+      parts,
+      '}'
+    ]
+    return Qt.createQmlObject(lines.join("\n"), root, "launcher_snap_slice.qml")
   }
 
   function fresh() {
@@ -185,6 +313,11 @@ Item {
   function namesFound(bodies) {
     for (const k in bodies) if (bodies[k] === "") return false
     return true
+  }
+
+  // The snap writer is also described in comments; count writes in code only.
+  function codeOnly(src) {
+    return src.split("\n").map(l => l.replace(/\/\/.*$/, "")).join("\n")
   }
 
   function drive() {
@@ -254,6 +387,103 @@ Item {
     m.list.count = 2
     m._drainFit()
     kv("count.latched", m._latchedListH)
+
+    driveSnap(snapStrings())
+  }
+
+  function driveSnap(bodies) {
+    const src = root.source
+    kv("snap.source.found", namesFound(bodies))
+    if (!namesFound(bodies)) return
+
+    // Structure: both raw sizeSnap writes live in one generation-guarded
+    // setSnap. The fade path must not touch snap at all: a hidden sync after
+    // close runs it, and disarming there is the grow-to-fit on summon.
+    const code = codeOnly(src)
+    const rawWrites = (code.match(/panel\.sizeSnap\s*=/g) || []).length
+    const writerWrites = (codeOnly(bodies.setSnap).match(/panel\.sizeSnap\s*=/g) || []).length
+    kv("snap.source.singleWriter", rawWrites > 0 && rawWrites === writerWrites)
+    kv("snap.source.guarded", /function setSnap\(reason, gen\)/.test(src)
+      && /gen !== panel\._snapGen/.test(bodies.setSnap))
+    kv("snap.source.fadeNeverWrites", bodies.fade.indexOf("sizeSnap") < 0)
+    kv("snap.source.closeArms", /setSnap\("close-arm",\s*\+\+panel\._snapGen\)/.test(src))
+    kv("snap.source.gateReleases", /panel\.setSnap\("shown",\s*panel\._snapGen\)/.test(bodies.shown))
+    kv("snap.source.inputReleases", /AppLauncher\.visible\)\s*panel\.setSnap\("input"/.test(src))
+    // LNC-5: the open seat mints a generation in both branches, and the
+    // deferred sync captures one at schedule time and checks it at fire.
+    kv("swap.source.genInSyncNow", (bodies.syncNow.match(/panel\._swapGen\+\+/g) || []).length === 1
+      && bodies.syncNow.indexOf("panel._swapGen++") < bodies.syncNow.indexOf("list.beginSwap"))
+    kv("swap.source.capturedGen", /const scheduledGen = panel\._swapGen/.test(bodies.sync)
+      && /scheduledGen !== panel\._swapGen/.test(bodies.sync))
+
+    // LNC-5: hidden recompute -> deferred sync -> open seat. The seat steals
+    // the install and bumps the generation; the stale closure must retire
+    // instead of installing and settling a second row set over it.
+    let m = buildSnapMachine(bodies)
+    m.rows = [{ uid: "a" }, { uid: "b" }]
+    m.app.results = m.rows
+    m.syncRows()
+    kv("swap.pendingArmed", m._rowsPending)
+    const beforeGen = m._swapGen
+    m._openSeat = true
+    m.app.visible = true
+    m.onVisibleChanged()
+    kv("swap.genBumped", m._swapGen === beforeGen + 1)
+    kv("swap.installsAfterSeat", m.installCalls)
+    const seatInstalls = m.installCalls
+    m.drainLater()
+    kv("swap.staleRetired", m.installCalls === seatInstalls && m.swapRunCalls === 0)
+
+    // LNC-4: open -> typed query -> close -> hidden typed query + recompute
+    // -> close -> open. The first sizing of the last open must still snap.
+    let n = buildSnapMachine(bodies)
+    n.rows = [{ uid: "a" }, { uid: "b" }]
+    n.app.results = n.rows
+    n.app.visible = true
+    n.onVisibleChanged()
+    kv("snap.afterFirstOpen", n.sizeSnap)
+    n.shown = true
+    n.onShown()
+    kv("snap.afterGate", n.sizeSnap)
+    n.app.entry = "ab"
+    n.onEntryChanged()
+    kv("snap.afterTyping", n.sizeSnap)
+
+    n.app.visible = false
+    n.onVisibleChanged()
+    kv("snap.closeArmed", n.sizeSnap)
+    kv("snap.closeReason", n._snapReason)
+    const armGen = n._snapGen
+
+    // A query arriving while hidden must not release the arm.
+    n.app.entry = "c"
+    n.onEntryChanged()
+    kv("snap.hiddenInputKeepsArm", n.sizeSnap)
+
+    // A hidden recompute republishes rows through the deferred sync, which
+    // runs _maybeSwapFade while still hidden. That path must leave the arm.
+    n.rows = [{ uid: "x", kind: "calc" }]
+    n.syncRows()
+    n.drainLater()
+    kv("snap.fadeCallsWhileHidden", n.fadeCalls)
+    kv("snap.survivesHiddenSync", n.sizeSnap)
+    kv("snap.reasonSurvives", n._snapReason)
+
+    // A release carrying an older generation cannot clear the fresh arm.
+    n.setSnap("shown", armGen - 1)
+    kv("snap.staleReleaseIgnored", n.sizeSnap)
+
+    // Reopen: the first sizing still happens under the snap, then the gate
+    // opens and releases it for typing.
+    m = n
+    m.app.results = m.rows
+    m.app.visible = true
+    m.onVisibleChanged()
+    kv("snap.beforeReopenGate", m.sizeSnap)
+    m.shown = true
+    m.onShown()
+    kv("snap.afterReopenGate", m.sizeSnap)
+    kv("snap.releaseReason", m._snapReason)
   }
 
   Component.onCompleted: {
