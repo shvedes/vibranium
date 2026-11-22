@@ -29,6 +29,13 @@ Item {
   property string name: ""
   // Palette key the SVG is recolored with.
   property string colorKey: "foreground_0"
+  // Optional per-glyph palette resolver, so a swap that changes color keeps
+  // the outgoing glyph's own tone while it fades (SlideSwap's colorFor
+  // contract on the icon axis). Null keeps the single colorKey above.
+  property var colorFor: null
+  function colorOf(glyph) {
+    return typeof root.colorFor === "function" ? root.colorFor(glyph) : root.colorKey
+  }
   // Optional second palette key for two-tone assets (class="indicator").
   property string accentKey: ""
   // Tiered glyphs (volume/wifi strength): how many leading wave/arc
@@ -161,7 +168,7 @@ Item {
     id: iconA
     anchors.centerIn: parent
     name: root._aName
-    colorKey: root.colorKey
+    colorKey: root.colorOf(root._aName)
     accentKey: root.accentKey
     dimTiers: root.dimTiers
     indicatorActive: root.indicatorActive
@@ -192,7 +199,7 @@ Item {
     id: iconB
     anchors.centerIn: parent
     name: root._bName
-    colorKey: root.colorKey
+    colorKey: root.colorOf(root._bName)
     accentKey: root.accentKey
     dimTiers: root.dimTiers
     indicatorActive: root.indicatorActive
