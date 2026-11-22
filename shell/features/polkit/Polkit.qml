@@ -53,7 +53,12 @@ Singleton {
   // refocus the field.
   readonly property bool checking: root.conv.checking
   readonly property int attempts: root.conv.attempts
+  // resetToken wipes and refocuses the field, including on a rejected attempt.
+  // The failure flash belongs to the conversation instead: conversationToken
+  // moves only when beginRequest takes a new seat, so a supersession clears a
+  // previous request's red border without hiding the feedback for this one.
   property int resetToken: 0
+  property int conversationToken: 0
 
   // The flow currently wired and the generation it was wired in. A newer
   // request retires every deferred closure of the old flow: each observer
@@ -244,6 +249,9 @@ Singleton {
     }
     // Tokens: a newer request retires every deferred closure of the old flow.
     root.flowEpoch += 1
+    // The view clears its failure flash here, not on resetToken: a rejection
+    // bumps that token to show the flash, not to end it.
+    root.conversationToken++
     root.active = true
     root.inFlight += 1
     root.wireFlow(incoming)
@@ -269,25 +277,31 @@ Singleton {
   }
 
   function submitPassword(text) {
-    const f = agent.flow
-    if (!root.active || !f || !f.isResponseRequired || root.checking || text === "") return
+    // The observers own wiredFlow: agent.flow can already name a different
+    // object by the time the user answers. Acting on that pointer would send
+    // the secret to a conversation nobody is looking at.
+    const f = root.wiredFlow
+    if (!root.active || !f || !root.isCurrentFlow(f, root.flowEpoch)
+        || !f.isResponseRequired || root.checking || text === "") return
     // `text` goes from here straight into the backend; nothing derived from it
     // is kept anywhere in this component. `checking` is derived from conv:
-    // _apply("submit") is its single writer.
-    root._apply("submit")
+    // _apply("submit") is its single writer. A refusal means there is no turn
+    // to answer, so the backend must not see this response at all.
+    if (!root._apply("submit")) return
     f.submit(text)
     root.resetToken++
   }
 
   function cancelRequest() {
-    const f = agent.flow
-    if (f && root.active) {
+    const f = root.wiredFlow
+    if (f && root.active && root.isCurrentFlow(f, root.flowEpoch)) {
       // Note what the backend does NOT do here: `cancelAuthenticationRequest`
       // sets `isCancelled` and cancels the session, and unlike
       // `cancelFromAgent` it emits NO `authenticationRequestCancelled`. So the
       // user-side cancel has to be recorded here, because nothing downstream
-      // will ever report it.
-      root._apply("cancelled", undefined, undefined, "user")
+      // will ever report it. A refusal leaves both the record and the backend
+      // untouched.
+      if (!root._apply("cancelled", undefined, undefined, "user")) return
       f.cancelAuthenticationRequest()
     }
     root.beginClose()
@@ -299,10 +313,9 @@ Singleton {
   // late-outcome grace is started. finishClose() then drops the state.
   function beginClose() {
     if (root.closing || !root.active) return
-    // Legal by the guard above, so assigned directly rather than through
-    // _apply: a failure here could only be the guard disagreeing with the
-    // machine, and the guard is the one that decides.
-    root.conv = PolkitTrace.apply(root.conv, { type: "begin-close", at: Date.now() })
+    // conv has one writer: this funnel. A refusal leaves the record exactly
+    // where it was, so the closing flag must not move either.
+    if (!root._apply("begin-close")) return
     root.closing = true
   }
 

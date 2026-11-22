@@ -211,9 +211,9 @@ Variants {
       // showK and vigK belong to the animations alone: no snap here. Snapping
       // showK on the hide edge is exactly what killed the exit fade. The next
       // show resets vigK in appearVignette(), so there is nothing to clear on
-      // the way out. A request reopening inside a previous failure's feedback
-      // window must not inherit the red border.
-      authBox.clearFailure()
+      // the way out. The failure flash is cleared on the conversation token:
+      // a supersession inside an earlier failure's feedback window leaves
+      // this window mapped, so this edge never arrives for it.
       win.fade(true)
       win.appearVignette()
       win.refocus()
@@ -271,6 +271,13 @@ Variants {
       // Fresh prompt after failure or in multi-turn PAM conversations.
       function onResponseRequiredChanged() {
         if (Polkit.responseRequired) win.refocus()
+      }
+
+      // Two tokens, two jobs. A new conversation ends the previous request's
+      // failure flash even when the window never hid; a turn only wipes and
+      // refocuses the field, so a rejection can still show its feedback.
+      function onConversationTokenChanged() {
+        authBox.clearFailure()
       }
 
       function onResetTokenChanged() {
