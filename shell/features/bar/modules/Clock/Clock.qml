@@ -97,7 +97,8 @@ BarModule {
   // the record of the stopped position and never writes clockFullDate.
   property int previewIndex: 0
   // The face the last swap brought forward, so the next one knows what to
-  // slide out even when a swap was interrupted mid-flight.
+  // slide out even when a swap was interrupted mid-flight. It is only the
+  // interruption breaker: what is actually painted comes from swap.
   property int lastFaceIndex: 0
   // True when the incoming face enters from above (the wheel rolled down).
   property bool previewFromTop: false
@@ -105,23 +106,51 @@ BarModule {
   // gesture advances the cycle once instead of stepping on every event.
   property int wheelBank: 0
   readonly property int wheelNotch: 120
-  // Number of stacked face layers, not the cycle length: the mode decides
-  // which of them the wheel actually visits.
-  readonly property int faceCount: 3
   // With the full date in the label the date face would be a duplicate, so
   // that mode cycles clock and year progress only.
   readonly property var faceCycle: root.fullDate ? [0, 2] : [0, 1, 2]
-  // The indexed face drives the label in every mode. The full-date setting
-  // only adds the date segment and rule while the cycle sits on the clock.
+
+  // One progress owns every rendered face: 0 at the start of a swap, 1 once
+  // it has settled. The endpoints are captured from the values actually on
+  // screen when the swap starts, so an interruption interpolates from there
+  // instead of snapping to a clean 0/1. Opacity and y for all three faces are
+  // derived from this one scalar over those endpoints; nothing imperatively
+  // writes a face's opacity or y.
+  property real swap: 1
+  property int fromFace: -1
+  property int toFace: 0
+  property real fromOpacity: 0
+  property real fromY: 0
+  property real toOpacity: 0
+  property real toY: 0
+  property real exitY: 0
+
+  // The indexed face still drives the label in every mode. The full-date
+  // setting only adds the date segment and rule while the cycle sits on the
+  // clock.
   readonly property int faceIndex: root.previewIndex
+  // The one value that means "which face is being shown" while a swap is in
+  // flight: the outgoing face until the halfway point, then the incoming.
+  readonly property int shownFace: root.swap < 0.5 ? root.fromFace : root.toFace
   // The full-date label says everything itself; only a cycle face that
   // hides it still has something to report in a bubble.
   readonly property bool tipWanted: root.faceIndex === 2
     || (root.faceIndex === 0 && !root.fullDate)
 
   function faceAt(i) { return i === 0 ? timeText : i === 1 ? previewText : yearText }
-  function slideFor(i) { return i === 0 ? slide0 : i === 1 ? slide1 : slide2 }
-  function fadeFor(i) { return i === 0 ? fade0 : i === 1 ? fade1 : fade2 }
+
+  // The single derivation behind each face's opacity and y. The face outside
+  // this swap is parked at zero, the hidden layer of the stacked layout.
+  function faceOpacity(i) {
+    if (i === root.toFace) return root.toOpacity + (1 - root.toOpacity) * root.swap
+    if (i === root.fromFace) return root.fromOpacity * (1 - root.swap)
+    return 0
+  }
+  function faceY(i) {
+    if (i === root.toFace) return root.toY * (1 - root.swap)
+    if (i === root.fromFace) return root.fromY + (root.exitY - root.fromY) * root.swap
+    return 0
+  }
 
   // step is +1 on scroll up, -1 on scroll down: the direction walks the
   // mode's cycle instead of always advancing, and the sign steers the
@@ -137,64 +166,42 @@ BarModule {
     root.previewIndex = steps[pos]
   }
 
-  // Lay the stacked faces out. Each face owns its tweens, so an interrupted
-  // swap cannot freeze the face it was taking out as a hidden layer: that
-  // face keeps its own animation and either finishes or reverses cleanly.
-  function applyPreviewLayers(animate) {
+  // Capture the values actually rendered before the new source properties
+  // take over, then drive swap from 0 to 1. lastFaceIndex is set here as the
+  // breaker for the next wheel event, never as the rendered face.
+  function beginSwap(animate) {
+    swapAnim.stop()
     // Read the raw index, not the faceIndex binding: bindings that depend on
     // previewIndex are still stale when its change handler runs, which would
     // swap in the previous face and leave the label one step behind the index.
     const front = root.previewIndex
-    const incoming = faceAt(front)
-    if (!animate || front === root.lastFaceIndex) {
-      for (let i = 0; i < root.faceCount; i++) {
-        slideFor(i).stop()
-        fadeFor(i).stop()
-        const f = faceAt(i)
-        f.opacity = i === front ? 1 : 0
-        f.y = 0
-      }
-      root.lastFaceIndex = front
-      return
-    }
-    const outgoing = faceAt(root.lastFaceIndex)
+    const outgoing = root.lastFaceIndex
+    const incomingItem = faceAt(front)
+    const leavingItem = faceAt(outgoing)
+    const startToOpacity = incomingItem.opacity
+    const startToY = incomingItem.y
+    const startFromOpacity = leavingItem.opacity
+    const startFromY = leavingItem.y
     const travel = Math.round(timeText.height * 0.7)
     const enterY = root.previewFromTop ? -travel : travel
-    const inSlide = slideFor(front)
-    const inFade = fadeFor(front)
-    if (incoming.opacity > 0) {
-      inSlide.from = incoming.y
-      inFade.from = incoming.opacity
-    } else {
-      incoming.y = enterY
-      incoming.opacity = 0
-      inSlide.from = enterY
-      inFade.from = 0
-    }
-    inSlide.to = 0
-    inFade.to = 1
-    inSlide.restart()
-    inFade.restart()
 
-    const outSlide = slideFor(root.lastFaceIndex)
-    const outFade = fadeFor(root.lastFaceIndex)
-    outSlide.from = outgoing.y
-    outSlide.to = -enterY
-    outFade.from = outgoing.opacity
-    outFade.to = 0
-    outSlide.restart()
-    outFade.restart()
-
-    // The face outside this swap is parked; a tween left on it by an earlier
-    // interruption must not repaint it over the two live faces.
-    for (let i = 0; i < root.faceCount; i++) {
-      if (i === front || i === root.lastFaceIndex) continue
-      slideFor(i).stop()
-      fadeFor(i).stop()
-      faceAt(i).opacity = 0
-      faceAt(i).y = 0
-    }
+    root.fromFace = outgoing
+    root.toFace = front
+    root.toOpacity = startToOpacity
+    root.toY = startToOpacity > 0 ? startToY : enterY
+    root.fromOpacity = startFromOpacity
+    root.fromY = startFromY
+    root.exitY = -enterY
     root.lastFaceIndex = front
+
+    if (!animate || outgoing === front) {
+      root.toOpacity = 0
+      root.toY = 0
+      root.swap = 1
+      return
+    }
+    root.swap = 0
+    swapAnim.restart()
   }
 
   // Refresh the time and the bubble together: both read clock.date and the
@@ -256,14 +263,14 @@ BarModule {
 
   onPreviewIndexChanged: {
     refreshLabel()
-    root.applyPreviewLayers(root.animOn)
+    root.beginSwap(root.animOn)
   }
 
   // First paint: refreshLabel() reads clock.date + renders the time, and
   // the layers start with the clock in front.
   Component.onCompleted: {
     refreshLabel()
-    root.applyPreviewLayers(false)
+    root.beginSwap(false)
   }
 
   // The label as segments: day/date, time, am/pm suffix. Toggling a
@@ -375,6 +382,8 @@ BarModule {
         font.pixelSize: Math.round(Ui.fontM * root.textScale)
         font.bold: false
         text: ""
+        opacity: root.faceOpacity(0)
+        y: root.faceY(0)
       }
 
       Title {
@@ -383,6 +392,8 @@ BarModule {
         font.pixelSize: Math.round(Ui.fontM * root.textScale)
         font.bold: false
         text: ""
+        opacity: root.faceOpacity(1)
+        y: root.faceY(1)
       }
 
       Title {
@@ -391,47 +402,18 @@ BarModule {
         font.pixelSize: Math.round(Ui.fontM * root.textScale)
         font.bold: false
         text: ""
+        opacity: root.faceOpacity(2)
+        y: root.faceY(2)
       }
 
+      // The one clock for a swap. The faces read it through faceOpacity/faceY;
+      // no face carries its own opacity or y tween.
       NumberAnimation {
-        id: slide0
-        target: timeText
-        property: "y"
-        duration: Ui.fastMs
-        easing.type: Easing.OutCubic
-      }
-      NumberAnimation {
-        id: fade0
-        target: timeText
-        property: "opacity"
-        duration: Ui.fastMs
-        easing.type: Easing.OutCubic
-      }
-      NumberAnimation {
-        id: slide1
-        target: previewText
-        property: "y"
-        duration: Ui.fastMs
-        easing.type: Easing.OutCubic
-      }
-      NumberAnimation {
-        id: fade1
-        target: previewText
-        property: "opacity"
-        duration: Ui.fastMs
-        easing.type: Easing.OutCubic
-      }
-      NumberAnimation {
-        id: slide2
-        target: yearText
-        property: "y"
-        duration: Ui.fastMs
-        easing.type: Easing.OutCubic
-      }
-      NumberAnimation {
-        id: fade2
-        target: yearText
-        property: "opacity"
+        id: swapAnim
+        target: root
+        property: "swap"
+        from: 0
+        to: 1
         duration: Ui.fastMs
         easing.type: Easing.OutCubic
       }
