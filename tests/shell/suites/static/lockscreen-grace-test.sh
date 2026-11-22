@@ -1,13 +1,13 @@
 #!/bin/bash
-# Suite: lockscreen-grace - grace is idle-only, expires on the wall clock.
+# Suite: lockscreen-grace - grace covers every fresh lock but suspend, on the wall clock.
 #
-# The grace window lets an idle-triggered lock release on the first real input,
-# so a user already back after an idle timeout is not asked for a password. The
-# flaw this suite pins: arming grace on every lock let a suspend-triggered lock
-# carry an armed window into sleep, and a QML timer's monotonic clock freezes
-# during suspend, so the first input on wake unlocked the session without a
-# password. The fix gates arming on the idle reason and measures the window on
-# the wall clock, which a suspend does advance.
+# The grace window lets a fresh lock release on the first real input, so a user
+# already back is not asked for a password - the setting promises activity after
+# locking, whatever asked for the lock. The flaw this suite pins: a
+# suspend-triggered lock could carry an armed window into sleep, and a QML
+# timer's monotonic clock freezes during suspend, so the first input on wake
+# unlocked the session without a password. Arming is refused for the suspend
+# reason and the window is measured on the wall clock, which a suspend advances.
 #
 # This is a SOURCE suite: Lockscreen is a Singleton with a PAM context and a
 # WlSessionLock and cannot be constructed headlessly, so the three grace
@@ -19,7 +19,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
-t_init "lockscreen-grace" "grace arms only for idle locks and a suspend consumes its window"
+t_init "lockscreen-grace" "grace arms on every fresh lock but suspend, and a suspend consumes its window"
 
 require_tools node
 
@@ -83,7 +83,8 @@ out.suspendArmed = armed()
 fns.graceActivity()
 out.suspendReleased = state.release
 
-// An explicit lock is held on purpose; no grace either.
+// A manual lock still arms grace: the setting promises activity after any
+// lock, not only one the idle daemon asked for.
 fns._armGrace("verb")
 out.manualArmed = armed()
 fns.graceActivity()
@@ -124,11 +125,11 @@ t_eq "first input inside the window releases" "1" "${R[idleReleased]}"
 t_eq "the release consumes the window" "true" "${R[idleConsumed]}"
 t_eq "a second input cannot release again" "1" "${R[idleSecondRelease]}"
 
-t_section "only idle locks arm grace"
+t_section "every fresh lock but suspend arms grace"
 t_eq "a suspend lock arms no window" "false" "${R[suspendArmed]}"
 t_eq "wake input after a suspend lock does not release" "0" "${R[suspendReleased]}"
-t_eq "an explicit lock arms no window" "false" "${R[manualArmed]}"
-t_eq "input after an explicit lock does not release" "0" "${R[manualReleased]}"
+t_eq "a manual lock arms the window" "true" "${R[manualArmed]}"
+t_eq "input after a manual lock releases" "1" "${R[manualReleased]}"
 
 t_section "a suspend consumes an already-armed idle grace"
 t_eq "the idle window was armed before sleep" "true" "${R[sleepArmedBefore]}"

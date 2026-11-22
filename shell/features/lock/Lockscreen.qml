@@ -25,12 +25,13 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 // backend at boot because compositors refuse the first request made from an
 // already-locked session.
 // Keyboard state (caps, layout) lives in the shared Keyboard singleton.
-// An optional grace window (Settings.lockscreenGraceSeconds) releases an
-// idle-triggered lock on the first real input inside that window, so a user
-// already back after an idle timeout is not asked for a password. It is armed
-// only for idle locks and measured against the wall clock: a suspend advances
-// that clock but freezes a QML timer, so time asleep always consumes the grace
-// and wake input can never ride a window that was armed before sleep.
+// An optional grace window (Settings.lockscreenGraceSeconds) releases a fresh
+// lock on the first real input inside that window, so a user already back is
+// not asked for a password. It is measured against the wall clock: a suspend
+// advances that clock but freezes a QML timer, so time asleep always consumes
+// the grace and wake input can never ride a window armed before sleep. A lock
+// that belongs to a suspend never arms grace at all, so a failed suspend still
+// leaves the session held.
 Singleton {
   id: root
 
@@ -116,13 +117,14 @@ Singleton {
   // authority on whether input still counts as grace activity.
   property double _graceDeadlineMs: 0
 
-  // Grace belongs only to an idle-triggered lock. A suspend locks first with
-  // a "suspend" reason and its wake input must not be mistaken for a user who
-  // never left; an explicit lock is held on purpose. The wall-clock deadline
-  // also expires a grace that a later suspend carries past its window.
+  // Grace covers every fresh lock except one that belongs to a suspend. The
+  // suspend reason is the only one that must never release on input: its wake
+  // cannot be mistaken for a user who never left, and a suspend that fails to
+  // sleep still has to hold the session. The wall-clock deadline expires any
+  // other grace that a later suspend carries past its window.
   function _armGrace(reason) {
     root._endGrace()
-    if (reason !== "idle") return
+    if (reason === "suspend") return
     if (Settings.lockscreenGraceSeconds <= 0) return
     root._graceDeadlineMs = Date.now() + Settings.lockscreenGraceSeconds * 1000
   }
