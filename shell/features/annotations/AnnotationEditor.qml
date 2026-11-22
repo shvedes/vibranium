@@ -39,6 +39,10 @@ LayerSurface {
   // Instance id assigned by the screenshots service: pairs probe
   // lines with annotate() opens in the logs.
   property int _uid: -1
+  // The single teardown guard. Set once in _close(), then read at the top of
+  // every callback that can land after the surface starts its exit: a late
+  // settle tick must not promote the board and re-reveal the toolbar. This
+  // extends the seq checks in the export path; it does not replace them.
   property bool _closing: false
   readonly property string _sessionId: Quickshell.processId + "-" + Date.now()
   // Final save target: the temp-load flows (annotator opened by a capture)
@@ -539,7 +543,7 @@ LayerSurface {
   // and one repaint lands when it ends. Taking the drawn scale, not the target,
   // means the rebuild never moves the ink on screen.
   function _commitBoardZoom() {
-    if (!editor.boardReady) return
+    if (editor._closing || !editor.boardReady) return
     editor._boardZoom = editor._shownZoom
     board.requestPaint()
   }
@@ -727,7 +731,7 @@ LayerSurface {
   // Canvas never repaints on its own once its image arrives, so without the
   // repaint the board reveals an empty black sheet.
   function _markBoardReady() {
-    if (editor.imgW <= 0 || editor.boardReady) return
+    if (editor._closing || editor.imgW <= 0 || editor.boardReady) return
     settleTimer.stop()
     editor.boardReady = true
     editor.loadState = "ready"
@@ -955,7 +959,10 @@ LayerSurface {
 
     interval: editor.exportSettleMs
     repeat: false
-    onTriggered: editor._finishExportSettle()
+    onTriggered: {
+      if (editor._closing) return
+      editor._finishExportSettle()
+    }
   }
 
   // The tween's own end, not a poll: the export waits for exactly this.
@@ -977,7 +984,10 @@ LayerSurface {
     id: exportPaintTimer
 
     interval: 5000
-    onTriggered: exportCanvas.complete(false)
+    onTriggered: {
+      if (editor._closing) return
+      exportCanvas.complete(false)
+    }
   }
 
   function _canonicalPath(path, done) {
@@ -1173,8 +1183,16 @@ LayerSurface {
      if (editor._closing) return
      editor._closing = true
      const output = editor._activeOutput
+     // One teardown boundary: stop every clock before the exit starts, so
+     // none of them can re-enter a surface already on its way out.
      exportSettle.stop()
      exportPaintTimer.stop()
+     discardTimer.stop()
+     zoomSettleTimer.stop()
+     clearTimer.stop()
+     settleTimer.stop()
+     blurPlateTimer.stop()
+     paintCooldown.stop()
     editor._exportSeq++
     editor._saveCheckSeq++
     editor._saveTargetPending = false
@@ -1221,7 +1239,10 @@ LayerSurface {
     id: discardTimer
 
     interval: 3000
-    onTriggered: editor.discardArmed = false
+    onTriggered: {
+      if (editor._closing) return
+      editor.discardArmed = false
+    }
   }
 
   // Delay between the last zoom step and the backing rebuild, in ms. Long
@@ -1231,14 +1252,20 @@ LayerSurface {
     id: zoomSettleTimer
 
     interval: 140
-    onTriggered: editor._commitBoardZoom()
+    onTriggered: {
+      if (editor._closing) return
+      editor._commitBoardZoom()
+    }
   }
 
   Timer {
     id: clearTimer
 
     interval: 3000
-    onTriggered: editor.clearArmed = false
+    onTriggered: {
+      if (editor._closing) return
+      editor.clearArmed = false
+    }
   }
 
   // Full-screen veil behind everything else. Its opacity is the arrival
@@ -1376,6 +1403,7 @@ LayerSurface {
       interval: 50
       repeat: true
       onTriggered: {
+        if (editor._closing) return
         if (board.isImageLoaded(editor.fileUrl)) {
           editor._markBoardReady()
           return
@@ -1455,7 +1483,10 @@ LayerSurface {
 
         interval: 150
         repeat: false
-        onTriggered: editor._grabBlurPlate()
+        onTriggered: {
+          if (editor._closing) return
+          editor._grabBlurPlate()
+        }
       }
 
       Item {
@@ -1720,6 +1751,7 @@ LayerSurface {
         interval: 80
         repeat: false
         onTriggered: {
+          if (editor._closing) return
           // Same reason as the plate grab above: this repaint covers the whole
           // ink backing, and it lands 80 ms into the reveal.
           if (editor._revealing) {
@@ -3449,6 +3481,7 @@ LayerSurface {
   // Blur the plate once and keep it as a PNG. This grab is the only pixel
   // readback in the blur path - once per shot, never per stroke.
   function _grabBlurPlate() {
+    if (editor._closing) return
     // Held until the toolbar has landed: the grab renders and PNG-encodes the
     // plate on the main thread, and its timer fires 150 ms into a 260 ms
     // reveal, which is the stall that reads as the island stopping halfway.
@@ -3474,6 +3507,7 @@ LayerSurface {
     editor._blurPlatePending = true
     const grabbed = blurPlate.grabToImage(result => {
       editor._blurPlatePending = false
+      if (editor._closing) return
       if (result === null || result === undefined
         || typeof result.saveToFile !== "function"
         || result.saveToFile(path) === false) {
