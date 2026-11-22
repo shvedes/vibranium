@@ -181,9 +181,13 @@ Item {
   width: root.maxWidth
   height: Math.min(root.implicitHeight, root.maxHeight)
 
-  // Minute precision: the block re-renders once a minute.
+  // The source ticks at the rate the visible digits need. Seconds are only
+  // drawn when the option is on: a minute-rate source would freeze them,
+  // while the default second-rate source re-binds the whole block every
+  // second when they are hidden.
   SystemClock {
     id: clock
+    precision: root.showSeconds ? SystemClock.Seconds : SystemClock.Minutes
   }
 
   // Time group: three slidefades on one baseline, then the suffix against
