@@ -59,6 +59,10 @@ Window {
 
   property int pwEditedCount: 0
   property string pwEditedLast: "none"
+  // Ctrl+U / Alt+U eraseLine contract (LCK-1). Kept separate from pwMask's
+  // counters so the key-driven-signal invariant below stays untouched.
+  property int eraseEditedCount: 0
+  property string eraseEditedLast: "none"
   property int pwSubmittedCount: 0
   property int pwCancelledCount: 0
   property int pwCapsCount: 0
@@ -141,6 +145,10 @@ Window {
   // Caps jitter sampled without a tween: the poses are read on both sides of
   // the switch in one turn, which a Behavior would smear.
   PasswordBox { id: pwCaps; y: 1700; x: 600; animated: false }
+  // Driven through eraseLine() directly: Keys.onPressed cannot be posted
+  // headlessly (no compositor, no QTest), so the primitive the key branch
+  // calls is what gets asserted.
+  PasswordBox { id: pwErase; y: 700; x: 600 }
 
   // ---- the event loop -------------------------------------------------
 
@@ -195,6 +203,7 @@ Window {
     reportPaste()
     reportAffordances()
     reportPasswordBox()
+    reportErase()
   }
 
   // ---- InputField: text, placeholder ----------------------------------
@@ -994,6 +1003,41 @@ Window {
     kv("pw.signalAfter.cancelled", pwCancelledCount)
     kv("pw.signalAfter.capsToggled", pwCapsCount)
     kv("pw.signalAfter.navigate", pwNavCount)
+  }
+
+  // Ctrl+U / Alt+U must carry the same user-edit contract as onTextEdited:
+  // exactly one edited("") for the lockscreen to mirror, plus a wiped field
+  // and a silenced failure flash. The key branch itself cannot be posted
+  // headlessly, so eraseLine() - the primitive it calls - is driven directly.
+  function reportErase() {
+    kv("erase.handler.type", typeof pwErase.eraseLine)
+    if (typeof pwErase.eraseLine !== "function") {
+      kv("erase.edited.count", "missing")
+      kv("erase.edited.payload", "missing")
+      kv("erase.text", "missing")
+      kv("erase.revealed", "missing")
+      kv("erase.failure", "missing")
+      return
+    }
+
+    pwErase.edited.connect(t => {
+      eraseEditedCount++
+      eraseEditedLast = t
+    })
+    // A rejected secret leaves the box failing and masked; erasing the line
+    // must reach the consumer the way a real keystroke would.
+    pwErase.text = "s3cret"
+    pwErase.fail()
+    kv("erase.before.text", pwErase.text)
+    kv("erase.before.failure", pwErase.failure)
+    eraseEditedCount = 0
+    eraseEditedLast = "none"
+    pwErase.eraseLine()
+    kv("erase.edited.count", eraseEditedCount)
+    kv("erase.edited.payload", eraseEditedLast)
+    kv("erase.text", pwErase.text)
+    kv("erase.revealed", pwErase.revealed)
+    kv("erase.failure", pwErase.failure)
   }
 
   // PasswordBox has no releaseFocus(), so the probe hands focus back to a

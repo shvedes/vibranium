@@ -134,6 +134,17 @@ Rectangle {
     root.revealed = false
   }
 
+  // The user-edit path for Ctrl+U / Alt+U. Carries the same contract as
+  // onTextEdited so a consumer that mirrors the secret only through edited()
+  // learns about the wipe: one edited("") carrying the empty value, with the
+  // failure flash ended. clear() stays a silent lifecycle wipe for a fresh
+  // prompt, which the polkit dialog relies on.
+  function eraseLine() {
+    root.clearFailure()
+    passwordInput.text = ""
+    root.edited("")
+  }
+
   function grabFocus() {
     passwordInput.forceActiveFocus()
   }
@@ -302,7 +313,7 @@ Rectangle {
         root.cancelled()
         event.accepted = true
       } else if (event.key === Qt.Key_U && ((event.modifiers & Qt.ControlModifier) || (event.modifiers & Qt.AltModifier))) {
-        passwordInput.text = ""
+        root.eraseLine()
         event.accepted = true
       } else if (event.key === Qt.Key_H && (event.modifiers & Qt.ControlModifier)) {
         root.toggleReveal()
