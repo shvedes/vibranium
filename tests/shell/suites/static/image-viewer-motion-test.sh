@@ -68,4 +68,41 @@ t_eq "two OutQuad fades keep their curve" "2" \
 t_eq "two OutCubic slides keep their curve" "2" \
   "$(grep -c 'easing.type: Easing.OutCubic' "$WINDOW")"
 
+t_section "chrome intent is separate from compositor fullscreen"
+# Finding APP-2: source-level (no headless window can be built). Tab and the
+# Hide UI button own `uiHidden`; `visibility` is the compositor's value. The
+# chrome is derived from both, so a compositor-driven exit from fullscreen
+# restores the bars without a write from this file. The fullscreen verb below
+# must not carry a second copy of the chrome state.
+t_contains "the holder declares one chrome-intent bit" \
+  "property bool uiHidden: false" "$SRC"
+t_contains "the holder derives chromeShown from intent and visibility" \
+  "readonly property bool chromeShown: !root.uiHidden && root.win.visibility !== Window.FullScreen" "$SRC"
+t_not_match "no imperative chromeVisible latch remains" 'chromeVisible' "$SRC"
+t_eq "the intent has two writes: Tab and the button" "2" \
+  "$(grep -c 'root.uiHidden =' "$WINDOW")"
+TOGGLE_FN="$(awk '/function toggleFullscreen\(\)/ { inside = 1 } inside { print } inside && /^  \}$/ { exit }' "$WINDOW")"
+t_contains "the fullscreen verb writes visibility" \
+  "root.win.visibility =" "$TOGGLE_FN"
+t_not_match "the fullscreen verb writes no chrome intent" \
+  'uiHidden|chromeVisible' "$TOGGLE_FN"
+
+t_section "every chrome read goes through the derived value"
+# Source-level (no headless window can be built): the five readers named in
+# APP-2 (zoom badge, both Frost.shown, both bar y bindings) plus the Hide UI
+# button's label all read the one derived value. The count is a non-vacuity
+# guard; the five exact reads below keep each named site on that derivation.
+t_eq "six chrome reads use chromeShown" "6" \
+  "$(grep -c 'root.chromeShown' "$WINDOW")"
+t_contains "zoom badge reads the derived chrome" \
+  "zoomTimer.running && !root.chromeShown" "$SRC"
+t_contains "toolbar frost reads the derived chrome" \
+  "shown: root.chromeShown || root.hoverNearTop || toolbarHoverHandler.hovered" "$SRC"
+t_contains "toolbar slide reads the derived chrome" \
+  "y: (root.chromeShown || root.hoverNearTop || toolbarHoverHandler.hovered) ? 14 : -height - 14" "$SRC"
+t_contains "status frost reads the derived chrome" \
+  "shown: root.chromeShown || root.hoverNearBottom || statusbarHoverHandler.hovered" "$SRC"
+t_contains "status slide reads the derived chrome" \
+  "y: (root.chromeShown || root.hoverNearBottom || statusbarHoverHandler.hovered)" "$SRC"
+
 t_summary

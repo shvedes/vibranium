@@ -174,11 +174,18 @@ QtObject {
   property real panX: 0
   property real panY: 0
 
-  // Chrome state. The toolbar and the status bar each slide away when the chrome
-  // is hidden or the pointer is not near them, so the image can be seen whole.
-  property bool chromeVisible: true
+  // Chrome intent. Tab and the Hide UI button own this one bit; the compositor
+  // owns fullscreen. The two are combined into `chromeShown` below, so a
+  // compositor-driven exit from fullscreen restores the bars without any write
+  // from this file. The bars also slide away when the pointer is not near them.
+  property bool uiHidden: false
   property bool hoverNearTop: false
   property bool hoverNearBottom: false
+
+  // What the chrome reads: hidden by intent, or hidden because the window is
+  // fullscreen. `visibility` is the compositor's value, read live, so a window
+  // rule, Alt+F11 or hyprctl cannot leave the chrome hidden after an exit.
+  readonly property bool chromeShown: !root.uiHidden && root.win.visibility !== Window.FullScreen
 
   // Context menu. The position is the click point in the content item's
   // coordinates and the card clamps itself against that item, so no card size
@@ -206,10 +213,10 @@ QtObject {
   // status bar rather than competing with it: with the chrome shown the status
   // bar already prints the same number from the same expression, so the badge
   // would be a second copy of a value on screen. Once `Tab` hides the chrome -
-  // or fullscreen does, since entering it forces `chromeVisible` off - the
+  // or fullscreen does, since `chromeShown` derives from live visibility - the
   // status bar is gone and this is the only place the scale is readable.
   // `zoomTimer` is the badge's own dwell timer, declared with the badge below.
-  readonly property bool zoomBadgeWanted: zoomTimer.running && !root.chromeVisible
+  readonly property bool zoomBadgeWanted: zoomTimer.running && !root.chromeShown
 
   // ------------------------------------------------------------- components
 
@@ -648,12 +655,13 @@ QtObject {
   // Fullscreen through `visibility` and not through a second flag, because a
   // compositor can also take the window out of fullscreen on its own: an
   // internal flag would then disagree with the window's actual state and the
-  // next Escape would try to leave a mode the window is not in. Layer shell has
-  // no `visibility` at all, which is one of the reasons this is a `Window`.
+  // next Escape would try to leave a mode the window is not in. `chromeShown`
+  // reads the same live value, so the bars come back with an exit from any
+  // source. Layer shell has no `visibility` at all, which is one of the reasons
+  // this is a `Window`.
   function toggleFullscreen() {
     const goingFullscreen = root.win.visibility !== Window.FullScreen
     root.win.visibility = goingFullscreen ? Window.FullScreen : Window.Windowed
-    root.chromeVisible = !goingFullscreen
   }
 
   // ---- context menu ----
@@ -1292,7 +1300,7 @@ QtObject {
           case Qt.Key_Plus: case Qt.Key_Equal: root.zoomIn(); break
           case Qt.Key_Minus: root.zoomOut(); break
           case Qt.Key_0: root.zoomActual(); break
-          case Qt.Key_Tab: root.chromeVisible = !root.chromeVisible; break
+          case Qt.Key_Tab: root.uiHidden = !root.uiHidden; break
           case Qt.Key_F: case Qt.Key_F11: root.toggleFullscreen(); break
           case Qt.Key_Escape:
             // The menu is the top layer while it is up, so Escape dismisses it
@@ -1313,7 +1321,7 @@ QtObject {
 
       Frost {
         target: toolbar
-        shown: root.chromeVisible || root.hoverNearTop || toolbarHoverHandler.hovered
+        shown: root.chromeShown || root.hoverNearTop || toolbarHoverHandler.hovered
       }
 
       // ---- floating toolbar: translucent bar, slides away when hidden ----
@@ -1321,11 +1329,11 @@ QtObject {
         id: toolbar
 
         anchors.horizontalCenter: parent.horizontalCenter
-        // Three ways up, one way down: the chrome flag, the pointer near the
+        // Three ways up, one way down: the chrome state, the pointer near the
         // top, or the pointer already on the bar itself. The third is what keeps
         // a moving bar from sliding out from under the pointer on its way to a
         // button.
-        y: (root.chromeVisible || root.hoverNearTop || toolbarHoverHandler.hovered) ? 14 : -height - 14
+        y: (root.chromeShown || root.hoverNearTop || toolbarHoverHandler.hovered) ? 14 : -height - 14
         width: toolRow.implicitWidth + 14
         height: 50
         color: Ui.tint("background_0", 0.55)
@@ -1364,7 +1372,7 @@ QtObject {
 
           ToolDivider {}
 
-          Btn { label: root.chromeVisible ? "Hide UI" : "Show UI"; tip: "Hide controls (Tab)"; ghost: true; onClicked: root.chromeVisible = !root.chromeVisible }
+          Btn { label: root.chromeShown ? "Hide UI" : "Show UI"; tip: "Hide controls (Tab)"; ghost: true; onClicked: root.uiHidden = !root.uiHidden }
         }
       }
 
@@ -1397,7 +1405,7 @@ QtObject {
 
       Frost {
         target: statusbar
-        shown: root.chromeVisible || root.hoverNearBottom || statusbarHoverHandler.hovered
+        shown: root.chromeShown || root.hoverNearBottom || statusbarHoverHandler.hovered
       }
 
       // ---- floating status bar: translucent, slides away when hidden ----
@@ -1405,7 +1413,7 @@ QtObject {
         id: statusbar
 
         anchors.horizontalCenter: parent.horizontalCenter
-        y: (root.chromeVisible || root.hoverNearBottom || statusbarHoverHandler.hovered)
+        y: (root.chromeShown || root.hoverNearBottom || statusbarHoverHandler.hovered)
           ? parent.height - height - 14
           : parent.height + 8
         // The live window width, not the seed: a cap written against the seed
