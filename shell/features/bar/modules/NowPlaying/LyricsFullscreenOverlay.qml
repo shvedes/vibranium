@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Mpris
 import qs.common
+import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/process/CommandSpec.js" as CommandSpec
 import "../../../../common/math/Range.js" as Range
@@ -16,22 +17,26 @@ import "../../../../common/math/Range.js" as Range
 // outlives the island and is handed the client rather than a binding to it.
 //
 // The composition is ratio-driven rather than pixel-driven, so 16:9, 16:10
-// and 3:2 outputs all read the same: a cover column on the left with the three
-// transport pads and the seek lane centred under it, and the synced transcript
-// running the full height of the window on the right, its top and bottom edges
-// blurred. The cover box is derived from the cover's own aspect ratio, drawn
-// at 97.75% of the fit its column allows, and centred in the column, so a
-// portrait or wide cover is neither cropped nor left in a letterbox.
+// and 3:2 outputs all read the same: a cover column on the left with the track
+// and artist on their own centred lines under it, then the seek lane, the
+// volume row and the transport pads, and the synced transcript running
+// the full height of the window on the right, its top and bottom edges blurred.
+// The cover box is
+// derived from the cover's own aspect ratio, drawn at 97.75% of the fit its
+// column allows, and centred in the column, so a portrait or wide cover is
+// neither cropped nor left in a letterbox. Three chrome buttons sit at the top
+// left: fullscreen, backdrop transparency and the idle hold.
 //
-// Esc closes it. Right-clicking the island's artwork goes back to the
-// island's controls instead of opening this.
+// Esc closes it, or leaves the enlarged artwork first.
 //
 // A regular toplevel, not a layer surface, like the audio mixer and the image
-// viewer. The transcript is an app-like view: it seeks, it takes
-// keys and it holds an idle inhibitor, so a window the compositor lists is one
-// the user can reach from a switcher and leave with the same verbs as any other
-// window. Quickshell 0.3.2 has no toplevel of its own - `PanelWindow` always
-// maps `wlr_layer_shell_v1` and `PopupWindow` needs a parent - so the window
+// viewer. The transcript is an app-like view: it seeks, it takes keys and can
+// be sent fullscreen, so a window the compositor lists is one the user can
+// reach from a switcher and leave with the same verbs as any other window.
+// Idle inhibition belongs to fullscreen or to the explicit caffeine button,
+// never to a plain window. Quickshell 0.3.2 has no toplevel of its own -
+// `PanelWindow` always maps `wlr_layer_shell_v1` and `PopupWindow` needs a
+// parent - so the window
 // below is a plain QtQuick `Window`. The root is a holder because a `Window`
 // created inside a QQuickItem renders into that item instead of reaching the
 // compositor (see AudioMixerWindow.qml for the measured case).
@@ -43,6 +48,19 @@ QtObject {
   property var player: null
   property bool opened: false
   property ShellScreen targetScreen: null
+
+  // Window mode is read from the Window's own visibility, never a shadow flag:
+  // a compositor can leave fullscreen on its own, and the button has to agree
+  // with whatever the surface is actually doing.
+  readonly property bool fullscreen: root.win !== null
+    && root.win.visibility === Window.FullScreen
+  // Inhibition follows fullscreen until the user overrides it: -1 forces it
+  // off (including in fullscreen), 1 forces it on in a plain window, 0 is the
+  // automatic state. One button flips to the opposite of what is in force.
+  property int inhibitChoice: 0
+  readonly property bool inhibitWanted: root.opened
+    && (root.inhibitChoice === 1
+      || (root.inhibitChoice === 0 && root.fullscreen))
 
   readonly property bool animOn: MotionPolicy.enabled
   readonly property string artUrl: root.player !== null ? root.player.trackArtUrl ?? "" : ""
@@ -74,11 +92,11 @@ QtObject {
   property real swapK: 1
 
   // Backdrop density. The surface paints the theme background solid under the
-  // transcript; a double click on empty space swaps it for the same color at
-  // 80% opacity, which lets the desktop read faintly behind the lyrics while
-  // they stay legible. A view preference rather than a setting, so it lives in
-  // the shell cache ($VIBRANIUM_CACHE/shell.json, "lyrics" section) instead of
-  // the settings catalog.
+  // transcript; the transparency button swaps it for the same color at 80%
+  // opacity, which lets the desktop read faintly behind the lyrics while they
+  // stay legible. A view preference rather than a setting, so it lives in the
+  // shell cache ($VIBRANIUM_CACHE/shell.json, "lyrics" section) instead of the
+  // settings catalog.
   //
   // The fill is a Rectangle inside the window, not the window's own `color`:
   // a surface color reaches the compositor with the surface, so a live change
@@ -121,9 +139,25 @@ QtObject {
     root.backdropAlpha = next
   }
 
+  // The compositor owns the fullscreen mode; visibility is the request and
+  // the state at once, as in the image viewer. No visibility is assigned at
+  // construction - a non-windowed state maps the Window at shell startup.
+  function toggleFullscreen() {
+    if (root.win === null) return
+    root.win.visibility = root.fullscreen ? Window.Windowed : Window.FullScreen
+  }
+
+  function toggleInhibit() {
+    root.inhibitChoice = root.inhibitWanted ? -1 : 1
+  }
+
+  // No client is a state, not an error: the menu can open the surface in
+  // standby and the first MPRIS player that appears is adopted below.
+  readonly property bool standby: root.opened
+    && (root.player === null || root.player === undefined)
+
   function open(p) {
-    if (p === null || p === undefined) return
-    root.player = p
+    root.player = p !== undefined ? p : null
     root.reanchor()
     root.opened = true
     // LYR-2: focus is claimed on the window's real activation edge below, not
@@ -133,6 +167,9 @@ QtObject {
 
   function close() {
     root.artExpanded = false
+    // A hidden fullscreen window would reopen fullscreen and inhibit before
+    // anyone asked; leaving fullscreen keeps the next open in window mode.
+    if (root.fullscreen) root.win.visibility = Window.Windowed
     root.opened = false
   }
 
@@ -205,47 +242,53 @@ QtObject {
       // the only read that follows it: the property itself is not a binding.
       root._readBackdrop()
       root.reanchor()
-      root._holdStart()
     } else {
       // Teardown is an edge too: retire any staged fade so a later reopen of
       // the same track starts from a fully shown transcript.
       trackSwap.stop()
       root.swapK = 1
-      root._holdStop()
     }
+  }
+  // One edge owns both inhibitors: fullscreen, or the manual caffeine button
+  // while the surface is open. A plain window never holds the session awake.
+  onInhibitWantedChanged: {
+    if (root.inhibitWanted) root._holdStart()
+    else root._holdStop()
   }
   Component.onDestruction: root._holdStop()
   onPlayerChanged: {
     root._seeking = false
     root.reanchor()
-    // The client left the bus: nothing on this surface can act any more.
-    if (root.player === null && root.opened) root.close()
+    // A client leaving the bus drops the surface into standby; the window
+    // stays up so the next player can be adopted without another menu trip.
   }
   onLengthSecChanged: root.reanchor()
+  onStandbyChanged: if (root.standby) root.artExpanded = false
   // --- logind hold ---------------------------------------------------------
   //
-  // The Wayland inhibitor above is what stops the compositor idling, but logind
+  // The Wayland inhibitor below is what stops the compositor idling, but logind
   // has no record of it, so `systemd-inhibit --list` and the lock screen's
   // blocker notice (which reads logind's ListInhibitors) cannot see it. This is
   // the same hold as a real logind lock: an idle block owned by a
-  // systemd-inhibit child for as long as the surface is open. Idle only, the
-  // policy the caffeine lock already follows - an explicit suspend stays an
-  // explicit suspend.
+  // systemd-inhibit child for as long as inhibition is wanted - fullscreen or
+  // the manual button, never a plain window. Idle only, the policy the
+  // caffeine lock already follows - an explicit suspend stays an explicit
+  // suspend.
   property var _holdJob: null
 
   function _holdStart() {
-    if (root._holdJob !== null) return
+    if (root._holdJob !== null || !root.inhibitWanted) return
     const spec = CommandSpec.argv([
       "systemd-inhibit", "--what=idle", "--who=Vibranium",
-      "--why=Lyrics window is open", "--mode=block",
+      "--why=Lyrics fullscreen or caffeine is active", "--mode=block",
       "sleep", "infinity"
     ])
     if (spec.ok !== true) return
     const ended = () => {
       root._holdJob = null
-      // A hold that died under an open surface is retried; a hold released by
-      // closing the surface is not.
-      if (root.opened) holdRetry.restart()
+      // A hold that died under a wanted state is retried; one released by
+      // leaving fullscreen or turning the button off is not.
+      if (root.inhibitWanted) holdRetry.restart()
     }
     let job = null
     try {
@@ -299,7 +342,7 @@ QtObject {
   // child below it belongs to the window.
   property Window win: Window {
     visible: root.opened
-    title: "Lyrics"
+    title: "Player view"
     // `WindowScreen` is the name-matching bridge between Quickshell's screen
     // objects and the QtQuick Screen a `Window` takes; a name that does not
     // meet leaves the window on the compositor's choice rather than on none.
@@ -323,16 +366,15 @@ QtObject {
 
       interval: 5000
       repeat: false
-      onTriggered: if (root.opened) root._holdStart()
+      onTriggered: if (root.inhibitWanted) root._holdStart()
     }
 
-    // While the transcript is up the session must not idle out from under it:
-    // the inhibitor stops the compositor marking the session idle, which is
-    // what the idle daemon's lock and suspend rows wait on. Releasing the
-    // surface releases the hold; the window association is what makes a
-    // compositor respect it.
+    // Fullscreen, or the manual caffeine button, stops the compositor marking
+    // the session idle, which is what the idle daemon's lock and suspend rows
+    // wait on. A plain window has no hold; the window association is what makes
+    // a compositor respect the one that is active.
     IdleInhibitor {
-      enabled: root.opened
+      enabled: root.inhibitWanted
       window: root.win
     }
 
@@ -376,6 +418,19 @@ QtObject {
     // seekAt makes, must not move it under the pointer.
     function onPositionChanged() { if (!root._seeking) root.reanchor() }
     function onPlaybackStateChanged() { root.reanchor() }
+  }
+
+  // Standby adopts the first usable client rather than waiting for another
+  // menu trip. The menu path already hands in the active one when present.
+  Connections {
+    target: Core.MediaState
+
+    function onActivePlayerChanged() {
+      const p = Core.MediaState.activePlayer
+      if (root.opened && root.standby && p !== null && p !== undefined) {
+        root.player = p
+      }
+    }
   }
 
 
@@ -428,14 +483,58 @@ QtObject {
       color: root.backdropColor
     }
 
-    // Empty space is the gesture surface: a double click anywhere the pads,
-    // the lane and the transcript do not reach swaps the backdrop. Declared
-    // under the rest, so every other child keeps its own clicks.
-    MouseArea {
+    // The window's own chrome, pinned to the top-left corner rather than the
+    // content inset so it never crowds the artwork. All three hand keys back
+    // after a click so Space keeps toggling playback instead of reactivating
+    // a focused pad.
+    Row {
+      x: Ui.s
+      y: Ui.s
+      spacing: Ui.s / 2
+      // The chrome stays reachable above the standby view.
+      z: 11
 
-      anchors.fill: parent
-      acceptedButtons: Qt.LeftButton
-      onDoubleClicked: root.toggleBackdrop()
+      IconButton {
+        name: root.fullscreen ? "minimize" : "maximize"
+        colorKey: root.fullscreen ? "accent" : "foreground_1"
+        slotSize: content.chromeSlot
+        iconSize: Math.max(16, Math.round(content.chromeSlot / 3))
+        flat: true
+        cornerRadius: RoundingPolicy.radius
+        animationsEnabled: root.animOn
+        onClicked: {
+          root.toggleFullscreen()
+          content.forceActiveFocus()
+        }
+      }
+
+      IconButton {
+        name: "hypr-blur"
+        colorKey: root.backdropAlpha < 1 ? "accent" : "foreground_1"
+        slotSize: content.chromeSlot
+        iconSize: Math.max(16, Math.round(content.chromeSlot / 3))
+        flat: true
+        cornerRadius: RoundingPolicy.radius
+        animationsEnabled: root.animOn
+        onClicked: {
+          root.toggleBackdrop()
+          content.forceActiveFocus()
+        }
+      }
+
+      IconButton {
+        name: "caffeine"
+        colorKey: root.inhibitWanted ? "accent" : "foreground_1"
+        slotSize: content.chromeSlot
+        iconSize: Math.max(16, Math.round(content.chromeSlot / 3))
+        flat: true
+        cornerRadius: RoundingPolicy.radius
+        animationsEnabled: root.animOn
+        onClicked: {
+          root.toggleInhibit()
+          content.forceActiveFocus()
+        }
+      }
     }
 
     // Screen-relative margins: a 1080p output and a 3:2 laptop get the same
@@ -452,13 +551,29 @@ QtObject {
     // from the cover column so the whole left group keeps one scale.
     readonly property real padSlot: Math.round(Range.clamp(coverW * 0.115, 48, 88))
     readonly property real padIcon: Math.round(padSlot * 0.5)
+    // The top-left chrome is smaller than the transport pads so three slots
+    // fit without cutting into the cover column.
+    readonly property real chromeSlot: Math.round(Range.clamp(padSlot * 0.7, 32, 56))
     readonly property real timePx: Math.max(Ui.fontS, Math.round(Ui.fontS * 1.45))
     readonly property real progressH: Math.round(timePx * 1.6)
+    // The volume row copies the island's [icon][lane][level] shape at this
+    // presentation scale, under the progress lane.
+    readonly property int volSlot: Math.round(Range.clamp(padSlot * 0.45, 28, 44))
+    readonly property real volumeH: volSlot
     readonly property real stackGap: Math.round(gap * 0.35)
-    // The band the cover may occupy: the column minus the pads, the lane and
-    // the gaps between them.
+    // The volume row belongs to the progress lane, not to the transport group:
+    // its lead is only a hair while the pads keep a full gap below it.
+    readonly property real volGap: Math.max(2, Math.round(stackGap * 0.3))
+    // Track and artist own one centred line each between the cover and the
+    // lane; progress, volume and the pads follow underneath.
+    readonly property real trackPx: Math.round(timePx * 1.45)
+    readonly property real artistPx: timePx
+    readonly property real metaH: Math.round(trackPx * 1.3 + artistPx * 1.3 + 2)
+    // The band the cover may occupy: the column minus the header, the two
+    // name lines, the lanes, the pads and the gaps between them.
     readonly property real artMaxH: Math.max(80,
-      availH - padSlot - progressH - 2 * stackGap)
+      availH - chromeSlot - padSlot - progressH - volumeH - metaH
+        - 3 * stackGap - volGap)
     // Presentation type: the pane's own base sizes multiplied, bounded so a
     // 4K output does not turn one cue into a headline.
     readonly property real lyricsScale: Range.clamp(availH / 460, 1.5, 3.2)
@@ -476,11 +591,13 @@ QtObject {
     readonly property real artScale: 0.9775
     readonly property real coverBoxW: Range.clamp(artMaxH * artAspect, 0, coverW) * artScale
     readonly property real coverBoxH: artAspect > 0 ? coverBoxW / artAspect : coverBoxW
-    // Cover, transport and lane are one group centred in the column: a short
-    // wide cover leaves no gap above the pads, and a tall one does not push
-    // them off the bottom.
-    readonly property real stackH: coverBoxH + padSlot + progressH + 2 * stackGap
-    readonly property real stackY: pad + Math.max(0, Math.round((availH - stackH) / 2))
+    // Cover, names, both lanes and transport are one group centred in the
+    // column: a short wide cover leaves no gap above the pads, and a tall one
+    // does not push them off the bottom.
+    readonly property real stackH: coverBoxH + metaH + progressH + volGap
+      + volumeH + padSlot + 3 * stackGap
+    readonly property real stackY: pad + chromeSlot
+      + Math.max(0, Math.round((availH - chromeSlot - stackH) / 2))
     // The blur bands run from each screen edge past the artwork's top and
     // bottom edges, so they are taller than the cover's own level on the
     // transcript side. Fractions of the surface height, because the masks
@@ -490,6 +607,14 @@ QtObject {
       content.stackY / Math.max(1, height) + 0.10)
     readonly property real blurBottom: Math.max(0.60,
       (content.stackY + content.coverBoxH) / Math.max(1, height) - 0.10)
+
+    // Faint all-direction halo, declared before the frame so it paints behind
+    // the cover instead of being clipped by it. The shadow tracks the cover's
+    // own ratio-driven geometry through the shared host contract.
+    SoftShadow {
+      host: artFrame
+      radius: 0
+    }
 
     Rectangle {
       id: artFrame
@@ -590,14 +715,57 @@ QtObject {
       }
     }
 
+    // The recording's own name, one centred line each, directly under the
+    // cover. An empty field keeps its line so the lane below never jumps.
+    Column {
+      x: content.pad
+      y: content.stackY + content.coverBoxH + content.stackGap
+      width: content.coverW
+      spacing: 2
+
+      Text {
+        width: parent.width
+        horizontalAlignment: Text.AlignHCenter
+        text: root.player ? String(root.player.trackTitle ?? "") : ""
+        color: Ui.tint("foreground_0", 0.95)
+        font.pixelSize: content.trackPx
+        font.family: Ui.fontFamily
+        font.bold: true
+        elide: Text.ElideRight
+        textFormat: Text.PlainText
+      }
+
+      Text {
+        width: parent.width
+        horizontalAlignment: Text.AlignHCenter
+        text: root.player ? String(root.player.trackArtist ?? "") : ""
+        color: Ui.tint("foreground_1", 0.7)
+        font.pixelSize: content.artistPx
+        font.family: Ui.fontFamily
+        elide: Text.ElideRight
+        textFormat: Text.PlainText
+      }
+    }
+
     // Transport: previous, play/pause, next - centred under the cover at a
     // size that belongs on this surface rather than in the bar.
     Row {
 
       x: content.pad + Math.round((content.coverW - width) / 2)
       y: content.stackY + content.coverBoxH + content.stackGap
+        + content.metaH + content.stackGap + content.progressH + content.volGap
+        + content.volumeH + content.stackGap
       height: content.padSlot
       spacing: Math.round(content.padSlot * 0.22)
+
+      Core.PlayerModePad {
+        player: root.player
+        mode: "shuffle"
+        slotSize: content.padSlot
+        iconSize: content.padIcon
+        animationsEnabled: root.animOn
+        onActivated: content.forceActiveFocus()
+      }
 
       IconButton {
         name: "skip-back"
@@ -665,9 +833,19 @@ QtObject {
           content.forceActiveFocus()
         }
       }
+
+      Core.PlayerModePad {
+        player: root.player
+        mode: "loop"
+        slotSize: content.padSlot
+        iconSize: content.padIcon
+        animationsEnabled: root.animOn
+        onActivated: content.forceActiveFocus()
+      }
     }
 
-    // Elapsed, seek lane, total: the island's lane contract under the cover,
+    // Elapsed, seek lane, total: the island's lane contract under the two
+    // name lines,
     // at presentation scale. The block is 70% of the artwork's width and
     // centred on it, which leaves ~15% of free space on each side.
     Item {
@@ -675,7 +853,7 @@ QtObject {
 
       x: content.pad + Math.round((content.coverW - width) / 2)
       y: content.stackY + content.coverBoxH + content.stackGap
-        + content.padSlot + content.stackGap
+        + content.metaH + content.stackGap
       width: Math.round(content.coverBoxW * 0.7)
       height: content.progressH
 
@@ -804,6 +982,22 @@ QtObject {
           elide: Text.ElideRight
         }
       }
+    }
+
+    // The shared player-volume row: the one gate, write path and gesture
+    // contract the island uses, at this surface's presentation scale.
+    Core.PlayerVolumeRow {
+      x: content.pad + Math.round((content.coverW - width) / 2)
+      y: content.stackY + content.coverBoxH + content.stackGap
+        + content.metaH + content.stackGap + content.progressH + content.volGap
+      width: Math.round(content.coverBoxW * 0.7)
+      player: root.player
+      slotSize: content.volumeH
+      fontPx: content.timePx
+      laneGap: Ui.s / 2
+      rowHeight: content.volumeH
+      animationsEnabled: root.animOn
+      onActivated: content.forceActiveFocus()
     }
 
     // The transcript is not a box beside the cover: it runs the full height of
@@ -1152,6 +1346,42 @@ QtObject {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         onClicked: root.artExpanded = false
+      }
+    }
+
+    // Standby: no MPRIS client at all. A full-surface answer rather than the
+    // right-half "Nothing playing" block, so no dead cover, lane or transport
+    // is left behind. The corner chrome stays above it.
+    Rectangle {
+      anchors.fill: parent
+      // Standby hides a dead composition, so it stays opaque even when the
+      // transcript's backdrop preference is translucent.
+      color: Ui.solid("background_0")
+      visible: root.standby
+      z: 9
+
+      Column {
+        anchors.centerIn: parent
+        width: parent.width
+        spacing: Ui.l
+
+        Icon {
+          anchors.horizontalCenter: parent.horizontalCenter
+          name: "eighth-note"
+          colorKey: "foreground_1"
+          size: content.emptyIcon
+        }
+
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: "Waiting for a player"
+          color: Ui.tint("foreground_1", 0.7)
+          font.pixelSize: Math.round(Ui.fontM * Math.min(2, content.lyricsScale))
+          font.family: Ui.fontFamily
+          wrapMode: Text.Wrap
+          textFormat: Text.PlainText
+        }
       }
     }
   }

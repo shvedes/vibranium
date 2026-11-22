@@ -1631,10 +1631,10 @@ Singleton {
   }
 
   function showLyrics(player, screen) {
-    const fromIsland = player !== null && player !== undefined
-    const p = fromIsland ? player : Core.MediaState.activePlayer
-    if (p === null || p === undefined) return false
-    if (!fromIsland && !Core.MediaState.hasActivePlayer) return false
+    const p = player !== null && player !== undefined
+      ? player : Core.MediaState.activePlayer
+    // With no client the menu path opens the standby view; the surface
+    // adopts the first player that appears instead of refusing to map.
     // Close the duplicate surface for this track on EITHER path, before the
     // overlay maps. The gesture wrapper no longer does this itself.
     root._closeIslandShowingPlayer(p)

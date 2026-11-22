@@ -6,7 +6,6 @@ import Quickshell.Services.Mpris
 import qs.common
 import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
-import "../../../../common/text/Format.js" as Format
 import "../../../../common/motion/Marquee.js" as Marquee
 import "../../../../common/math/Range.js" as Range
 
@@ -254,31 +253,6 @@ Item {
   readonly property bool hasTrack: root.hasClient && root.title !== ""
   readonly property bool canNext: root.playerIndex < root.players.length - 1
   readonly property bool canPrev: root.playerIndex > 0
-  readonly property bool shuffling: root.player !== null ? (root.player.shuffle ?? false) : false
-  readonly property bool looping: root.player !== null && root.player.loopState !== undefined
-    && root.player.loopState !== MprisLoopState.None
-  readonly property bool loopOne: root.player !== null && root.player.loopState === MprisLoopState.Track
-  // Per-player MPRIS capabilities: unsupported pads dim via `enabled`
-  // and the toggles below refuse to write.
-  //
-  // `shuffle` and `loopState` each need *two* answers before a write: MPRIS
-  // makes the write conditional on canControl as well as on the matching
-  // *Supported flag. A player that offers the flag but refuses control - a
-  // remote or companion client - answers the write with an error, so the
-  // capability is the conjunction, the same shape `canSetPlayerVolume` uses
-  // for volume.
-  readonly property bool canShuffle: root.player !== null
-    && root.player.canControl !== false
-    && root.player.shuffleSupported !== false
-  readonly property bool canLoop: root.player !== null
-    && root.player.canControl !== false
-    && root.player.loopSupported !== false
-  // The volume gate lives in MediaState: the MPRIS flags plus the round trip
-  // that settles a browser client (which declares Volume and drops the write),
-  // and the volumeKnown refusal for a client reporting -1. Every writer in
-  // this card and in the bar goes through MediaState.setPlayerVolume, which
-  // asks the same gate; this property only dims the row.
-  readonly property bool canSetVolume: Core.MediaState.volumeCapable(root.player)
   // The player's own length, through the shared accessor MediaState
   // reads. Reading `player.length` raw is what made a live
   // stream look like a finished track: Quickshell reports `length` as the
@@ -411,20 +385,6 @@ Item {
     root.player?.next()
   }
 
-  function toggleShuffle() {
-    if (!root.canShuffle) return
-    const next = !root.shuffling
-    root.player.shuffle = next
-  }
-
-  // Loop cycle: none -> repeat-all -> repeat-one -> none.
-  function cycleLoop() {
-    if (!root.canLoop) return
-    const next = root.player.loopState === MprisLoopState.None ? MprisLoopState.Playlist
-      : (root.player.loopState === MprisLoopState.Playlist ? MprisLoopState.Track : MprisLoopState.None)
-    root.player.loopState = next
-  }
-
   function seekRelative(offset) {
     if (!root.canSeekPosition) return
     root.player.seek(offset)
@@ -452,36 +412,12 @@ Item {
     root.shownPosition = NP.scrubPosition(x, w, root.lengthSec)
   }
 
-  // Active player's own volume (0..1, never the system sink).
-  //
-  // A player whose Volume reads -1 means "this client does not know its
-  // volume" (see the MPRIS spec), and `NP.normalizeVolume` clamps that to 0 -
-  // so the lane below renders an unknown level as a muted one. The clamp is
-  // load-bearing for the fill, so it is kept; MediaState's volumeCapable gate
-  // is what refuses a write derived from that read. The player is passed
-  // explicitly because the island can hold a client other than activePlayer.
+  // Active player's own volume (0..1, never the system sink), kept here for
+  // the mute-resume path; the shared volume row reads the same level itself.
   readonly property real playerVolume: root.player !== null ? NP.normalizeVolume(root.player.volume) : 0
 
   function setPlayerVolume(ratio) {
     return Core.MediaState.setPlayerVolume(root.player, ratio)
-  }
-  function adjustPlayerVolume(direction) {
-    const d = Number(direction)
-    if (!root.canSetVolume || !isFinite(d) || d === 0) return false
-    return root.setPlayerVolume(NP.adjustedVolume(root.playerVolume, d, Core.Audio.step))
-  }
-  function togglePlayerMute() {
-    if (!root.canSetVolume) return false
-    const next = NP.togglePlayerVolume(root.player, 0.5)
-    const wasPlaying = root.playing
-    const changed = root.setPlayerVolume(next)
-    if (changed && next === 0) NP.setMuteResumePending(root.player, wasPlaying)
-    // Muting pauses a playing client, which is a transport call the user did
-    // not ask for and which no pad on the card suggests.
-    if (changed && next === 0 && wasPlaying && root.player.canPause === true) {
-      root.player.pause()
-    }
-    return changed
   }
   function resumePlayer() {
     if (!root.hasClient) return
@@ -1332,149 +1268,16 @@ Item {
               }
             }
 
-            // Player volume: the Volume island slider language (sharp
-            // 6px track, direct drag, wheel steps). Icon tiers follow
-            // the level through the Audio service thirds.
-            //
-            // A player that does not take a volume write is grayed, not
-            // hidden: the row still shows what the player reports, and the
-            // annotator's split says how. `actionable` keeps the button and
-            // the lane in the hit-test chain so Qt.ForbiddenCursor actually
-            // reaches the user, and the row's opacity carries the dim.
-            //
-            // The row is [icon][lane][percentage]: the pad at the row's left edge
-            // where the icon rows above put theirs, the lane hard against it, the
-            // level at the right end. One lead and one short readout against the
-            // progress row's two time columns and no lead, so this lane is the
-            // longer of the two - by exactly what the progress row spends on
-            // readouts - and neither row has width reserved against it.
-            Row {
+            // One shared volume row: the gate, write path and gesture
+            // contract live in qs.services with the player view.
+            Core.PlayerVolumeRow {
               width: parent.width
-              spacing: root.laneGap
-              visible: root.hasClient
-              opacity: root.canSetVolume ? 1 : 0.5
-
-              Behavior on opacity {
-                enabled: root.animOn
-                NumberAnimation {
-                  duration: Ui.fastMs
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              // `slotSize` is the button's own square target and its own width
-              // (IconButton sizes itself from it), so the lane's lead is the pad
-              // and nothing more.
-              IconButton {
-                name: Core.Audio.volumeIconFor(root.playerVolume, false)
-                colorKey: "foreground_1"
-                accentKey: root.playerVolume <= 0.01 ? "red" : ""
-                dimTiers: Core.Audio.volumeDimTiersFor(root.playerVolume, false)
-                iconSize: root.muteSlot
-                slotSize: root.muteSlot
-                flat: true
-                cornerRadius: RoundingPolicy.radius
-                animationsEnabled: root.animOn
-                actionable: root.canSetVolume
-                onClicked: root.togglePlayerMute()
-
-                WheelHandler {
-                  acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                  onWheel: event => {
-                    if (!root.adjustPlayerVolume(event.angleDelta.y)) return
-                    event.accepted = true
-                  }
-                }
-              }
-
-              Item {
-                id: volLane
-
-                width: root.volumeLaneWidth
-                height: 18
-                anchors.verticalCenter: parent.verticalCenter
-
-                property bool dragging: false
-                property real pressX: 0
-
-                Rectangle {
-                  width: parent.width
-                  height: 6
-                  anchors.verticalCenter: parent.verticalCenter
-                  color: Ui.tint("foreground_1", 0.25)
-
-                  Rectangle {
-                    width: parent.width * Range.clamp01(root.playerVolume)
-                    height: parent.height
-                    color: Ui.solid("accent")
-
-                    Behavior on width {
-                      enabled: root.animOn && !volLane.dragging
-                      NumberAnimation {
-                        duration: Ui.normalMs
-                        easing.type: Easing.OutCubic
-                      }
-                    }
-                  }
-                }
-
-                MouseArea {
-                  anchors.fill: parent
-                  anchors.topMargin: -6
-                  anchors.bottomMargin: -6
-                  hoverEnabled: true
-                  cursorShape: root.canSetVolume ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-                  acceptedButtons: Qt.LeftButton
-                  // Seek-lane rule: clicks glide to the point, sustained
-                  // drags (past 6px) snap and commit on release. Every
-                  // write is guarded on the gate, which is what leaves an
-                  // inert lane inert while its cursor still reads as
-                  // forbidden.
-                  onPressed: mouse => {
-                    if (!root.canSetVolume) return
-                    volLane.pressX = mouse.x
-                  }
-                  onPositionChanged: mouse => {
-                    if (!root.canSetVolume || !pressed) return
-                    if (Math.abs(mouse.x - volLane.pressX) > 6) {
-                      volLane.dragging = true
-                      root.setPlayerVolume(mouse.x / width)
-                    }
-                  }
-                  onReleased: mouse => {
-                    if (root.canSetVolume) root.setPlayerVolume(mouse.x / width)
-                    volLane.dragging = false
-                  }
-                  // Same release rule as the seek lane above: an
-                  // interrupted drag must never stick `dragging` on.
-                  onCanceled: volLane.dragging = false
-                }
-
-                WheelHandler {
-                  acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                  onWheel: event => {
-                    if (!root.adjustPlayerVolume(event.angleDelta.y)) return
-                    event.accepted = true
-                  }
-                }
-              }
-
-              // The level, at the row's right end in a three-digit reserve so
-              // `9%` and `100%` leave the lane exactly where it is, and
-              // right-aligned so the number sits on the card's right margin
-              // where the volume row's edge is, rather than drifting with its own
-              // width.
-              Text {
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.percentColumnWidth
-                horizontalAlignment: Text.AlignRight
-                text: Format.percent(root.playerVolume)
-                color: Ui.tint("foreground_1", 0.55)
-                font.pixelSize: Ui.fontXs
-                font.family: Ui.fontFamily
-                textFormat: Text.PlainText
-                elide: Text.ElideRight
-              }
+              player: root.player
+              slotSize: root.muteSlot
+              fontPx: Ui.fontXs
+              laneGap: root.laneGap
+              rowHeight: 18
+              animationsEnabled: root.animOn
             }
 
             Row {
@@ -1495,49 +1298,12 @@ Item {
                 onClicked: root.prevPlayer()
               }
 
-              // Tint crossfade: the icon raster cannot morph, so a
-              // foreground layer and an accent layer blend in opposite
-              // directions on state change. No dip, no flicker; the slot
-              // (hover wash, border, clicks) stays on the bottom button.
-              Item {
-                id: shuffleWrap
-
-                width: 30
-                height: 30
-
-                property real shuffleTint: root.shuffling ? 1 : 0
-                Behavior on shuffleTint {
-                  enabled: root.animOn
-                  NumberAnimation {
-                    duration: Ui.slowMs
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                IconButton {
-                  id: shuffleBtn
-
-                  anchors.fill: parent
-                  name: "shuffle"
-                    iconSize: 20
-                  slotSize: 30
-                  flat: true
-                  cornerRadius: RoundingPolicy.radius
-                  colorKey: "foreground_0"
-                  animationsEnabled: root.animOn
-                  actionable: root.canShuffle
-                  opacity: live ? 1 : 0.4
-                  iconOpacity: 1 - shuffleWrap.shuffleTint
-                  onClicked: root.toggleShuffle()
-
-                  Icon {
-                    anchors.centerIn: parent
-                    name: "shuffle"
-                    colorKey: "accent"
-                    size: 20
-                    opacity: (shuffleBtn.live ? 1 : 0.4) * shuffleWrap.shuffleTint
-                  }
-                }
+              Core.PlayerModePad {
+                player: root.player
+                mode: "shuffle"
+                slotSize: 30
+                iconSize: 20
+                animationsEnabled: root.animOn
               }
 
               IconButton {
@@ -1631,48 +1397,12 @@ Item {
                 onClicked: root.nextTrack()
               }
 
-              // Tint crossfade, same as shuffle above: foreground and
-              // accent layers blend on loop change. Glyph swaps with the
-              // loop mode on both layers at once (no blank frame).
-              Item {
-                id: repeatWrap
-
-                width: 30
-                height: 30
-
-                property real repeatTint: root.looping ? 1 : 0
-                Behavior on repeatTint {
-                  enabled: root.animOn
-                  NumberAnimation {
-                    duration: Ui.slowMs
-                    easing.type: Easing.OutCubic
-                  }
-                }
-
-                IconButton {
-                  id: repeatBtn
-
-                  anchors.fill: parent
-                  name: root.loopOne ? "repeat-1" : "repeat"
-                    iconSize: 20
-                  slotSize: 30
-                  flat: true
-                  cornerRadius: RoundingPolicy.radius
-                  colorKey: "foreground_0"
-                  animationsEnabled: root.animOn
-                  actionable: root.canLoop
-                  opacity: live ? 1 : 0.4
-                  iconOpacity: 1 - repeatWrap.repeatTint
-                  onClicked: root.cycleLoop()
-
-                  Icon {
-                    anchors.centerIn: parent
-                    name: root.loopOne ? "repeat-1" : "repeat"
-                    colorKey: "accent"
-                    size: 20
-                    opacity: (repeatBtn.live ? 1 : 0.4) * repeatWrap.repeatTint
-                  }
-                }
+              Core.PlayerModePad {
+                player: root.player
+                mode: "loop"
+                slotSize: 30
+                iconSize: 20
+                animationsEnabled: root.animOn
               }
 
               IconButton {

@@ -57,19 +57,6 @@ Singleton {
     return p !== null && p !== undefined && p.playbackState !== MprisPlaybackState.Stopped
   }
 
-  // Menu provider for the Utilities "Show Lyrics" row. The row stays listed
-  // and mutes while there is no usable client, the same shape every other
-  // state-gated row uses: reading hasActivePlayer inside the hook makes the
-  // delegate's availability binding follow MPRIS without a shell guard.
-  function _registerMenuProvider() {
-    ProviderHost.claimProvider("show.lyrics", {
-      visible: () => root.hasActivePlayer
-    }, root)
-  }
-
-  Component.onCompleted: root._registerMenuProvider()
-  Component.onDestruction: ProviderHost.unregisterProvider("show.lyrics", root)
-
   // --- external volume control -------------------------------------------
   //
   // Whether a player takes a volume write is the player's own declaration:

@@ -108,6 +108,11 @@ Item {
   // A freshly applied sheet is a cut: its first placement must not glide in
   // from the scroll offset the previous track left behind.
   property bool _freshSheet: false
+  // After the settle, hold the placement that seated the new sheet until the
+  // cue itself moves. A late layout or position tick re-centred against a
+  // partially created view and dragged a correctly centred sheet away.
+  property bool _freshAnchor: false
+  property int _freshAnchorIndex: -1
   // The key whose lines were last put on screen, for telling a track switch
   // from a first load or a reload of the same sheet.
   property string _shownKey: ""
@@ -127,6 +132,7 @@ Item {
   Component.onDestruction: root._abort()
   onActiveChanged: {
     root._returnPending = false
+    root._freshAnchor = false
     if (!root.active) return
     // A surface opens showing the clock, not whatever the previous showing
     // left the view scrolled to.
@@ -149,7 +155,13 @@ Item {
     root._load()
   }
   onPositionChanged: root._track()
-  onActiveIndexChanged: Qt.callLater(root._follow)
+  onActiveIndexChanged: {
+    // A new cue releases the fresh anchor so playback follows normally. Read
+    // the edge directly: the derived currentIndex can still lag inside this
+    // handler, which would leave a stale anchor behind.
+    root._freshAnchor = false
+    Qt.callLater(root._follow)
+  }
   // The slot can resize under the transcript while the card grows or shrinks;
   // keep the cue in the middle without waiting for the next position tick.
   onHeightChanged: Qt.callLater(root._follow)
@@ -251,6 +263,7 @@ Item {
     root._pinnedByUser = false
     root._returnPending = false
     root._freshSheet = true
+    root._freshAnchor = false
     const switched = root._shownKey !== "" && root._shownKey !== key
     root._shownKey = key
     if (switched && root.slidefadeSheets && root.animOn) {
@@ -276,6 +289,7 @@ Item {
     // A closed pane has nothing to place; opening runs _load -> _apply, which
     // follows again with the view up.
     if (!root.active) return
+    if (root._freshAnchor && root.currentIndex === root._freshAnchorIndex) return
     if (root.synced && root.currentIndex >= 0) {
       // A drag or flick owns the view until it actually stops. Placing a cue
       // under a moving view used to snap contentY in one frame; arm the return
@@ -320,7 +334,20 @@ Item {
     // No motion policy, or a caller that disables gliding, is a cut too.
     if (root._freshSheet || !root.animOn || !root.glide) {
       root._placing = true
-      view.positionViewAtIndex(index, ListView.Center)
+      // A new model only schedules a layout, so the first placement used to
+      // run against the previous sheet's geometry. Force it, then use the
+      // same explicit target as the glide: ListView.Center measures against
+      // the half-view header/footer and lands the cue off-centre, which the
+      // settle pass then "corrected" by scrolling the fresh sheet away.
+      view.forceLayout()
+      const freshRow = view.itemAtIndex(index)
+      const freshY = freshRow !== null ? freshRow.y : root._estimatedCueY(index)
+      const freshH = freshRow !== null ? freshRow.height : 0
+      const freshTarget = freshY + freshH / 2 - view.height / 2
+      // Do not clamp the lower bound to zero: with the half-view header the
+      // view's resting contentY is negative, and forcing zero drops the cue
+      // to the bottom. ListView applies its own bounds to the assignment.
+      view.contentY = freshTarget
       root._placing = false
       return
     }
@@ -333,8 +360,11 @@ Item {
     const restY = row !== null ? row.y : root._estimatedCueY(index)
     const rowH = row !== null ? row.height : 0
     const target = restY + rowH / 2 - view.height / 2
-    scrollTo.to = Math.max(0, Math.min(
-      Math.max(0, view.contentHeight - view.height), target))
+    // With the half-view header the top of the scroll range is negative;
+    // clamping to zero instead drops the cue to the top of the slot.
+    const minY = view.headerItem ? -view.headerItem.height : 0
+    const maxY = Math.max(minY, view.contentHeight - view.height)
+    scrollTo.to = Math.max(minY, Math.min(maxY, target))
     scrollTo.start()
   }
 
@@ -345,11 +375,18 @@ Item {
   function _estimatedCueY(index) {
     const n = view.count
     if (!(n > 0)) return 0
-    const headerH = view.headerItem ? view.headerItem.height : 0
+    const header = view.headerItem
+    const headerH = header ? header.height : 0
     const footerH = view.footerItem ? view.footerItem.height : 0
+    // The half-view header sits at a NEGATIVE content y, so the first row is
+    // at header.y + header.height, not at header.height. Using the height
+    // alone put every estimated cue a whole header too low - the fresh sheet
+    // opened centred, then a placement made before the delegate existed
+    // scrolled it to the top.
+    const firstY = header ? header.y + header.height : 0
     const rowH = Math.max(1,
       (view.contentHeight - headerH - footerH - (n - 1) * view.spacing) / n)
-    return headerH + index * (rowH + view.spacing) + rowH / 2
+    return firstY + index * (rowH + view.spacing) + rowH / 2
   }
 
   NumberAnimation {
@@ -379,14 +416,24 @@ Item {
         // The stop edge re-arms this; never place under a moving view.
         return
       }
-      root._freshSheet = false
       if (root._returnPending) {
         root._returnPending = false
         root._pinnedByUser = false
+        // A reader's return is a glide, not the fresh cut: release the flag
+        // before placing so _centre takes the animation path.
+        root._freshSheet = false
         root._centre(root.currentIndex)
+        root._freshAnchor = true
+        root._freshAnchorIndex = root.currentIndex
         return
       }
       if (root.synced) root._follow()
+      // Keep any late correction an instant cut; cue changes after the settle
+      // still glide because the flag is released only here. The anchor then
+      // holds this placement until the cue moves or the reader takes over.
+      root._freshAnchor = true
+      root._freshAnchorIndex = root.currentIndex
+      root._freshSheet = false
     }
   }
 
@@ -499,8 +546,10 @@ Item {
       // clicked.
       onMovementStarted: {
         scrollTo.stop()
-        // A new drag supersedes any return a previous flick had armed.
+        // A new drag supersedes any return a previous flick had armed, and
+        // hands the view back to the reader from the fresh placement.
         root._returnPending = false
+        root._freshAnchor = false
         root._pinnedByUser = true
       }
       // The flick has actually stopped. StopAtBounds means reaching either end
@@ -517,7 +566,8 @@ Item {
       // next cue change free to pull them back. Scrolling the cue under the
       // middle again - or clicking a line, or a new sheet - releases it.
       onContentYChanged: {
-        if (root._placing || scrollTo.running || settleGuard.running) return
+        if (root._placing || scrollTo.running || settleGuard.running
+          || root._freshSheet) return
         if (view.contentHeight <= view.height) return
         const row = root.currentIndex >= 0 ? view.itemAtIndex(root.currentIndex) : null
         if (row === null) {
@@ -609,6 +659,7 @@ Item {
             // Acting on a line asks for the clock to take the view back: the
             // seek moves the cue, and following centres it again.
             root._pinnedByUser = false
+            root._freshAnchor = false
             root.seekRequested(line.modelData.t)
           }
         }

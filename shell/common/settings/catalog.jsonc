@@ -6250,8 +6250,8 @@
                 {
                     "id": "show.lyrics",
                     "type": "action",
-                    "label": "Show Lyrics",
-                    "sub": "Open the current track's lyrics",
+                    "label": "Player view",
+                    "sub": "Open the current track's player view",
                     "icon": "music",
                     "call": "lyrics showLyrics",
                     "close": true

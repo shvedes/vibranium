@@ -29,6 +29,7 @@ When something is playing, the "**Copy Current Track**" entry in the Utilities m
 When selected, the URI, URL, or FILE of the currently playing track will be copied to clipboard,
 making it easy to share your music with friends.
 
-The "**Show Lyrics**" entry in the Utilities menu opens the fullscreen, synced lyrics view for the
-current track and closes the menu. It is usable whenever an MPRIS client is playing or paused,
-regardless of whether the Now Playing bar module is enabled.
+The "**Player view**" entry in the Utilities menu opens a window with the artwork, transport and
+synced lyrics for the current track. It closes the menu and works regardless of whether the Now
+Playing bar module is enabled. With no MPRIS client available it opens in standby and adopts the
+first player that starts; the entry stays available in the menu either way.
