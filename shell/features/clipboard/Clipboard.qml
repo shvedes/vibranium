@@ -1785,11 +1785,15 @@ Singleton {
             : { kind: "mediainfo", mi: null, done: true, summary: CL.buildMediaSummary(root._pathForId(mediaProc._id)) })
         }
       }
-      Qt.callLater(() => root._dequeueMedia())
+      // The newest wish owns the probe. If the cursor moved to another media
+      // row while this child ran, launch it on this real exit edge - the same
+      // handoff the text sibling uses. A deferred queue would only add a
+      // second clock whose writer never existed.
+      if (root._mWish >= 0 && root._mWish !== mediaProc._id)
+        root._launchMediaFor(root._mWish)
     }
   }
   property int _mWish: -1
-  property var _mediaQueue: []
 
   function _wishMedia(id, p) {
     if (!CL.isMediaPath(p)) {
@@ -1808,11 +1812,6 @@ Singleton {
     mediaProc._id = id
     mediaProc.command = CL.buildMediaInfoCmd(p)
     mediaProc.running = true
-  }
-  function _dequeueMedia() {
-    if (mediaProc.running || root._mediaQueue.length === 0) return
-    const id = root._mediaQueue.shift()
-    if (id === root._mWish) root._launchMediaFor(id)
   }
 
   // ---- folders: git repo card (branch, status, commit) ----
