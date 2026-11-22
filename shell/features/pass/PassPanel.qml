@@ -533,30 +533,57 @@ PanelCard {
   // head once motion re-arms. Armed by onDeleteCommitted, spent by the
   // install below - never by navigation, which seats its own rows.
   property bool _deleteGlide: false
-  // Release a delete-landing pin once the bar can travel: the stillness
-  // lease (land seat) zeroes highlight motion, so releasing earlier
-  // snaps instead of gliding. A wall-clock deadline, never a turn
-  // budget - DeferredQueue turns drain several to a frame (menu parity).
-  function _releaseDeletePinWhenLive() {
-    const t0 = Date.now()
-    const poll = () => {
-      if (!Pass.visible) { list.unpinHighlight(); return }
-      if (list.currentIndex !== 0 && list.currentIndex !== -1) { list.unpinHighlight(); return }
-      if (Date.now() - t0 > 2000) { list.unpinHighlight(); return }
-      if (list._inSwap || list._seatsInstant) {
-        Idle.run(poll, 2)
-        return
+  // Generation of the delete pin's release. A newer delete arms a new pin
+  // and retires the older release, so an overlapping motion cannot be
+  // unpinned by the attempt that belonged to the one it replaced.
+  property int _pinGen: 0
+  property var _pinRelease: null
+
+  // The bar may only travel once the swap window and the landing hold are
+  // gone. List publishes both edges (onSeatsInstantChanged when _inSwap or
+  // the stillness lease falls, onMotionFinished when the content leg lands),
+  // so the release waits on them instead of polling a wall clock. No
+  // fallback timer: endSwap() clears _inSwap and the landing hold in one
+  // write, and the settle animation clears _settleActive, so there is no
+  // motion that can end without signalling.
+  function _watchDeletePin(gen, immediate) {
+    const release = () => {
+      if (gen !== panel._pinGen || panel._pinRelease !== release) return
+      if (!Pass.visible) { list.unpinHighlight(); panel._pinRelease = null; return }
+      if (list.currentIndex !== 0 && list.currentIndex !== -1) {
+        list.unpinHighlight(); panel._pinRelease = null; return
       }
+      if (list._inSwap || list._seatsInstant) return
       list.unpinHighlight()
+      panel._pinRelease = null
     }
-    Idle.run(poll, 2)
+    panel._pinRelease = release
+    if (immediate) release()
+  }
+
+  // install() bumps _pinGen when it arms the pin, so an earlier release is
+  // already stale by the time the head landing asks for this one.
+  function _releaseDeletePinWhenLive() {
+    panel._watchDeletePin(panel._pinGen, true)
+  }
+
+  // A newer swap takes the bar over: retire the release armed for the old
+  // motion and re-arm it under the new generation. The pin stands until the
+  // new motion's live edge; no stale closure can drop it mid-flight.
+  function _rearmDeletePin() {
+    const gen = ++panel._pinGen
+    if (panel._pinRelease) panel._watchDeletePin(gen, false)
+  }
+
+  Connections {
+    target: list
+    function onSeatsInstantChanged() { if (panel._pinRelease) panel._pinRelease() }
+    function onMotionFinished() { if (panel._pinRelease) panel._pinRelease() }
   }
 
   property bool _rowsPending: false
-  property int _pendingFrameToken: -1
-  property bool _pendingResumeTracking: false
-  // A same-turn install invalidates an already queued flush: the stale
-  // closure would otherwise read the new pending payload and write twice.
+  // Each sync mints an epoch. A newer sync retires the queued flush, so its
+  // captured token cannot commit against a window the newer one opened.
   property int _flushEpoch: 0
   property bool _openSeat: false
   property int _swapGen: 0
@@ -564,24 +591,28 @@ PanelCard {
   property string listError: ""
 
   function syncRows(frameToken, resumeTracking, sameTurn) {
-    panel._pendingFrameToken = frameToken
-    panel._pendingResumeTracking = resumeTracking === true
-    if (panel._rowsPending && sameTurn !== true) return
+    // Every intent mints an epoch. A newer sync retires the queued flush,
+    // so its captured token cannot commit against a window this one opened.
+    const epoch = ++panel._flushEpoch
     panel._rowsPending = true
-    if (sameTurn === true) panel._flushEpoch++
-    const epoch = panel._flushEpoch
+    // Capture the whole intent here. The deferred flush must never read a
+    // shared slot: a newer rebuild would overwrite it before the closure
+    // runs, and a token from that rebuild paired with this view key or page
+    // generation fails commit and resets a slide the newer intent owns.
+    const token = frameToken
+    const shouldResume = resumeTracking === true
+    panel._swapGen++
+    const g = panel._swapGen
+    const k = panel.viewKey()
+    const transitionGen = panel._pageTransitionGen
+    // A new swap supersedes the motion a delete pin was armed for: retire
+    // its release and re-arm it under the new generation.
+    panel._rearmDeletePin()
     const flush = () => {
       if (panel._flushEpoch !== epoch) return
       panel._rowsPending = false
-      const frameToken = panel._pendingFrameToken
-      const shouldResume = panel._pendingResumeTracking
-      panel._pendingFrameToken = -1
-      panel._pendingResumeTracking = false
-      if (frameToken < 0) return
+      if (token < 0) return
 
-      panel._swapGen++
-      const g = panel._swapGen
-      const k = panel.viewKey()
       const openSeat = panel._openSeat === true
       // A seat change or a page turn. `values` is the only write a ScriptModel
       // has, so the swap window is the only thing this decides, and that half
@@ -610,8 +641,6 @@ PanelCard {
       const useSwap = pageTurn || editorFocus
       if (openSeat) panel._openSeat = false
 
-      const transitionGen = panel._pageTransitionGen
-
       const install = () => {
         const candidate = panel.keyedRows()
         if (candidate === null) {
@@ -629,7 +658,12 @@ PanelCard {
         // Skipped at the head: no travel, and nothing to freeze.
         const deleteGlide = panel._deleteGlide
         panel._deleteGlide = false
-        if (deleteGlide && MotionPolicy.enabled && list.currentIndex > 0) list.pinHighlight()
+        if (deleteGlide && MotionPolicy.enabled && list.currentIndex > 0) {
+          // The pin is the origin of THIS delete's glide. A new generation
+          // retires any release armed for the motion this one replaced.
+          panel._pinGen++
+          list.pinHighlight()
+        }
         // The model's single write. `values` is the only write a ScriptModel
         // has and it refuses nothing, so there is no result to inspect and
         // no second verb to fall back from: the write lands, or the array
@@ -733,12 +767,13 @@ PanelCard {
       const queueCommit = () => {
         if (!shouldResume) return
         Idle.run(() => {
+          if (panel._flushEpoch !== epoch) return
           if (g !== panel._swapGen) {
             if (panel._pageTransitionGen === transitionGen)
               panel.resetPageTransition()
             return
           }
-          if (!panel.frames.commit(frameToken, k)) {
+          if (!panel.frames.commit(token, k)) {
             if (panel._pageTransitionGen === transitionGen)
               panel.resetPageTransition()
           }
@@ -1082,6 +1117,9 @@ PanelCard {
     // across the swap window, restore right after.
     panel._swapGen++
     const g = panel._swapGen
+    // This swap owns the bar now; a delete pin armed for the previous
+    // motion must wait for this one's live edge before it releases.
+    panel._rearmDeletePin()
     list.swapRun(g, v => v === panel._swapGen, () => {
       panel.rebuild()
     })
