@@ -358,7 +358,11 @@ Rectangle {
   // reveal, a search filter) that has no transition to finish. A resize
   // the model asked for is no different from one the user asked for, and it
   // is the one that repeats under the cursor, so it rides the same tween.
-  function _startHeightTransition(target, gen) {
+  // fromH names the height the card is showing when the caller has already
+  // cleared the slot region that owned it. The ordinary callers omit it and
+  // read the live chain; a close release needs the pre-clear value because
+  // the region goes away in the same turn the claim does.
+  function _startHeightTransition(target, gen, fromH) {
     if (gen >= 0 && (gen !== panel._transitionGen || !panel._transitionActive)) return
     Menu.trace("panel.heightArm", {
       want: Math.round(target * 10) / 10, gen: gen,
@@ -367,7 +371,7 @@ Rectangle {
       searching: panel.searching
     })
     const next = Range.clamp(target, 0, panel.screenMaxListH)
-    const current = Math.max(0, panel._currentListH())
+    const current = Math.max(0, fromH !== undefined ? fromH : panel._currentListH())
     // The show gate, honoured here for the first time. The width Behavior
     // below already gates on `shown`, and the comment on the no-Behavior
     // block states the rule for both axes: before the opening layout
@@ -2706,7 +2710,18 @@ Rectangle {
     // region sized to the OUTGOING fit - a height no row in the new projection
     // owns. Only an armed claim may grow the card through the region.
     if (!claimed || panel._claimListH <= 0) {
+      const from = panel._slotRegionH
+      const base = panel._restingFallbackH()
       panel._slotRegionH = -1
+      // A close releases the claim in the turn the slot starts folding, while
+      // the row is still tall. The region alone cannot carry that shrink: it
+      // is gone now, so the card would fall from the grown height to rest in
+      // one frame. Hand the height it was showing to the card's own single
+      // tween, which lands on the resting region with intermediate frames.
+      // One clock and one writer (_animatedListH); no second tween or retry.
+      if (from > base + 0.5 && !panel._heightAnimating
+        && !panel._transitionActive && panel.shown && MotionPolicy.enabled)
+        panel._startHeightTransition(base, -1, from)
       return
     }
     // During a result handoff the filter's old one-row latch can still be the
