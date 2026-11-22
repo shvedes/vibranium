@@ -285,6 +285,22 @@ Item {
     kv("token.viewRefocuses", root.viewRefocuses)
     const matches = root.viewSource.match(/authBox\.clearFailure\(\)/g) || []
     kv("view.clearFailureCalls", matches.length)
+
+    // LCK-7: shouldShow is the cause, not the owner of the exit fade. The view
+    // deliberately omits `closing`, and passing it hid the window on the first
+    // closing frame. suppression() still reports it for diagnostics.
+    kv("show.closingIgnored", PolkitTrace.shouldShow({
+      requested: true, locked: false, screens: 1, primary: true, closing: true
+    }))
+    kv("show.locked", PolkitTrace.shouldShow({
+      requested: true, locked: true, screens: 1, primary: true, closing: true
+    }))
+    kv("show.noScreen", PolkitTrace.shouldShow({
+      requested: true, locked: false, screens: 0, primary: true
+    }))
+    kv("suppression.closing", PolkitTrace.suppression({
+      requested: true, locked: false, screens: 1, primary: true, closing: true
+    }))
   }
 
   Component.onCompleted: {

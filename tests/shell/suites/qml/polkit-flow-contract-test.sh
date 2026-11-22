@@ -54,4 +54,14 @@ qp_assert "the conversation token clears it exactly once" "token.viewConversatio
 qp_assert "resetToken still refocuses" "token.viewRefocuses" "1"
 qp_assert "only one site clears the flash" "view.clearFailureCalls" "1"
 
+t_section "LCK-7: shouldShow never owns the exit fade"
+qp_assert "shouldShow ignores closing" "show.closingIgnored" "true"
+qp_assert "shouldShow still gates on locked" "show.locked" "false"
+qp_assert "shouldShow still gates on a screen" "show.noScreen" "false"
+qp_assert "suppression still reports closing" "suppression.closing" "closing"
+# XHR cannot read a .js import, so the doc claim is checked as source text.
+t_false "no stale visible-binding claim remains" \
+  grep -Fq 'visible: Polkit.visible && !Lockscreen.locked' \
+  "$SHELL_DIR/features/polkit/PolkitTrace.js"
+
 t_summary

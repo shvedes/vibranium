@@ -323,21 +323,21 @@ function outcome(s) {
 // Why the request is not showing a prompt, as a fixed token.
 //
 // Precedence is the argument, and `session-locked` is first because it is the
-// one that never resolves on its own: the view's `visible` binding is
-// `Polkit.visible && !Lockscreen.locked`, so a request that lands while the
-// session is locked stays pending with nothing drawn and nothing said. The app
-// waits, polkitd's clock runs down, and the user never learns there was a
-// prompt. That is the "no prompt appeared but the request is pending" state,
-// and it is a distinct token rather than the absence of one.
+// one that never resolves on its own: the view gates `showRequested` on
+// `locked`, so a request that lands while the session is locked stays pending
+// with nothing drawn and nothing said. The app waits, polkitd's clock runs down,
+// and the user never learns there was a prompt. That is the "no prompt appeared
+// but the request is pending" state, and it is a distinct token rather than the
+// absence of one.
 //
 //   requested   a request is pending in the singleton
 //   locked      Lockscreen.locked
 //   screens     how many screens Ui considers real
 //   primary     whether a primary screen was found among them
-//   closing     the exit fade is playing
-//   visible     the window's own `visible`
 // True when the prompt SHOULD be on screen: a request is pending, nothing is
-// suppressing it, and there is a screen to put it on.
+// suppressing it, and there is a screen to put it on. `closing` is not an input:
+// the exit fade owns the window while it plays, and hiding on its first frame
+// cuts the fade. `suppression()` still reports `closing` as a diagnostic.
 //
 // This is the one decision in this file that must never read the window's
 // visibility back, because the window's `visible` is bound to it. A binding
@@ -348,16 +348,14 @@ function outcome(s) {
 // `suppression()` below answers the same question AND takes the window's
 // visibility as its last input, because "a request is pending and the window is
 // not up" is a diagnostic worth naming. So there are two, deliberately: this one
-// is the cause, that one is the report. The original code had a single binding,
-// `visible: Polkit.visible && !Lockscreen.locked`, which had no such input and
-// could not loop.
+// is the cause, that one is the report. A single decision cannot be both without
+// reading its own output.
 function shouldShow(cfg) {
   const c = cfg || {}
   if (c.requested !== true) return false
   if (c.locked === true) return false
   if (!(Number(c.screens) > 0)) return false
   if (c.primary !== true) return false
-  if (c.closing === true) return false
   return true
 }
 
