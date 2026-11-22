@@ -360,4 +360,20 @@ t_eq "the first Bus read is still this Bus" "true" "$(qp_get both.identity.busSt
 t_eq "and it still holds the topic published first" "60" "$(qp_get both.identity.busSurvived)"
 t_eq "and the topics published after it" "1" "$(qp_get both.identity.busSeesLaterWrites)"
 
+# --- ProcessRegistry: consumer callbacks carry the registry token -----------
+
+t_section "a cancelled job's consumer callback is retired with its entry"
+t_eq "the first job started" "true" "$(qp_get process.guard.oldStarted)"
+t_eq "cancelOwner retired it" "1" "$(qp_get process.guard.oldCancelled)"
+t_eq "the replacement started" "true" "$(qp_get process.guard.newStarted)"
+t_eq "a late finished from the cancelled job is refused" "0" "$(qp_get process.guard.oldFinishedRefused)"
+t_eq "a late failed from the cancelled job is refused" "0" "$(qp_get process.guard.oldFailedRefused)"
+t_eq "the replacement's finished is delivered" "1" "$(qp_get process.guard.newFinishedAccepted)"
+t_eq "the replacement is the next generation" "1" "$(qp_get process.guard.generationDelta)"
+t_eq "the callback carries that generation" "1" "$(qp_get process.guard.callbackGenerationDelta)"
+t_eq "and its own code" "ok" "$(qp_get process.guard.newCode)"
+t_eq "a different owner's live job is not refused" "1" "$(qp_get process.guard.otherFinishedAccepted)"
+t_eq "a live job's failed is delivered" "1" "$(qp_get process.guard.failedAccepted)"
+t_eq "only the live callbacks ran, in order" "new:finished,other:finished,failed:failed" "$(qp_get process.guard.eventTags)"
+
 t_summary

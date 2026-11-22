@@ -62,10 +62,32 @@ Singleton {
     root._generation = generation
     root._jobs.push(entry)
 
+    // These consumer callbacks are connected BEFORE the registry's own
+    // terminal handlers so they run while the entry is still indexed; a
+    // terminal handler forgets the entry as its first act. They are NOT a
+    // retain: a callback that captured a panel or controller holds no
+    // lifetime, and the consumer must cancelOwner(owner) (or
+    // release/cancelAll) when that object goes away. The guard is the second
+    // line of defence: a job retired by any cancel path has no entry and
+    // cannot reach a torn-down consumer even if its terminal signal is
+    // delivered late. The generation token rides on the result, so a result
+    // from a displaced job of the same owner cannot pass as the current one.
+    if (typeof settings.onFinished === "function") {
+      job.finished.connect((result) => {
+        if (!root._consumerLive(entry, owner, generation,
+          result === null || result === undefined ? -1 : result.generation)) return
+        settings.onFinished(result)
+      })
+    }
+    if (typeof settings.onFailed === "function") {
+      job.failed.connect((reason) => {
+        if (!root._consumerLive(entry, owner, generation, generation)) return
+        settings.onFailed(reason)
+      })
+    }
+
     job.finished.connect((result) => root._onFinished(entry, result))
     job.failed.connect((reason) => root._onFailed(entry, reason))
-    if (typeof settings.onFinished === "function") job.finished.connect(settings.onFinished)
-    if (typeof settings.onFailed === "function") job.failed.connect(settings.onFailed)
     job.start()
     return job
   }
@@ -199,6 +221,19 @@ Singleton {
       if (root._jobs[i].job === job) return root._jobs[i]
     }
     return null
+  }
+
+  // The consumer-side guard for start()'s onFinished/onFailed. A live job's
+  // entry is still indexed when the callback runs; a cancelled one never is,
+  // because every cancel path forgets the entry before asking for its
+  // terminal transition. Both the owner and the generation identify that
+  // entry; the generation is copied onto the job's result, so a late result
+  // from an older job cannot be mistaken for this one.
+  function _consumerLive(entry, owner, generation, resultGeneration) {
+    if (entry.owner !== owner || entry.job.owner !== owner) return false
+    if (resultGeneration !== generation) return false
+    if (entry.job.generation !== generation) return false
+    return root._entry(entry.job) !== null
   }
 
   function _entryById(id) {

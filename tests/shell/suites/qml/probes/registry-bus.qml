@@ -128,6 +128,75 @@ Item {
     busPayloads()
     busTopics()
     together()
+    processGuard()
+  }
+
+  // ---------------------------------------------------------------------
+  // ProcessRegistry consumer callbacks carry the registry's token. A job
+  // retired by cancelOwner has no entry, so its late terminal signal must
+  // not reach a consumer that may already be torn down. A live job, and a
+  // live job of a different owner, must still reach theirs.
+  // ---------------------------------------------------------------------
+  function processGuard() {
+    const owner = "probe.registry.guard"
+    const otherOwner = "probe.registry.guard.other"
+    const events = []
+    function consumer(tag, kind) {
+      return (value) => events.push({
+        tag: tag,
+        kind: kind,
+        generation: kind === "finished" && value !== null && value !== undefined ? value.generation : undefined,
+        code: kind === "finished" && value !== null && value !== undefined ? value.code : undefined
+      })
+    }
+    function settingsFor(tag) {
+      return { onFinished: consumer(tag, "finished"), onFailed: consumer(tag, "failed") }
+    }
+    function result(job, code) {
+      return {
+        id: job.jobId,
+        generation: job.generation,
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        timedOut: false,
+        cancelled: false,
+        destroyed: false,
+        truncated: false,
+        outputLimitsEnforced: false,
+        code: code,
+        reason: ""
+      }
+    }
+
+    const oldJob = ProcessRegistry.start(["/bin/true"], owner, settingsFor("old"))
+    kv("process.guard.oldStarted", oldJob !== null && oldJob.generation > 0)
+    const oldGeneration = oldJob.generation
+    kv("process.guard.oldCancelled", ProcessRegistry.cancelOwner(owner))
+
+    const newJob = ProcessRegistry.start(["/bin/true"], owner, settingsFor("new"))
+    kv("process.guard.newStarted", newJob !== null && newJob.generation > oldGeneration)
+    const otherJob = ProcessRegistry.start(["/bin/true"], otherOwner, settingsFor("other"))
+    const failedJob = ProcessRegistry.start(["/bin/true"], owner, settingsFor("failed"))
+
+    // A cancelled job reports twice: once synchronously from cancelOwner and
+    // once from a late terminal that arrives after the replacement started.
+    oldJob.finished(result(oldJob, "ok"))
+    oldJob.failed("late-refusal")
+    newJob.finished(result(newJob, "ok"))
+    otherJob.finished(result(otherJob, "ok"))
+    failedJob.failed("legit-refusal")
+
+    kv("process.guard.oldFinishedRefused", events.filter((e) => e.tag === "old" && e.kind === "finished").length)
+    kv("process.guard.oldFailedRefused", events.filter((e) => e.tag === "old" && e.kind === "failed").length)
+    const accepted = events.filter((e) => e.tag === "new" && e.kind === "finished")
+    kv("process.guard.newFinishedAccepted", accepted.length)
+    kv("process.guard.generationDelta", newJob.generation - oldGeneration)
+    kv("process.guard.callbackGenerationDelta", accepted.length === 1 ? accepted[0].generation - oldGeneration : "none")
+    kv("process.guard.newCode", accepted.length === 1 ? accepted[0].code : "none")
+    kv("process.guard.otherFinishedAccepted", events.filter((e) => e.tag === "other" && e.kind === "finished").length)
+    kv("process.guard.failedAccepted", events.filter((e) => e.tag === "failed" && e.kind === "failed").length)
+    kv("process.guard.eventTags", events.map((e) => e.tag + ":" + e.kind).join(","))
   }
 
   // ---------------------------------------------------------------------
