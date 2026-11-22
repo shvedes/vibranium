@@ -245,24 +245,15 @@ CollapsibleSlot {
       Glide { duration: Ui.fastMs }
     }
 
-    // Transport slide-fade: two Icons share one fixed, clipped slot and
-    // trade place when the glyph flips - play slides in from the right,
-    // pause from the left, and the trip home mirrors the flash direction,
-    // so the album glyph comes back from the side the action glyph is
-    // leaving toward (the island's kickSwap language, on the icon axis).
-    // tweens below, never bound, and handoffs start from live values;
-    // with motion off the swap snaps. `clip` keeps the travel inside
-    // the slot so neighbours never see it.
+    // Transport slide-fade: the shared CrossfadeIcon trades the two glyphs
+    // in one fixed, clipped slot. Play arrives from the right, pause from
+    // the left, and the return mirrors the last direction, so the album
+    // glyph comes back from the side the action glyph is leaving toward.
+    // The wrapper docks left so the label anchors to a stable right edge;
+    // clip keeps the travel inside the slot so neighbours never see it.
     Item {
       id: trackIcon
 
-      // Fixed one-slot wrapper, always docked left: the icon keeps its
-      // centred canvas and the label anchors to its stable right edge,
-      // so the flash open/close moves only the pill's trailing edge
-      // while icon and text hold still (the Network/Bluetooth
-      // glyph-wrapper convention). The old left-vs-centered switch read
-      // the titleSlide driver but positioned against the lagging pill
-      // width, so the icon snapped right at the end of every close.
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: Bar.iconSlot
@@ -274,164 +265,36 @@ CollapsibleSlot {
       // 1s flash then hands the slot back to the album.
       readonly property string currentName: root.transportIcon !== "" ? root.transportIcon : "music-album"
       // Travel of the incoming glyph: +1 arrives from the right (play),
-      // -1 from the left (pause).
+      // -1 from the left (pause); the trip home mirrors the last one.
       property int slideDir: 1
 
       // Two-tone like glyphs: the added heart is red whole, while the
       // removed heart keeps the body tone and lets its slash carry the red
       // (heart-off marks only that path as class="indicator"). Every other
-      // transport glyph stays in the regular foreground tone.
+      // transport glyph stays in the regular foreground tone. The resolver
+      // runs at swap time, so each layer keeps its own tone while it fades.
       function toneFor(glyph) {
         return glyph === "heart" ? "red" : "foreground_0"
       }
       function accentFor(glyph) {
         return glyph === "heart-off" ? "red" : ""
       }
-
-      property string _aName: currentName
-      property string _bName: ""
-      property bool _aFront: true
-      // The currentName binding evaluates before _aName is initialised, so
-      // the handler below would read an empty front layer and stage a birth
-      // swap: every delegate rebuild (any settings toggle) replayed the
-      // album glyph sliding in on itself. Seed the buffers first; only real
-      // glyph flips after construction animate.
-      property bool _seeded: false
-
-      Component.onCompleted: {
-        _aName = currentName
-        _seeded = true
+      function directionFor(glyph) {
+        if (glyph === "play") trackIcon.slideDir = 1
+        else if (glyph === "pause") trackIcon.slideDir = -1
+        else trackIcon.slideDir = -trackIcon.slideDir
+        return trackIcon.slideDir
       }
 
-      function _layer(i) { return i === 0 ? iconA : iconB }
-      function _fadeOut(i) { return i === 0 ? fadeOutA : fadeOutB }
-      function _slideOut(i) { return i === 0 ? slideOutA : slideOutB }
-
-      onCurrentNameChanged: {
-        if (!_seeded) return
-        const showing = _aFront ? _aName : _bName
-        if (currentName === showing) return
-        if (currentName === "play") slideDir = 1
-        else if (currentName === "pause") slideDir = -1
-        else slideDir = -slideDir
-        const target = _aFront ? 1 : 0
-        const outgoing = _aFront ? 0 : 1
-        if (target === 0) _aName = currentName
-        else _bName = currentName
-        _aFront = target === 0
-        const enter = _layer(target)
-        const exit = _layer(outgoing)
-        if (MotionPolicy.enabled) {
-          fadeIn.stop()
-          slideIn.stop()
-          const outF = _fadeOut(outgoing)
-          const outS = _slideOut(outgoing)
-          outF.stop()
-          outS.stop()
-          fadeIn.target = enter
-          fadeIn.from = enter.opacity
-          fadeIn.restart()
-          slideIn.target = enter
-          slideIn.from = slideDir * Ui.s
-          slideIn.to = 0
-          slideIn.restart()
-          outF.from = exit.opacity
-          outF.restart()
-          outS.from = exit.slideOff
-          outS.to = -slideDir * Ui.s
-          outS.restart()
-        } else {
-          fadeIn.stop()
-          slideIn.stop()
-          fadeOutA.stop()
-          fadeOutB.stop()
-          slideOutA.stop()
-          slideOutB.stop()
-          enter.slideOff = 0
-          enter.opacity = 1
-          exit.slideOff = 0
-          exit.opacity = 0
-        }
-      }
-
-      Icon {
-        id: iconA
-
-        property real slideOff: 0
-        x: (parent.width - width) / 2 + slideOff
-        y: (parent.height - height) / 2
-        name: trackIcon._aName
-        colorKey: trackIcon.toneFor(trackIcon._aName)
-        accentKey: trackIcon.accentFor(trackIcon._aName)
-        opacity: 1
-      }
-
-      Icon {
-        id: iconB
-
-        property real slideOff: 0
-        x: (parent.width - width) / 2 + slideOff
-        y: (parent.height - height) / 2
-        name: trackIcon._bName
-        colorKey: trackIcon.toneFor(trackIcon._bName)
-        accentKey: trackIcon.accentFor(trackIcon._bName)
-        opacity: 0
-      }
-
-      NumberAnimation {
-        id: fadeIn
-
-        property: "opacity"
-        to: 1
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.OutCubic
-      }
-
-      NumberAnimation {
-        id: slideIn
-
-        property: "slideOff"
-        to: 0
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.OutCubic
-      }
-
-      NumberAnimation {
-        id: fadeOutA
-
-        target: iconA
-        property: "opacity"
-        to: 0
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.OutCubic
-      }
-
-      NumberAnimation {
-        id: slideOutA
-
-        target: iconA
-        property: "slideOff"
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.OutCubic
-      }
-
-      NumberAnimation {
-        id: fadeOutB
-
-        target: iconB
-        property: "opacity"
-        to: 0
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.OutCubic
-      }
-
-      NumberAnimation {
-        id: slideOutB
-
-        target: iconB
-        property: "slideOff"
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.OutCubic
+      CrossfadeIcon {
+        anchors.centerIn: parent
+        name: trackIcon.currentName
+        colorFor: glyph => trackIcon.toneFor(glyph)
+        accentFor: glyph => trackIcon.accentFor(glyph)
+        directionFor: glyph => trackIcon.directionFor(glyph)
+        slideX: Ui.s
+        durationMs: Ui.slowMs
+        fadeEasing: Easing.OutCubic
       }
     }
 

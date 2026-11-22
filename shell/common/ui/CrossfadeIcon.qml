@@ -9,8 +9,11 @@ import qs.common
 // axis. `rise` adds vertical travel (incoming from below, outgoing above) and
 // `slideX` adds horizontal travel (incoming from the right, outgoing left),
 // both in step with the fade - the icon counterpart of SlideSwap's text
-// travel. Opacity and transform never touch measure, so the slot holds its
-// size throughout and surrounding rows never reflow mid-swap.
+// travel. A `directionFor` resolver flips the horizontal sign per swap, and
+// `colorFor` / `accentFor` keep each layer's own tone through the fade;
+// `durationMs` and `fadeEasing` tune the tween. Opacity and transform never
+// touch measure, so the slot holds its size throughout and surrounding rows
+// never reflow mid-swap.
 // Empty swaps snap: going to "" hides the slot at once (a vanishing glyph
 // always coincides with its owner's own show/hide fade).
 //
@@ -38,6 +41,12 @@ Item {
   }
   // Optional second palette key for two-tone assets (class="indicator").
   property string accentKey: ""
+  // Accent twin of colorFor: keeps the outgoing glyph's own accent through
+  // the swap. Null keeps the single accentKey above.
+  property var accentFor: null
+  function accentOf(glyph) {
+    return typeof root.accentFor === "function" ? root.accentFor(glyph) : root.accentKey
+  }
   // Tiered glyphs (volume/wifi strength): how many leading wave/arc
   // groups stay in full body tone.
   property int dimTiers: 0
@@ -55,8 +64,25 @@ Item {
   property real rise: 0
   // Horizontal counterpart: > 0 stages the incoming glyph `slideX` px to the
   // right and sends the outgoing one `slideX` px left. Independent of `rise`;
-  // 0 (default) keeps the pure crossfade.
+  // 0 (default) keeps the pure crossfade. The sign is flipped per swap by
+  // `directionFor` when that resolver is set.
   property real slideX: 0
+  // Optional per-swap direction resolver, called with the incoming name at
+  // swap time: a positive result arrives from the right, a negative one from
+  // the left, and the outgoing glyph leaves the other way. Null is the
+  // existing right-arrival behavior.
+  property var directionFor: null
+  function directionOf(glyph) {
+    const d = typeof root.directionFor === "function" ? root.directionFor(glyph) : 1
+    return d < 0 ? -1 : 1
+  }
+  // Tween length for the fade and the travel. Consumers that assign duration
+  // gate their Behavior with `animate` instead of MotionPolicy.duration, which
+  // is why the policy lives in `animate` and not in this value.
+  property int durationMs: Ui.fastMs
+  // Easing of the opacity fade. Travel already uses OutCubic; the default
+  // keeps the linear fade every pre-existing consumer has.
+  property int fadeEasing: Easing.Linear
   // Whether the fade and any travel run. Defaults to the shell's global
   // motion policy; a consumer whose swap must stay alive with animations off
   // (the launcher badge cycle) sets true explicitly.
@@ -83,13 +109,16 @@ Item {
   // its first raster.
   property bool _aPainted: false
   property bool _bPainted: false
-  // Travel offsets for the two layers: the hidden layer waits below/right of
-  // the slot, the front sits at rest, and the outgoing layer leaves above/left
-  // when the front trades.
+  // Travel offsets for the two layers: the hidden layer waits off-slot on the
+  // staged side, the front sits at rest, and the outgoing layer leaves the
+  // opposite way when the front trades.
   property real _aRise: 0
   property real _bRise: 0
   property real _aX: 0
   property real _bX: 0
+  // Direction captured at staging, so the deferred trade sends each layer
+  // the way the incoming glyph chose rather than re-reading a changed value.
+  property int _dir: 1
 
   Component.onCompleted: {
     _aName = name
@@ -112,14 +141,15 @@ Item {
       else _aName = ""
       return
     }
+    root._dir = root.directionOf(name)
     if (_aFront) {
       _bName = name
       _bRise = root.rise
-      _bX = root.slideX
+      _bX = root.slideX * root._dir
     } else {
       _aName = name
       _aRise = root.rise
-      _aX = root.slideX
+      _aX = root.slideX * root._dir
     }
     _swapPending = true
     // The staged layer's own name -> source binding lands with this change
@@ -136,15 +166,16 @@ Item {
     const incoming = root._aFront ? iconB : iconA
     if (!incoming.swapReady) return
     root._swapPending = false
+    const x = root.slideX * root._dir
     if (root._aFront) {
       root._aRise = -root.rise
       root._bRise = 0
-      root._aX = -root.slideX
+      root._aX = -x
       root._bX = 0
     } else {
       root._bRise = -root.rise
       root._aRise = 0
-      root._bX = -root.slideX
+      root._bX = -x
       root._aX = 0
     }
     root._aFront = !root._aFront
@@ -169,7 +200,7 @@ Item {
     anchors.centerIn: parent
     name: root._aName
     colorKey: root.colorOf(root._aName)
-    accentKey: root.accentKey
+    accentKey: root.accentOf(root._aName)
     dimTiers: root.dimTiers
     indicatorActive: root.indicatorActive
     indicatorAnim: root.indicatorAnim
@@ -180,18 +211,18 @@ Item {
       y: root._aRise
       Behavior on x {
         enabled: root.animate
-        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: root.durationMs; easing.type: Easing.OutCubic }
       }
       Behavior on y {
         enabled: root.animate
-        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: root.durationMs; easing.type: Easing.OutCubic }
       }
     }
     onSwapReadyChanged: root._tradeIfReady()
     onReadyChanged: if (ready) root._aPainted = true
     Behavior on opacity {
       enabled: root.animate
-      NumberAnimation { duration: Ui.fastMs }
+      NumberAnimation { duration: root.durationMs; easing.type: root.fadeEasing }
     }
   }
 
@@ -200,7 +231,7 @@ Item {
     anchors.centerIn: parent
     name: root._bName
     colorKey: root.colorOf(root._bName)
-    accentKey: root.accentKey
+    accentKey: root.accentOf(root._bName)
     dimTiers: root.dimTiers
     indicatorActive: root.indicatorActive
     indicatorAnim: root.indicatorAnim
@@ -211,18 +242,18 @@ Item {
       y: root._bRise
       Behavior on x {
         enabled: root.animate
-        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: root.durationMs; easing.type: Easing.OutCubic }
       }
       Behavior on y {
         enabled: root.animate
-        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: root.durationMs; easing.type: Easing.OutCubic }
       }
     }
     onSwapReadyChanged: root._tradeIfReady()
     onReadyChanged: if (ready) root._bPainted = true
     Behavior on opacity {
       enabled: root.animate
-      NumberAnimation { duration: Ui.fastMs }
+      NumberAnimation { duration: root.durationMs; easing.type: root.fadeEasing }
     }
   }
 }
