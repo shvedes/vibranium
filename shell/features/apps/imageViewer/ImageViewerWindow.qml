@@ -106,6 +106,12 @@ QtObject {
 
   // ------------------------------------------------------------------ state
 
+  // MotionPolicy is the single global animation switch; this is this file's
+  // one reading of it. Every Behavior owned below carries `enabled:
+  // root.animOn`, so turning hypr.animations.enabled off lands each value in
+  // one frame instead of letting the local tweens keep running.
+  readonly property bool animOn: MotionPolicy.enabled
+
   // Window geometry as seeds and floors on the holder, never as the window's
   // own `width` / `height`. The source read `root.width` for the status bar's
   // width cap, and in an ApplicationWindow that name is the window's own live
@@ -229,7 +235,7 @@ QtObject {
     // always has its edge, because the fill is what it is.
     border.width: ghost ? (ma.containsMouse ? 1 : 0) : 1
 
-    Behavior on color { ColorAnimation { duration: 100 } }
+    Behavior on color { enabled: root.animOn; ColorAnimation { duration: Ui.fastMs } }
 
     Text {
       id: lbl
@@ -243,7 +249,7 @@ QtObject {
       font.pixelSize: Ui.fontM
       font.family: Ui.fontFamily
 
-      Behavior on color { ColorAnimation { duration: 100 } }
+      Behavior on color { enabled: root.animOn; ColorAnimation { duration: Ui.fastMs } }
     }
 
     MouseArea {
@@ -344,7 +350,7 @@ QtObject {
 
     color: ima.pressed ? Ui.tint("foreground_0", 0.18) : (ima.containsMouse ? Ui.tint("foreground_0", 0.12) : "transparent")
 
-    Behavior on color { ColorAnimation { duration: 100 } }
+    Behavior on color { enabled: root.animOn; ColorAnimation { duration: Ui.fastMs } }
 
     MouseArea {
       id: ima
@@ -929,7 +935,7 @@ QtObject {
           // own visibility is what the source's test actually meant.
           playing: root.win.visible && Qt.application.state === Qt.ApplicationActive
 
-          Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutQuad } }
+          Behavior on opacity { enabled: root.animOn; NumberAnimation { duration: Ui.normalMs; easing.type: Easing.OutQuad } }
 
           // The scale that fits, measured against the ROTATED painted
           // extent: a 90 or 270 degree turn swaps which source dimension
@@ -1250,7 +1256,7 @@ QtObject {
         border.width: 1
         opacity: zoomBadge.shown ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutQuad } }
+        Behavior on opacity { enabled: root.animOn; NumberAnimation { duration: Ui.slowMs; easing.type: Easing.OutQuad } }
 
         Text {
           id: zlbl
@@ -1328,7 +1334,7 @@ QtObject {
         border.color: Ui.tint("foreground_0", 0.17)
         border.width: 1
 
-        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+        Behavior on y { enabled: root.animOn; NumberAnimation { duration: Ui.normalMs; easing.type: Easing.OutCubic } }
 
         HoverHandler { id: toolbarHoverHandler }
 
@@ -1412,7 +1418,7 @@ QtObject {
         border.color: Ui.tint("foreground_0", 0.17)
         border.width: 1
 
-        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+        Behavior on y { enabled: root.animOn; NumberAnimation { duration: Ui.normalMs; easing.type: Easing.OutCubic } }
 
         HoverHandler { id: statusbarHoverHandler }
 
