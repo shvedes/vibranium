@@ -218,6 +218,13 @@ Singleton {
   // their own burst, so one provider in flight is a property of the state
   // machine rather than a scheduling accident.
   function refresh() {
+    // A new cycle retires every leg of the old one before resetting its
+    // counters: a wttr leg can still be draining ~40 s into this cycle, and
+    // its answer must not overwrite the fresh cycle's report. Bumping the
+    // generation drops that answer even where abort cannot stop the socket.
+    root._fetchGeneration++
+    root._abortForecast()
+    root._abortDailyForecast()
     root._forecastSettled = false
     root.forecastRetries = 0
     root.dailyForecastRetries = 0
@@ -242,6 +249,11 @@ Singleton {
   // keeps one provider request per cycle.
   function _startWttrFallback() {
     if (root._forecastReq) return
+    // Spending the Open-Meteo burst is a cycle boundary: retire the daily leg
+    // and bump the generation before the wttr leg goes out, so a late daily
+    // answer cannot land under this fallback cycle.
+    root._fetchGeneration++
+    root._abortDailyForecast()
     root.wttrFallbackActive = true
     root.forecastRetries = 0
     root._startForecast()
@@ -450,6 +462,12 @@ Singleton {
   property var _dailyReq: null
   property var _geocodeReq: null
 
+  // Monotonic cycle generation. Bumped at every refresh boundary; each handle
+  // carries the generation it was issued in, so an answer from a retired cycle
+  // is dropped even while its socket is still draining. Mirrors the discipline
+  // _geocodeGeneration applies to the geocode leg.
+  property int _fetchGeneration: 0
+
   // Minimal GET: onDone gets the response text, or "" on any failure
   // (timeout, HTTP error). Superseded handles never call back.
   // User-Agent spoofs curl: wttr.in serves bot-gate HTML to unknown
@@ -461,12 +479,15 @@ Singleton {
   // instead of inventing a code at each site.
   function _get(url, timeoutMs, onDone) {
     const target = _netTarget(url)
+    const gen = root._fetchGeneration
     let xhr = null
-    try { xhr = new XMLHttpRequest() } catch (e) { Qt.callLater(() => { onDone("", "no_transport", target) }); return { abort() {} } }
+    try { xhr = new XMLHttpRequest() } catch (e) { Qt.callLater(() => { onDone("", "no_transport", target) }); return { dead: false, gen: gen, abort() {} } }
     // Never tear down TLS mid-flight: aborting a handshaking QSslSocket
     // logs device-not-open reads. Stale responses die via the dead flag
-    // while the socket drains on its own; the timeout bounds the wait.
-    const handle = { dead: false, abort() { handle.dead = true } }
+    // while the socket drains on its own; the timeout bounds the wait. The
+    // generation is the second guard: a handle whose cycle ended before its
+    // socket answered is dropped even if abort could not mark it dead.
+    const handle = { dead: false, gen: gen, abort() { handle.dead = true } }
     const finish = (text, code) => { if (handle.dead) return; handle.dead = true; onDone(text, code, target) }
     xhr.onreadystatechange = () => {
       if (xhr.readyState !== XMLHttpRequest.DONE) return
@@ -519,9 +540,13 @@ Singleton {
 
   function _startForecast() {
     if (root._forecastReq) return
+    // Capture the generation at issue time, not in the callback: a newer
+    // cycle may have retired this request while its socket was draining.
+    const gen = root._fetchGeneration
     const query = root.locationQuery
     const url = "https://wttr.in/" + query + "?format=j1"
     root._forecastReq = root._get(url, 10000, (text, code, host) => {
+      if (gen !== root._fetchGeneration) return
       root._forecastReq = null
       root._onForecast(text, code, host)
     })
@@ -608,7 +633,11 @@ Singleton {
 
   function _startDailyForecast(url) {
     if (root._dailyReq) return
+    // Same cycle guard as the wttr leg: a daily answer from a retired cycle
+    // must not publish into the report the current cycle is building.
+    const gen = root._fetchGeneration
     root._dailyReq = root._get(url, 5000, (text, code, host) => {
+      if (gen !== root._fetchGeneration) return
       root._dailyReq = null
       root._onDailyForecast(text, code, host)
     })
