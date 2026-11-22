@@ -196,8 +196,13 @@ Singleton {
   }
 
   // Hold the overlay mapped for the linger window. Called when the payload
-  // is fully gone, never while it is still on screen.
+  // is fully gone, never while it is still on screen. Both the card's live
+  // fade edge and the exit ceiling below funnel through here: disarm the
+  // ceiling and clear `dismissing` so retention follows the card's own pixels
+  // and the timer is only the fallback for a delegate that never published.
   function _keepSurface() {
+    exitTimer.stop()
+    root.dismissing = false
     if (root.desktopSuppressed) {
       root._lingering = false
       return
@@ -224,12 +229,14 @@ Singleton {
 
   Timer {
     id: exitTimer
+    // -> Bounded ceiling for a card whose delegate never published its fade
+    // -> edge. The normal release is OSDCard's live opacity crossing its
+    // -> visible end, which calls _keepSurface() directly. Ui.fastMs is the
+    // -> token the card's own fade Behavior uses, so this is a ceiling, not
+    // -> the drop trigger.
     interval: Ui.fastMs
     repeat: false
-    onTriggered: {
-      root.dismissing = false
-      root._keepSurface()
-    }
+    onTriggered: root._keepSurface()
   }
 
   Timer {

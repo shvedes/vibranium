@@ -49,6 +49,15 @@ Card {
     NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
   }
 
+  // The exit release is this edge, not a fraction of the fade's duration: the
+  // card reads its own live opacity and the OSD only needs to hear when a
+  // departing payload is visually gone. With motion off the opacity binding is
+  // already 0, so the surface is retained at once rather than waiting on the
+  // exit ceiling.
+  onOpacityChanged: {
+    if (!OSD.visible && root.opacity <= 0.02) OSD._keepSurface()
+  }
+
   Item {
     id: body
     anchors.fill: parent

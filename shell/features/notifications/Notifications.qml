@@ -522,14 +522,26 @@ Singleton {
     // card can take it on the same frame the pile starts to close the gap.
     root._reflowSlots()
     // Do not restart on every release: a newer card must not postpone the
-    // drop an older one already earned on its own fade edge.
-    if (!exitFallback.running) exitFallback.restart()
+    // drop an older one already earned on its own fade edge. Store the entry
+    // at arm time, not at fire time: the ceiling answers for the card that
+    // opened the window, and a card released just before it fires keeps its
+    // own fade instead of being swept by it.
+    if (!exitFallback.running) {
+      root._fallbackEntry = entry
+      exitFallback.restart()
+    }
   }
 
   // The card's fade reached its visible end. Drop that entry on its own edge;
-  // the fallback below is only for a card that never published one.
+  // the fallback below is only for a card that never published one. When the
+  // card that armed the ceiling lands here, clear the token and disarm the
+  // timer so a late fire cannot sweep another card inside the same window.
   function noteExitDone(entry): void {
     if (!entry || !entry.leaving) return
+    if (root._fallbackEntry === entry) {
+      root._fallbackEntry = null
+      exitFallback.stop()
+    }
     root._dropLeaving(entry)
   }
 
@@ -547,10 +559,9 @@ Singleton {
     const gone = []
     for (let i = 0; i < root._tracked.length; i++) {
       const candidate = root._tracked[i]
-      // With an entry, drop only that card (its own fade edge). With none,
-      // sweep what the fallback found still leaving.
-      if (candidate && candidate.leaving
-        && (entry === undefined || candidate === entry)) {
+      // One entry per call: the card's own fade edge, or the one the ceiling
+      // was armed for. There is no sweep of every leaving card any more.
+      if (candidate && candidate.leaving && candidate === entry) {
         gone.push(candidate)
         continue
       }
@@ -1030,6 +1041,12 @@ Singleton {
   // off the departing card's live opacity, so no timer decides when a card
   // that did publish it goes. Card state cannot live in a delegate here: the
   // view regenerates them on pile changes.
+  //
+  // The ceiling is armed for exactly one entry. Stored here rather than read
+  // at fire time, so a second card released late in the window is never the
+  // one it drops: that card is still mid-fade and rides its own edge.
+  property var _fallbackEntry: null
+
   Timer {
     id: deadlineTimer
     repeat: false
@@ -1038,11 +1055,16 @@ Singleton {
 
   Timer {
     id: exitFallback
-    // -> Only a card whose delegate never published its fade edge reaches this.
-    // -> The normal drop is the card's own opacity crossing its visible end.
+    // -> Only a card whose delegate never published its fade edge reaches this,
+    // -> and then only the entry the ceiling was armed for above.
     interval: root.exitFallbackMs
     repeat: false
-    onTriggered: root._dropLeaving()
+    onTriggered: {
+      // -> Never argument-less: that swept every leaving card, including one
+      // -> released just before this fire and still fading.
+      if (root._fallbackEntry) root._dropLeaving(root._fallbackEntry)
+      root._fallbackEntry = null
+    }
   }
 
   // Instantiate the surface once the singleton is boot-touched. The view reads
