@@ -62,16 +62,19 @@ group('size or fallback', () => {
 
 // ---------------------------------------------------------------------------
 // SET-3: three uncoordinated SystemFont writers let completion order decide
-// the font; one source record with a rank gate now governs it. Headless has no
-// gsettings and no GTK ini files, so these are source-level assertions: the
-// rank gate is extracted from the real QML and executed against a stub root.
+// the font; one source record with a rank gate now governs it. All three
+// readers still start at boot: the gate, not the load order, sets precedence.
+// Headless has no gsettings and no GTK ini files, so these are source-level
+// assertions: the rank gate is extracted from the real QML and executed
+// against a stub root.
 section('SystemFont - one source record, rank wins over arrival order')
 
-group('onCompleted starts only gsettings, not all three readers', () => {
+group('onCompleted starts all three initial reads', () => {
   const body = block(SYSFONT_QML, 'Component\\.onCompleted', '  ')
-  contains('onCompleted still spawns gsettings', body, 'gsettingsProc.running = true')
-  notMatch('onCompleted does not reload gtk3', body, /gtk3File\.reload/)
-  notMatch('onCompleted does not reload gtk4', body, /gtk4File\.reload/)
+  contains('onCompleted spawns gsettings', body, 'gsettingsProc.running = true')
+  // FileView does not load on path assignment; it needs an explicit read.
+  contains('onCompleted reloads gtk3', body, 'gtk3File.reload()')
+  contains('onCompleted reloads gtk4', body, 'gtk4File.reload()')
 })
 
 group('ini reloads stay in the gsettings failure branch', () => {
@@ -100,12 +103,14 @@ group('the rank gate: lower rank wins, later ini cannot clobber', () => {
   eq('gsettings wins the boot race', root._fontSource.raw, 'Cantarell 11')
   eq('and its rank is kept', root._fontSource.rank, 0)
 
+  // Boot path: all three readers start together, ini answers can land first.
   root = fresh()
   put = offer(root)
-  put(1, 'Noto Sans 10') // gtk4 first
-  put(2, 'DejaVu Sans 9') // gtk3 second
-  put(0, 'Cantarell 11') // later gsettings answer
-  eq('a later gsettings answer still wins', root._fontSource.raw, 'Cantarell 11')
+  put(2, 'DejaVu Sans 9') // gtk3 onLoaded
+  put(1, 'Noto Sans 10') // gtk4 onLoaded
+  put(0, 'Cantarell 11') // gsettings answer, later in arrival order
+  eq('boot: ini first, later rank-0 answer still wins', root._fontSource.raw, 'Cantarell 11')
+  eq('boot: the winning rank is gsettings', root._fontSource.rank, 0)
 
   root = fresh()
   put = offer(root)

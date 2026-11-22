@@ -112,12 +112,17 @@ Singleton {
         "ping",
       ]
     })
-    // gsettings is the authoritative probe on GNOME. The ini FileViews load
-    // themselves and their watchers stay live; only the failure branch reloads
-    // them. Starting gsettings alone here keeps its rank-0 answer from being
-    // pre-empted by an unnecessary ini reload. One callLater moves the fork
-    // past the first frame - the default family is already a valid value.
-    Qt.callLater(() => { gsettingsProc.running = true })
+    // FileView does not load on path assignment: it needs an explicit read, so
+    // all three readers start here in one deferred turn. The rank gate - not
+    // the load order - decides the winner, so a later rank-0 gsettings answer
+    // replaces any ini answer that lands first. The watchers stay live for
+    // mid-session ini writes. One callLater moves the fork past the first frame;
+    // the default family is already a valid value.
+    Qt.callLater(() => {
+      gsettingsProc.running = true
+      gtk3File.reload()
+      gtk4File.reload()
+    })
   }
 
   // For debugging: allow `qs ipc call systemFont dump`
