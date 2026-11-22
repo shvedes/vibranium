@@ -81,9 +81,12 @@ Item {
   // A family is open only after an explicit select. The row's variants are
   // instantiated only while this is true.
   property bool _expanded: false
-  // The variant row's own arrival, one tick behind `_expanded`, so its
-  // cards are born behind the parent and then slide down into place.
-  property bool _variantOpen: false
+  // The variant row's arrival follows the parent, not a clock: the cards are
+  // born behind it while the stage grows and slide down once the stage has
+  // taken its expanded height. Reading the live height also retires the
+  // arrival if the target moves while the family is open.
+  readonly property bool _variantOpen: panel._expanded && panel._settled
+    && stage.height >= panel.stageH - 0.5
 
   // Open fade and the deck's own settle. `_settled` keeps geometry tweens
   // off until the surface has taken the screen's size, so the first frame
@@ -339,8 +342,6 @@ Item {
 
   function collapseVariants() {
     panel._expanded = false
-    panel._variantOpen = false
-    variantTimer.stop()
   }
 
   function expandVariants() {
@@ -349,19 +350,6 @@ Item {
     panel.variantIndex = panel._activeVariantIndex(panel.currentRow)
     panel._keepFolder = panel._folderOf(panel.variants[panel.variantIndex])
     panel._expanded = true
-    panel._variantOpen = false
-    variantTimer.stop()
-    if (!MotionPolicy.enabled) {
-      panel._variantOpen = true
-      return
-    }
-    variantTimer.restart()
-  }
-
-  Timer {
-    id: variantTimer
-    interval: 30
-    onTriggered: panel._variantOpen = true
   }
 
   function _seatOnActive() {

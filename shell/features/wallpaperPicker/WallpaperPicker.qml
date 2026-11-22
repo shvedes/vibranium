@@ -112,21 +112,14 @@ Singleton {
     // when the folder keeps changing while a git run is in flight this
     // flips back and another run is scheduled.
     property bool _gitFresh: false
-    // A git that never answers - absent, wedged, or failing - would otherwise
-    // leave the rerun timer arming itself on every directory change and hold
-    // the listing slot forever. Attempts are counted per directory and each
-    // retry waits longer than the last; the last attempt settles into the
-    // degraded state instead of asking again.
-    property int _gitAttempts: 0
-    property bool _gitDegraded: false
-    // A listing answers in milliseconds, so this only bounds a wedged child.
-    // The spawn window is what catches an absent git, which reports no exit
-    // at all, and the debounce ceiling caps the backoff the retries use.
+    // A listing answers in milliseconds, so the timeout only bounds a wedged
+    // child and the spawn window catches an absent git, which reports no exit
+    // at all. One failed run is the verdict for that listing; a later
+    // directory change or a fresh open asks the repository again. The
+    // debounce below merges the changes landing while a run is in flight.
     readonly property int _gitTimeoutMs: 10000
     readonly property int _gitSpawnMs: 2000
-    readonly property int _gitAttemptLimit: 3
     readonly property int _gitRerunMs: 300
-    readonly property int _gitRerunMaxMs: 5000
 
     // --- request identity ---
     // Every asynchronous step here settles after the theme it was issued
@@ -354,15 +347,8 @@ Singleton {
         root._gitUntracked = null
         root._hasGit = false
         root._gitFresh = false
-        // A pass over a new directory starts with a full attempt budget: what
-        // the replaced directory exhausted says nothing about this one.
-        root._gitAttempts = 0
-        root._gitDegraded = false
         // FolderListModel will auto-update when path changes
         bgModel.folder = root._bgUrl
-        // A new directory is a new listing; the previous one's re-aim budget
-        // says nothing about whether this one needs re-aiming.
-        root._bgReaims = 0
         // The shipped listing is a fresh question for this theme.
         root._builtinFiles = []
         root._builtinListed = false
@@ -529,10 +515,6 @@ Singleton {
     // stale - snapshot.
     function _runGitLs() {
         if (!root._hasGit || root.backgroundsDir === "") return
-        // A pass that spent its attempts is not asked again by a directory
-        // change: re-arming it is an explicit act - a theme swap or a fresh
-        // open - not a side effect of a file landing.
-        if (root._gitDegraded) return
         const theme = String(root.currentTheme)
         // The directory handed to git is the one the theme name authorizes,
         // and it is recorded with the generation so a run answers only the
@@ -546,7 +528,7 @@ Singleton {
         }
         root._refusal = ""
         if (root._gitRunning) {
-            root._queueGitRefresh(dir.path, root._gitAttempts + 1)
+            root._queueGitRefresh(dir.path)
             return
         }
         const handle = root._beginWork(root._listKey)
@@ -566,19 +548,15 @@ Singleton {
     // A dir change during a run becomes one debounced refresh for the
     // directory it was observed in. The queued record carries its own
     // generation, so a burst of drops collapses into the last one and a
-    // refresh queued for a replaced directory is retired with it. The wait
-    // doubles once per attempt that already failed, capped, so a retry of an
-    // unanswered listing backs off instead of polling at a fixed rate.
-    function _queueGitRefresh(dir, attempt) {
+    // refresh queued for a replaced directory is retired with it. The wait is
+    // a single debounce: it merges directory edges, not attempts at a failed
+    // listing.
+    function _queueGitRefresh(dir) {
         const handle = root._beginWork(root._refreshKey)
         if (handle.id === 0) return
         root._gitRerun = { handle: handle, dir: dir }
-        gitRerun.interval = root._gitDelay(attempt)
+        gitRerun.interval = root._gitRerunMs
         gitRerun.restart()
-    }
-    function _gitDelay(attempt) {
-        const rounds = attempt > 1 ? attempt - 1 : 0
-        return Math.min(root._gitRerunMaxMs, root._gitRerunMs * Math.pow(2, rounds))
     }
 
     // A queued refresh for the directory the next run covers is retired:
@@ -638,43 +616,26 @@ Singleton {
         }
         root._gitUntracked = set
         root._gitFresh = true
-        root._gitAttempts = 0
         root._applyGitFilter()
     }
 
-    // A listing that did not produce a set spends one attempt. While budget
-    // remains it is retried through the same debounce timer a directory change
-    // uses, so an absent or failing git cannot arm a timer on its own. The
-    // last attempt settles into the degraded state instead: no file is offered
-    // as a user wallpaper while the untracked set is unknown, and the snapshot
-    // is marked fresh so the empty list reads as the answer it is rather than
-    // as a listing that has not landed. A fresh open or a theme swap clears
-    // the state and the listing runs again.
+    // Terminal verdict of a listing that produced no set. An unknown
+    // untracked set offers no file as a user wallpaper, and is marked fresh so
+    // the empty list reads as the answer it is rather than as a listing still
+    // in flight. A later directory change or a fresh open asks the repository
+    // again; a failed run never arms the debounce on its own.
     function _failGitList() {
-        root._gitAttempts = root._gitAttempts + 1
-        if (root._gitAttempts < root._gitAttemptLimit) {
-            root._queueGitRefresh(root.themeDir, root._gitAttempts)
-            return
-        }
-        root._gitDegraded = true
-        if (root._gitRerun !== null) {
-            RequestGate.invalidate(root._gitRerun.handle)
-            root._gitRerun = null
-        }
-        gitRerun.stop()
         root._gitUntracked = {}
         root._gitFresh = true
         root._applyGitFilter()
     }
 
-    // Recovery for a pass that exhausted its attempts: the picker re-arms it
-    // when it is opened, so a git that was missing or failing at load time
-    // gets another bounded budget without a theme swap. Only an open does
-    // this, which is what keeps the re-arm out of the directory-change path.
+    // A fresh visit asks the listing again even when the previous answer was
+    // a failure: that verdict belonged to the listing that produced it. A run
+    // already in flight is left alone, so an open cannot start a second child
+    // or queue a refresh for the directory the model is already scanning.
     function _rearmGitList() {
-        if (!root._hasGit || root._gitDegraded === false) return
-        root._gitDegraded = false
-        root._gitAttempts = 0
+        if (root._gitRunning) return
         root._runGitLs()
     }
 
@@ -711,9 +672,14 @@ Singleton {
     function _onBgCountChanged() {
         // Nothing to list until a theme names a directory.
         if (root._bgUrl === "") return
+        // A re-aim blanks the folder to force a fresh scan. That assignment
+        // raises countChanged while `folder` is empty: it is the re-aim's own
+        // edit, not a listing verdict. The folder the fresh scan carries is
+        // the generation the rows below are judged against.
+        if (String(bgModel.folder) === "") return
         // A model still aimed elsewhere has not answered for this theme yet.
         if (String(bgModel.folder) !== root._bgUrl) {
-            root._reaimBgModel(true)
+            root._reaimBgModel()
             return
         }
         if (bgModel.status !== FolderListModel.Ready) return
@@ -733,7 +699,7 @@ Singleton {
             // against the next Ready.
             const row = String(bgModel.get(i, "filePath"))
             if (row.lastIndexOf(root.backgroundsDir + "/", 0) !== 0) {
-                root._reaimBgModel(true)
+                root._reaimBgModel()
                 return
             }
             arr.push(String(name))
@@ -747,14 +713,6 @@ Singleton {
         root._applyGitFilter()
     }
 
-    // How many times one directory assignment may react to a scan that
-    // described some other directory. A re-aim forces a fresh scan, and a
-    // model that keeps answering with a directory this theme does not name
-    // must not be able to spin forever. The budget is per assignment, not per
-    // session, so a theme swap starts over rather than inheriting a spent one.
-    readonly property int _bgReaimLimit: 3
-    property int _bgReaims: 0
-
     // Point the model at this theme's backgrounds and start a scan that
     // belongs to it. Blanking the folder first is what makes the assignment
     // take effect at all: re-aiming at a URL the model already holds is a
@@ -762,24 +720,15 @@ Singleton {
     //
     // Whatever the model was showing is dropped on the way, because a re-aim
     // is a statement that the previous answer described a different
-    // directory.
-    //
-    // `capped` is true only for the automatic reaction to a bad scan, which
-    // can arrive on its own and is therefore bounded. When a bounded re-aim
-    // finds the budget spent the listing simply stays empty: an empty answer
-    // claims no wallpaper the theme does not have, which is the only claim
-    // this module is willing to make while the scan is untrustworthy. A
-    // summon passes false and is never capped, because the directory it is
-    // waiting for is created by the very action the user is about to take -
-    // spending the budget there would leave the picker deaf to the first
-    // wallpaper set after a few previews.
-    function _reaimBgModel(capped) {
+    // directory. The folder and filePath predicates in _onBgCountChanged are
+    // the generation of that answer: a row from another directory is retired
+    // by a fresh re-aim, and an empty list claims no wallpaper the theme does
+    // not have while the scan is untrustworthy. A summon re-aims the same way,
+    // because the directory it waits for is created by the action the user is
+    // about to take.
+    function _reaimBgModel() {
         root._rawFiles = []
         root._applyGitFilter()
-        if (capped === true) {
-            if (root._bgReaims >= root._bgReaimLimit) return
-            root._bgReaims = root._bgReaims + 1
-        }
         bgModel.folder = ""
         bgModel.folder = root._bgUrl
     }
@@ -874,24 +823,24 @@ Singleton {
         // scan on every summon is how a user holding the menu key down keeps
         // a directory from ever finishing its listing.
         if (root._bgUrl !== "" && bgModel.status === FolderListModel.Null) {
-            root._reaimBgModel(false)
+            root._reaimBgModel()
         }
         // A shipped listing that never answered is retried here, the one
         // place a fresh question belongs.
         if (!root._builtinListed && !root._builtinRunning && root.builtinDir !== "") {
             root._runBuiltinList(root.currentTheme, root.builtinDir)
         }
-        // A listing that spent its attempt budget is re-armed here, before the
-        // scan below, so a summon is the one place a degraded git gets
-        // another bounded budget.
-        root._rearmGitList()
         root._onBgCountChanged()
+        // A summon re-asks the git listing when the scan above did not start
+        // one: a failed run was the verdict for that listing, not a permanent
+        // answer from the repository.
+        root._rearmGitList()
         // The empty notification is only trusted once the data is known
         // current: FolderListModel may still be loading, and on git themes
         // the untracked set may still be in flight - both would wrongly
         // report "no wallpapers" for a list about to fill. A live listing
-        // counts as in flight here too, because a degraded set is re-armed
-        // directly above. An outstanding probe counts as in flight as well,
+        // counts as in flight here too, because a summon re-arms it directly
+        // above. An outstanding probe counts as in flight as well,
         // including one queued behind a retiring child, which is not running
         // yet. Git results re-filter async, so the panel updates in place when
         // they land.
@@ -1000,18 +949,25 @@ Singleton {
 
     function requestDelete(fileName) {
         if (!fileName) return false
-        if (root.optimistic.isPending(fileName)) return false
-        if (root._rowFor(fileName) === null) return false
-        root.optimistic.mark(fileName)
-        Idle.run(() => root.commitDelete(fileName), 2)
+        const name = String(fileName)
+        if (root.optimistic.isPending(name)) return false
+        if (root._rowFor(name) === null) return false
+        // One generation for the whole deletion: the deferred commit and the
+        // rm job carry the same handle, so a request retired before it lands
+        // cannot remove a file a later intent now owns.
+        const handle = root._beginWork("delete:" + name)
+        if (handle.id === 0) return false
+        root.optimistic.mark(name)
+        Idle.run(() => root.commitDelete(name, handle), 2)
         return true
     }
 
-    function commitDelete(fileName) {
+    function commitDelete(fileName, handle) {
+        if (!RequestGate.current(handle)) return
         if (!root.optimistic.isPending(fileName)) return
         // File vanished between stages - abort safely.
         if (root._rowFor(fileName) === null) { root.finishDelete(fileName); return }
-        root.deleteFile(fileName)
+        root.deleteFile(fileName, handle)
     }
 
     function finishDelete(fileName) {
@@ -1032,6 +988,9 @@ Singleton {
     // theme prune - so one refusal covers a wallpaper the picker promised to
     // remove and did not.
     function _abortDelete(fileName, code) {
+        // Retire the deferred commit as well as the optimistic row: a request
+        // that never reached the rm job must not commit on a later turn.
+        RequestGate.invalidateScope(root._gateScope, "delete:" + String(fileName))
         root.optimistic.cancel(fileName)
         // The panel armed the reflow before the request - the slide, the
         // settle slot and the repair index. A removal that never landed has
@@ -1044,7 +1003,7 @@ Singleton {
         root._refuse(code)
     }
 
-    function deleteFile(fileName) {
+    function deleteFile(fileName, handle) {
         if (!fileName) return
         const theme = String(root.currentTheme)
         const name = String(fileName)
@@ -1070,14 +1029,11 @@ Singleton {
             return
         }
         root._refusal = ""
-        // One generation per file, so two deletions in flight never retire
-        // each other, and the theme it belongs to, so a swap cannot make an
-        // old removal edit the new theme's list.
-        const handle = root._beginWork("delete:" + name)
-        if (handle.id === 0) {
-            root._abortDelete(name, "gate_refused")
-            return
-        }
+        // The handle comes from requestDelete and rides through the deferred
+        // commit, so the rm job answers the intent the panel armed. One
+        // generation per file keeps two deletions from retiring each other,
+        // and the theme travels with it so a swap cannot make an old removal
+        // edit the new theme's list.
         const record = Object.freeze({ handle: handle, theme: theme, file: name, shipped: row.shipped === true })
         // Step 1: rm both mirrors. Leaf removal only - no recursive flag, no
         // shell, and both authorized paths travel as arguments after `--`. The

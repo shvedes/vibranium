@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// Suite: theme picker scan retirement and focus ownership (WAL-3, WAL-4).
+// Suite: theme picker scan retirement, focus ownership and variant arrival
+// (WAL-3, WAL-4, WAL-8).
 //
 //   shell/features/pickers/theme/ThemePicker.qml        _doScan / _finishScan
-//   shell/features/pickers/theme/ThemePickerPanel.qml   themeSearch focus
+//   shell/features/pickers/theme/ThemePickerPanel.qml   focus + variant deck
 //
 // Limitation: both files are QML components driven by FileView,
 // FolderListModel and the compositor's keyboard grant, none of which exist in
@@ -11,7 +12,9 @@
 // retire decision for a queued scan, not the file reads themselves. The focus
 // finding is a source check: a keyboard grant cannot be synthesized offscreen,
 // so it asserts that no second writer of focusCtrl.mode survives in the panel
-// and that the primitive's own healing edge is still present.
+// and that the primitive's own healing edge is still present. The variant
+// binding is lifted and evaluated against a stub stage, so its live-geometry
+// verdict is pinned without needing the panel's LayerSurface.
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -109,5 +112,55 @@ group('the primitive heals a lost field focus on its own', () => {
 })
 skip('a field focus request that never grants cannot declare filter mode',
   'needs a compositor keyboard grant; the source-level single-writer check stands in')
+
+// ======================================================================
+section('WAL-8 - the variant row arrives on the parent geometry')
+// The binding is read from the shipped panel, not restated here. It spans two
+// lines, so take everything up to the next blank line and fold the whitespace.
+const VARIANT_EXPR = (() => {
+  const at = PANEL.indexOf('readonly property bool _variantOpen:')
+  if (at < 0) return ''
+  const rest = PANEL.slice(at)
+  const colon = rest.indexOf(':')
+  const end = rest.indexOf('\n\n')
+  return rest.slice(colon + 1, end < 0 ? undefined : end).replace(/\s+/g, ' ').trim()
+})()
+
+group('the arrival is a derivation, not a scheduled edge', () => {
+  contains('it is a readonly binding', PANEL, 'readonly property bool _variantOpen:')
+  eq('the binding has a body', VARIANT_EXPR !== '', true)
+  notMatch('no stagger timer remains in the panel', PANEL, /variantTimer/)
+  // Scope the write check to the two mutators: a whole-file dump on a red
+  // assertion would swamp the rest of the suite's output.
+  const start = PANEL.indexOf('function collapseVariants()')
+  const end = PANEL.indexOf('function _seatOnActive()')
+  const mutators = PANEL.slice(start, end)
+  notMatch('nothing writes the arrival imperatively', mutators, /_variantOpen\s*=/)
+  if (VARIANT_EXPR !== '') {
+    contains('it gates on expanded and settled', VARIANT_EXPR, 'panel._expanded && panel._settled')
+    contains('and reads the live stage height against its target', VARIANT_EXPR,
+      'stage.height >= panel.stageH - 0.5')
+  }
+})
+
+group('the derivation samples geometry on every turn', () => {
+  if (VARIANT_EXPR === '') {
+    skip('the binding is absent, so no verdict can be sampled',
+      'the source assertions above are red')
+    return
+  }
+  // eslint-disable-next-line no-new-func
+  const fn = new Function('panel', 'stage', `return (${VARIANT_EXPR})`)
+  const arrive = (expanded, settled, height, target) => fn(
+    { _expanded: expanded, _settled: settled, stageH: target }, { height })
+  eq('a collapsed parent keeps the child behind it', arrive(false, true, 500, 500), false)
+  eq('an unsettled surface keeps it behind too', arrive(true, false, 500, 500), false)
+  eq('a stage still growing is not the arrival edge', arrive(true, true, 400, 500), false)
+  eq('a fraction short of the target is not the edge', arrive(true, true, 499.4, 500), false)
+  eq('the settled stage is the edge', arrive(true, true, 500, 500), true)
+  eq('a target that grows under the panel retires the verdict', arrive(true, true, 500, 520), false)
+})
+skip('the real stage height Glide under an open family',
+  'needs the panel LayerSurface; offscreen checks the derived verdict against a stub stage')
 
 finish()

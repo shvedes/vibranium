@@ -4329,4 +4329,172 @@ group('the adapter-shape helpers stay byte-identical', () => {
   contains('_normalize de-dupes and sorts', NORMALIZE_BODY, 'out.sort()')
 })
 
+// ======================================================================
+section('WallpaperPicker - one listing verdict, live re-aim, delete epochs')
+// ======================================================================
+// WAL-9/10/11 are QML decisions, not pure JS. The real bodies are lifted by
+// brace matching and driven with stubs, so a retry budget, a counter-driven
+// re-aim or an unguarded deferred delete turns this suite red without needing
+// FolderListModel, ProcessRegistry or the compositor offscreen.
+const WP_QML = fs.readFileSync(
+  path.join(SHELL_DIR, 'features', 'wallpaperPicker', 'WallpaperPicker.qml'), 'utf8')
+function wpBody(name) {
+  const at = WP_QML.indexOf(`function ${name}(`)
+  if (at < 0) return ''
+  let depth = 0
+  const open = WP_QML.indexOf('{', at)
+  for (let i = open; i < WP_QML.length; i++) {
+    if (WP_QML[i] === '{') depth++
+    if (WP_QML[i] === '}') {
+      depth--
+      if (depth === 0) return WP_QML.slice(open + 1, i)
+    }
+  }
+  return ''
+}
+const FAIL_BODY = wpBody('_failGitList')
+const REARM_BODY = wpBody('_rearmGitList')
+const QUEUE_BODY = wpBody('_queueGitRefresh')
+const ONBG_BODY = wpBody('_onBgCountChanged')
+const REQ_BODY = wpBody('requestDelete')
+const COMMIT_BODY = wpBody('commitDelete')
+const DEL_BODY = wpBody('deleteFile')
+const ABORT_BODY = wpBody('_abortDelete')
+const count = (s, needle) => (s.match(needle) || []).length
+
+group('WAL-9 - a git listing has one terminal verdict and one debounce', () => {
+  for (const token of ['_gitAttempts', '_gitAttemptLimit', '_gitDegraded',
+    '_gitDelay', '_gitRerunMaxMs']) {
+    eq(`${token} is gone`, count(WP_QML, new RegExp(token, 'g')), 0)
+  }
+  contains('a failed listing publishes the empty set', FAIL_BODY, 'root._gitUntracked = {}')
+  contains('and marks it as the answer', FAIL_BODY, 'root._gitFresh = true')
+  eq('and queues no retry', count(FAIL_BODY, /_queueGitRefresh/g), 0)
+  eq('and stops no retry timer', count(FAIL_BODY, /gitRerun\.stop/g), 0)
+  contains('one fixed directory-change debounce remains', QUEUE_BODY,
+    'gitRerun.interval = root._gitRerunMs')
+  eq('the debounce has no backoff ladder', count(QUEUE_BODY, /Math\.pow/g), 0)
+  eq('open still re-arms the listing', count(WP_QML, /root\._rearmGitList\(\)/g), 1)
+  eq('the re-arm carries no degraded latch', count(REARM_BODY, /_gitDegraded/g), 0)
+  contains('and asks the listing again', REARM_BODY, 'root._runGitLs()')
+})
+
+// Drive the real _onBgCountChanged body against a stub model. Every verdict
+// is sampled from the live folder/filePath pair the body reads.
+function runOnBg(o) {
+  const calls = []
+  const root = {
+    _bgUrl: o.bgUrl,
+    backgroundsDir: o.backgroundsDir || '/theme/backgrounds',
+    _imgOk: (name) => o.bad !== name,
+    _rawFiles: ['stale'],
+    _reaimBgModel: () => calls.push('reaim'),
+    _runGitLs: () => calls.push('git'),
+    _applyGitFilter: () => calls.push('filter'),
+  }
+  const rows = o.rows || []
+  const bgModel = {
+    folder: o.folder,
+    status: o.status === undefined ? 2 : o.status,
+    count: rows.length,
+    get: (i, role) => (role === 'fileName' ? rows[i].name : rows[i].path),
+  }
+  // eslint-disable-next-line no-new-func
+  const fn = new Function('root', 'bgModel', 'FolderListModel', ONBG_BODY)
+  fn(root, bgModel, { Ready: 2 })
+  return { calls, root }
+}
+
+group('WAL-10 - the re-aim follows the live folder/filePath pair', () => {
+  eq('_bgReaimLimit is gone', count(WP_QML, /_bgReaimLimit/g), 0)
+  eq('_bgReaims is gone', count(WP_QML, /_bgReaims/g), 0)
+  eq('no call site passes a capped flag', count(WP_QML, /_reaimBgModel\((?:true|false)\)/g), 0)
+  contains('the folder predicate is still an edge', ONBG_BODY,
+    'String(bgModel.folder) !== root._bgUrl')
+  contains('the foreign-row predicate is still an edge', ONBG_BODY,
+    'row.lastIndexOf(root.backgroundsDir + "/", 0) !== 0')
+  contains('the blank phase of a re-aim is not a listing verdict', ONBG_BODY,
+    'String(bgModel.folder) === ""')
+  const url = 'file:///theme/backgrounds'
+  const own = [{ name: 'a.jpg', path: '/theme/backgrounds/a.jpg' }]
+  eq('a blanked folder retires its own count callback',
+    runOnBg({ folder: '', bgUrl: url, rows: own }).calls, [])
+  eq('a folder aimed elsewhere re-aims',
+    runOnBg({ folder: 'file:///other', bgUrl: url, rows: own }).calls, ['reaim'])
+  eq('a scan still loading is not a verdict',
+    runOnBg({ folder: url, bgUrl: url, status: 1, rows: own }).calls, [])
+  eq('a foreign filePath re-aims', runOnBg({
+    folder: url, bgUrl: url, rows: [{ name: 'a.jpg', path: '/other/a.jpg' }],
+  }).calls, ['reaim'])
+  const good = runOnBg({ folder: url, bgUrl: url, rows: own })
+  eq('own rows are adopted', good.calls, ['git', 'filter'])
+  eq('and published as basenames', good.root._rawFiles, ['a.jpg'])
+  const mixed = runOnBg({
+    folder: url, bgUrl: url, bad: 'x.txt',
+    rows: [own[0], { name: 'x.txt', path: '/theme/backgrounds/x.txt' }],
+  })
+  eq('a non-image row never becomes a row', mixed.root._rawFiles, ['a.jpg'])
+})
+
+// Drive the real requestDelete/commitDelete pair with a stub gate. A callback
+// whose handle was retired must not reach the rm job.
+function runDelete(o) {
+  const calls = []
+  const handle = { id: 7, scope: 'sc', key: 'delete:' + o.name }
+  let deferred = null
+  const state = { pending: false }
+  const gate = { current: () => o.current !== false }
+  const root = {
+    optimistic: {
+      isPending: () => state.pending || o.pending === true,
+      mark: (name) => { calls.push('mark:' + name); state.pending = true },
+    },
+    _rowFor: (name) => (o.vanished === true && state.pending ? null : { value: name }),
+    _beginWork: (key) => {
+      calls.push('begin:' + key)
+      return o.refused ? { id: 0 } : handle
+    },
+    deleteFile: (name, h) => calls.push('delete:' + name + ':' + h.id),
+    finishDelete: (name) => calls.push('finish:' + name),
+  }
+  const Idle = {
+    run: (fn, turns) => { calls.push('idle:' + turns); deferred = fn },
+  }
+  // eslint-disable-next-line no-new-func
+  const requestFn = new Function('root', 'Idle', 'fileName', REQ_BODY)
+  // eslint-disable-next-line no-new-func
+  const commitFn = new Function('root', 'RequestGate', 'fileName', 'handle', COMMIT_BODY)
+  root.commitDelete = (name, h) => commitFn(root, gate, name, h)
+  const ret = requestFn(root, Idle, o.name)
+  if (deferred !== null) deferred()
+  return { calls, ret }
+}
+
+group('WAL-11 - the deferred delete carries a RequestGate handle', () => {
+  contains('the request mints the handle', REQ_BODY, 'root._beginWork("delete:" + name)')
+  contains('the deferred callback captures it', REQ_BODY, 'root.commitDelete(name, handle)')
+  notContains('the callback is not keyed by name alone', REQ_BODY,
+    '() => root.commitDelete(fileName)')
+  contains('the deferred commit checks the gate', COMMIT_BODY, 'RequestGate.current(handle)')
+  eq('deleteFile mints no second generation', count(DEL_BODY, /_beginWork/g), 0)
+  contains('the rm job carries the request handle', DEL_BODY, 'handle: handle')
+  contains('an abort retires the generation', ABORT_BODY, 'RequestGate.invalidateScope')
+
+  const live = runDelete({ name: 'a.jpg', current: true })
+  eq('a live request reaches the rm job with its handle', live.calls,
+    ['begin:delete:a.jpg', 'mark:a.jpg', 'idle:2', 'delete:a.jpg:7'])
+  eq('and reports acceptance', live.ret, true)
+  eq('a retired request does not commit', runDelete({
+    name: 'a.jpg', current: false,
+  }).calls, ['begin:delete:a.jpg', 'mark:a.jpg', 'idle:2'])
+  eq('a vanished row is finished', runDelete({
+    name: 'a.jpg', vanished: true,
+  }).calls, ['begin:delete:a.jpg', 'mark:a.jpg', 'idle:2', 'finish:a.jpg'])
+  eq('a refused gate is not marked', runDelete({
+    name: 'a.jpg', refused: true,
+  }).calls, ['begin:delete:a.jpg'])
+})
+skip('the armed slide and rm job under a live picker',
+  'needs FolderListModel and ProcessRegistry; the handle decisions are pinned above')
+
 finish()
