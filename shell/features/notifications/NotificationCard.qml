@@ -324,6 +324,14 @@ Rectangle {
     NumberAnimation { duration: Notifications.motionMs; easing.type: Notifications.motionEasing }
   }
 
+  // The exit drop is this edge, not a fraction of the tween's duration: the
+  // card knows its own live opacity and the controller only needs to hear when
+  // a departing card is visually gone. With motion off the opacity binding is
+  // already 0, so the card leaves at once instead of waiting on a clock.
+  onOpacityChanged: {
+    if (root.departing && root.opacity <= 0.02) Notifications.noteExitDone(root.entry)
+  }
+
   // Hover is a HoverHandler on the card itself (see border.color), and the two
   // gestures stay a MouseArea beneath the content so the action buttons and the
   // reply field still take their own clicks.
