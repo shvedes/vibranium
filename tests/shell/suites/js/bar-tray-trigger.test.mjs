@@ -31,8 +31,12 @@ const tray = fs.readFileSync(TRAY, 'utf8')
 // Both expressions are one line each so they can be lifted verbatim.
 const DERIVATION_RE = /readonly\s+property\s+bool\s+trayTriggerHovered\s*:\s*([^\n]+)/
 const HOVER_WRITE_RE = /\bw\.logoutHovered\s*=\s*([^\n]+)/
+const ARM_BODY_RE = /function _armRecentDrag\(\)\s*\{([\s\S]*?)\}/
+const ARM_CLEAR_RE = /\bwin\.logoutHovered\s*=\s*([^\n]+)/
 const derivation = (barView.match(DERIVATION_RE) || [])[1] || ''
 const hoverWrite = (logout.match(HOVER_WRITE_RE) || [])[1] || ''
+const armBody = (barView.match(ARM_BODY_RE) || [])[1] || ''
+const armClear = (armBody.match(ARM_CLEAR_RE) || [])[1] || ''
 
 function evalExpr(expr, names) {
   if (!expr) return undefined
@@ -60,6 +64,16 @@ function step(s) {
   return s
 }
 
+// The drag-arm edge: freeze the trigger and, when the source does so,
+// invalidate a hover latched before the drag started. Both enterSlotDrag
+// and leaveSlotDrag route through _armRecentDrag.
+function arm(s) {
+  s.recentDragActive = true
+  s.slotDragActive = true
+  if (armClear) s.logoutHovered = evalExpr(armClear, { win: s })
+  return s
+}
+
 suite('bar/tray-trigger', 'BAR-4: hover and drag derive one tray trigger')
 
 section('the writer side')
@@ -84,6 +98,14 @@ group('the drag grace is preserved', () => {
   contains('the grace timer stays', barView, 'dragGraceTimer')
   contains('the grace length stays', barView, 'dragGraceMs')
   contains('the freeze flag stays', barView, 'recentDragActive')
+})
+group('arming a drag invalidates a hover latched before it', () => {
+  match('the arm edge clears the stale hover', barView, ARM_CLEAR_RE)
+  const leave = barView.slice(
+    barView.indexOf('function leaveSlotDrag'),
+    barView.indexOf('function _armRecentDrag'),
+  )
+  notMatch('leaveSlotDrag never restores the hover', leave, /logoutHovered\s*=\s*true/)
 })
 group('the Tray reader contract is untouched', () => {
   match('dragMode still reads recentDragActive', tray, /dragMode:\s*root\.windowFlag\("recentDragActive"\)/)
@@ -141,6 +163,36 @@ group('the drag term wins over a latched source', () => {
   s.recentDragActive = false
   step(s)
   eq('once the freeze lifts the live source opens it', s.trayTriggerHovered, true)
+})
+group('a hover latched before the drag cannot survive the grace', () => {
+  const s = fresh()
+  s.hovered = true
+  s.hoverEdge = true
+  step(s)
+  eq('a hover at rest latches', s.logoutHovered, true)
+  eq('and opens the trigger', s.trayTriggerHovered, true)
+
+  arm(s)
+  step(s)
+  eq('arming the drag discards the stale hover', s.logoutHovered, false)
+  eq('the derivation closes the trigger', s.trayTriggerHovered, false)
+
+  s.slotDragActive = false
+  step(s)
+  eq('drag end inside the grace stays closed', s.trayTriggerHovered, false)
+
+  s.recentDragActive = false
+  step(s)
+  eq('grace expiry does not reopen on the stale hover', s.trayTriggerHovered, false)
+  eq('the stale hover is still discarded', s.logoutHovered, false)
+
+  s.hovered = false
+  s.hoverEdge = true
+  step(s)
+  s.hovered = true
+  s.hoverEdge = true
+  step(s)
+  eq('a fresh leave/enter re-arms the trigger', s.trayTriggerHovered, true)
 })
 
 finish()

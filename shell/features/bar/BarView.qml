@@ -81,8 +81,9 @@ LayerSurface {
     ? (rightZone.width <= 0 || rightZone.height <= 0
       ? 0 : Math.ceil(rightZone.height)) : 0
 
-  // The logout trigger publishes its raw hover here. Logout.qml is the only
-  // writer. Lives on the window so each monitor's bar keeps its own state.
+  // The logout trigger publishes its raw hover here. Logout.qml produces the
+  // hover value; arming a drag invalidates it. Lives on the window so each
+  // monitor's bar keeps its own state.
   property bool logoutHovered: false
 
   // Count of zones on this window with a slot-reorder drag running. While a
@@ -120,6 +121,10 @@ LayerSurface {
   }
   function _armRecentDrag() {
     win.recentDragActive = true
+    // A hover latched before the drag would survive the grace and pop the tray
+    // open when the freeze lifts, with no fresh hover to justify it. Discard it
+    // at the arm edge; only a new hover after the freeze may publish it again.
+    win.logoutHovered = false
     dragGraceTimer.restart()
   }
 
