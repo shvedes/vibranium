@@ -384,42 +384,81 @@ Singleton {
         return true
     }
 
+    // The symlink write is a three-leg chain (test -L -> mv -> ln). Its paths
+    // belong to the pick that started the chain, not to a later pick: two
+    // global pending slots would let the older chain back up the newer target
+    // or point the newer source at it. One chain runs at a time and a newer
+    // pick collapses into a single follow-up started when the chain finishes.
+    property int _presetGen: 0
+    property var _presetQueued: null
+
+    function _drainPresetQueue() {
+        if (root._presetQueued === null) return
+        const next = root._presetQueued
+        root._presetQueued = null
+        root._writeAnimPreset(next)
+    }
+
     // Backup check for anim preset - pure QML, no bash
     FileView { id: animProbe; printErrors: false }
     Process {
         id: animTestLProc
+        property int presetGen: 0
+        property string presetSrc: ""
+        property string presetTarget: ""
         stdout: StdioCollector {}
         stderr: StdioCollector {}
         onExited: (code, status) => {
+            if (animTestLProc.presetGen !== root._presetGen) return
+            const src = animTestLProc.presetSrc
+            const target = animTestLProc.presetTarget
             if (code === 0) {
-                lnProc.command = ["ln", "-sf", root._animPendingSrc, root._animPendingTarget]
+                lnProc.presetGen = animTestLProc.presetGen
+                lnProc.presetSrc = src
+                lnProc.presetTarget = target
+                lnProc.command = ["ln", "-sf", src, target]
                 lnProc.running = true
                 root._reloadHyprland()
             } else {
                 animProbe.path = ""
-                animProbe.path = root._animPendingTarget + ".bak"
+                animProbe.path = target + ".bak"
                 const bakExists = animProbe.waitForJob()
-                let bakPath = root._animPendingTarget + ".bak"
-                if (bakExists) bakPath = root._animPendingTarget + ".bak." + Math.floor(Date.now()/1000)
-                animMvProc.command = ["mv", root._animPendingTarget, bakPath]
+                let bakPath = target + ".bak"
+                if (bakExists) bakPath = target + ".bak." + Math.floor(Date.now()/1000)
+                animMvProc.presetGen = animTestLProc.presetGen
+                animMvProc.presetSrc = src
+                animMvProc.presetTarget = target
+                animMvProc.command = ["mv", target, bakPath]
                 animMvProc.running = true
             }
         }
     }
     Process {
         id: animMvProc
+        property int presetGen: 0
+        property string presetSrc: ""
+        property string presetTarget: ""
         stdout: StdioCollector {}
         stderr: StdioCollector {}
         onExited: (code, status) => {
-            lnProc.command = ["ln", "-sf", root._animPendingSrc, root._animPendingTarget]
+            if (animMvProc.presetGen !== root._presetGen) return
+            const src = animMvProc.presetSrc
+            const target = animMvProc.presetTarget
+            lnProc.presetGen = animMvProc.presetGen
+            lnProc.presetSrc = src
+            lnProc.presetTarget = target
+            lnProc.command = ["ln", "-sf", src, target]
             lnProc.running = true
             root._reloadHyprland()
         }
     }
-    property string _animPendingSrc: ""
-    property string _animPendingTarget: ""
 
     function _writeAnimPreset(preset) {
+        if (animTestLProc.running || animMvProc.running || lnProc.running) {
+            root._presetQueued = String(preset)
+            return true
+        }
+        const gen = ++root._presetGen
         const vibraniumHome = Paths.vibraniumHome !== "" ? Paths.vibraniumHome : root._expandFile("$VIBRANIUM")
         const configHome = Paths.configHome
         const targetFile = root._expandFile("$XDG_CONFIG_HOME/hypr/hyprland.conf.d/animations.lua")
@@ -434,15 +473,20 @@ Singleton {
         animProbe.path = targetFile
         const exists = animProbe.waitForJob()
         if (exists) {
-            // Check if it's a symlink via test -L
-            root._animPendingSrc = src
-            root._animPendingTarget = targetFile
+            // Check if it's a symlink via test -L. The paths travel with the
+            // process so the exit handlers cannot borrow a newer pick's.
+            animTestLProc.presetGen = gen
+            animTestLProc.presetSrc = src
+            animTestLProc.presetTarget = targetFile
             animTestLProc.command = ["test", "-L", targetFile]
             animTestLProc.running = true
             // Next steps handled in animTestLProc.onExited
             return true
         }
         // No existing file - just symlink directly (no backup needed)
+        lnProc.presetGen = gen
+        lnProc.presetSrc = src
+        lnProc.presetTarget = targetFile
         lnProc.command = ["ln", "-sf", src, targetFile]
         lnProc.running = true
         root._reloadHyprland()
@@ -527,9 +571,28 @@ Singleton {
     }
 
     // --- live fetch via hyprctl ---
+    //
+    // Config reloads, file watches, reload completion and IPC can all ask for
+    // a fetch at once. One process runs at a time: a request that arrives
+    // while it is in flight arms a single follow-up, started on exit from the
+    // then-current catalog. The batch fields travel with the process, so an
+    // exit merges under the keys and ctls it was launched with.
+    property int _fetchGen: 0
+    property bool _fetchQueued: false
+
+    function _drainFetchQueue() {
+        if (!root._fetchQueued) return
+        root._fetchQueued = false
+        root._fetchLive()
+    }
 
     function _fetchLive() {
         if (!root._byKey) return
+        if (fetchProc.running) {
+            root._fetchQueued = true
+            return
+        }
+        const gen = ++root._fetchGen
         const keys = []
         const ctls = []
         const typeByCtl = {}
@@ -556,18 +619,13 @@ Singleton {
         // Build batch query: semicolon separated getoption
         let query = ""
         for (let i = 0; i < ctls.length; i++) query += (query ? ";" : "") + "getoption " + ctls[i]
-        root._fetchKeys = keys
-        root._fetchCtls = ctls
-        root._fetchTypeByCtl = typeByCtl
-        root._fetchBuf = ""
+        fetchProc.batchGen = gen
+        fetchProc.batchKeys = keys
+        fetchProc.batchCtls = ctls
+        fetchProc.batchTypeByCtl = typeByCtl
         fetchProc.command = ["hyprctl", "-j", "--batch", query]
         fetchProc.running = true
     }
-
-    property var _fetchKeys: []
-    property var _fetchCtls: []
-    property var _fetchTypeByCtl: ({})
-    property string _fetchBuf: ""
 
     // --- pages for the menu tree ---
 
@@ -624,116 +682,118 @@ Singleton {
         printErrors: false
     }
 
+    // Merge one batch's answer. The keys, ctls and type map are the ones
+    // captured when this process was launched, so a later request cannot
+    // change the meaning of an answer already in flight.
+    function _mergeFetch(code, status, raw) {
+        if (code !== 0 || status !== 0 || String(raw).trim() === "") {
+            // hyprctl is the LIVE source, so its absence is not an error to
+            // hide: the values below come off disk and are correct until the
+            // compositor says otherwise.
+            root._fallbackToFiles()
+            root._markReady()
+            root.rev++
+            return
+        }
+        raw = String(raw)
+        // Patch nan
+        raw = raw.replace(/nan/g, "0")
+        let arr = null
+        try {
+            const trimmed = raw.trim()
+            if (trimmed.startsWith("[")) {
+                arr = JSON.parse(trimmed)
+            } else {
+                // Concatenated objects: "}{" -> "},{"
+                const wrapped = "[" + trimmed.replace(/\}\s*\{/g, "},{") + "]"
+                arr = JSON.parse(wrapped)
+            }
+        } catch(e) {
+            // Exit 0 with output that is not the array we asked for: a
+            // hyprctl version change and a truncated pipe both look like a
+            // working command until you look, so fall back to disk.
+            root._fallbackToFiles()
+            root._markReady()
+            root.rev++
+            return
+        }
+        if (!Array.isArray(arr)) arr = [arr]
+        const next = Object.assign({}, root.values)
+        const keys = fetchProc.batchKeys
+        const ctls = fetchProc.batchCtls
+        const typeMap = fetchProc.batchTypeByCtl
+        const fileCache = {}
+        for (let i = 0; i < keys.length && i < arr.length; i++) {
+            const key = keys[i]
+            // Still owed its reload: this answer describes the config the
+            // write replaced, not the one it wrote.
+            if (root._writtenKeys[key] === true) continue
+            const ctl = ctls[i]
+            const opt = root._byKey[key]
+            const obj = arr[i]
+            if (!obj || typeof obj !== "object") continue
+            let v = undefined
+            const t = typeMap[ctl]
+            if (t === "bool") v = obj.bool
+            else if (t === "int") {
+                // gaps_in/out have css string not int - fallback to file
+                if (obj.int !== undefined && typeof obj.int === "number") v = obj.int
+                else if (typeof obj.css === "string") {
+                    const first = obj.css.split(" ")[0]
+                    const n = Number(first)
+                    if (!isNaN(n)) v = Math.round(n)
+                }
+            } else if (t === "float") {
+                if (obj.float !== undefined && typeof obj.float === "number") v = obj.float
+                else if (typeof obj.css === "string") {
+                    const first = obj.css.split(" ")[0]
+                    const n = Number(first)
+                    if (!isNaN(n)) v = n
+                }
+            } else if (t === "string") {
+                if (obj.str !== undefined) v = obj.str
+            }
+            if (v === undefined) {
+                // fallback to file - use Paths-aware expansion to avoid literal $XDG_... folder
+                const meta = opt.hypr
+                const file = root._expandFile(meta.file)
+                const content = root._readFileContent(file, fileCache)
+                const res = HE.hyprGetContent(content, meta.path, { occurrence: 1 })
+                if (res.ok) v = res.value
+            }
+            if (v !== undefined) {
+                const check = SL.validateValue(opt, v)
+                if (check.ok) next[key] = check.value
+            }
+        }
+        // Re-probe special kinds (smartGaps already, anim preset via earlier process)
+        // smartGaps value from file probe already in next; keep
+        // For anim preset, if process already set, keep; else default remains
+        root.values = next
+        // A key that fell back to disk is a compositor option hyprctl did not
+        // answer - usually `gaps_in`, which hyprctl reports as a CSS string
+        // - and it stays correct until something moves.
+        root._markReady()
+        root.rev++
+    }
+
     Process {
         id: fetchProc
+        property int batchGen: 0
+        property var batchKeys: []
+        property var batchCtls: []
+        property var batchTypeByCtl: ({})
         stdout: StdioCollector { id: fetchOut }
         stderr: StdioCollector { id: fetchErr }
         onExited: function(code, status) {
             let raw = ""
             try { raw = fetchOut.text } catch(e) {}
-            // A batch that asked for nothing is not a merge - it is an exit
-            // belonging to a run that a later `_fetchLive` already superseded,
-            // because `_fetchKeys` is instance state cleared by whichever run
-            // finished first. Reporting it as a merge would be a true-looking
-            // answer about nothing, and it would also let the fallback path
-            // below run a second time and rewrite values from disk over a live
-            // result. `_fetchLive` never spawns the process with an empty key
-            // list (that case returns before the spawn), so empty here can only
-            // mean superseded.
-            if (root._fetchKeys.length === 0) {
-                return
-            }
-            if (code !== 0 || status !== 0 || String(raw).trim() === "") {
-                // hyprctl is the LIVE source, so its absence is not an error to
-                // hide: the values below come off disk and are correct until the
-                // compositor says otherwise.
-                root._fallbackToFiles()
-                root._markReady()
-                root.rev++
-                return
-            }
-            raw = String(raw)
-            // Patch nan
-            raw = raw.replace(/nan/g, "0")
-            let arr = null
-            try {
-                const trimmed = raw.trim()
-                if (trimmed.startsWith("[")) {
-                    arr = JSON.parse(trimmed)
-                } else {
-                    // Concatenated objects: "}{" -> "},{"
-                    const wrapped = "[" + trimmed.replace(/\}\s*\{/g, "},{") + "]"
-                    arr = JSON.parse(wrapped)
-                }
-            } catch(e) {
-                // Exit 0 with output that is not the array we asked for: a
-                // hyprctl version change and a truncated pipe both look like a
-                // working command until you look, so fall back to disk.
-                root._fallbackToFiles()
-                root._markReady()
-                root.rev++
-                return
-            }
-            if (!Array.isArray(arr)) arr = [arr]
-            const next = Object.assign({}, root.values)
-            const keys = root._fetchKeys
-            const ctls = root._fetchCtls
-            const typeMap = root._fetchTypeByCtl
-            const fileCache = {}
-            for (let i = 0; i < keys.length && i < arr.length; i++) {
-                const key = keys[i]
-                // Still owed its reload: this answer describes the config the
-                // write replaced, not the one it wrote.
-                if (root._writtenKeys[key] === true) continue
-                const ctl = ctls[i]
-                const opt = root._byKey[key]
-                const obj = arr[i]
-                if (!obj || typeof obj !== "object") continue
-                let v = undefined
-                const t = typeMap[ctl]
-                if (t === "bool") v = obj.bool
-                else if (t === "int") {
-                    // gaps_in/out have css string not int - fallback to file
-                    if (obj.int !== undefined && typeof obj.int === "number") v = obj.int
-                    else if (typeof obj.css === "string") {
-                        const first = obj.css.split(" ")[0]
-                        const n = Number(first)
-                        if (!isNaN(n)) v = Math.round(n)
-                    }
-                } else if (t === "float") {
-                    if (obj.float !== undefined && typeof obj.float === "number") v = obj.float
-                    else if (typeof obj.css === "string") {
-                        const first = obj.css.split(" ")[0]
-                        const n = Number(first)
-                        if (!isNaN(n)) v = n
-                    }
-                } else if (t === "string") {
-                    if (obj.str !== undefined) v = obj.str
-                }
-                if (v === undefined) {
-                    // fallback to file - use Paths-aware expansion to avoid literal $XDG_... folder
-                    const meta = opt.hypr
-                    const file = root._expandFile(meta.file)
-                    const content = root._readFileContent(file, fileCache)
-                    const res = HE.hyprGetContent(content, meta.path, { occurrence: 1 })
-                    if (res.ok) v = res.value
-                }
-                if (v !== undefined) {
-                    const check = SL.validateValue(opt, v)
-                    if (check.ok) next[key] = check.value
-                }
-            }
-            // Re-probe special kinds (smartGaps already, anim preset via earlier process)
-            // smartGaps value from file probe already in next; keep
-            // For anim preset, if process already set, keep; else default remains
-            root.values = next
-            root._fetchKeys = []
-            root._fetchCtls = []
-            // A key that fell back to disk is a compositor option hyprctl did not
-            // answer - usually `gaps_in`, which hyprctl reports as a CSS string
-            // - and it stays correct until something moves.
-            root._markReady()
-            root.rev++
+            // An exit from a retired batch is a true-looking answer about a
+            // request nobody is waiting for. Refuse it, then start the newest
+            // queued batch from a clean set of fields.
+            if (fetchProc.batchGen === root._fetchGen)
+                root._mergeFetch(code, status, raw)
+            root._drainFetchQueue()
         }
     }
 
@@ -812,8 +872,15 @@ Singleton {
 
     Process {
         id: lnProc
+        property int presetGen: 0
+        property string presetSrc: ""
+        property string presetTarget: ""
         stdout: StdioCollector {}
         stderr: StdioCollector {}
+        onExited: (code, status) => {
+            if (lnProc.presetGen !== root._presetGen) return
+            root._drainPresetQueue()
+        }
     }
 
     // Watch hypr lua files directly (was Watch governor): external edits
