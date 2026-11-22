@@ -140,11 +140,6 @@ Singleton {
     readonly property string _listKey: "gitList"
     readonly property string _refreshKey: "gitRefresh"
     readonly property string _builtinKey: "builtinList"
-    // Immutable record of the running listing: the handle it must answer to
-    // plus the theme and directory its command was built from. The job's
-    // callback carries this record, so a reused slot or a replacement run can
-    // never report against whatever the picker currently holds.
-    property var _gitRun: null
     // Immutable record of the child the reused probe Process is running right
     // now, same shape. The record is bound to that child and is never replaced
     // while a child is in flight, so the exit it reports can only ever answer
@@ -557,7 +552,6 @@ Singleton {
         const handle = root._beginWork(root._listKey)
         if (handle.id === 0) return
         const run = Object.freeze({ handle: handle, theme: theme, dir: dir.path })
-        root._gitRun = run
         root._gitRunning = true
         // The theme name reaches git as a -C argument and the pathspec follows
         // `--`, so it stays data: the policy above named the only directory
@@ -621,7 +615,6 @@ Singleton {
     function _onGitLsDone(run, result) {
         if (root._closing) return
         root._gitRunning = false
-        root._gitRun = null
         if (run === null) return
         if (!RequestGate.current(run.handle) || run.theme !== root.currentTheme || run.dir !== root.themeDir) {
             root._absorbGitRefresh(run.dir)
