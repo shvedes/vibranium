@@ -21,6 +21,11 @@ Row {
   property real fontPx: Ui.fontXs
   property real laneGap: Ui.s / 2
   property real rowHeight: 18
+  property real trackHeight: 6
+  // A caller that stacks this under a seek row can inset the glyph and the
+  // readout so this lane starts and ends on the same x as the seek lane.
+  property real leadInset: 0
+  property real trailInset: 0
   property bool animationsEnabled: true
 
   signal activated()
@@ -78,27 +83,37 @@ Row {
     return changed
   }
 
-  IconButton {
-    name: Audio.volumeIconFor(root.volume, false)
-    colorKey: "foreground_1"
-    accentKey: root.volume <= 0.01 ? "red" : ""
-    dimTiers: Audio.volumeDimTiersFor(root.volume, false)
-    // The SVG has internal padding, so a glyph sized at the slot paints
-    // visibly smaller than the bar's row. Scale it up from the row height
-    // instead; the shipped volume tiers then read at the bar's height.
-    iconSize: Math.round(root.rowHeight * 1.3)
-    slotSize: root.slotSize
-    flat: true
-    cornerRadius: RoundingPolicy.radius
-    animationsEnabled: root.animationsEnabled
-    actionable: root.capable
-    onClicked: root.toggleMute()
+  Item {
+    width: root.leadInset
+    height: 1
+  }
 
-    WheelHandler {
-      acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-      onWheel: event => {
-        if (!root.adjust(event.angleDelta.y)) return
-        event.accepted = true
+  Item {
+    // Row lays children out from the top; give the glyph its own row-height
+    // slot so a small icon stays centred on the bar.
+    width: root.slotSize
+    height: root.rowHeight
+
+    IconButton {
+      anchors.centerIn: parent
+      name: Audio.volumeIconFor(root.volume, false)
+      colorKey: "foreground_1"
+      accentKey: root.volume <= 0.01 ? "red" : ""
+      dimTiers: Audio.volumeDimTiersFor(root.volume, false)
+      iconSize: root.slotSize
+      slotSize: root.slotSize
+      flat: true
+      cornerRadius: RoundingPolicy.radius
+      animationsEnabled: root.animationsEnabled
+      actionable: root.capable
+      onClicked: root.toggleMute()
+
+      WheelHandler {
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        onWheel: event => {
+          if (!root.adjust(event.angleDelta.y)) return
+          event.accepted = true
+        }
       }
     }
   }
@@ -106,7 +121,8 @@ Row {
   Item {
     id: volLane
 
-    width: Math.max(0, root.width - root.slotSize - root.percentW - 2 * root.laneGap)
+    width: Math.max(0, root.width - root.leadInset - root.trailInset
+      - root.slotSize - root.percentW - 4 * root.laneGap)
     height: root.height
     anchors.verticalCenter: parent.verticalCenter
 
@@ -115,7 +131,7 @@ Row {
 
     Rectangle {
       width: parent.width
-      height: 6
+      height: root.trackHeight
       anchors.verticalCenter: parent.verticalCenter
       color: Ui.tint("foreground_1", 0.25)
 
@@ -136,8 +152,8 @@ Row {
 
     MouseArea {
       anchors.fill: parent
-      anchors.topMargin: -6
-      anchors.bottomMargin: -6
+      anchors.topMargin: -Math.max(6, root.trackHeight)
+      anchors.bottomMargin: -Math.max(6, root.trackHeight)
       hoverEnabled: true
       cursorShape: root.capable ? Qt.PointingHandCursor : Qt.ForbiddenCursor
       acceptedButtons: Qt.LeftButton
@@ -166,6 +182,11 @@ Row {
         event.accepted = true
       }
     }
+  }
+
+  Item {
+    width: root.trailInset
+    height: 1
   }
 
   Text {

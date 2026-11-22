@@ -987,15 +987,26 @@ QtObject {
     // The shared player-volume row: the one gate, write path and gesture
     // contract the island uses, at this surface's presentation scale.
     Core.PlayerVolumeRow {
+      id: volumeRow
+
       x: content.pad + Math.round((content.coverW - width) / 2)
       y: content.stackY + content.coverBoxH + content.stackGap
         + content.metaH + content.stackGap + content.progressH + content.volGap
       width: Math.round(content.coverBoxW * 0.7)
       player: root.player
-      slotSize: content.volumeH
+      // The glyph and the track follow the volume row's own scale: a small
+      // speaker with a bar as thick as the seek lane's 8px track.
+      slotSize: Math.max(16, Math.round(content.volumeH * 0.6))
       fontPx: content.timePx
       laneGap: Ui.s / 2
       rowHeight: content.volumeH
+      trackHeight: 8
+      // The seek lane is inset by the elapsed time column on both sides;
+      // mirror that here so both bars share the same left and right edges.
+      leadInset: Math.max(0, progressBlock.timeW + Ui.s
+        - volumeRow.slotSize - 2 * volumeRow.laneGap)
+      trailInset: Math.max(0, progressBlock.timeW + Ui.s
+        - volumeRow.percentW - 2 * volumeRow.laneGap)
       animationsEnabled: root.animOn
       onActivated: content.forceActiveFocus()
     }
