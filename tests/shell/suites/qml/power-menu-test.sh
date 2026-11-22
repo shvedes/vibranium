@@ -83,4 +83,19 @@ t_eq "and does not emit edited from the bridge" "true" \
 t_eq "the panel keeps no imperative field copy" "0" "$(qp_get panel.fieldWrites)"
 t_eq "the panel binds value to the query" "true" "$(qp_get panel.valueBinding)"
 
+t_section "OVL-13: the row latch and the stale focus callback"
+latch_decl="$(grep -n -B6 'property bool _rowsPending' <<<"$PANEL_SRC")"
+if grep -q 'onResultsChanged' <<<"$latch_decl"; then
+  t_ok "the row latch is labelled with its re-entrant source"
+else
+  t_no "the row latch is labelled with its re-entrant source" \
+    "no onResultsChanged comment precedes _rowsPending"
+fi
+if grep -q 'g !== panel._swapGen' <<<"$PANEL_SRC"; then
+  t_ok "the focus deferral retires a superseded swap"
+else
+  t_no "the focus deferral retires a superseded swap" \
+    "the deferred reassert does not check the captured swap generation"
+fi
+
 t_summary

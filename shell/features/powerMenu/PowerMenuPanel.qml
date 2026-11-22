@@ -89,6 +89,11 @@ PanelCard {
 
   readonly property bool primarySurface: visible
   property int _swapGen: 0
+  // Coalescing latch for the re-entrant onResultsChanged loop: the handler
+  // calls syncRows(), which reads PowerMenu.results in a callLater; a
+  // follow-up publish can land before that turn drains and fire the handler
+  // again. One pending swap absorbs both publishes instead of queuing two
+  // swaps for the same result set.
   property bool _rowsPending: false
   // The record array the model shows. syncRows is its only writer and the
   // ScriptModel below reads it through `values`, so this is the model's whole
@@ -218,7 +223,13 @@ PanelCard {
         // takes the seat the head-row default would otherwise take.
         if (!panel.landPendingActivate()) list.settle(0, true)
       })
-      Qt.callLater(() => panel.reassertFocus())
+      // The focus claim rides the same generation as the swap it follows: a
+      // newer publish that superseded g owns the focus now, so this older
+      // callLater retires instead of stealing it back.
+      Qt.callLater(() => {
+        if (g !== panel._swapGen) return
+        panel.reassertFocus()
+      })
     })
   }
   function reassertFocus() { focusCtrl.reassert() }
