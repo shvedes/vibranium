@@ -68,14 +68,18 @@ Item {
   // milliseconds. A child the runtime never confirms fails after
   // _spawnWatchdogMs rather than waiting for the exit that a missing
   // executable never produces; _timeoutMs caps a child that did start and
-  // never finished; _maxAttempts with a doubling backoff caps the sequence.
-  // A missing vb-network-qr or vb-network-password therefore settles in
-  // about a second instead of leaving the card in its loading state.
+  // never finished; spawnFallbackMaxAttempts with a doubling backoff caps the
+  // sequence. A missing vb-network-qr or vb-network-password therefore
+  // settles in about a second instead of leaving the card loading.
+  //
+  // Process retry budget, not a UI readiness guess. A bounded spawn fallback
+  // for a ProcessRegistry job: it only answers "did the runtime start this
+  // child". Do not copy it into UI code to guess at readiness.
   readonly property int _spawnWatchdogMs: 1500
   readonly property int _timeoutMs: 5000
-  readonly property int _maxAttempts: 2
-  readonly property int _backoffMs: 250
-  readonly property int _maxBackoffMs: 1000
+  readonly property int spawnFallbackMaxAttempts: 2
+  readonly property int spawnFallbackBackoffMs: 250
+  readonly property int spawnFallbackMaxBackoffMs: 1000
 
   // A helper the shell cannot start at all is a different failure from one
   // that started and returned no code, so it says so rather than implying
@@ -231,9 +235,9 @@ Item {
     try {
       job = ProcessRegistry.start(argv, owner, {
         timeoutMs: root._timeoutMs,
-        maxAttempts: root._maxAttempts,
-        backoffMs: root._backoffMs,
-        maxBackoffMs: root._maxBackoffMs,
+        maxAttempts: root.spawnFallbackMaxAttempts,
+        backoffMs: root.spawnFallbackBackoffMs,
+        maxBackoffMs: root.spawnFallbackMaxBackoffMs,
         spawnWatchdogMs: root._spawnWatchdogMs,
         onFinished: settle,
         onFailed: () => settle(null)

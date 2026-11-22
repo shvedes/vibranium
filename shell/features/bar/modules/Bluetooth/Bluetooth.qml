@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell.Bluetooth
 import qs.common
 import qs.features.bar
+import "../../BackendGrace.js" as BackendGrace
 import "Model.js" as Model
 
 // Bluetooth module: shows the adapter state with the shipped bluetooth
@@ -35,7 +36,7 @@ BarModule {
   // deadline keeps a machine with no adapter at all faulting eventually.
   property bool _adapterSeen: false
   property bool _adapterGraceDone: false
-  readonly property int adapterGraceMs: 2000
+  readonly property int adapterGraceMs: BackendGrace.DEADLINE_MS
   property Timer adapterGrace: Timer {
     interval: root.adapterGraceMs
     repeat: false
@@ -48,8 +49,7 @@ BarModule {
     }
   }
   readonly property bool _adapterPending: root.adapter === null
-    && !root._adapterSeen
-    && !root._adapterGraceDone
+    && BackendGrace.pending(root._adapterSeen, root._adapterGraceDone)
 
   readonly property var connectedDevice: {
     for (const d of root.devices) if (d.connected) return d

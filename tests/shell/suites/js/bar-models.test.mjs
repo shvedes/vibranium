@@ -43,6 +43,7 @@ const VO = loadLib(path.join(BAR, 'modules', 'Volume', 'Model.js'))
 const WSM = loadLib(path.join(BAR, 'modules', 'Workspaces', 'Model.js'))
 const PP = loadLib(path.join(BAR, 'modules', 'ColorPicker', 'PreviewPlacement.js'))
 const CN = loadLib(path.join(SHELL, 'common', 'NowPlaying.js'))
+const BG = loadLib(path.join(BAR, 'BackendGrace.js'))
 
 // --- a fresh library instance per group ---------------------------------
 //
@@ -2890,6 +2891,40 @@ group('teardown keeps the one node-set observation', () => {
   contains('destruction still releases it', VISLAND, 'AudioNodes.release(root._nodeSet)')
   contains('the peak holds are still taken', VISLAND, 'root._reacquirePeaks()')
   contains('and released', VISLAND, 'root._releasePeaks()')
+})
+
+// ======================================================================
+section('BackendGrace - one backend-readiness deadline')
+group('the library owns the single value and the single decision', () => {
+  is('BackendGrace loads', BG, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
+  eq('publishes exactly the deadline and the decision', Object.keys(BG).sort(), ['DEADLINE_MS', 'pending'])
+  eq('the deadline is 2000 ms', BG.DEADLINE_MS, 2000)
+})
+group('pending retires on the edge or on the deadline, whichever comes first', () => {
+  eq('no edge, not expired is pending', BG.pending(false, false), true)
+  eq('a live edge retires it early', BG.pending(true, false), false)
+  eq('the deadline retires it without an edge', BG.pending(false, true), false)
+  eq('both is not pending', BG.pending(true, true), false)
+})
+group('both bar modules read the one helper, not a copied value', () => {
+  for (const [label, file] of [['Bluetooth', 'modules/Bluetooth/Bluetooth.qml'], ['Network', 'modules/Network/Network.qml']]) {
+    const src = fs.readFileSync(path.join(BAR, file), 'utf8')
+    contains(`${label} imports the shared helper`, src, 'BackendGrace.js')
+    contains(`${label} reads the shared deadline`, src, 'BackendGrace.DEADLINE_MS')
+    contains(`${label} uses the shared decision`, src, 'BackendGrace.pending(')
+    notContains(`${label} has no private 2000 ms copy`, src, ': 2000')
+  }
+})
+group('the QR overlay names its process retry budget as a spawn fallback', () => {
+  const src = fs.readFileSync(path.join(BAR, 'modules/Network/NetworkQrOverlay.qml'), 'utf8')
+  contains('max attempts is renamed', src, 'spawnFallbackMaxAttempts')
+  contains('backoff is renamed', src, 'spawnFallbackBackoffMs')
+  contains('max backoff is renamed', src, 'spawnFallbackMaxBackoffMs')
+  notContains('no _maxAttempts copy remains', src, '_maxAttempts')
+  notContains('no _backoffMs copy remains', src, '_backoffMs')
+  notContains('no _maxBackoffMs copy remains', src, '_maxBackoffMs')
+  contains('the comment says it is a bounded spawn fallback', src, 'bounded spawn fallback')
+  contains('the comment warns against UI readiness use', src, 'not a UI readiness guess')
 })
 
 // One thing neither copy does, recorded so the gap is visible in the total

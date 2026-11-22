@@ -6,6 +6,7 @@ import Quickshell.Networking
 import qs.common
 import qs.services as Core
 import qs.features.bar
+import "../../BackendGrace.js" as BackendGrace
 import "Model.js" as Model
 import "../../../../common/capture/ShotLib.js" as ShotLib
 
@@ -48,14 +49,17 @@ BarModule {
   // bounded grace is the only signal that survives that assembly; after it a
   // still-absent link is a genuine fault and paints red.
   property bool _devicesGraceDone: false
-  readonly property int devicesGraceMs: 2000
+  readonly property int devicesGraceMs: BackendGrace.DEADLINE_MS
   Timer {
     id: devicesGrace
     interval: root.devicesGraceMs
     repeat: false
     onTriggered: root._devicesGraceDone = true
   }
-  readonly property bool _devicesPending: !root._devicesGraceDone
+  // No live edge survives NetworkManager's graph assembly (see above), so
+  // the shared helper gets a constant false edge and only the deadline retires
+  // the grace. The dim/red derivation below is unchanged.
+  readonly property bool _devicesPending: BackendGrace.pending(false, root._devicesGraceDone)
 
   readonly property string ssid: root.connectedWifi ? root.connectedWifi.name : ""
   // Link changes are user-meaningful events: wifi roam, cable plug,
