@@ -57,6 +57,11 @@ Singleton {
   // the three-day "Ignore" window.
   property double _sentAt: 0
 
+  // Bumped only where a fetch cycle begins. Each child exit carries the
+  // generation it belongs to; a merge from an older cycle is refused so a
+  // queued follow-up can never publish its predecessor's answer.
+  property int _fetchGeneration: 0
+
   // Per-source results collected while both processes run; merged in
   // _finishRefresh once both have exited.
   property bool _officialDone: false
@@ -90,12 +95,6 @@ Singleton {
     }
     root.state = "loading"
     root.errorText = ""
-    root._officialDone = false
-    root._aurDone = false
-    root._officialPkgs = []
-    root._aurPkgs = []
-    root._officialErr = ""
-    root._aurErr = ""
     root._startFetches()
   }
 
@@ -104,6 +103,18 @@ Singleton {
     // begins - never in `refresh` above, which also runs for an ask that is
     // only queued.
     root._why = root._whyNext
+    // The six merge slots belong to a cycle, not to an ask: a queued follow-up
+    // starts inside _finishRefresh, where refresh never runs, so clearing them
+    // here is what keeps the previous cycle's done flags and packages out of
+    // the new cycle's first publish. Bump the generation at the same boundary
+    // so an answer threaded from an older cycle is refused on arrival.
+    root._fetchGeneration++
+    root._officialDone = false
+    root._aurDone = false
+    root._officialPkgs = []
+    root._aurPkgs = []
+    root._officialErr = ""
+    root._aurErr = ""
     refreshProc.running = true
     aurProc.running = true
   }
@@ -231,7 +242,8 @@ Singleton {
   // Merge once both fetches have exited and decide the final state.
   // Official failure is fatal (the check is unreliable); AUR failure is
   // tolerated and surfaces as a note on the ready list.
-  function _finishRefresh() {
+  function _finishRefresh(gen) {
+    if (gen !== root._fetchGeneration) return
     if (!root._officialDone || !root._aurDone) return
     // One line per completed query, and it is the RESULT rather than the
     // start: "a check began" says nothing that `state` does not already say,
@@ -314,6 +326,7 @@ Singleton {
     stdout: StdioCollector { id: refreshOut }
     stderr: StdioCollector { id: refreshErr }
     onExited: (code, status) => {
+      const gen = root._fetchGeneration
       const outText = String(refreshOut.text || "")
       const errText = String(refreshErr.text || "")
       const trimmed = outText.trim()
@@ -332,7 +345,7 @@ Singleton {
         + (code === 124 ? " (timeout fired)" : "")
         + ", " + root._officialPkgs.length + " parsed")
       root._officialDone = true
-      root._finishRefresh()
+      root._finishRefresh(gen)
     }
   }
 
@@ -347,6 +360,7 @@ Singleton {
     stdout: StdioCollector { id: aurOut }
     stderr: StdioCollector { id: aurErr }
     onExited: (code, status) => {
+      const gen = root._fetchGeneration
       const outText = String(aurOut.text || "")
       const errText = String(aurErr.text || "")
       const trimmed = outText.trim()
@@ -359,7 +373,7 @@ Singleton {
         + (code === 124 ? " (timeout fired)" : "")
         + ", " + root._aurPkgs.length + " parsed")
       root._aurDone = true
-      root._finishRefresh()
+      root._finishRefresh(gen)
     }
   }
 
