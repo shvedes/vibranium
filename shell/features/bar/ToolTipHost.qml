@@ -57,6 +57,12 @@ LayerSurface {
   // Activation serial; highest rev wins.
   property int _rev: 0
 
+  // One deferred placement per turn. The winner captured when a pass is
+  // scheduled retires it if a new winner is elected before it runs, so a late
+  // callback cannot park the new snapshot with the old anchor's settle
+  // assumptions. Same coalescer shape as IslandHost.requestPark().
+  property bool _placeQueued: false
+
   // Bumped on every row add/remove so the measures below re-run. They
   // intentionally do NOT read the column's implicit size: a positioner
   // does not refresh implicitWidth/Height for children a Repeater adds
@@ -503,12 +509,29 @@ LayerSurface {
     }
   }
 
+  // Coalesce the geometry-triggered placements to one per event-loop turn and
+  // close over the winner that scheduled them. A pass queued for a retiring
+  // _req is inert once a new winner is elected; the new winner's own settle
+  // hooks schedule its placement. Synchronous callers pass no captured winner
+  // and keep reading live state.
+  function requestPlace() {
+    if (root._placeQueued) return
+    root._placeQueued = true
+    const winner = root._winner
+    Qt.callLater(() => {
+      if (winner !== root._winner) return
+      root._placeQueued = false
+      root.place(winner)
+    })
+  }
+
   // Park the bubble next to the served module on every appearance, whenever
   // the surface maps/configures, and whenever the bubble's live size changes
   // (a text/lines feed updating while shown). The first pass runs
   // pre-configure, so the same settle hooks as the island re-run it at real
   // coordinates.
-  function place() {
+  function place(capturedWinner) {
+    if (capturedWinner !== undefined && capturedWinner !== root._winner) return
     if (!root._req || !root._req.anchor || !root._req.barWindow) return
     // The settle is the SCREEN's, not the surface's. A mapping surface is still
     // at its 100x100 placeholder, and clamping against root.width put the
@@ -544,13 +567,17 @@ LayerSurface {
       showTimer.restart()
     }
   }
+  // A new election starts a fresh placement cycle: retire the coalescer so the
+  // new winner's settle hooks can schedule their own deferred pass. The stale
+  // callback rechecks the winner and leaves this cycle's latch alone.
+  on_WinnerChanged: root._placeQueued = false
   on_ReqChanged: if (root.visible) {
     // The text binds _req and updates in this turn. A winner swap while the
     // bubble is shown must move it now too: deferring place left the new text
     // painted at the outgoing module's x/y for a frame. Keep the deferred pass
     // for the configure that follows a new anchor.
     root.place()
-    Qt.callLater(root.place)
+    root.requestPlace()
   }
   onVisibleChanged: {
     // Place on the spot as well as after the configure: the first present is
@@ -558,13 +585,13 @@ LayerSurface {
     // it at 0,0 for that frame.
     if (root.visible) {
       root.place()
-      Qt.callLater(root.place)
+      root.requestPlace()
     }
     // The next bubble has to be placed on its own screen before it paints:
     // keeping the latch through the hide would show it at the old position.
     else root._placed = false
   }
-  onBackingWindowVisibleChanged: if (root.backingWindowVisible) Qt.callLater(root.place)
+  onBackingWindowVisibleChanged: if (root.backingWindowVisible) root.requestPlace()
   // `100` is the surface's placeholder size, not a threshold about the bubble:
   // an anchored PanelWindow carries no real geometry until the compositor
   // configures it, so a width at or below it means this is a pre-configure
@@ -572,5 +599,5 @@ LayerSurface {
   // the bar window, and neither answer is real at that size. The other settle
   // hooks re-run `place` once the surface has one. Same shape and same number
   // as the island host's re-park.
-  onWidthChanged: if (root.width > 100) Qt.callLater(root.place)
+  onWidthChanged: if (root.width > 100) root.requestPlace()
 }

@@ -39,6 +39,12 @@ LayerSurface {
   // until it has, the card stays transparent rather than drawn at 0,0.
   property bool _parked: false
 
+  // One deferred park per turn, retired on every logical menu change. The
+  // epoch captured at scheduling keeps a pass queued for a closed or replaced
+  // menu from parking the card with stale geometry (IslandHost coalescer).
+  property int _parkEpoch: 0
+  property bool _parkQueued: false
+
   // Submenu stack: each level is the DBusMenuItem whose children are
   // showing; empty means the root menu.
   property var stack: []
@@ -105,6 +111,7 @@ LayerSurface {
     // coordinates, and the deferred pass used to leave it at 0,0 for a frame.
     // The anchor's bar window and its screen are known while this surface is
     // still unmapped.
+    root._bumpParkEpoch()
     root._parked = false
     root.positionCard()
     if (root._claimToken === null) {
@@ -116,6 +123,7 @@ LayerSurface {
   function close() {
     if (!root.open) return
     root.open = false
+    root._bumpParkEpoch()
     root._parked = false
     if (root._claimToken !== null) {
       SurfaceClaim.release(root._claimToken)
@@ -127,15 +135,17 @@ LayerSurface {
 
   function pushSubmenu(entry) {
     root.stack = root.stack.concat([entry])
+    root._bumpParkEpoch()
     card.contentY = 0
     Qt.callLater(root.refreshCurrent)
-    Qt.callLater(root.positionCard)
+    root.requestPark()
   }
 
   function popSubmenu() {
     if (root.stack.length === 0) return
     root.stack = root.stack.slice(0, -1)
-    Qt.callLater(root.positionCard)
+    root._bumpParkEpoch()
+    root.requestPark()
   }
 
   // The card's rows: the current level's DBusMenu entries, plus a leading Back
@@ -183,13 +193,13 @@ LayerSurface {
     // entries exist, so the width they give the card re-parks it. Height has
     // its own handler below - a second one here is a duplicate handler and a
     // load-time error for the whole type.
-    onWidthChanged: if (root.open) Qt.callLater(root.positionCard)
+    onWidthChanged: if (root.open) root.requestPark()
 
     // Menu content can land after open (DBus aboutToShow, late layout
     // updates): for a bottom bar the card must grow UP from its bottom edge
     // (pinned just above the bar) rather than extend downward off-screen,
     // so re-park whenever the card's own height changes.
-    onHeightChanged: if (root.open) Qt.callLater(root.positionCard)
+    onHeightChanged: if (root.open) root.requestPark()
 
     Behavior on opacity {
       enabled: MotionPolicy.enabled
@@ -230,10 +240,33 @@ LayerSurface {
     }
   }
 
+  // Every logical menu change starts a fresh park cycle: close(), openFor()
+  // and both level changes retire the coalescer, so a stale callback cannot
+  // clear the new cycle's latch.
+  function _bumpParkEpoch() {
+    root._parkEpoch++
+    root._parkQueued = false
+  }
+
+  // Coalesce the geometry-triggered parks to one per event-loop turn and
+  // close over the epoch. A pass queued for a replaced menu is inert; the
+  // new level's own settle hooks schedule its park.
+  function requestPark() {
+    if (root._parkQueued) return
+    root._parkQueued = true
+    const epoch = root._parkEpoch
+    Qt.callLater(() => {
+      if (epoch !== root._parkEpoch) return
+      root._parkQueued = false
+      root.positionCard(epoch)
+    })
+  }
+
   // Park the card next to its anchor on every open and when the surface
   // maps/configures (the first pass runs pre-configure, so the same
   // settle hooks as the island re-run it at real coordinates).
-  function positionCard() {
+  function positionCard(epoch) {
+    if (epoch !== undefined && epoch !== root._parkEpoch) return
     if (!root.anchorItem || !root.anchorWindow) return
     const w = card.width
     const h = card.height
@@ -259,14 +292,14 @@ LayerSurface {
 
   onOpenChanged: {
     if (root.open) {
-      Qt.callLater(root.positionCard)
+      root.requestPark()
       Qt.callLater(() => keyScope.forceActiveFocus())
     }
   }
-  onAnchorItemChanged: if (root.open) Qt.callLater(root.positionCard)
-  onAnchorWindowChanged: if (root.open) Qt.callLater(root.positionCard)
-  onBarPositionChanged: if (root.open) Qt.callLater(root.positionCard)
-  onBackingWindowVisibleChanged: if (root.backingWindowVisible && root.open) Qt.callLater(root.positionCard)
-  onWidthChanged: if (root.width > 100 && root.open) Qt.callLater(root.positionCard)
-  onHeightChanged: if (root.height > 100 && root.open) Qt.callLater(root.positionCard)
+  onAnchorItemChanged: if (root.open) root.requestPark()
+  onAnchorWindowChanged: if (root.open) root.requestPark()
+  onBarPositionChanged: if (root.open) root.requestPark()
+  onBackingWindowVisibleChanged: if (root.backingWindowVisible && root.open) root.requestPark()
+  onWidthChanged: if (root.width > 100 && root.open) root.requestPark()
+  onHeightChanged: if (root.height > 100 && root.open) root.requestPark()
 }
