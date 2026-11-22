@@ -510,7 +510,13 @@ Singleton {
     // controller come back exactly as they were before the reload.
     if (root.visible) {
       root._replaying = true
-      root.open()
+      // Drive the flag false so open() takes the whole open path again. With
+      // visible already true it returns before demanding or claiming, and a
+      // claim is memory-only - the reload cannot restore one by itself.
+      root.visible = false
+      // A refused demand leaves no controller to show, so put the persisted
+      // visibility back rather than closing a panel the reload found open.
+      if (!root.open()) root.visible = true
       root._replaying = false
     }
   }
@@ -992,6 +998,12 @@ Singleton {
   // facade exists from the drain on so its IPC target answers; what sits
   // behind it waits for the motion to end.
   property bool _prewarmPending: false
+  // The boot entrance is an edge (see the Connections below), not a clock.
+  // The only remaining retry is for a UnitGate refusal: another unit's boot
+  // demand can hold the lease briefly. One capped attempt covers that hand-off;
+  // the edge cancels it and a successful demand stops it.
+  property int _prewarmRetries: 0
+  readonly property int _prewarmMaxRetries: 1
 
   function _prewarm() {
     if (root._prewarmed) return
@@ -1009,9 +1021,17 @@ Singleton {
     const ctrl = lease.demand()
     if (ctrl !== null) {
       root._prewarmed = true
+      prewarmRetry.stop()
       return
     }
-    if (root.controllerState !== "failed") prewarmRetry.restart()
+    if (root.controllerState === "failed") return
+    // A refusal means the gate has answered "not yet", not "keep asking".
+    // Bound the retry so a permanently held gate leaves the session cold
+    // once instead of polling every 500ms for its whole life.
+    if (root._prewarmRetries < root._prewarmMaxRetries) {
+      root._prewarmRetries++
+      prewarmRetry.restart()
+    }
   }
 
   // Drop the controller and the lease, then state the outcome. The flag is
@@ -1076,10 +1096,9 @@ Singleton {
     AppLauncherController {}
   }
 
-  // Retries the boot prewarm until the gate lets the controller build:
-  // a demand that lands while a dependency is still settling reports
-  // unavailable, and the next tick tries again instead of leaving the
-  // session's opens cold. Stops on the first success or a hard failure.
+  // The single bounded retry for a UnitGate refusal during prewarm. It is
+  // not the boot-entrance gate: that is the edge below, and no clock guesses
+  // it. Stops on success, on the edge, and when the one retry is spent.
   Timer {
     id: prewarmRetry
     interval: 500
@@ -1091,6 +1110,7 @@ Singleton {
   Connections {
     target: DesktopLayoutState
     function onBootEntrancePlayedChanged() {
+      prewarmRetry.stop()
       if (root._prewarmPending) root._prewarm()
     }
   }

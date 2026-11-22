@@ -49,6 +49,18 @@ Item {
   // half-built controller behind for the next one.
   property string startupError: ""
 
+  // One teardown guard for every deferred continuation this controller
+  // schedules. The holder is a plain JS object so a callback can still read
+  // it after the QML object is gone; Component.onDestruction flips it before
+  // any child unwinds. Scheduling captures the holder, never a property of
+  // `root`, so a callback armed just before an unload retires with it.
+  property var _life: ({ alive: true })
+
+  function _later(fn) {
+    const life = root._life
+    Qt.callLater(function() { if (life.alive) fn() })
+  }
+
   // --- indexes ---
 
   // Desktop entries snapshotted into plain records (rebuilt when
@@ -119,7 +131,7 @@ Item {
     // Defer the restart out of this exit handler: setting `running` on the
     // Process whose onExited is still unwinding is a reentrancy the other
     // scan queues avoid the same way.
-    if (root._tryExecQueued) Qt.callLater(() => root._scanTryExec())
+    if (root._tryExecQueued) root._later(() => root._scanTryExec())
   }
 
   // --- publishing the reads the facade serves ---
@@ -364,6 +376,10 @@ Item {
   }
 
   Component.onDestruction: {
+    // Retire every deferred continuation first: a callback armed in the last
+    // tick before this unload must not reach into a controller that is
+    // already being torn down.
+    root._life.alive = false
     // A launch bumps the usage counter and closes the launcher in the same
     // tick, so this teardown lands INSIDE the debounce window. Flush the
     // pending write here or the increment dies with the timer that would
@@ -561,7 +577,7 @@ Item {
     // plain records, stay cheaply resident so the delegates - and their
     // decoded icons - survive the close.
     AppLauncher._publishRows(root.results, root.matchedCount, root.totalCount)
-    if (root.autoSelect) Qt.callLater(root._maybeAutoSelect)
+    if (root.autoSelect) root._later(() => root._maybeAutoSelect())
   }
 
   // Every row the first enabled, non-broken engine plugin answering the query
@@ -1283,9 +1299,25 @@ Item {
 
   // The directory walk is the library's argv; this file owns the Process
   // that runs it and the one callback that turns its output into a
-  // registry.
+  // registry. The generation travels with the demand the way pathStatProc.seq
+  // does for the stat probe: a walk demanded while an older one is still
+  // running is queued, and the older exit is retired rather than allowed to
+  // register dirs that a newer scan will publish again.
+  property int scanSeq: 0
+  property bool _scanQueued: false
+
   function discoverPlugins() {
+    const g = ++root.scanSeq
     root.pluginsResolved = false
+    if (scanProc.running) {
+      root._scanQueued = true
+      return
+    }
+    root._scanQueued = false
+    scanProc.seq = g
+    // Clear at demand, not after registration: a superseded walk's lines may
+    // still be in the collector when this scan starts.
+    scanProc.dirs = []
     scanProc.command = LauncherLib.pluginScanArgv(root._builtinRoot, root._userRoot)
     scanProc.running = true
   }
@@ -1300,9 +1332,18 @@ Item {
       }
     }
 
+    property int seq: 0
     property var dirs: []
 
     onExited: {
+      // A newer demand bumped scanSeq while this walk ran: its lines are not
+      // this registry's. Requeue the newer scan off the exit handler (setting
+      // `running` here is a reentrancy) and leave the collector for that scan
+      // to clear at its own start.
+      if (scanProc.seq !== root.scanSeq) {
+        if (root._scanQueued) root._later(() => root.discoverPlugins())
+        return
+      }
       root._registerPlugins(scanProc.dirs)
       scanProc.dirs = []
     }
