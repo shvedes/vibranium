@@ -33,6 +33,9 @@ LayerSurface {
   property bool immediate: false
   property int grabFrameW: 0
   property int grabFrameH: 0
+  // The deferred first capture belongs to one show. A hide/re-show retires it
+  // even when `visible` is true again by the time the callback runs.
+  property int _showToken: 0
 
   // Live selection in window-logical coordinates (empty until dragged).
   property real selX: 0
@@ -160,20 +163,6 @@ LayerSurface {
     opacity: 0
     onHasContentChanged: {
       if (!hasContent) return
-      // The grab below already runs off this signal, so capTimer is only
-      // the backstop behind it - but its own act on a landed frame is to
-      // notice and stop, and left alone it notices at the end of the
-      // interval it is part-way through, up to 250ms later, while the
-      // view stays armed. Collapse the interval so it stops on the next
-      // tick. 1ms, not 0: a QML Timer given a runtime-assigned interval
-      // of 0 keeps reporting running and never fires again. `running` is
-      // the guard because the immediate path arms the timer inside
-      // Qt.callLater, and a frame landing before it is armed must not
-      // restart a timer that is not polling for it.
-      if (capTimer.running) {
-        capTimer.interval = 1
-        capTimer.restart()
-      }
       if (overlay.seeded) {
         grabWatchdog.stop()
         overlay._grabPending = false
@@ -190,36 +179,38 @@ LayerSurface {
       // them on a smaller one than the file they address - a selection
       // landed anchored top-left and short of what the pointer drew.
       const saved = ShotLib.grabResultSize(target.width, target.height, overlay.reportedDpr)
-      overlay.grabFrameW = saved.width
-      overlay.grabFrameH = saved.height
-        overlay._grabPending = true
-        grabWatchdog.restart()
-        const grabbed = view.grabToImage(r => {
-          if (attempt !== view.grabAttempt || overlay.seeded || !overlay.visible) return
-          grabWatchdog.stop()
-          overlay._grabPending = false
-          const url = r && r.url !== undefined ? String(r.url) : ""
-          if (url === "") {
-            overlay.failed("region preview capture failed")
-            return
-          }
-          overlay._grabResult = r
-          frameImg.source = url
-        }, Qt.size(target.width, target.height))
-        if (!grabbed) {
-          grabWatchdog.stop()
-          overlay._grabPending = false
+      overlay._grabPending = true
+      grabWatchdog.restart()
+      const grabbed = view.grabToImage(r => {
+        if (attempt !== view.grabAttempt || overlay.seeded || !overlay.visible) return
+        grabWatchdog.stop()
+        overlay._grabPending = false
+        const url = r && r.url !== undefined ? String(r.url) : ""
+        if (url === "") {
           overlay.failed("region preview capture failed")
+          return
         }
+        // The size belongs to this attempt. A new show or a re-grab bumps
+        // grabAttempt and clears both it and the result, so an accept that
+        // lands before the next frame maps with the new screen, not this one.
+        overlay.grabFrameW = saved.width
+        overlay.grabFrameH = saved.height
+        overlay._grabResult = r
+        frameImg.source = url
+      }, Qt.size(target.width, target.height))
+      if (!grabbed) {
+        grabWatchdog.stop()
+        overlay._grabPending = false
+        overlay.failed("region preview capture failed")
+      }
     }
 
-    // The compositor ended the stream, which is a reason no frame is coming
-    // rather than a reason to wait out the next 250ms interval. `visible` is
-    // the liveness gate, and it is what bounds this: capTimer keeps polling
-    // alongside, fails the overlay at the eighth attempt and onVisibleChanged
-    // closes it, so a stream that ends without content ends the capture
-    // rather than re-arming forever. The re-request spends no attempt of its
-    // own, so capTimer's count keeps its meaning for the failure message.
+    // The compositor ended the stream: this is the real edge that says no
+    // frame is coming, so it re-requests without spending a fallback tick.
+    // `visible` is the liveness gate and bounds the retry: capTimer is the
+    // one bounded fallback behind a cancelled stream, and onVisibleChanged
+    // closes the overlay. Its re-request spends no attempt of its own, so
+    // capTimer's count keeps its meaning for the failure message.
     onStopped: {
       if (overlay.visible && !view.hasContent) view.captureFrame()
     }
@@ -253,30 +244,34 @@ LayerSurface {
     }
   }
 
-    onVisibleChanged: {
-      view.grabAttempt++
-      grabWatchdog.stop()
-      overlay._grabPending = false
-      overlay.cursorX = overlay.visible && overlay.width > 0 ? overlay.width / 2 : -1
+  onVisibleChanged: {
+    view.grabAttempt++
+    grabWatchdog.stop()
+    overlay._grabPending = false
+    overlay.cursorX = overlay.visible && overlay.width > 0 ? overlay.width / 2 : -1
     overlay.cursorY = overlay.visible && overlay.height > 0 ? overlay.height / 2 : -1
     overlay.keyboardAnchor = null
     overlay.keyboardMode = false
     overlay.shiftDown = false
     overlay._grabResult = null
+    overlay.grabFrameW = 0
+    overlay.grabFrameH = 0
     frameImg.source = overlay.seeded ? overlay.seedUrl : ""
     overlay._clearSelection()
     if (visible && !overlay.seeded) {
       view.attempts = 0
+      const show = ++overlay._showToken
       if (overlay.immediate) {
         capTimer.stop()
+        // The layer surface has no mapped edge here, so one deferred request
+        // after configure is the only grace. Capture the show token: a hide
+        // and re-show leaves `visible` true when this callback runs.
         Qt.callLater(() => {
-          if (!overlay.visible || overlay.seeded) return
+          if (show !== overlay._showToken || !overlay.visible || overlay.seeded) return
           view.captureFrame()
-          capTimer.interval = 250
           capTimer.restart()
         })
       } else {
-        capTimer.interval = 120
         capTimer.restart()
       }
     } else {
@@ -284,10 +279,18 @@ LayerSurface {
     }
   }
 
+  // The one bounded capture fallback. The real re-request is view.onStopped;
+  // this exists only for the missing stopped edge on a screencopy the
+  // compositor cancels without a signal (output retarget, context destroy).
+  // It fails the overlay after a fixed budget instead of re-arming forever.
   Timer {
     id: capTimer
 
-    interval: 120
+    // 1ms, not 0: a QML Timer given a runtime-assigned interval of 0 keeps
+    // reporting running and never fires again. A landed frame collapses this
+    // to 1ms so the stop below runs on the next tick; without a frame the
+    // grace is long enough for the compositor to answer.
+    interval: view.hasContent ? 1 : overlay.immediate ? 250 : 120
     repeat: true
     running: false
     onTriggered: {
@@ -302,7 +305,6 @@ LayerSurface {
       }
       view.attempts++
       view.captureFrame()
-      capTimer.interval = 250
     }
   }
 
@@ -381,16 +383,11 @@ LayerSurface {
       view.grabAttempt++
       frameImg.source = ""
       overlay._grabResult = null
+      overlay.grabFrameW = 0
+      overlay.grabFrameH = 0
       view.destroyContextWithUpdate()
     }
     view.attempts = 0
-    // 1ms, not 0: a QML Timer given a runtime-assigned interval of 0 keeps
-    // reporting running and never fires again, and says nothing when it
-    // stops - so an immediate-mode re-grab would leave capTimer armed but
-    // mute, `attempts` frozen, and the ladder's give-up unreachable, with
-    // grabWatchdog the only thing left able to end this grab. 1ms is the
-    // finest a Timer carries and polls on the next tick.
-    capTimer.interval = overlay.immediate ? 1 : 120
     capTimer.restart()
   }
 
