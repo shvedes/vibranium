@@ -30,4 +30,17 @@ t_eq "a follow seat uses the fast-start curve" "$out" "$(qp_get curve.follow)"
 t_eq "a reveal seat uses the gentle curve" "$inout" "$(qp_get curve.reveal)"
 t_ne "the two curves really differ" "$out" "$inout"
 
+t_section "a newer snapped land retires the older deferred follow"
+
+qp_assert "both lands to the same row were scheduled in one turn" \
+  deferred.seatsScheduled true
+
+# traceDebug was armed only around the two deferred lands. seatTo emits one
+# NTRACE list.seatIn with tag follow per follow that survives its guards.
+# An older follow that re-seats against the stale viewH shows up as a second.
+follow_seats="$(qp_out | grep -c 'NTRACE list.seatIn .*"tag":"follow"')"
+t_eq "only the newer deferred follow seats the view" "1" "$follow_seats"
+t_eq "the surviving follow used the newer viewH" \
+  "$(qp_get deferred.newTarget)" "$(qp_get deferred.finalY)"
+
 t_summary

@@ -238,6 +238,11 @@ ListView {
     if (c === "land") {
       if (snap === true) {
         const probe = index
+        // A newer seat retires this deferred follow by epoch. Two lands to
+        // the same row in one turn move no index, so the probe guard alone
+        // cannot tell them apart: the older follow would re-seat against the
+        // viewH it captured before the newer intent arrived.
+        const epoch = root._seatEpoch
         Qt.callLater(function() {
           if (root.traceDebug) root._trace("list.deferredFollow", {
             idx: probe, cur: root.currentIndex,
@@ -247,6 +252,9 @@ ListView {
           // The cursor left the row this seat put it on: a gesture took
           // over, and the row it names is the one that matters.
           if (root.currentIndex !== probe) return
+          // A newer seat (same index, different viewH) won: its own
+          // deferred follow carries the geometry that must win.
+          if (epoch !== root._seatEpoch) return
           // A swap or a restore sweep owns the view in its own window: a
           // follow here would fight the hold that is keeping the view
           // where the model change left it.
