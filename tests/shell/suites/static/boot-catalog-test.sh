@@ -733,4 +733,122 @@ for unit in archUpdates printers; do
   t_eq "$unit is optional" "optional" "$(unit_field "$unit" CRIT)"
 done
 
+# --------------------------------------------------------------------------
+# SET-8: a half that never lands must still settle its ref-counted slot.
+#
+# A headless QML probe cannot force this: building Boot starts the shell (see
+# suites/qml/probes/unitgate.qml:9-10), and offscreen has no BootLate component
+# whose createObject can be made to return null. So lift the real function
+# bodies out of Boot.qml and run them against stubs. The failing createObject
+# is the only invented part; settle, replay, drain and verdict are the file's
+# own code. With bar and services already settled, the buggy tree leaves
+# _halvesPending at 1, parks the drain and reports "starting" forever.
+# --------------------------------------------------------------------------
+BOOT_LATE_SIM="$(
+  BOOT_QML="$BOOT_QML" node - <<'NODE'
+const fs = require("fs")
+const src = fs.readFileSync(process.env.BOOT_QML, "utf8")
+function emit(k, v) { console.log(k + "=" + String(v)) }
+
+// Brace-balanced body of one top-level function, skipping strings/comments.
+function body(name) {
+  const at = src.indexOf("  function " + name + "(")
+  if (at < 0) throw new Error("no function " + name)
+  const open = src.indexOf("{", at)
+  let depth = 0, quote = null
+  for (let i = open; i < src.length; i++) {
+    const c = src[i]
+    if (quote) {
+      if (c === "\\") { i++; continue }
+      if (c === quote) quote = null
+      continue
+    }
+    if (c === '"' || c === "'" || c === "`") { quote = c; continue }
+    if (c === "/" && src[i + 1] === "/") { while (i < src.length && src[i] !== "\n") i++; continue }
+    if (c === "/" && src[i + 1] === "*") {
+      const close = src.indexOf("*/", i + 2)
+      i = close < 0 ? src.length : close + 1
+      continue
+    }
+    if (c === "{") depth++
+    else if (c === "}") { depth--; if (depth === 0) return src.slice(open + 1, i) }
+  }
+  throw new Error("unterminated " + name)
+}
+
+const calls = []
+const Log = {
+  error: function() { calls.push("log") },
+  debug: function() {}, warn: function() {}, info: function() {}
+}
+const DesktopLayoutState = {
+  bootEntrancePlayed: true,
+  noteBootConstructionSettled: function() {},
+  noteBootEntrancePlayed: function() {}
+}
+const boot = {
+  // bar and services have settled; only the feature half is still outstanding
+  _halvesPending: 1, _constructHalvesPending: 0,
+  _lateFeatures: null, _lateBar: {}, _lateServices: {},
+  _drainStarted: false, _drainRequested: false,
+  _pendingLateResolves: [], _replayQueue: [],
+  _queue: [], _deferredQueue: [], _catalog: [],
+  _shellMilestone: "starting", frameBudgetMs: 8,
+  _startEarly: function() {},
+  _requestPump: function(fn) { fn() },
+  _drainNext: function() {}, _ensureAnnotations: function() {},
+  _sinceProcessStart: function() { return 0 }, start: "test"
+}
+const UnitGate = {
+  refresh: function() {},
+  shellState: function() {
+    return (boot._halvesPending > 0 || !boot._drainStarted) ? "starting" : "ready"
+  }
+}
+const AnnotationActions = { bind: function() {} }
+const annotationLoader = {}
+// The stubs every lifted body closes over, plus that body's own parameters.
+const stubs = ["boot", "Log", "DesktopLayoutState", "UnitGate", "AnnotationActions", "annotationLoader", "Qt", "Date"]
+const args = [boot, Log, DesktopLayoutState, UnitGate, AnnotationActions, annotationLoader, {}, Date]
+function params(name) {
+  const at = src.indexOf("  function " + name + "(")
+  const sig = src.slice(at, src.indexOf("{", at))
+  return sig.slice(sig.indexOf("(") + 1, sig.lastIndexOf(")"))
+    .split(",").map(function(s) { return s.trim() }).filter(function(s) { return s.length > 0 })
+}
+for (const name of ["_failHalf", "_halfSettled", "_replayNext", "_beginDrain", "_adoptLate", "_shellMilestoneNow"]) {
+  if (src.indexOf("function " + name + "(") < 0) continue
+  const raw = new Function(stubs.concat(params(name)), body(name))
+  boot[name] = function() {
+    return raw.apply(null, args.concat(Array.prototype.slice.call(arguments)))
+  }
+}
+const settle = boot._halfSettled
+boot._halfSettled = function(heavy) { calls.push("settle"); return settle(heavy) }
+const drain = boot._beginDrain
+boot._beginDrain = function() { calls.push("drain"); return drain() }
+
+boot._adoptLate({ createObject: function() { return null } })
+boot._shellMilestoneNow()
+
+emit("late.halvesPending", boot._halvesPending)
+emit("late.drainStarted", boot._drainStarted)
+emit("late.verdict", boot._shellMilestone)
+emit("late.settleBeforeDrain", calls.indexOf("settle") >= 0 && calls.indexOf("settle") < calls.indexOf("drain"))
+emit("late.errorLogged", calls.indexOf("log") >= 0)
+NODE
+)"
+
+late_val() { printf '%s\n' "$BOOT_LATE_SIM" | sed -n "s/^$1=//p"; }
+
+t_eq "a failed late half releases its ref-counted slot" "0" "$(late_val late.halvesPending)"
+t_eq "a failed late half reaches the drain" "true" "$(late_val late.drainStarted)"
+t_eq "a failed late half reaches a terminal verdict" "ready" "$(late_val late.verdict)"
+t_eq "the settle runs before the drain" "true" "$(late_val late.settleBeforeDrain)"
+t_eq "the failure is still logged" "true" "$(late_val late.errorLogged)"
+t_eq "the four half-failure paths share one settle helper" "4" \
+  "$(grep -c 'boot._failHalf(' "$BOOT_QML")"
+t_contains "the shared helper owns the settle" 'boot._halfSettled(heavy)' \
+  "$(awk '/^  function _failHalf\(/,/^  \}$/' "$BOOT_QML")"
+
 t_summary

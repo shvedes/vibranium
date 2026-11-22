@@ -811,6 +811,16 @@ Item {
     if (boot._halvesPending === 0) boot._replayNext()
   }
 
+  // Every half that cannot land goes through here. Settling is what releases
+  // its slot: only _halfSettled decrements _halvesPending, so a failure that
+  // logged and returned instead left the replay stashing demands and the drain
+  // parked with units in starting. The late paths call _beginDrain right after,
+  // when the last half settling means no owner is left to release it.
+  function _failHalf(label, heavy) {
+    Log.error("boot: " + label)
+    boot._halfSettled(heavy)
+  }
+
   function _loadBarHalf() {
     if (boot._lateBar || boot._lateBarComponent) return
     const comp = Qt.createComponent("BootBar.qml", Component.Asynchronous)
@@ -894,8 +904,7 @@ Item {
       boot._adoptLate(comp)
       return
     }
-    Log.error("boot: late half failed to load: " + comp.errorString())
-    boot._halfSettled()
+    boot._failHalf("late half failed to load: " + comp.errorString())
     boot._beginDrain()
   }
 
@@ -907,8 +916,7 @@ Item {
   function _adoptBarHalf(comp) {
     boot._lateBar = comp.createObject(boot, { boot: boot })
     if (!boot._lateBar) {
-      Log.error("boot: bar half failed to instantiate")
-      boot._halfSettled(true)
+      boot._failHalf("bar half failed to instantiate", true)
       return
     }
     Log.debug("boot: bar half adopted in " + boot._sinceProcessStart() + "ms")
@@ -932,8 +940,7 @@ Item {
   function _adoptServicesHalf(comp) {
     boot._lateServices = comp.createObject(boot, { boot: boot })
     if (!boot._lateServices) {
-      Log.error("boot: services half failed to instantiate")
-      boot._halfSettled(true)
+      boot._failHalf("services half failed to instantiate", true)
       return
     }
     Log.debug("boot: services half adopted in " + boot._sinceProcessStart() + "ms")
@@ -954,7 +961,7 @@ Item {
   function _adoptLate(comp) {
     boot._lateFeatures = comp.createObject(boot, { boot: boot })
     if (!boot._lateFeatures) {
-      Log.error("boot: late half failed to instantiate")
+      boot._failHalf("late half failed to instantiate")
       boot._beginDrain()
       return
     }
