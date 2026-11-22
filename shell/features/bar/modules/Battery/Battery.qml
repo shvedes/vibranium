@@ -298,20 +298,27 @@ CollapsibleSlot {
     || (root.percentageSlide > 0 && root.preferredRow !== null))
     ? root.preferredRow : root.summary
 
-  // The row the pill actually paints. It follows displayRow, except while a
-  // wheel cycle is in flight: the outgoing row is what slides away, and the
-  // swap to the incoming one happens at the animation's midpoint
-  // (_landCycle), so no phase draws two devices at once.
-  property var paintRow: null
-  onDisplayRowChanged: if (!cycleAnim.running) root.paintRow = root.displayRow
+  // The row the pill actually paints. displayRow is the one source; a wheel
+  // cycle holds the outgoing row until its midpoint, then the landed row
+  // takes over for the rest of the roll. cycleK is that single progress,
+  // driven by cycleAnim, and cycleFromRow is written once by cycleDevice.
+  // No handler copies the row, so a second wheel mid-roll cannot leave the
+  // row it just wheeled away from painted.
+  // The clock lives on a resolvable object so the animation can target it.
+  QtObject {
+    id: cycleClock
+    property real cycleK: 1
+  }
+  readonly property real cycleK: cycleClock.cycleK
+  property var cycleFromRow: null
+  readonly property var paintRow: root.cycleK < 0.5 ? root.cycleFromRow : root.displayRow
+  readonly property var shownRow: root.paintRow !== null ? root.paintRow : root.displayRow
+
   Component.onCompleted: {
-    root.paintRow = root.displayRow
     root._acSeeded = true
     root._onAc = UPower.onBattery === true
     root._observePower()
   }
-
-  readonly property var shownRow: root.paintRow !== null ? root.paintRow : root.displayRow
   readonly property real displayPct: root.shownRow ? root.shownRow.percentage : 100
   readonly property bool displayCharging: root.shownRow ? root.shownRow.charging : false
   readonly property string percentageText: root.shownRow
@@ -332,13 +339,20 @@ CollapsibleSlot {
 
   function cycleDevice(step): bool {
     if (!root.showPercentage) return false
-    const key = Model.cycleKey(root.rows, root.paintRow ? root.paintRow.key : "", step)
+    const from = root.shownRow
+    const key = Model.cycleKey(root.rows, from ? from.key : "", step)
     if (key === "") return false
-    if (root.paintRow !== null && String(root.paintRow.key || "") === key) return false
+    if (from !== null && String(from.key || "") === key) return false
+    // One write of the outgoing row and one arm of the clock per wheel. A
+    // later notch reuses these, so only the last roll's midpoint writes.
+    root.cycleFromRow = from
     root._cycleKey = key
     root._cycleStep = step > 0 ? 1 : -1
-    if (!MotionPolicy.enabled) root._landCycle()
-    else cycleAnim.restart()
+    cycleClock.cycleK = 0
+    if (!MotionPolicy.enabled) {
+      root._landCycle()
+      cycleClock.cycleK = 1
+    } else cycleAnim.restart()
     return true
   }
 
@@ -346,16 +360,18 @@ CollapsibleSlot {
     const key = root._cycleKey
     root._cycleKey = ""
     if (key === "") return
-    const row = Model.rowForKey(root.rows, key)
-    root.paintRow = row !== null ? row : root.displayRow
+    // The land edge: the remembered key is the only write, and displayRow
+    // follows it through storedRow. The ScriptAction below is the labelled
+    // breaker that lets the roll cross from cycleFromRow to displayRow.
     Settings.setRawSection("battery", "device", key)
   }
 
   // The cycle slidefade: the outgoing content leaves through the top on a
   // forward step and through the bottom on a backward one, and the incoming
   // content enters from the opposite edge. Each half travels one pill height
-  // so the change reads as a roll rather than a nudge, and the two halves
-  // together last the same Ui.fastMs as the pill's width. With motion off
+  // so the change reads as a roll rather than a nudge, and each half is one
+  // Ui.fastMs leg. The same two legs drive cycleK from 0 to 0.5 to 1, so the
+  // row hand-off lands exactly at the slide's midpoint. With motion off
   // cycleDevice lands the pick directly instead of running this.
   readonly property int cycleMs: Math.max(1, Math.round(Ui.fastMs / 2))
   SequentialAnimation {
@@ -373,6 +389,13 @@ CollapsibleSlot {
         target: cycleContent
         property: "opacity"
         to: 0
+        duration: root.cycleMs
+      }
+      NumberAnimation {
+        target: cycleClock
+        property: "cycleK"
+        from: 0
+        to: 0.5
         duration: root.cycleMs
       }
     }
@@ -393,6 +416,13 @@ CollapsibleSlot {
       NumberAnimation {
         target: cycleContent
         property: "opacity"
+        to: 1
+        duration: root.cycleMs
+      }
+      NumberAnimation {
+        target: cycleClock
+        property: "cycleK"
+        from: 0.5
         to: 1
         duration: root.cycleMs
       }
@@ -428,10 +458,14 @@ CollapsibleSlot {
   // width drives both, so the readout dissolves into the word and the pill
   // slides to whichever is longer instead of showing both side by side.
   // With the setting off the line is empty at rest, so an announcement
-  // still opens the pill from icon width.
+  // still opens the pill from icon width. pillWidth is the single animated
+  // real: its target is the whole width, so the reveal and a label swap are
+  // one clock rather than a width Behavior chasing textSlide's own Glide.
   readonly property bool textShown: root.percentageVisible || root.flashActive
-  property real textSlide: root.textShown ? 1 : 0
-  Behavior on textSlide {
+  property real pillWidth: root.textShown
+    ? Bar.iconSlot + root.labelWidth + root.textGap + Bar.slotInset
+    : Bar.iconSlot
+  Behavior on pillWidth {
     Glide { duration: Ui.slowMs }
   }
   // Keep the flash word's width through its fade-out: the label is still
@@ -459,18 +493,13 @@ CollapsibleSlot {
 
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
-    width: Math.round(Bar.iconSlot
-      + root.textSlide * (root.labelWidth + root.textGap + Bar.slotInset))
+    width: Math.round(root.pillWidth)
     height: root.height
     clip: true
-    Behavior on width {
-      enabled: root.percentageSlide === 1
-      Glide { duration: Ui.fastMs }
-    }
 
     // The pill's paint layer. The cycle slidefade travels this box without
-    // touching the pill's own geometry, so the width behavior keeps its rest
-    // states while the content rolls inside the clip.
+    // touching the pill's own geometry, so pillWidth keeps its rest states
+    // while the content rolls inside the clip.
     Item {
       id: cycleContent
 

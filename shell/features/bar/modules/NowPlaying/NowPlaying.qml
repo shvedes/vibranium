@@ -217,9 +217,18 @@ CollapsibleSlot {
   // lands on the bare slot rather than reserving room for empty text.
   collapseShown: root.shown
   collapseFull: root.titleSlide > 0 ? pill.width : Bar.iconSlot
+  // The reveal is the pill's one open/close clock. The name swap is a second
+  // scalar folded into the same width expression, not a width Behavior:
+  // gating a width chase on titleSlide === 1 made the close freeze and the
+  // snap land at the end. nameWidth binds the live label extent, so a spammed
+  // next/prev retargets the one width binding at each swap.
   property real titleSlide: root.hasTrack && (root.showTitle || root.flashActive) ? 1 : 0
   Behavior on titleSlide {
     Glide { duration: Ui.slowMs }
+  }
+  property real nameWidth: Math.min(labelText.implicitWidth, 240)
+  Behavior on nameWidth {
+    Glide { duration: Ui.fastMs }
   }
 
   // Icon + title pill (the Weather module boxing): the slot's own
@@ -229,21 +238,12 @@ CollapsibleSlot {
 
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
-    width: Bar.iconSlot + root.titleSlide * (Math.min(labelText.implicitWidth, 240) + 4 + Bar.slotInset)
+    width: Bar.iconSlot + root.titleSlide * (root.nameWidth + 4 + Bar.slotInset)
     height: root.height
-    // The open/close travel is owned by the titleSlide Behavior below, so
-    // this chase stays out of its way: ungated it restarts every frame off
-    // the moving driver, the close freezes, and the snap lands at the end.
-    // Gated to the settled-open state it only smooths the width jumps when
-    // the name swaps while the flash is already up (spammed next/prev).
-    // clip keeps the sliding name inside the slot while the width catches
+    // clip keeps the sliding name inside the slot while nameWidth catches
     // up. The Bar.iconSlot base keeps collapseFull continuous when the
     // flash closes (pill settles exactly onto the icon-only width).
     clip: true
-    Behavior on width {
-      enabled: root.titleSlide === 1
-      Glide { duration: Ui.fastMs }
-    }
 
     // Transport slide-fade: the shared CrossfadeIcon trades the two glyphs
     // in one fixed, clipped slot. Play arrives from the right, pause from
@@ -318,6 +318,11 @@ CollapsibleSlot {
       // kickMeta language, so a name arriving while the flash is up
       // reads as motion instead of a jump.
       function kickName() {
+        // labelText.text and nameWidth both bind live values - root.title and
+        // its implicit width. The kick rides the name on screen at this edge,
+        // never a title snapshotted when the flash opened, so a spammed
+        // next/prev retargets the same width binding each time.
+        if (root.title === "") return
         if (MotionPolicy.enabled) {
           nameSlide.restart()
           nameFade.restart()
