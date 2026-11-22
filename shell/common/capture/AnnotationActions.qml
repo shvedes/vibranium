@@ -68,10 +68,15 @@ Singleton {
   // callback, not an import. A service that asks for a view while no
   // controller exists asks the hook first and retries once.
   property var _ensure: null
-  // A hook that throws, or that comes back without a controller, is not
-  // called again for this contract instance: one refused demand must not
-  // turn a capture flow into a construction loop.
-  property int _ensureRefusals: 0
+  // The last terminal answer from the hook, or null. A throw, "pending" and a
+  // missing answer are not terminal: the next demand asks the hook again. Only
+  // a denial stops a hook that really failed from being reconstructed on every
+  // demand, and only a readiness edge or a new hook clears it.
+  property var _ensureDenial: null
+  // Why the most recent demand could not get a controller. Shared with the
+  // caller on the refusal so it can tell a terminal failure from a unit that
+  // is simply not ready yet.
+  property string _ensureReason: ""
 
   function hasController() {
     return root._handler !== null
@@ -88,39 +93,70 @@ Singleton {
     if (typeof ensureFn !== "function") return false
     if (root._ensure === ensureFn) return true
     root._ensure = ensureFn
-    root._ensureRefusals = 0
+    root._retireDenial()
     return true
+  }
+
+  // A controller arriving is the observable readiness edge: either the unit
+  // the hook demand-loaded reached its controller, or another source adopted
+  // one. A denial recorded before that edge says nothing about the unit that
+  // exists now, so let the next demand ask the hook again.
+  function _retireDenial() {
+    root._ensureDenial = null
+    root._ensureReason = ""
   }
 
   // The demand side's answer: build the controller, or say why not. The hook
   // may return true (built), false (a construction that failed, terminal) or
   // "pending" (the unit is not ready yet, so the next demand asks again).
-  // Returning nothing at all means the hook did not report, which is
-  // treated as terminal so a silently broken hook cannot spin.
-  //
-  // The distinction matters: a capture keypress during startup is refused
-  // because settings are not ready yet, and latching that would leave the
-  // annotation flow dead for the whole session.
+  // A throw and a missing answer are "not ready" too: a capture keypress
+  // during startup must not kill the flow for the whole session. Only false
+  // latches a denial, and the reason travels with the refusal so a caller can
+  // decide whether to retry on a later readiness edge.
   function ensureController() {
-    if (root._handler !== null) return true
-    if (root._ensure === null) return false
-    if (root._ensureRefusals > 0) return false
+    if (root._handler !== null) {
+      root._retireDenial()
+      return true
+    }
+    if (root._ensure === null) {
+      root._ensureReason = "no_hook"
+      return false
+    }
+    if (root._ensureDenial !== null) {
+      root._ensureReason = root._ensureDenial.reason
+      return false
+    }
     let answered
     try {
       answered = root._ensure()
     } catch (ignored) {
-      root._ensureRefusals++
+      // A transient throw while the unit starts up is not a verdict.
+      root._ensureReason = "threw"
       return false
     }
-    if (root._handler !== null) return true
-    if (answered === "pending") return false
-    root._ensureRefusals++
+    if (root._handler !== null) {
+      root._retireDenial()
+      return true
+    }
+    if (answered === "pending") {
+      root._ensureReason = "pending"
+      return false
+    }
+    if (answered === undefined || answered === null) {
+      // The hook did not report. Treat it like "pending" instead of latching a
+      // silently broken hook forever.
+      root._ensureReason = "no_answer"
+      return false
+    }
+    root._ensureDenial = Object.freeze({ reason: "failed" })
+    root._ensureReason = "failed"
     return false
   }
 
   function adopt(handler) {
     if (!HandlerSlot.canAdopt(root._handler, handler)) return false
     root._handler = handler
+    root._retireDenial()
     return true
   }
 
@@ -144,7 +180,10 @@ Singleton {
     const normalized = root._spec(kind, raw)
     if (normalized === null) return { ok: false, code: "invalid", id: 0 }
     if (root._handler === null && !root.ensureController()) {
-      return { ok: false, code: "no_controller", id: 0 }
+      return {
+        ok: false, code: "no_controller",
+        reason: root._ensureReason || "not_ready", id: 0
+      }
     }
     const id = root._generation + 1
     root._generation = id
