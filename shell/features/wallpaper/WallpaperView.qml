@@ -299,7 +299,9 @@ LayerSurface {
     // The snap path above already returned with animations off, so the image
     // snaps straight to fit here too.
     if (baseImg.source.toString() === "") {
-      imageLayer.scale = 1.06
+      // The pre-write and the tween's from are one origin; read it from the
+      // animation so first frame and first tick cannot disagree.
+      imageLayer.scale = fitAnim.from
       fitAnim.restart()
     } else {
       fitAnim.stop()
@@ -357,7 +359,10 @@ LayerSurface {
       property: "scale"
       from: 1.08
       to: 1
-      duration: 1000
+      // The fade and this push are one boot reveal: one duration owner so
+      // changing the reveal length moves both, including on an interrupted
+      // swap where the fade stops but the push still runs.
+      duration: win.bootFadeMs
       easing.type: Easing.OutCubic
     }
 
