@@ -756,10 +756,15 @@ Singleton {
   // travel.
   readonly property real entranceSlideFrom: root.position === "top" ? -root.height : root.height
   property real entranceSlide: 0
+  // The strip's travel is the only edge the modules' release waits for. One
+  // writer (the slide animation's onFinished) marks it done; no other handler
+  // copies that fact into a second latch.
+  property bool entranceSlideDone: false
   // The modules' own release, one step behind the strip: the bar's surface
   // slides in first, and only once that travel ends does this flip and let
   // the held slots run their intro. Without motion it lands with the strip.
-  property bool entranceModulesReady: false
+  readonly property bool entranceModulesReady: root.entranceReady
+    && (root.entranceSlideDone || !MotionPolicy.enabled)
 
   // A module that never builds must not hold the entrance forever. The shared
   // boot milestone already carries that backstop, so the latch follows it
@@ -802,15 +807,12 @@ Singleton {
     // screen. The warm composite is paid during the build instead.
     root.entranceReady = true
     // The strip starts at the edge and travels home first; the held slots
-    // follow once it has landed (entranceModulesPause below), so the modules
-    // fade onto a bar that is already in place. Without motion it simply
-    // rests in place and the slots land with it.
+    // follow once that travel reports done (entranceSlideAnim.onFinished),
+    // so the modules fade onto a bar that is already in place. Without motion
+    // there is no travel and the modules land with the strip, derived above.
     if (MotionPolicy.enabled) {
       root.entranceSlide = root.entranceSlideFrom
       entranceSlideAnim.restart()
-    } else {
-      // No travel to wait for: the slots land with the strip.
-      root.entranceModulesReady = true
     }
     // Every placed module is built, which is the shell's own answer to "boot
     // construction settled" - the surfaces that play a boot animation (the
@@ -845,22 +847,10 @@ Singleton {
     onFinished: DesktopLayoutState.noteBootEntrancePlayed("bar")
   }
 
-  // The modules' release waits out the strip's travel: it starts from the
-  // same latch and runs for the slide's own duration on the animation driver,
-  // so it ends on the first tick after the last frame that drew the bar and
-  // the slots' intro then plays over a settled backdrop. The duration is 0
-  // without motion, where the slots land with the strip anyway.
-  PauseAnimation {
-    id: entranceModulesPause
-
-    running: root.entranceReady && !root.entranceModulesReady
-    duration: MotionPolicy.duration(Ui.slowMs)
-    onFinished: root.entranceModulesReady = true
-  }
-
   // The entrance travel: the strip's own slide, with the curve and duration a
-  // slot's intro uses (Zone.intro). The slots start only after it (see
-  // entranceModulesPause), so the bar is in place before its contents fade on.
+  // slot's intro uses (Zone.intro). The slots start only after it, so the bar
+  // is in place before its contents fade on. Its finished edge is the single
+  // writer of entranceSlideDone; the modules' release derives from that.
   NumberAnimation {
     id: entranceSlideAnim
 
@@ -869,6 +859,7 @@ Singleton {
     to: 0
     duration: Ui.slowMs
     easing.type: Easing.OutCubic
+    onFinished: root.entranceSlideDone = true
   }
 
   // Is `kind` on the bar, either as a slot of its own or as a member of a

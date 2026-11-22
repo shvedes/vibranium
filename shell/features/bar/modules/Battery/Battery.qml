@@ -126,86 +126,96 @@ CollapsibleSlot {
     return any
   }
 
-  // The first snapshot seeds, so a shell that starts while the charger is
-  // already in never announces a connection nobody made. Seeding on AC
-  // also counts that session as announced, so Pending charge turning into
-  // Charging ten seconds later does not announce a cable that was already
-  // in. rows rebuilds on every UPower change, so the handler sees state
-  // changes even though each device object is a fresh snapshot.
-  property bool _powerSeeded: false
+  // One adapter session per plug/unplug. `UPower.onBattery` is the adapter
+  // edge and it lands at once; the battery's own state can sit at "Pending
+  // charge" for about ten seconds before UPower reports Charging, so the AC
+  // edge speaks for its whole session and the later state change does not
+  // repeat it. The id is the only session counter and has one writer below.
+  property int acSessionId: 0
+  // The session that already announced, or -1 while the current one has not.
+  // Announced is a comparison against the live id, never a boolean copied
+  // around by two observers, so the boot seed is the only "already said" mark.
+  property int announcedSessionId: -1
+  readonly property bool _chargeAnnounced: root.announcedSessionId === root.acSessionId
+  // The first observer call seeds from live values, whichever signal lands
+  // first. A shell that starts while the charger is in never announces a
+  // connection nobody made; a later Pending -> Charging must not repeat it.
+  property bool _chargeSeeded: false
+  // The live adapter state, mirrored at the seed and only on a real edge.
+  property bool _onBattery: false
+  // Previous main-battery tuple, one writer (the observer), for edge detect.
   property bool _lastMainCharging: false
   property bool _lastMainCharged: false
-  // AC-session bookkeeping. `UPower.onBattery` is the adapter edge and it
-  // lands at once; the battery's own state can sit at "Pending charge" for
-  // about ten seconds before UPower reports Charging, so waiting for that
-  // would put the flash ten seconds after the cable went in. One
-  // announcement per plug-in: the AC edge speaks for the session and the
-  // later state change does not repeat it.
-  property bool _acSeeded: false
-  property bool _onAc: false
-  property bool _chargeAnnounced: false
 
-  function _observePower(): void {
-    if (!root.hasMainBattery) {
-      root._powerSeeded = false
-      root._chargeAnnounced = false
-      return
-    }
+  // The announcement word, derived from the live tuple. On battery there is
+  // nothing to say. On AC a fresh crossing to 100% reads "Charged"; an edge
+  // into an already full pack reads "Fully charged"; the rest of an AC
+  // session reads "Charging" (UPower may still be reporting Pending).
+  readonly property string announceKind: {
+    if (!root.hasMainBattery || root._onBattery) return ""
+    if (root.mainCharged && !root._lastMainCharged) return "Charged"
+    return root.mainCharged ? "Fully charged" : "Charging"
+  }
+
+  // rows rebuilds on every UPower change, so this handler sees state changes
+  // even though each device object is a fresh snapshot. The adapter signal
+  // calls the same observer, so the two can arrive in either order without
+  // changing which snapshot seeds the session.
+  function _observeCharge(): void {
+    const onBattery = UPower.onBattery === true
     const charging = root.mainCharging
     const charged = root.mainCharged
-    if (!root._powerSeeded) {
-      root._powerSeeded = true
+
+    if (!root._chargeSeeded) {
+      root._chargeSeeded = true
+      root._onBattery = onBattery
       root._lastMainCharging = charging
       root._lastMainCharged = charged
-      root._chargeAnnounced = !root._onAc
+      // Boot on AC counts as announced; boot on battery leaves the session
+      // open for the next plug.
+      root.announcedSessionId = onBattery ? -1 : root.acSessionId
       return
     }
-    // A pack crossing 100% while charging flips `charging` off in the same
-    // update, so the full state is checked first: the moment reads
-    // "Charged", never a stale "Charging". Only an adapter session can
-    // complete a charge - a battery that reads 100% while running down is
-    // not being charged by an event.
-    if (charged && !root._lastMainCharged) {
-      if (!root._onAc) {
-        root._fireFlash("Charged")
-        root._chargeAnnounced = true
+
+    // One real adapter edge is the only session boundary. Unplugging opens
+    // a new session; plugging in announces from the live tuple at once.
+    if (onBattery !== root._onBattery) {
+      root._onBattery = onBattery
+      root.acSessionId++
+      const plugKind = root.announceKind
+      root._lastMainCharging = charging
+      root._lastMainCharged = charged
+      if (plugKind === "") return
+      root.announcedSessionId = root.acSessionId
+      root._fireFlash(plugKind)
+      return
+    }
+
+    const kind = root.announceKind
+    if (kind !== "") {
+      // A pack crossing 100% while charging flips `charging` off in the same
+      // update, so the full state is checked first: the moment reads
+      // "Charged", never a stale "Charging". Only an adapter session can
+      // complete a charge - a battery reading 100% while running down is not
+      // being charged by an event.
+      if (charged && !root._lastMainCharged) {
+        root.announcedSessionId = root.acSessionId
+        root._fireFlash(kind)
+      } else if (charging && !root._lastMainCharging && !root._chargeAnnounced) {
+        root.announcedSessionId = root.acSessionId
+        root._fireFlash(kind)
       }
-    } else if (charging && !root._lastMainCharging && !root._chargeAnnounced) {
-      root._fireFlash(root.mainCharged ? "Fully charged" : "Charging")
-      root._chargeAnnounced = true
     }
     root._lastMainCharging = charging
     root._lastMainCharged = charged
   }
 
-  onRowsChanged: root._observePower()
-
-  // The adapter edge. A full pack announces "Fully charged" rather than a
-  // second charging event; anything else announces "Charging" at once,
-  // while UPower may still be reporting Pending charge. Booting on AC
-  // seeds here without announcing, and unplugging opens a new session.
-  function _observeAc(): void {
-    const onBattery = UPower.onBattery === true
-    if (!root._acSeeded) {
-      root._acSeeded = true
-      root._onAc = onBattery
-      return
-    }
-    if (onBattery === root._onAc) return
-    root._onAc = onBattery
-    if (onBattery) {
-      root._chargeAnnounced = false
-      return
-    }
-    if (!root.hasMainBattery || !root._powerSeeded || root._chargeAnnounced) return
-    root._fireFlash(root.mainCharged ? "Fully charged" : "Charging")
-    root._chargeAnnounced = true
-  }
+  onRowsChanged: root._observeCharge()
 
   Connections {
     target: UPower
 
-    function onOnBatteryChanged() { root._observeAc() }
+    function onOnBatteryChanged() { root._observeCharge() }
   }
 
   FlashReveal {
@@ -314,11 +324,7 @@ CollapsibleSlot {
   readonly property var paintRow: root.cycleK < 0.5 ? root.cycleFromRow : root.displayRow
   readonly property var shownRow: root.paintRow !== null ? root.paintRow : root.displayRow
 
-  Component.onCompleted: {
-    root._acSeeded = true
-    root._onAc = UPower.onBattery === true
-    root._observePower()
-  }
+  Component.onCompleted: root._observeCharge()
   readonly property real displayPct: root.shownRow ? root.shownRow.percentage : 100
   readonly property bool displayCharging: root.shownRow ? root.shownRow.charging : false
   readonly property string percentageText: root.shownRow
