@@ -34,8 +34,9 @@ Variants {
     overlayOpen: ThemePicker.isOpen
     primary: modelData === Ui.primaryScreen
     // The scrim is inseparable from these full-surface overlays: follow the
-    // dim level but ignore the menu scrim on/off toggle.
-    dim: Settings.menuDimLevel
+    // dim level but ignore the menu scrim on/off toggle. Push it further than
+    // the menu scrim so only the deck reads on the surface.
+    dim: Math.min(1, Settings.menuDimLevel * Ui.pickerDimFactor)
     wlrNamespace: "vibranium:modal"
     onCloseRequested: ThemePicker.close()
 

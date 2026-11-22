@@ -157,6 +157,13 @@ Singleton {
   // Visual helpers.
   readonly property real disabledOpacity: 0.45
   readonly property real dimmedOpacity: 0.55
+  // The full-surface pickers (theme, wallpaper) dim the desktop harder than
+  // the menu scrim does: their deck is the only thing meant to read on the
+  // surface, so the backdrop is pushed further toward black. This multiplies
+  // the user's menu dim level - never brightening their choice - and the
+  // consumers clamp the result at fully opaque. One token so both pickers
+  // stay in lockstep.
+  readonly property real pickerDimFactor: 1.4
 
   // Palette color softened by alpha. Theme.color answers every key from its
   // fallback map - an unknown key is "#000000", never undefined - so there is
