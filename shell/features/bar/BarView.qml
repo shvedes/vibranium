@@ -81,10 +81,9 @@ LayerSurface {
     ? (rightZone.width <= 0 || rightZone.height <= 0
       ? 0 : Math.ceil(rightZone.height)) : 0
 
-  // Shared hover state between the logout trigger and the tray module: the
-  // tray stays expanded while the logout icon (or the tray itself) is
-  // hovered. Lives on the window so each monitor's bar keeps its own state.
-  property bool trayTriggerHovered: false
+  // The logout trigger publishes its raw hover here. Logout.qml is the only
+  // writer. Lives on the window so each monitor's bar keeps its own state.
+  property bool logoutHovered: false
 
   // Count of zones on this window with a slot-reorder drag running. While a
   // drag is live the session group must be inert: hovering it (the logout
@@ -101,12 +100,16 @@ LayerSurface {
   property bool recentDragActive: false
   property int dragGraceMs: 450
 
+  // Shared hover state between the logout trigger and the tray module: the
+  // tray stays expanded while the logout icon (or the tray itself) is
+  // hovered. One derivation over the two source events, with the drag term
+  // winning, so a hover that arrived during a rearrange cannot re-arm the
+  // tray when the grace expires under a parked cursor.
+  readonly property bool trayTriggerHovered: !win.recentDragActive && win.logoutHovered
+
   function enterSlotDrag() {
     win._slotDragCount++
     win._armRecentDrag()
-    // Clear any hover the logout trigger accumulated, so a drag that swept
-    // over the session can't leave the tray latched open on release.
-    win.trayTriggerHovered = false
     // Trace: the per-window drag count is the contract the session group
     // reads to freeze itself, so a frozen tray is explained by the window
     // that reported the drag rather than by a guess.
@@ -114,7 +117,6 @@ LayerSurface {
   function leaveSlotDrag() {
     if (win._slotDragCount > 0) win._slotDragCount--
     win._armRecentDrag()
-    win.trayTriggerHovered = false
   }
   function _armRecentDrag() {
     win.recentDragActive = true

@@ -38,9 +38,15 @@ BarModule {
 
   barTipText: "Session - power options"
 
-  // Hover is the tray's expansion trigger (see BarView.trayTriggerHovered):
-  // while the mouse sits on this icon the tray module stays slid out, so
-  // the cursor can move straight onto the tray icons. Per-window state, so
-  // each monitor's bar behaves independently.
-  onHoveredChanged: if (root.barWindow) root.barWindow.trayTriggerHovered = root.hovered
+  // Hover feeds the tray's expansion trigger (derived on BarView): while the
+  // mouse sits on this icon the tray module stays slid out, so the cursor can
+  // move straight onto the tray icons. Per-window state, so each monitor's bar
+  // behaves independently. The drag term wins at the source, so a hover that
+  // starts during the freeze is never published and cannot survive the grace
+  // to reopen the tray without a deliberate fresh hover.
+  onHoveredChanged: {
+    const w = root.barWindow
+    if (!w) return
+    w.logoutHovered = root.hovered && !w.recentDragActive
+  }
 }
