@@ -255,17 +255,19 @@ LayerSurface {
   readonly property bool animOn: MotionPolicy.enabled
 
   // The boot wallpaper's entrance, applied to the whole overlay. The content
-  // spawns a little larger than the screen and eases back to fit while a
-  // linear alpha ramp reveals it. Alpha stays linear on purpose: an eased
-  // fade would be fully opaque early and leave the last of the push reading
-  // as a slow drift of an already-settled image. Alpha runs on its own,
-  // shorter clock so the desktop is uncovered quickly while the settle keeps
-  // going. Both start as the surface maps, not after the image decodes. With
-  // animations off they snap to rest.
+  // spawns a little larger than the screen and eases back to fit while alpha
+  // ramps in over the same progress. Both start as the surface maps, not after
+  // the image decodes. With animations off they snap to rest.
+  // One progress drives both: scale and alpha are functions of the live value,
+  // so a close mid-arrival eases out of the frame on screen instead of popping
+  // to a hardcoded `from` endpoint. The two directions keep their own clocks
+  // and curves - arrival settles over arrivalMs (OutCubic), exit clears over
+  // fadeMs (Linear) - but never own separate visible properties.
   readonly property int arrivalMs: 320
   readonly property int fadeMs: 150
-  property real pushScale: 1
-  property real pushOpacity: 1
+  property real push: 0
+  readonly property real pushScale: 1 + 0.09 * (1 - editor.push)
+  readonly property real pushOpacity: editor.push
 
   // True while the arrival or the toolbar slide is still running. A plate
   // grab and a full-size canvas repaint both render on the main thread, and
@@ -274,52 +276,26 @@ LayerSurface {
   // for this to clear instead.
   readonly property bool _revealing: arrivalAnim.running || slideAnim.running
 
-  ParallelAnimation {
+  // `to` is set at the edge that starts each direction; `from` is omitted so
+  // the tween begins at the current value. The two animations are the two
+  // ends of one progress and never run together.
+  NumberAnimation {
     id: arrivalAnim
-
-    NumberAnimation {
-      target: editor
-      property: "pushScale"
-      from: 1.09
-      to: 1
-      duration: editor.arrivalMs
-      easing.type: Easing.OutCubic
-    }
-    NumberAnimation {
-      target: editor
-      property: "pushOpacity"
-      from: 0
-      to: 1
-      duration: editor.fadeMs
-      easing.type: Easing.Linear
-    }
+    target: editor
+    property: "push"
+    duration: editor.arrivalMs
+    easing.type: Easing.OutCubic
   }
 
   // The arrival played backwards on close: the board shrinks back into the
   // screen while the veil and the content fade out. The destroy waits for the
   // animation, so the surface cannot disappear a frame into the exit.
-  ParallelAnimation {
+  NumberAnimation {
     id: exitAnim
-
-    // The scale must finish with the fade, not after it: a push that outlives
-    // the alpha ramp plays out on an already-invisible surface. Matching the
-    // fade clock keeps the whole zoom visible on the way out.
-    NumberAnimation {
-      target: editor
-      property: "pushScale"
-      from: 1
-      to: 1.09
-      duration: editor.fadeMs
-      easing.type: Easing.InCubic
-    }
-    NumberAnimation {
-      target: editor
-      property: "pushOpacity"
-      from: 1
-      to: 0
-      duration: editor.fadeMs
-      easing.type: Easing.Linear
-    }
+    target: editor
+    property: "push"
+    duration: editor.fadeMs
+    easing.type: Easing.Linear
     onStopped: editor._finishClose()
   }
 
@@ -384,10 +360,10 @@ LayerSurface {
   // contents. The image arriving mid-fade simply joins the reveal.
   Component.onCompleted: {
     if (editor.animOn) {
+      arrivalAnim.to = 1
       arrivalAnim.restart()
     } else {
-      editor.pushScale = 1
-      editor.pushOpacity = 1
+      editor.push = 1
     }
   }
 
@@ -1209,6 +1185,7 @@ LayerSurface {
     panel.visible = false
     if (editor.animOn) {
       arrivalAnim.stop()
+      exitAnim.to = 0
       exitAnim.start()
     } else {
       editor._finishClose()
@@ -2926,12 +2903,9 @@ LayerSurface {
     color: Ui.solid("background_1")
     border.color: Ui.tint("foreground_1", 0.4)
     border.width: 1
-     Component.onCompleted: Qt.callLater(reveal)
+      // onLoadStateChanged is the single edge that owns visibility, the
+      // slide offset and its clock; no deferred call races the load.
       function reveal() {
-        if (editor.loadState !== "ready") {
-          panel.visible = false
-          return
-        }
         if (!editor.animOn) {
          panel.revealOffset = 0
          panel.visible = true
