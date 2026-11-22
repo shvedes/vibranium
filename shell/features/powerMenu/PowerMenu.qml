@@ -39,6 +39,11 @@ Singleton {
   // Token for the exclusive-surface claim this open holds, released by
   // close() and by Component.onDestruction.
   property var _claimToken: null
+  // Generation of the newest dispatch intent. A deferred dispatch captures it
+  // before the dismiss and compares it at the top of the executor, so a newer
+  // open/activate retires the older one. The close() that belongs to the same
+  // activation must NOT bump it, or it would cancel its own dispatch.
+  property int _dispatchGen: 0
 
   function _attachPanel(panel) {
     root._panels = PanelList.attach(root._panels, panel)
@@ -221,6 +226,8 @@ Singleton {
 
   function open() {
     if (root.visible) return
+    // A new session retires any dispatch the last one left queued.
+    root._dispatchGen++
     // Exclusive surfaces: dismiss whichever menu holds the screen first.
     root.visible = true
     // Claimed once the surface is up, not before: the stored closer is
@@ -233,6 +240,10 @@ Singleton {
   function close() {
     if (!root.visible) return
     root.visible = false
+    // The query dies with the surface on this same synchronous edge. A
+    // deferred reset here landed in the next session and wiped a query typed
+    // after a close->open inside one turn.
+    root.reset()
     // The stage dies with the surface: no armed destructive action outlives
     // its menu.
     root._clearConfirmation()
@@ -247,10 +258,6 @@ Singleton {
   function reset() {
     root.query = ""
     root._recompute()
-  }
-
-  onVisibleChanged: {
-    if (!root.visible) Qt.callLater(root.reset)
   }
 
   function submit(text) {
@@ -268,6 +275,9 @@ Singleton {
     if (!row) return
     const action = String(row.action ?? "")
     if (action === "") return
+    // Capture the intent's generation before the dismiss. close() below is
+    // part of this same activation and never bumps it.
+    const g = ++root._dispatchGen
     // A destructive row arms the stage instead of running: the menu stays
     // open and only the confirm path asks Session to act.
     if (root.isDestructive(action)) {
@@ -275,7 +285,7 @@ Singleton {
       return
     }
     root.close()
-    Qt.callLater(() => root._execute(row))
+    Qt.callLater(() => root._execute(row, g))
   }
 
   function isDestructive(action) {
@@ -285,6 +295,8 @@ Singleton {
   // Arm the single destructive stage. Re-arming replaces the armed action,
   // so one activation can never queue two.
   function _armConfirmation(row) {
+    // Arming replaces the intent, so it retires any dispatch still queued.
+    root._dispatchGen++
     root._confirmationAction = String(row.action)
     root._confirmationLabel = String(row.label ?? row.action)
     root._dispatchFault = ""
@@ -323,18 +335,22 @@ Singleton {
       root._recordDispatchFault("nothing_to_confirm")
       return
     }
+    // Capture before the dismiss, as activate() does; a newer intent retires
+    // this dispatch, the close() below does not.
+    const g = root._dispatchGen
     root._clearConfirmation()
     // Dismiss first: close() drops visible, the armed stage and the claim in
     // that order, all before any command that can end the session runs.
     root.close()
     // Same shape as activate(): close now, dispatch on a later tick.
-    Qt.callLater(() => root._dispatchConfirmed(action))
+    Qt.callLater(() => root._dispatchConfirmed(action, g))
   }
 
   // Runs only on the tick after the view is gone. The verdict - including a
   // refusal - is published here, after dismissal, so it is never lost with
   // the panel that asked for it.
-  function _dispatchConfirmed(action) {
+  function _dispatchConfirmed(action, g) {
+    if (g !== root._dispatchGen) return
     let wired = false
     try {
       wired = typeof Session.requestDestructive === "function"
@@ -365,7 +381,8 @@ Singleton {
     root._publishState()
   }
 
-  function _execute(row) {
+  function _execute(row, g) {
+    if (g !== root._dispatchGen) return
     if (!row || typeof row.action !== "string") return
     // Second gate on the destructive family: whatever routed the row in,
     // it never reaches Session.dispatch from here.

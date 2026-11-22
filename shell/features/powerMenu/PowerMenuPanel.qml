@@ -186,7 +186,6 @@ PanelCard {
         return
       }
       panel.show()
-      searchField.text = ""
       list.settle(0, true)
       focusCtrl.grabList()
     }
@@ -314,7 +313,6 @@ PanelCard {
       panel._pendingActivate = it
       panel._pendingActivateKey = String(it.id ?? "")
       PowerMenu.clearQuery()
-      if (searchField.text !== "") searchField.text = ""
       focusCtrl.grabList()
       return
     }
@@ -404,10 +402,10 @@ PanelCard {
   function escapeChain() {
     if (panel.armed) { panel.closeConfirm(); return }
     if (focusCtrl.mode === "filter") {
-      if (PowerMenu.query !== "") { PowerMenu.clearQuery(); searchField.text = ""; return }
+      if (PowerMenu.query !== "") { PowerMenu.clearQuery(); return }
       focusCtrl.grabList(); return
     }
-    if (PowerMenu.query !== "") { PowerMenu.clearQuery(); searchField.text = ""; return }
+    if (PowerMenu.query !== "") { PowerMenu.clearQuery(); return }
     PowerMenu.close()
   }
   function scrollBy(factor) { list.pageBy(factor) }
@@ -448,7 +446,6 @@ PanelCard {
     if (!ctrl && !meta && event.text.length === 1 && event.text.charCodeAt(0) >= 32) {
       if (focusCtrl.mode === "list") {
         PowerMenu.submit(event.text)
-        searchField.text = event.text
         focusCtrl.grabFilter()
         event.accepted = true
       }
@@ -469,6 +466,9 @@ PanelCard {
     InputField {
       id: searchField
       anchors.fill: parent
+      // The service owns the query; this is the one guarded bridge into the
+      // control, and edited() is the only way back to the source.
+      value: PowerMenu.query
       implicitHeight: panel.filterH
       placeholder: "Filter power actions..."
       inputRole: "filter"

@@ -36,6 +36,16 @@ Rectangle {
   property string placeholder: ""
   // Rendered text; alias to the inner input for full control.
   property alias text: input.text
+  // Guarded bridge from the owner that holds the canonical string (the power
+  // menu's query, say) into the control. The owner binds `value` to its source
+  // and writes back in edited(); a source write updates the control without
+  // emitting edited(), so the field can never drift from its source the way a
+  // second imperative store did.
+  property string value: ""
+  onValueChanged: {
+    if (input.text === value) return
+    input.text = value
+  }
   readonly property alias input: input
   readonly property bool focused: input.activeFocus
   // Border hue while the field owns focus.
