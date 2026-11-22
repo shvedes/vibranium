@@ -212,7 +212,7 @@ PanelCard {
           if (es[i] && es[i].path === Pass.selectedPath) { found = true; break }
         }
         if (!found) {
-          Pass.mode = "browse"
+          Pass.navigate({ mode: "browse" })
           panel.closeDelete()
           panel.closeEditor()
         }
@@ -222,7 +222,7 @@ PanelCard {
         panel.pendingSecret = ""
         panel.pendingName = ""
         panel.overwriteStage = 0
-        Pass.mode = "browse"
+        Pass.navigate({ mode: "browse" })
       }
       panel.rebuild()
     }
@@ -971,7 +971,7 @@ PanelCard {
       panel.clearQuery()
       panel.sub = ""
       if (started) Pass.browseTo(destinationDir)
-      else Pass.mode = "browse"
+      else Pass.navigate({ mode: "browse" })
       panel.rebuild()
       return
     }
@@ -1159,7 +1159,7 @@ PanelCard {
       // The picker below never filters (see rebuild): arriving with a
       // stale query would only confuse the next browse landing.
       panel.clearQuery()
-      Pass.mode = "create"
+      Pass.navigate({ mode: "create" })
       panel.settleEditorClose()
       return
     }
@@ -1187,7 +1187,7 @@ PanelCard {
       Qt.callLater(() => panel._editorAcceptTick = false)
       Pass.moveEntry(p, dest)
       panel.clearQuery()
-      Pass.mode = "browse"
+      Pass.navigate({ mode: "browse" })
       panel.settleEditorClose()
     }
   }

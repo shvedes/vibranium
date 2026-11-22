@@ -327,9 +327,7 @@ Singleton {
     // Demand first: without a controller there is no window to show, so
     // the claim must not be taken and `visible` must not be set.
     if (lease.demand() === null) return false
-    root.mode = "menu"
-    root.currentDir = ""
-    root.selectedPath = ""
+    root.navigate({ mode: "menu", dir: "", path: "" })
     root.visible = true
     // Claimed once the panel is up, not before: the stored closer is
     // hidePanel, which refuses to run while `visible` is false, so a claim
@@ -362,20 +360,29 @@ Singleton {
   function toggle() { root.visible ? root.hidePanel() : root.showPanel() }
 
   // --- navigation (view state only, no controller required) ---
+  // The single writer of mode/currentDir/selectedPath. Every verb below and
+  // every panel transition funnels through here, so a keyboard gesture and an
+  // IPC caller sequence the same field writes and the panel's onChanged
+  // rebuilds never observe a state the facade did not produce. A key left out
+  // is left untouched: browseTo never clears the selected path, select keeps
+  // the current dir, and a peel writes only the fields its step names.
+  function navigate(args) {
+    const next = args || {}
+    if (next.dir !== undefined) root.currentDir = String(next.dir || "")
+    if (next.path !== undefined) root.selectedPath = String(next.path || "")
+    if (next.mode !== undefined) root.mode = String(next.mode)
+  }
   function browseTo(dir) {
-    root.currentDir = String(dir || "")
-    root.mode = "browse"
+    root.navigate({ mode: "browse", dir: dir })
   }
   function select(path) {
-    root.selectedPath = String(path || "")
-    root.mode = "action"
+    root.navigate({ mode: "action", path: path })
   }
   // One peel step; the panel's Esc chain drives it. The rule is the store
   // library's, this is the facade's own state it is applied to.
   function back() {
     const step = Model.navigationBack(root.mode, root.currentDir)
-    if (step.mode !== undefined) root.mode = step.mode
-    if (step.dir !== undefined) root.currentDir = step.dir
+    root.navigate({ mode: step.mode, dir: step.dir })
     if (step.close === true) root.hidePanel()
   }
 
