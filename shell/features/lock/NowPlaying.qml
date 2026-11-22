@@ -100,12 +100,11 @@ Item {
   }
 
   onPlayerChanged: root.reanchor()
+  // Visibility belongs to the host, which gates on the setting and the track.
+  // The reveal is reset by onHasTrackChanged alone; this edge only re-anchors
+  // the position to the player that is actually on screen.
   onVisibleChanged: {
     root.reanchor()
-    if (root.visible && root.hasTrack) {
-      root.progressAppear = 0
-      progressAppearAnim.restart()
-    }
   }
   Component.onCompleted: {
     root._pinHead()
@@ -223,8 +222,8 @@ Item {
     easing.type: Easing.OutCubic
   }
 
-  // The reveal is started from the visible, completed and has-track edges,
-  // none of which keep watching the gate. A flip off mid-reveal must stop the
+  // The reveal is started from the completed and has-track edges, neither of
+  // which keep watching the gate. A flip off mid-reveal must stop the
   // tween and snap its driver so the fill stops growing with motion off.
   Connections {
     target: MotionPolicy

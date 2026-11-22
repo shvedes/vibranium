@@ -67,10 +67,6 @@ WlSessionLockSurface {
 
     onTriggered: {
       if (!surface.autohideEnabled || !surface.visible) return
-      if (Lockscreen.authenticating) {
-        autohideTimer.restart()
-        return
-      }
       surface.setIdleFade(true)
     }
   }
@@ -247,9 +243,16 @@ WlSessionLockSurface {
       if (Lockscreen.failedAttempts > 0) authBox.fail()
     }
 
-    // Disabling the field during auth drops its focus.
+    // Disabling the field during auth drops its focus, so the end edge
+    // reclaims it. The same edge owns the idle countdown: stopping it on entry
+    // holds the field revealed for the whole turn; the timer no longer reads
+    // `authenticating` to rearm itself.
     function onAuthenticatingChanged() {
-      if (!Lockscreen.authenticating && Lockscreen.requested) surface.grabFocus()
+      if (Lockscreen.authenticating) {
+        autohideTimer.stop()
+        return
+      }
+      if (Lockscreen.requested) surface.grabFocus()
     }
 
     function onPasswordChanged() {

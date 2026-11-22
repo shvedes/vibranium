@@ -260,3 +260,126 @@ t_section "the progress handler snaps its driver when motion flips off"
 t_eq "the gate edge stops progressAppearAnim" "true" "${G[progressStopped]}"
 t_eq "the gate edge snaps root.progressAppear to 1" "true" "${G[progressSnapped]}"
 t_eq "the progress gate does nothing when motion stays on" "true" "${G[progressOnNoop]}"
+
+# --- LCK-6/LCK-9: one owner per reveal countdown -----------------------------
+# LCK-6: the autohide timer's self-restart on `authenticating` duplicates the
+# auth edge that re-arms it on exit. The timer must not read auth at all; the
+# edge stops the countdown on entry and grabFocus() re-arms it on exit.
+# LCK-9: the progress reveal must not also be reset on the visible edge;
+# `hasTrack` owns that reset, and `visible` only re-anchors the position.
+#
+# Both handlers are lifted from the real QML and driven against stubs, as the
+# gate handlers above are. A handler that still owns the duplicate shows up as
+# an extra `restart` in the call log.
+
+OWNER="$(SURFACE="$SURFACE" NP="$NP" node - <<'NODE'
+const fs = require("fs")
+const surface = fs.readFileSync(process.env.SURFACE, "utf8")
+const nowPlaying = fs.readFileSync(process.env.NP, "utf8")
+
+function body(src, signature) {
+  const at = src.indexOf(signature)
+  if (at < 0) return "\n"
+  const open = src.indexOf("{", at + signature.length)
+  let depth = 0
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === "{") depth++
+    else if (src[i] === "}") { depth--; if (depth === 0) return src.slice(open + 1, i) }
+  }
+  throw new Error("unbalanced handler " + signature)
+}
+
+const triggerBody = body(surface, "onTriggered:")
+const authBody = body(surface, "function onAuthenticatingChanged()")
+const visibleBody = body(nowPlaying, "onVisibleChanged:")
+const hasTrackBody = body(nowPlaying, "onHasTrackChanged:")
+
+function drive(bodyText, makeStubs) {
+  const calls = []
+  const all = Object.assign({ calls }, makeStubs(calls))
+  const names = Object.keys(all)
+  new Function(...names, bodyText)(...names.map(n => all[n]))
+  return calls
+}
+
+// The auth edge and the timer fire at different times, so they are driven
+// separately: an auth-start stop means the timer cannot fire during the turn.
+function autohideStubs(calls, authenticating) {
+  return {
+    surface: {
+      autohideEnabled: true, visible: true,
+      setIdleFade: v => calls.push("fade:" + v),
+      grabFocus: () => calls.push("grabFocus")
+    },
+    autohideTimer: {
+      restart: () => calls.push("restart"),
+      stop: () => calls.push("stop")
+    },
+    Lockscreen: { authenticating, requested: true }
+  }
+}
+
+function reveal(bodyText, visible, hasTrack) {
+  const root = { visible, hasTrack, progressAppear: 7 }
+  const calls = drive(bodyText, c => {
+    root.reanchor = () => c.push("reanchor")
+    return {
+      root,
+      progressAppearAnim: {
+        restart: () => c.push("restart"),
+        stop: () => c.push("stop")
+      }
+    }
+  })
+  return { calls, root }
+}
+
+const out = {}
+// The timer body must not rearm on auth; the edge must stop on entry and
+// grab focus on exit.
+const fireAuth = drive(triggerBody, c => autohideStubs(c, true))
+out.timerNoSelfRearm = !fireAuth.includes("restart")
+const authStart = drive(authBody, c => autohideStubs(c, true))
+out.authStopsCountdown = authStart.includes("stop")
+out.authKeepsField = !authStart.includes("fade:true")
+const authEnd = drive(authBody, c => autohideStubs(c, false))
+out.authEndGrabsFocus = authEnd.includes("grabFocus")
+const fireIdle = drive(triggerBody, c => autohideStubs(c, false))
+out.idleTimerFades = fireIdle.includes("fade:true")
+out.idleTimerNoRearm = !fireIdle.includes("restart")
+
+// LCK-9: visible only reanchors; hasTrack owns the reset in both directions.
+const shown = reveal(visibleBody, true, true)
+out.visibleOnlyReanchors = shown.calls.length === 1 && shown.calls[0] === "reanchor"
+out.visibleKeepsDriver = shown.root.progressAppear === 7
+const trackOn = reveal(hasTrackBody, true, true)
+out.trackRestartsReveal = trackOn.calls.includes("restart")
+  && trackOn.root.progressAppear === 0
+const trackOff = reveal(hasTrackBody, true, false)
+out.trackStopsReveal = trackOff.calls.includes("stop")
+  && trackOff.root.progressAppear === 0
+
+for (const k of Object.keys(out)) process.stdout.write(k + "=" + out[k] + "\n")
+NODE
+)" || { t_block "node could not evaluate the reveal-owner handlers"; }
+
+declare -A O
+while IFS='=' read -r key value; do
+  [[ -n $key ]] && O["$key"]="$value"
+done <<<"$OWNER"
+
+t_section "LCK-6: the auth edge, not the timer, owns the autohide countdown"
+t_eq "the timer does not restart itself on auth" "true" "${O[timerNoSelfRearm]}"
+t_eq "the auth edge stops the countdown on entry" "true" "${O[authStopsCountdown]}"
+t_eq "auth entry leaves the field revealed" "true" "${O[authKeepsField]}"
+t_eq "the auth edge reclaims focus on exit" "true" "${O[authEndGrabsFocus]}"
+t_eq "the idle timer still fades the field" "true" "${O[idleTimerFades]}"
+t_eq "the idle timer never restarts itself" "true" "${O[idleTimerNoRearm]}"
+
+t_section "LCK-9: the has-track edge alone resets the progress reveal"
+t_eq "the visible edge only reanchors" "true" "${O[visibleOnlyReanchors]}"
+t_eq "the visible edge leaves the reveal driver alone" "true" "${O[visibleKeepsDriver]}"
+t_eq "a new track restarts the reveal" "true" "${O[trackRestartsReveal]}"
+t_eq "losing the track stops the reveal" "true" "${O[trackStopsReveal]}"
+
+t_summary
