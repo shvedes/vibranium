@@ -142,7 +142,6 @@ Singleton {
     root._secretHandles = root._secretHandles.concat([key])
     root._copyError = ""
     copyProc.running = true
-    copyFeed.restart()
     copyTimeout.restart()
     // A hand-off is the tail of a copy: the value is in the transport, which
     // is the facade's to finish, and the controller is only still needed for
@@ -186,7 +185,6 @@ Singleton {
     stderr: StdioCollector {}
     onStarted: root._feedCopyStdin()
     onExited: {
-      copyFeed.stop()
       copyTimeout.stop()
       copyProc._sink = null
       // Covers the child that exited before the write went out: the value it
@@ -195,14 +193,9 @@ Singleton {
       copyProc._handle = ""
     }
   }
-  // Feed fallback for the case where no started signal arrives: the write
-  // also goes out once the child owns a pid.
-  Timer {
-    id: copyFeed
-    interval: 250
-    repeat: false
-    onTriggered: root._feedCopyStdin()
-  }
+  // onStarted is the only feed edge. Process publishes it for every child
+  // that reaches exec, so no readiness timer is needed to guess when the
+  // write channel can be handed over.
   Timer {
     id: copyTimeout
     interval: 5000
