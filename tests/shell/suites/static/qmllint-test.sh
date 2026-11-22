@@ -172,7 +172,7 @@ eval 1
 missing-property 52
 uncreatable-type 1
 unqualified 40
-unresolved-type 5"
+unresolved-type 3"
 
 t_section "the tool under test"
 if [[ ! -x $QMLLINT_BIN ]]; then
@@ -333,7 +333,7 @@ t_note "the recorded warning total is $RECORDED_WARNING_COUNT and the per-kind b
 t_section "the unresolved types are only Quickshell C++ types"
 UNRESOLVED_LINES="$(grep -E '\[(unresolved-type|uncreatable-type)\]$' "$LINT_OUT" || true)"
 UNRESOLVED_COUNT="$(printf '%s\n' "$UNRESOLVED_LINES" | grep -c . || true)"
-t_count "the unresolved/uncreatable count" "6" "$UNRESOLVED_COUNT"
+t_count "the unresolved/uncreatable count" "4" "$UNRESOLVED_COUNT"
 
 # The names, from two different shapes of diagnostic:
 #   Property "adapter" has incomplete type "FileViewAdapter" ...
