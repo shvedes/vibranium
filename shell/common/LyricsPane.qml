@@ -70,6 +70,9 @@ Item {
   property string _requestedKey: ""
   property var _request: null
   readonly property bool animOn: MotionPolicy.enabled
+  // Whether a freshly applied sheet on a different track slides and fades in.
+  // Presentation surfaces that stage their own track switch leave this off.
+  property bool slidefadeSheets: false
   // Whether a cue change glides the transcript to its new centre. The island
   // has room for the travel; a caller can turn it off to place cues directly.
   property bool glide: true
@@ -98,6 +101,16 @@ Item {
   // A freshly applied sheet is a cut: its first placement must not glide in
   // from the scroll offset the previous track left behind.
   property bool _freshSheet: false
+  // The key whose lines were last put on screen, for telling a track switch
+  // from a first load or a reload of the same sheet.
+  property string _shownKey: ""
+  // Driven by the sheet-swap tweens below; the view travels and fades as one
+  // item so the loading text over it keeps its own fade clock.
+  property real _sheetX: 0
+  property real _sheetOpacity: 1
+  // The outgoing leg holds the load until it lands, so the loading text only
+  // takes over once the previous sheet has left.
+  property bool _exitingSheet: false
 
   // Asking starts with the track, not with the pane: the lyrics pad reads
   // `unavailable` so the answer has to be known before anyone opens the
@@ -112,7 +125,21 @@ Item {
     root._pinnedByUser = false
     root._load()
   }
-  onTrackKeyChanged: root._load()
+  onTrackKeyChanged: {
+    // A switch stages the exit first: the previous sheet slides and fades out
+    // before the ask starts, so the loading text follows the slidefade.
+    if (root.slidefadeSheets && root.animOn && !root._exitingSheet
+      && root.status === "ready" && root._shownKey !== ""
+      && root._shownKey !== root.trackKey) {
+      root._exitingSheet = true
+      sheetSlide.stop()
+      sheetFade.stop()
+      sheetOutSlide.restart()
+      sheetOutFade.restart()
+      return
+    }
+    root._load()
+  }
   onPositionChanged: root._track()
   onActiveIndexChanged: Qt.callLater(root._follow)
   // The slot can resize under the transcript while the card grows or shrinks;
@@ -120,6 +147,7 @@ Item {
   onHeightChanged: Qt.callLater(root._follow)
 
   function _load() {
+    if (root._exitingSheet) return
     const key = root.trackKey
     if (key === "") {
       root._abort()
@@ -213,6 +241,17 @@ Item {
     // from wherever the last transcript was left.
     root._pinnedByUser = false
     root._freshSheet = true
+    const switched = root._shownKey !== "" && root._shownKey !== key
+    root._shownKey = key
+    if (switched && root.slidefadeSheets && root.animOn) {
+      sheetSlide.restart()
+      sheetFade.restart()
+    } else {
+      sheetSlide.stop()
+      sheetFade.stop()
+      root._sheetX = 0
+      root._sheetOpacity = 1
+    }
     root._track()
     Qt.callLater(root._follow)
   }
@@ -242,7 +281,6 @@ Item {
   }
 
   function _placeBeginning() {
-    root._freshSheet = false
     root._placing = true
     view.positionViewAtBeginning()
     root._placing = false
@@ -258,10 +296,11 @@ Item {
     scrollTo.stop()
     // A fresh sheet is a cut rather than a cue change: it is placed on its
     // line instead of gliding there from the offset the previous track left.
+    // The flag stays up through the layout settle, so a placement made before
+    // the delegates exist is corrected in place rather than gliding into view.
     // A row the view has not created yet is the same case - it has only a
     // guessed y, so the move is the view's own placement.
     if (root._freshSheet || row === null || !root.animOn || !root.glide) {
-      root._freshSheet = false
       root._placing = true
       view.positionViewAtIndex(index, ListView.Center)
       root._placing = false
@@ -287,13 +326,17 @@ Item {
   // a wrapped line - moves contentY without the reader touching it. Those
   // moves are not a scroll and must not claim the view, or a freshly opened
   // pane would sit off centre until the idle timer handed it back. The timer
-  // restarts on every height change and recentres once the layout is still.
+  // restarts on every height change, holds the fresh-sheet cut until the layout
+  // is still, and releases it after the last recentre.
   Timer {
     id: settleGuard
 
     interval: 150
     repeat: false
-    onTriggered: if (root.synced) root._follow()
+    onTriggered: {
+      if (root.synced) root._follow()
+      root._freshSheet = false
+    }
   }
 
   function _embeddedText() {
@@ -379,6 +422,10 @@ Item {
       // hair of padding is left on the left and right edges.
       anchors.leftMargin: 4
       anchors.rightMargin: 4
+      // A sheet swap travels and fades the whole view; the placeholder over it
+      // fades on its own clock.
+      transform: Translate { x: root._sheetX }
+      opacity: root._sheetOpacity
       clip: true
       interactive: root.scrollable
       spacing: 6
@@ -513,15 +560,81 @@ Item {
       }
     }
 
+    // Track-switch exit: the sheet being replaced slides and fades out before
+    // the ask starts, so the loading text takes over an already-empty slot.
+    NumberAnimation {
+      id: sheetOutSlide
+
+      target: root
+      property: "_sheetX"
+      from: 0
+      to: -24
+      duration: Ui.fastMs
+      easing.type: Easing.OutCubic
+      onFinished: {
+        if (!root._exitingSheet) return
+        root._exitingSheet = false
+        root._sheetX = 0
+        root._sheetOpacity = 1
+        root._load()
+      }
+    }
+
+    NumberAnimation {
+      id: sheetOutFade
+
+      target: root
+      property: "_sheetOpacity"
+      from: 1
+      to: 0
+      duration: Ui.fastMs
+      easing.type: Easing.OutCubic
+    }
+
+    // Track-switch entrance: the incoming sheet rises from the right and fades
+    // in as the loading text leaves, the same slidefade the island gives its
+    // name rows. A host that stages its own switch leaves this off.
+    NumberAnimation {
+      id: sheetSlide
+
+      target: root
+      property: "_sheetX"
+      from: 24
+      to: 0
+      duration: Ui.fastMs
+      easing.type: Easing.OutCubic
+    }
+
+    NumberAnimation {
+      id: sheetFade
+
+      target: root
+      property: "_sheetOpacity"
+      from: 0
+      to: 1
+      duration: Ui.fastMs
+      easing.type: Easing.OutCubic
+    }
+
     Text {
       anchors.centerIn: parent
       width: parent.width - 16
-      visible: root.status !== "ready"
-      text: root.status === "loading" ? "Loading lyrics..."
+      // The placeholder fades with the load state: in as the ask starts, out
+      // as a ready sheet lands behind it.
+      opacity: root.status === "idle" || root.status === "ready" ? 0 : 1
+      visible: opacity > 0.001
+      Behavior on opacity {
+        enabled: root.animOn
+        NumberAnimation {
+          duration: Ui.fastMs
+          easing.type: Easing.OutCubic
+        }
+      }
+      text: root.status === "loading" ? "Getting lyrics..."
         : root.status === "none" ? "No lyrics"
         : root.status === "error" ? "Lyrics unavailable" : ""
       color: Ui.tint("foreground_1", 0.55)
-      font.pixelSize: Ui.fontM
+      font.pixelSize: Math.round(Ui.fontL * Math.min(2, root.textScale))
       font.family: Ui.fontFamily
       horizontalAlignment: Text.AlignHCenter
       wrapMode: Text.Wrap

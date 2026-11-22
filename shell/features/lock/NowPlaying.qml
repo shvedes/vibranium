@@ -60,11 +60,17 @@ Item {
     running: !root._lockPauseSettled
     onTriggered: root._lockPauseSettled = true
   }
-  // The body swaps to lyrics only for a playing track whose sheet is ready. A
+  // The body swaps to lyrics for a playing track whose sheet is ready. A
   // playing track the provider has no words for keeps the names: the pane's
   // "No lyrics" state is an offer in the island and noise on a lock screen.
+  // Across a track swap the footprint is held until the incoming sheet
+  // resolves: the pane replaces the words with its loading text instead of the
+  // card collapsing to the compact names and reopening a beat later.
+  property string _lastReadyKey: ""
+  readonly property bool _lyricsBetweenTracks: root._lastReadyKey !== ""
+    && root._lastReadyKey !== lyrics.trackKey
   readonly property bool lyricsUp: root.playing && root._lockPauseSettled
-    && root.hasTrack && lyrics.ready
+    && root.hasTrack && (lyrics.ready || root._lyricsBetweenTracks)
   readonly property string title: root.player !== null ? root.player.trackTitle ?? "" : ""
   readonly property string artist: root.player !== null ? root.player.trackArtist ?? "" : ""
   readonly property string album: root.player !== null ? root.player.trackAlbum ?? "" : ""
@@ -143,6 +149,20 @@ Item {
 
     function onPlaybackStateChanged() {
       root.reanchor()
+    }
+  }
+
+  // Remember the last sheet that was actually up. While the next track's
+  // sheet is being fetched the key changes but no answer exists yet, so the
+  // held key keeps the lyrics footprint up. A resolved answer latches the new
+  // key (ready) or drops the hold (none/error), leaving the hold scoped to the
+  // gap between tracks that were showing words.
+  Connections {
+    target: lyrics
+
+    function onStatusChanged() {
+      if (lyrics.status === "ready") root._lastReadyKey = lyrics.trackKey
+      else if (lyrics.status === "none" || lyrics.status === "error") root._lastReadyKey = ""
     }
   }
 
@@ -420,8 +440,11 @@ Item {
       dismissable: false
       scrollable: false
       // Cue changes glide to the next line like the island; only the body
-      // swap itself is a crossfade.
+      // swap itself is a crossfade. On a track switch the old words slidefade
+      // out first and the incoming sheet slidefades in, as the island's names
+      // do.
       glide: true
+      slidefadeSheets: true
       // The card's own growth drives the transcript's type: base size on the
       // compact track card, the larger size only once the lyrics frame opens.
       textScale: 1 + 0.4 * root.lyricsGrowth
