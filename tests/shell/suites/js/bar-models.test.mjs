@@ -2864,6 +2864,34 @@ group('the scalar answers are total and pairwise stable', () => {
     once === PP.placeX(700, 400, 150, 150, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10), true)
 })
 
+// ======================================================================
+section('VolumeIsland - the app list reads one live stream source')
+const VISLAND = fs.readFileSync(path.join(BAR, 'modules', 'Volume',
+  'VolumeIsland.qml'), 'utf8')
+group('the stable model is the live snapshot, with no delayed copy', () => {
+  contains('stableModel takes the snapshot directly', VISLAND,
+    'stableModel: Model.listSnapshot(root.audioStreams)')
+  notContains('the displayStreams copy is gone', VISLAND, 'displayStreams')
+  notContains('the refresh timer is gone', VISLAND, 'refreshTimer')
+  notContains('refreshDisplay is gone', VISLAND, 'refreshDisplay')
+  notContains('the change-driven restart is gone', VISLAND, 'onAudioStreamsChanged')
+  contains('the live source is still the node projection', VISLAND,
+    'readonly property var audioStreams: root.streamCandidates(root.nodes)')
+})
+group('every app readout reads the live source', () => {
+  eq('six live length reads', (VISLAND.match(/root\.audioStreams\.length/g) || []).length, 6)
+  contains('the empty section reads it', VISLAND,
+    'readonly property bool _appsEmpty: root.audioStreams.length === 0')
+  contains('the app counter reads it', VISLAND, 'text: root.audioStreams.length +')
+})
+group('teardown keeps the one node-set observation', () => {
+  contains('completion still observes the set', VISLAND,
+    'AudioNodes.observeSet("bar/volumeIsland")')
+  contains('destruction still releases it', VISLAND, 'AudioNodes.release(root._nodeSet)')
+  contains('the peak holds are still taken', VISLAND, 'root._reacquirePeaks()')
+  contains('and released', VISLAND, 'root._releasePeaks()')
+})
+
 // One thing neither copy does, recorded so the gap is visible in the total
 // rather than silently absent.
 skip('the OSD/island consumers of the time-gated helpers', 'the callers are QML; only the pure halves are asserted here')

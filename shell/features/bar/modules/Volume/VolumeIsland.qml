@@ -132,35 +132,19 @@ Item {
   readonly property var candidateSources: root.sourceCandidates(root.nodes)
   readonly property var audioStreams: root.streamCandidates(root.nodes)
 
-  property var displayStreams: []
   // Empty (no apps playing): the section shows three dimmed skeleton rows
-  // with a centered note instead of live rows. Never overlays a populated
-  // list: the moment a stream snapshot lands, displayStreams is non-empty
-  // and the live rows take over.
-  readonly property bool _appsEmpty: root.displayStreams.length === 0
+  // with a centered note instead of live rows. The note, the app counter and
+  // the list all read this one live projection, so they can never describe
+  // different stream sets.
+  readonly property bool _appsEmpty: root.audioStreams.length === 0
   // The device dropdowns are overlays anchored to their trigger chips (no
   // in-flow slot under them). Exactly one list may be unfolded at a time;
   // this names which, or "" when both are closed.
   property string popOpen: ""
 
-  function refreshDisplay() {
-    // The content only exists while the host shows it, so any refresh
-    // is open-gated by lifetime.
-    root.displayStreams = Model.listSnapshot(root.audioStreams)
-  }
-
-  Timer {
-    id: refreshTimer
-    interval: 75
-    repeat: false
-    onTriggered: root.refreshDisplay()
-  }
-
-  onAudioStreamsChanged: refreshTimer.restart()
-
-  // Snapshot on every show: the content is incubated fresh, so creation
-  // is open. Teardown stops the pending refresh and gives up the node-set
-  // observation; the next show re-snapshots anyway.
+  // The list reads the live stream projection directly; there is no snapshot
+  // step at creation. Teardown gives up the node-set observation, and the
+  // next show reads the live set again.
   //
   // The one observation this island holds is the node set, and it names no
   // node: the island filters the set but follows no device, so it takes no
@@ -178,14 +162,12 @@ Item {
   Component.onCompleted: {
     root._nodeSet = AudioNodes.observeSet("bar/volumeIsland")
     root._reacquirePeaks()
-    Qt.callLater(root.refreshDisplay)
   }
   // Every subscription this view holds is dropped here, in one place: the
   // node-set observation and the two peak holds. A second destruction handler
   // elsewhere in the object is the same teardown split in two, and the first
   // one to be missed is the one that leaks.
   Component.onDestruction: {
-    refreshTimer.stop()
     if (root._nodeSet !== null) {
       AudioNodes.release(root._nodeSet)
       root._nodeSet = null
@@ -1065,8 +1047,8 @@ Item {
         level: 4
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        text: root.displayStreams.length + (root.displayStreams.length === 1 ? " app" : " apps")
-        visible: root.displayStreams.length > 0
+        text: root.audioStreams.length + (root.audioStreams.length === 1 ? " app" : " apps")
+        visible: root.audioStreams.length > 0
       }
     }
 
@@ -1088,7 +1070,10 @@ Item {
           selectionHighlight: false
           width: parent.width
           height: Math.min(appList.contentHeight, 180)
-          stableModel: root.displayStreams
+          // A fresh snapshot per stream-set change. List keeps row identity
+          // across the swap through its own (index-default) row keys, so the
+          // model needs no coalescing timer.
+          stableModel: Model.listSnapshot(root.audioStreams)
           spacing: Ui.s
           interactive: appList.contentHeight > appList.height
           delegate: streamDelegate
@@ -1103,10 +1088,10 @@ Item {
           width: parent.width - root.rowPad
           spacing: Ui.m
           opacity: 0.8
-          visible: root.displayStreams.length < 3
+          visible: root.audioStreams.length < 3
 
           Repeater {
-            model: Math.max(0, 3 - root.displayStreams.length)
+            model: Math.max(0, 3 - root.audioStreams.length)
 
             delegate: SkeletonEntry {
               width: parent.width

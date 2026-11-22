@@ -1330,6 +1330,7 @@ Item {
               previewTitleText.implicitWidth - width)
             readonly property bool scrollable: Marquee.scrollable(overflow)
             readonly property int legMs: Marquee.legMs(overflow)
+            readonly property int endpointPauseMs: Marquee.endpointPauseMs()
 
             function reset() {
               previewTitleText.x = 0
@@ -1353,7 +1354,7 @@ Item {
                 duration: previewTitleMarquee.legMs
                 easing.type: Easing.InOutSine
               }
-              PauseAnimation { duration: 400 }
+              PauseAnimation { duration: previewTitleMarquee.endpointPauseMs }
               NumberAnimation {
                 target: previewTitleText
                 property: "x"
@@ -1362,7 +1363,7 @@ Item {
                 duration: previewTitleMarquee.legMs
                 easing.type: Easing.InOutSine
               }
-              PauseAnimation { duration: 400 }
+              PauseAnimation { duration: previewTitleMarquee.endpointPauseMs }
               onStopped: previewTitleText.x = 0
             }
 
@@ -2685,6 +2686,7 @@ Item {
               plTitleText.implicitWidth - width)
             readonly property bool scrollable: Marquee.scrollable(overflow)
             readonly property int legMs: Marquee.legMs(overflow)
+            readonly property int endpointPauseMs: Marquee.endpointPauseMs()
 
             HoverHandler {
               id: plTitleHover
@@ -2715,7 +2717,7 @@ Item {
               duration: plTitleBox.legMs
               easing.type: Easing.InOutSine
             }
-            PauseAnimation { duration: 400 }
+            PauseAnimation { duration: plTitleBox.endpointPauseMs }
             NumberAnimation {
               target: plTitleText
               property: "x"
@@ -2724,7 +2726,7 @@ Item {
               duration: plTitleBox.legMs
               easing.type: Easing.InOutSine
             }
-            PauseAnimation { duration: 400 }
+            PauseAnimation { duration: plTitleBox.endpointPauseMs }
             onStopped: plTitleText.x = 0
           }
 
@@ -2848,6 +2850,7 @@ Item {
             histTitleText.implicitWidth - width)
           readonly property bool scrollable: Marquee.scrollable(overflow)
           readonly property int legMs: Marquee.legMs(overflow)
+          readonly property int endpointPauseMs: Marquee.endpointPauseMs()
 
           HoverHandler {
             id: histTitleHover
@@ -2878,7 +2881,7 @@ Item {
               duration: histTitleBox.legMs
               easing.type: Easing.InOutSine
             }
-            PauseAnimation { duration: 400 }
+            PauseAnimation { duration: histTitleBox.endpointPauseMs }
             NumberAnimation {
               target: histTitleText
               property: "x"
@@ -2887,7 +2890,7 @@ Item {
               duration: histTitleBox.legMs
               easing.type: Easing.InOutSine
             }
-            PauseAnimation { duration: 400 }
+            PauseAnimation { duration: histTitleBox.endpointPauseMs }
             onStopped: histTitleText.x = 0
           }
 

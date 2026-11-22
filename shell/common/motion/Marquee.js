@@ -15,6 +15,7 @@ var BASE_MS = 1800
 var PER_PIXEL_MS = 24
 var MIN_MS = 1800
 var MAX_MS = 9000
+var ENDPOINT_PAUSE_MS = 400
 
 // Whether a clipped label has anything to reveal. Scrolling is an
 // accessibility behavior, not decoration: the animation setting governs how
@@ -36,13 +37,21 @@ function legMs(overflow) {
   return Range.clamp(Math.round(travel), MIN_MS, MAX_MS)
 }
 
+// Milliseconds a row dwells at each end of its travel before reversing. One
+// published value: every marquee keeps the same beat without copying a literal.
+function endpointPauseMs() {
+  return ENDPOINT_PAUSE_MS
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     BASE_MS: BASE_MS,
     PER_PIXEL_MS: PER_PIXEL_MS,
     MIN_MS: MIN_MS,
     MAX_MS: MAX_MS,
+    ENDPOINT_PAUSE_MS: ENDPOINT_PAUSE_MS,
     scrollable: scrollable,
-    legMs: legMs
+    legMs: legMs,
+    endpointPauseMs: endpointPauseMs
   }
 }

@@ -954,7 +954,7 @@ Item {
 
                   readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
                   readonly property int legMs: Marquee.legMs(overflow)
-                  readonly property int endpointPauseMs: 400
+                  readonly property int endpointPauseMs: Marquee.endpointPauseMs()
 
                   function reset() {
                     titleText.x = 0
@@ -1047,7 +1047,7 @@ Item {
 
                   readonly property real overflow: Math.max(0, artistText.implicitWidth - width)
                   readonly property int legMs: Marquee.legMs(overflow)
-                  readonly property int endpointPauseMs: 400
+                  readonly property int endpointPauseMs: Marquee.endpointPauseMs()
 
                   function reset() {
                     artistText.x = 0
@@ -1126,7 +1126,7 @@ Item {
 
                   readonly property real overflow: Math.max(0, albumText.implicitWidth - width)
                   readonly property int legMs: Marquee.legMs(overflow)
-                  readonly property int endpointPauseMs: 400
+                  readonly property int endpointPauseMs: Marquee.endpointPauseMs()
 
                   function reset() {
                     albumText.x = 0
