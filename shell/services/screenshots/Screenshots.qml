@@ -847,18 +847,19 @@ Singleton {
   property var _liveRegion: null
   property var _pendingCrop: null  // logical { x, y, w, h }, consumed by _finish
 
-  // Echo guard: shortcut triggers occasionally fire twice within
-  // milliseconds. 100ms drops the echo but passes the picker's
-  // immediate continuation and any human re-press.
-  property double _lastStartMs: 0
+  // Echo guard: a shortcut trigger occasionally fires twice within
+  // milliseconds. 100ms drops the echo but passes a human re-press and the
+  // picker's immediate continuation into another verb. Keyed by verb:
+  // openPicker(), openRegionSelect() and capture() are three distinct
+  // intents even when they land back-to-back.
+  property var _lastStartMs: Object.create(null)
 
-  // The 100ms window is the echo guard's own: the shortcut occasionally fires
-  // twice within milliseconds, and the picker's immediate continuation and a
-  // human re-press are both well past it.
+  // echoGuard owns the window; this only stores the accepted stamp under
+  // the verb that was accepted.
   function _debounced(what) {
     const now = Date.now()
-    if (ShotLib.echoGuard(now, root._lastStartMs, 100)) return true
-    root._lastStartMs = now
+    if (ShotLib.echoGuard(now, root._lastStartMs[what] || 0, 100)) return true
+    root._lastStartMs[what] = now
     return false
   }
 

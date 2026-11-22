@@ -10,6 +10,7 @@
 // deliberately surprising - a name-only screen key, an outline-only ellipse
 // hit test, a grid anchored to the view rather than to the rect - so the
 // surprising parts are pinned here with the reason they exist.
+import fs from 'node:fs'
 import path from 'node:path'
 import { loadLib } from '../../lib/qmlloader.mjs'
 import {
@@ -1032,6 +1033,55 @@ group('a press inside the window is an echo', () => {
   eq('a non-numeric clock is refused as an echo', SL.echoGuard('x', 1000, 100), true)
   eq('a non-numeric last press is no echo', SL.echoGuard(1000, 'x', 100), false)
   eq('a non-numeric window falls back to 100ms', SL.echoGuard(1050, 1000, 'x'), true)
+})
+
+// ---------------------------------------------------------------------------
+section('Screenshots._debounced - one echo window per verb (SVC-6)')
+//
+// Screenshots is a Singleton whose entry points fork capture processes, so the
+// guard is driven from the shipped source: lift the real _debounced body out
+// of the QML and run it against the real ShotLib.echoGuard with a stubbed
+// clock. openPicker() -> openRegionSelect() -> capture() in one 100 ms burst
+// are three intents; only a repeat of the same verb inside its window is an
+// echo.
+
+const SHOTS_QML = fs.readFileSync(
+  path.join(SHELL, 'services/screenshots/Screenshots.qml'), 'utf8')
+
+function bracedBody(src, marker, label) {
+  const at = src.indexOf(marker)
+  if (at < 0) throw new Error(`${label} has no body: ${marker}`)
+  let depth = 0
+  for (let j = at + marker.length - 1; j < src.length; j++) {
+    if (src[j] === '{') depth++
+    if (src[j] === '}') {
+      depth--
+      if (depth === 0) return src.slice(at + marker.length, j)
+    }
+  }
+  throw new Error(`${label} body never closes`)
+}
+
+const debouncedBody = bracedBody(SHOTS_QML, 'function _debounced(what) {', '_debounced')
+
+function debounced(root, at, what) {
+  return new Function('Date', 'ShotLib', 'root', 'what', debouncedBody)(
+    { now: () => at }, SL, root, what)
+}
+
+group('a picker -> region -> capture burst is three intents', () => {
+  const root = { _lastStartMs: {} }
+  eq('the picker press is accepted', debounced(root, 1000, 'picker'), false)
+  eq('region right after is not the picker echo', debounced(root, 1050, 'region'), false)
+  eq('capture right after is not a region echo', debounced(root, 1080, 'capture'), false)
+  eq('a repeat picker press inside its window is still an echo', debounced(root, 1090, 'picker'), true)
+  eq('each verb owns one stamp', Object.keys(root._lastStartMs).sort(), ['capture', 'picker', 'region'])
+})
+
+group('the three entry points pass their own verb', () => {
+  contains('the picker', SHOTS_QML, '_debounced("picker")')
+  contains('the region selector', SHOTS_QML, '_debounced("region")')
+  contains('the screen capture', SHOTS_QML, '_debounced("capture")')
 })
 
 section('AnnotationTools.colorName - the palette name a tool label speaks')
