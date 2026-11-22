@@ -752,6 +752,16 @@ Singleton {
     }
   }
 
+  // The one mutation boundary for a local clear: publish the new map,
+  // persist it, then derive the verdict from the passed map. _maybeAllDone
+  // must read its argument, not the bindings - those settle after this
+  // call returns. Both dismiss verbs funnel through here.
+  function _commitDismissed(next) {
+    root.dismissed = next
+    root._saveDismissed()
+    root._maybeAllDone(next)
+  }
+
   // Clear one finished entry. Active jobs always go through the server
   // cancel above - server truth for in-flight work is never hidden.
   function dismissJob(jobId) {
@@ -762,9 +772,7 @@ Singleton {
     // queue, is refused: the click does nothing.
     if (!row) return
     if (Model.isActiveJobState(row["job-state"])) return
-    root.dismissed = EntryMap.withEntry(root.dismissed, id, true)
-    root._saveDismissed()
-    root._maybeAllDone(next)
+    root._commitDismissed(EntryMap.withEntry(root.dismissed, id, true))
   }
 
   // Clear every finished entry at once (the JOBS header button).
@@ -775,9 +783,7 @@ Singleton {
       if (Model.isActiveJobState(j["job-state"])) continue
       next[String(j["job-id"])] = true
     }
-    root.dismissed = next
-    root._saveDismissed()
-    root._maybeAllDone(next)
+    root._commitDismissed(next)
   }
 
   // A clear that leaves the visible queue with no active and no failed
