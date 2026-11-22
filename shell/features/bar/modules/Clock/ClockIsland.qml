@@ -38,8 +38,10 @@ Item {
     today: root.today
   }
 
+  // Keep the declarative today binding: assigning it here would drop the
+  // binding and freeze the highlighted day at the open-time date. goToToday
+  // reads the live value, so the open and every later tick agree.
   Component.onCompleted: Qt.callLater(() => {
-    calendar.today = root.today
     calendar.goToToday()
     calendar.forceActiveFocus()
   })
