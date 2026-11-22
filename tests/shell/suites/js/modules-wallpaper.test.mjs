@@ -4279,4 +4279,54 @@ group('the interface a route reply names', () => {
   eq('a missing reply is empty', NET.routeIface(null), '')
 })
 
+// ======================================================================
+section('HiddenWallpapers - the file is canonical, _adopt is the one publisher')
+// ======================================================================
+const HW_QML = fs.readFileSync(
+  path.join(SHELL_DIR, 'common', 'state', 'HiddenWallpapers.qml'), 'utf8')
+function hwBody(name) {
+  const at = HW_QML.indexOf(`function ${name}(`)
+  if (at < 0) return ''
+  let depth = 0
+  const open = HW_QML.indexOf('{', at)
+  for (let i = open; i < HW_QML.length; i++) {
+    if (HW_QML[i] === '{') depth++
+    if (HW_QML[i] === '}') {
+      depth--
+      if (depth === 0) return HW_QML.slice(open + 1, i)
+    }
+  }
+  return ''
+}
+const HIDE_BODY = hwBody('hide')
+const SHOW_BODY = hwBody('show')
+const ADOPT_BODY = hwBody('_adopt')
+const NORMALIZE_BODY = hwBody('_normalize')
+const ASLIST_BODY = hwBody('_asList')
+
+group('hide/show write only the adapter and return', () => {
+  for (const [label, body] of [['hide', HIDE_BODY], ['show', SHOW_BODY]]) {
+    notContains(`${label} does not write the mirror`, body, 'root._hidden =')
+    notContains(`${label} does not bump rev`, body, 'root.rev++')
+    contains(`${label} assigns the adapter`, body, 'storeAdapter.hidden =')
+    contains(`${label} calls writeAdapter`, body, 'storeView.writeAdapter()')
+    contains(`${label} returns`, body, 'return true')
+  }
+  contains('hide computes the next array before writing', HIDE_BODY, 'const next =')
+  contains('show computes the next array before writing', SHOW_BODY, 'const next =')
+})
+
+group('_adopt is the only writer of the mirror, and only on a real change', () => {
+  contains('_adopt normalizes the adapter', ADOPT_BODY, 'root._normalize(storeAdapter.hidden)')
+  contains('_adopt compares against the current mirror', ADOPT_BODY, 'root._hidden')
+  contains('_adopt publishes the mirror', ADOPT_BODY, 'root._hidden = next')
+  match('_adopt bumps rev once', ADOPT_BODY, /root\.rev\+\+/)
+  eq('exactly one rev bump in _adopt', (ADOPT_BODY.match(/root\.rev\+\+/g) || []).length, 1)
+})
+
+group('the adapter-shape helpers stay byte-identical', () => {
+  contains('_asList handles C++ sequences', ASLIST_BODY, 'Array.isArray(raw)')
+  contains('_normalize de-dupes and sorts', NORMALIZE_BODY, 'out.sort()')
+})
+
 finish()

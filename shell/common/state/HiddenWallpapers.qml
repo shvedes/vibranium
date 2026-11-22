@@ -22,11 +22,12 @@ Singleton {
 
   readonly property string tag: "hiddenWallpapers"
 
-  // Sorted, unique keys; replaced wholesale so readers re-evaluate.
+  // Sorted, unique keys. The file is canonical: hide()/show() write it and
+  // _adopt() is the only publisher of this mirror. A listing built from it
+  // recomputes on the replacement, which happens only on a real key change.
   property var _hidden: []
 
-  // Bumped whenever the set or its mirror changes, so a listing built from
-  // it can recompute instead of watching the file itself.
+  // Bumped once by _adopt() when the normalized keys really change.
   property int rev: 0
 
   Component.onCompleted: {
@@ -70,14 +71,13 @@ Singleton {
 
   // Records one disabled wallpaper. False means the key was already there or
   // could not be built, so a caller never announces a change that did not
-  // happen. The in-memory set moves first, so a listing recomputed from this
-  // call already sees the wallpaper as gone.
+  // happen. The file is the source: the watch publishes the mirror through
+  // _adopt() when the write lands.
   function hide(theme, file): bool {
     const k = root.key(theme, file)
     if (k === "" || root._hidden.indexOf(k) >= 0) return false
-    root._hidden = root._hidden.concat([k]).sort()
-    root.rev++
-    storeAdapter.hidden = root._hidden
+    const next = root._hidden.concat([k]).sort()
+    storeAdapter.hidden = next
     storeView.writeAdapter()
     return true
   }
@@ -92,15 +92,25 @@ Singleton {
     if (at < 0) return false
     const next = root._hidden.slice()
     next.splice(at, 1)
-    root._hidden = next
-    root.rev++
-    storeAdapter.hidden = root._hidden
+    storeAdapter.hidden = next
     storeView.writeAdapter()
     return true
   }
 
+  // One publisher for the mirror. A watch echo carries the same keys that are
+  // already published (and a hand edit of unrelated fields does the same), so
+  // publishing on every load would bump rev without a change behind it.
   function _adopt() {
-    root._hidden = root._normalize(storeAdapter.hidden)
+    const next = root._normalize(storeAdapter.hidden)
+    const cur = root._hidden
+    let same = next.length === cur.length
+    if (same) {
+      for (let i = 0; i < next.length; i++) {
+        if (next[i] !== cur[i]) { same = false; break }
+      }
+    }
+    if (same) return
+    root._hidden = next
     root.rev++
   }
 
