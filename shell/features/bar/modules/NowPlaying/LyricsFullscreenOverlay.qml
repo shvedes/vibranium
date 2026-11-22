@@ -127,6 +127,7 @@ QtObject {
   }
 
   function close() {
+    root.artExpanded = false
     root.opened = false
   }
 
@@ -181,6 +182,15 @@ QtObject {
     if (!root.hasTrack || root.player?.canGoNext === false) return
     NP.noteManual("next")
     root.player?.next()
+  }
+
+  // The artwork click opens an enlarged copy of the cover over the whole
+  // surface. Close it on teardown so a later open starts on the transcript.
+  property bool artExpanded: false
+
+  function toggleArtExpanded() {
+    if (root.artUrl === "") return
+    root.artExpanded = !root.artExpanded
   }
 
   onOpenedChanged: {
@@ -370,7 +380,39 @@ QtObject {
 
     anchors.fill: parent
     focus: root.opened
-    Keys.onEscapePressed: root.close()
+
+    // Transport mirrors the island's keys: Space toggles playback, Ctrl plus
+    // an arrow skips a track and Shift plus an arrow steps a seek. Modifiers
+    // are masked so a combined chord cannot be read as a plain arrow.
+    Keys.onPressed: event => {
+      const key = event.key
+      if (key === Qt.Key_Escape) {
+        if (root.artExpanded) root.artExpanded = false
+        else root.close()
+        event.accepted = true
+        return
+      }
+      if (key === Qt.Key_Space) {
+        if (event.modifiers & (Qt.ShiftModifier | Qt.ControlModifier
+          | Qt.AltModifier | Qt.MetaModifier)) return
+        root.togglePlaying()
+        event.accepted = true
+        return
+      }
+      if (key !== Qt.Key_Left && key !== Qt.Key_Right) return
+
+      const mods = event.modifiers & (Qt.ShiftModifier | Qt.ControlModifier
+        | Qt.AltModifier | Qt.MetaModifier)
+      if (mods === Qt.ShiftModifier) {
+        root.commitSeek(root.shownPosition + (key === Qt.Key_Right ? 5 : -5))
+        event.accepted = true
+        return
+      }
+      if (mods !== Qt.ControlModifier || event.isAutoRepeat) return
+      if (key === Qt.Key_Right) root.nextTrack()
+      else root.previousTrack()
+      event.accepted = true
+    }
 
     // The surface's own backdrop, under everything else. See backdropColor for
     // why this is a Rectangle rather than the window's color.
@@ -533,6 +575,14 @@ QtObject {
         colorKey: "foreground_1"
         size: Math.round(Math.min(artFrame.width, artFrame.height) * 0.4)
       }
+
+      // The cover is the entrance to the enlarged view. Kept over both image
+      // layers so a click reaches it regardless of which one is settled.
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: root.artUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
+        onClicked: root.toggleArtExpanded()
+      }
     }
 
     // Transport: previous, play/pause, next - centred under the cover at a
@@ -553,19 +603,47 @@ QtObject {
         animationsEnabled: root.animOn
         actionable: root.hasTrack && root.player?.canGoPrevious !== false
         opacity: root.hasTrack ? 1 : 0.4
-        onClicked: root.previousTrack()
+        onClicked: {
+          root.previousTrack()
+          // A clicked button keeps focus and would consume Space itself;
+          // hand keys back so Space still toggles playback.
+          content.forceActiveFocus()
+        }
       }
 
       IconButton {
-        name: root.playing ? "pause" : "play"
-        iconSize: content.padIcon
+        // The glyph lives in the CrossfadeIcon below; the button keeps its
+        // native chrome and interaction with no icon of its own.
         slotSize: content.padSlot
         flat: true
         cornerRadius: RoundingPolicy.radius
         animationsEnabled: root.animOn
         actionable: root.canTogglePlaying
         opacity: root.canTogglePlaying ? 1 : 0.4
-        onClicked: root.togglePlaying()
+        onClicked: {
+          root.togglePlaying()
+          content.forceActiveFocus()
+        }
+
+        // Same transport slide-fade as the bar module: play arrives from the
+        // right, pause from the left, and each glyph leaves the way its
+        // counterpart came from. The slot is clipped so the travel stays
+        // inside the pad.
+        Item {
+          anchors.fill: parent
+          clip: true
+
+          CrossfadeIcon {
+            anchors.centerIn: parent
+            name: root.playing ? "pause" : "play"
+            colorKey: "foreground_0"
+            size: content.padIcon
+            slideX: Ui.s
+            durationMs: Ui.slowMs
+            fadeEasing: Easing.OutCubic
+            directionFor: glyph => glyph === "play" ? 1 : -1
+          }
+        }
       }
 
       IconButton {
@@ -577,7 +655,10 @@ QtObject {
         animationsEnabled: root.animOn
         actionable: root.hasTrack && root.player?.canGoNext !== false
         opacity: root.hasTrack ? 1 : 0.4
-        onClicked: root.nextTrack()
+        onClicked: {
+          root.nextTrack()
+          content.forceActiveFocus()
+        }
       }
     }
 
@@ -1018,6 +1099,46 @@ QtObject {
       }
     }
 
+    // Artwork-only view: a cover click fades this over the whole surface. The
+    // image keeps its own aspect ratio and fits inside the window with the
+    // same screen-relative padding as the composition, so a portrait or wide
+    // cover scales up without cropping. A click or Esc goes back to the
+    // transcript. The overlay is the last child so it paints over the lyrics,
+    // their effect passes and the transport.
+    Rectangle {
+      id: artView
+
+      anchors.fill: parent
+      color: root.backdropColor
+      opacity: root.artExpanded ? 1 : 0
+      visible: opacity > 0.01
+      z: 10
+
+      Behavior on opacity {
+        enabled: root.animOn
+        NumberAnimation {
+          duration: Ui.normalMs
+          easing.type: Easing.InOutCubic
+        }
+      }
+
+      Image {
+        anchors.fill: parent
+        anchors.margins: content.pad
+        source: root.artUrl
+        asynchronous: true
+        cache: true
+        retainWhileLoading: true
+        fillMode: Image.PreserveAspectFit
+        sourceSize.width: 2048
+      }
+
+      MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.artExpanded = false
+      }
+    }
   }
   }
 }
