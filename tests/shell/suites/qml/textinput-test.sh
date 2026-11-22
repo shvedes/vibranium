@@ -558,6 +558,46 @@ else
     "MotionPolicy is disabled on this host; with animations off the field stays still"
 fi
 
+t_section "UI-1: one tick, one shared CapsJitter smoothing leg"
+if [[ "$(qp_get probe.motion.enabled)" == "true" ]]; then
+  qp_assert "the password's jx leg is the one CapsJitter.poseMs value" \
+    capsPose.pw.behaviorMs "$(qp_get capsPose.pw.expectedMs)"
+  qp_assert "and so is its jy leg" \
+    capsPose.pw.behaviorYMs "$(qp_get capsPose.pw.expectedMs)"
+  qp_assert "the sensitive input's jx leg is the same published value" \
+    capsPose.in.behaviorMs "$(qp_get capsPose.in.expectedMs)"
+  qp_assert "and so is its jy leg" \
+    capsPose.in.behaviorYMs "$(qp_get capsPose.in.expectedMs)"
+  t_eq "the one published leg is the original 220ms" "220" \
+    "$(qp_get capsPose.legValue)"
+  t_eq "the password leg outlives the shortest possible cadence by design" "true" \
+    "$(qp_get capsPose.pw.beyondCadence)"
+  t_eq "and so does the input's" "true" "$(qp_get capsPose.in.beyondCadence)"
+
+  t_eq "the password step is big enough to observe" "true" \
+    "$(qp_get capsPose.pw.bigStep)"
+  t_eq "the input step is big enough to observe" "true" \
+    "$(qp_get capsPose.in.bigStep)"
+  t_eq "the password pose moves through distinct in-flight values" "true" \
+    "$(qp_get capsPose.pw.inFlight)"
+  t_eq "the input pose moves through distinct in-flight values" "true" \
+    "$(qp_get capsPose.in.inFlight)"
+  t_eq "PasswordBox's scale-1 poses are byte-identical to the original two-argument call" "true" \
+    "$(qp_get capsPose.pw.poseMatchesOriginal)"
+  t_note "After one hand-written tick, 24 short turns sample jx. The value rises from rest through several distinct in-flight poses toward the new pose: no instant jump and no frozen pose. The leg is longer than the cadence on purpose - consecutive poses blend, which is the original look. Both widgets take their duration from MotionPolicy.duration(CapsJitter.poseMs()) - one value in CapsJitter.js, no copy in either widget."
+else
+  t_skip "the shared smoothing leg" \
+    "MotionPolicy is disabled on this host, so the Behavior is off and the in-flight motion cannot be observed"
+fi
+t_eq "an animated:false box never starts its jitter Timer" "0" "$(qp_get capsPose.still.tick1)"
+t_eq "and still has not ticked on the next turn" "0" "$(qp_get capsPose.still.tick2)"
+t_note "With animations off the caps Timer does not run, so capsTick stays at 0 and the echo does not move. PasswordBox gates the Timer on MotionPolicy.enabled && root.animated; InputField gates it through capsEcho.visible, which is root._capsPaint = capsActive && MotionPolicy.enabled && text.length > 0 && _capsField."
+if grep -q '220' "$SHELL_DIR/common/ui/PasswordBox.qml" "$SHELL_DIR/common/ui/InputField.qml"; then
+  t_no "no literal 220 remains in either widget" "$(grep -n '220' "$SHELL_DIR/common/ui/PasswordBox.qml" "$SHELL_DIR/common/ui/InputField.qml")"
+else
+  t_ok "no literal 220 remains in either widget"
+fi
+
 t_section "a failure re-masks a revealed password without clearing it"
 t_eq "the reveal is dropped on failure" "false" "$(qp_get fail.revealed.stillRevealed)"
 t_eq "the display row paints only the mask" "******" "$(qp_get fail.revealed.glyphText)"

@@ -33,6 +33,7 @@
 import QtQuick
 import Quickshell
 import qs.common
+import "common/motion/CapsJitter.js" as CapsJitter
 
 Window {
   id: root
@@ -42,6 +43,22 @@ Window {
   visible: true
 
   property int phase: 0
+
+  // UI-1 smoothing sample: one hand-written tick, then consecutive short
+  // turns that must show the pose moving toward the new target and arriving.
+  property int smoothTurn: 0
+  property real pwFirstX: 0
+  property real pwLastX: 0
+  property int pwRises: 0
+  property real pwToX: 0
+  property real pwTick: 0
+  property real inFirstX: 0
+  property real inLastX: 0
+  property int inRises: 0
+  property real inToX: 0
+  property real inTick: 0
+  property string pwSamples: ""
+  property string inSamples: ""
 
   // Signal bookkeeping. `edited` is the one InputField signal a caller can
   // reach without a key event, and the property worth asserting is the count:
@@ -149,6 +166,12 @@ Window {
   // headlessly (no compositor, no QTest), so the primitive the key branch
   // calls is what gets asserted.
   PasswordBox { id: pwErase; y: 700; x: 600 }
+  // UI-1: the tick is the only pose clock and the shared leg smooths the
+  // move between two ticks. capsActive starts false so the probe can stop the
+  // random Timer before it fires and drive consecutive poses by hand.
+  PasswordBox { id: pwCapsSmooth; y: 700; x: 60; text: "abcd" }
+  PasswordBox { id: pwCapsStill; y: 700; x: 380; text: "abcd"; capsActive: true; animated: false }
+  InputField { id: ifCapsSmooth; y: 700; x: 60; width: 260; sensitive: true; text: "abcd" }
 
   // ---- the event loop -------------------------------------------------
 
@@ -178,6 +201,17 @@ Window {
   // Past 600 + 1400, which is where a restarted window lands.
   Timer { id: rest; interval: 2100; onTriggered: onRest() }
 
+  // One turn after construction, once the Repeater delegates exist. The
+  // widget timers are stopped here, so the only tick in the sample is the
+  // one this probe writes.
+  Timer { id: smoothKick; interval: 1; onTriggered: startSmoothSample() }
+  Timer {
+    id: smoothSampler
+    interval: 4
+    repeat: true
+    onTriggered: sampleSmooth()
+  }
+
   Component.onCompleted: {
     kv("textinput.error", "none")
     try {
@@ -187,6 +221,7 @@ Window {
       land.start()
       half.start()
       rest.start()
+      smoothKick.start()
     } catch (e) {
       kv("textinput.error", "" + (e && e.message ? e.message : e))
       console.log("##DONE##")
@@ -1046,11 +1081,164 @@ Window {
     plain.grabFocus()
   }
 
+  // ---- UI-1: one tick, one shared smoothing leg -----------------------
+
+  // The shortest cadence nextInterval can ever produce. The published leg is
+  // deliberately LONGER than this: consecutive poses blend into one another,
+  // which is the original look. The probe only checks that the leg is shared
+  // by both fields and that a tick still moves the glyphs in flight.
+  function minIntervalMs(scale) {
+    const s = scale > 0 ? Math.sqrt(scale) : 1
+    return Math.max(35, Math.round(70 / s))
+  }
+
+  // Read one delegate's pose and the real duration of its jx/jy animations.
+  function poseAt(p, i) {
+    const r = repeaterOf(p)
+    const it = r ? r.itemAt(i) : null
+    return it ? { x: it.jx, y: it.jy, dur: it.poseDuration, durY: it.poseDurationY } : null
+  }
+
+  // Pick the first tick whose jx is clearly above rest, so a monotone
+  // approach from 0 to the pose is unambiguous.
+  function posedTick(scale) {
+    // The pose amplitude is 3 * scale, so the threshold must be relative to
+    // the field's scale or a small field can never satisfy it.
+    for (let t = 1; t < 60; t++) {
+      if (CapsJitter.offsetX(0, t, scale) > 1.5 * scale) return t
+    }
+    return 1
+  }
+
+  function ceTick() {
+    const ce = capsEchoOf(ifCapsSmooth)
+    return ce ? ce.tick : "missing"
+  }
+
+  // PasswordBox's _capsScale is 1, so passing it through offsetX/Y must give
+  // byte-identical numbers to the pre-audit two-argument call. Compared as
+  // strings so a single different digit fails, not just a rounded tolerance.
+  function reportPoseCompat() {
+    let ok = pwCapsStill._capsScale === 1
+    for (let t = 0; t < 5 && ok; t++) {
+      pwCapsStill.capsTick = t
+      for (let i = 0; i < 5 && ok; i++) {
+        if (String(pwCapsStill.jitterX(i)) !== String(CapsJitter.offsetX(i, t))) ok = false
+        if (String(pwCapsStill.jitterY(i)) !== String(CapsJitter.offsetY(i, t))) ok = false
+      }
+    }
+    pwCapsStill.capsTick = 0
+    kv("capsPose.pw.poseMatchesOriginal", ok)
+  }
+
+  function startSmoothSample() {
+    const pwScale = pwCapsSmooth._capsScale
+    const inScale = ifCapsSmooth._capsScale
+    const ce = capsEchoOf(ifCapsSmooth)
+
+    root.pwTick = posedTick(pwScale)
+    root.inTick = posedTick(inScale)
+    root.pwToX = CapsJitter.offsetX(0, root.pwTick, pwScale)
+    root.inToX = CapsJitter.offsetX(0, root.inTick, inScale)
+
+    pwCapsSmooth.capsActive = true
+    pwCapsSmooth.capsTick = root.pwTick
+    ifCapsSmooth.capsActive = true
+    if (ce) ce.tick = root.inTick
+    // Stop only after activating: stopping an already-stopped Timer is a
+    // no-op that leaves its `running` binding live, so it would re-arm as
+    // soon as capsActive went true.
+    pwCapsSmooth.capsTimer.stop()
+    if (ce) ce.jitterTimer.stop()
+
+    root.smoothTurn = 0
+    root.pwSamples = ""
+    root.inSamples = ""
+    root.pwFirstX = 0
+    root.pwLastX = 0
+    root.pwRises = 0
+    root.inFirstX = 0
+    root.inLastX = 0
+    root.inRises = 0
+    smoothSampler.start()
+  }
+
+  function sampleSmooth() {
+    root.smoothTurn++
+    const p = poseAt(pwCapsSmooth, 0)
+    if (p) {
+      if (root.smoothTurn === 1) root.pwFirstX = p.x
+      if (p.x > root.pwLastX + 1e-6) root.pwRises++
+      root.pwLastX = p.x
+      root.pwSamples += (root.smoothTurn > 1 ? "," : "") + p.x.toFixed(3)
+        + "/" + pwCapsSmooth.capsTick
+    }
+    const i = poseAt(ifCapsSmooth, 0)
+    if (i) {
+      if (root.smoothTurn === 1) root.inFirstX = i.x
+      if (i.x > root.inLastX + 1e-6) root.inRises++
+      root.inLastX = i.x
+      root.inSamples += (root.smoothTurn > 1 ? "," : "") + i.x.toFixed(3)
+        + "/" + (ceTick())
+    }
+    if (root.smoothTurn >= 24) {
+      smoothSampler.stop()
+      reportSmoothArrival(p, i)
+    }
+  }
+
+  function reportSmoothArrival(p, i) {
+    const pwScale = pwCapsSmooth._capsScale
+    const inScale = ifCapsSmooth._capsScale
+    const leg = CapsJitter.poseMs()
+    const pwExpected = leg
+    const inExpected = leg
+    const pwMin = minIntervalMs(pwScale)
+    const inMin = minIntervalMs(inScale)
+
+    kv("capsPose.legValue", leg)
+    kv("capsPose.pw.behaviorMs", p ? p.dur : "missing")
+    kv("capsPose.pw.behaviorYMs", p ? p.durY : "missing")
+    kv("capsPose.pw.expectedMs", pwExpected)
+    kv("capsPose.pw.minIntervalMs", pwMin)
+    kv("capsPose.pw.beyondCadence", !!p && p.dur > pwMin && p.durY > pwMin)
+    kv("capsPose.pw.delta", root.pwToX)
+    kv("capsPose.pw.bigStep", root.pwToX > 1.5 * pwScale)
+    kv("capsPose.pw.firstX", root.pwFirstX)
+    kv("capsPose.pw.lastX", root.pwLastX)
+    kv("capsPose.pw.toX", root.pwToX)
+    kv("capsPose.pw.rises", root.pwRises)
+    kv("capsPose.pw.samples", root.pwSamples)
+    kv("capsPose.pw.inFlight", root.pwRises >= 2
+      && root.pwFirstX < root.pwToX - 0.05
+      && root.pwLastX > root.pwFirstX + 0.05)
+
+    kv("capsPose.in.behaviorMs", i ? i.dur : "missing")
+    kv("capsPose.in.behaviorYMs", i ? i.durY : "missing")
+    kv("capsPose.in.expectedMs", inExpected)
+    kv("capsPose.in.minIntervalMs", inMin)
+    kv("capsPose.in.beyondCadence", !!i && i.dur > inMin && i.durY > inMin)
+    kv("capsPose.in.delta", root.inToX)
+    kv("capsPose.in.bigStep", root.inToX > 1.5 * inScale)
+    kv("capsPose.in.firstX", root.inFirstX)
+    kv("capsPose.in.lastX", root.inLastX)
+    kv("capsPose.in.toX", root.inToX)
+    kv("capsPose.in.rises", root.inRises)
+    kv("capsPose.in.samples", root.inSamples)
+    kv("capsPose.in.inFlight", root.inRises >= 2
+      && root.inFirstX < root.inToX - 0.05
+      && root.inLastX > root.inFirstX + 0.05)
+  }
+
   // ---- the event-loop turns -------------------------------------------
 
   // 40ms in. The chip is mid-fade, the failure window is still open, and the
   // display rows have settled on their text.
   function onFirstTick() {
+    // animated:false stops the Timer even while capsActive is true, so the
+    // tick must still be 0 here and on the next turn.
+    kv("capsPose.still.tick1", pwCapsStill.capsTick)
+    reportPoseCompat()
     const chip = chipOf(chipFader)
     kv("anim.eventLoopRan", true)
     kv("anim.chip.opacity", chip ? chip.opacity : "missing")
@@ -1144,6 +1332,7 @@ Window {
   // incoming layer is still at zero while at 80ms both layers are
   // strictly mid-flight (rise and opacity alike).
   function onSecondTick() {
+    kv("capsPose.still.tick2", pwCapsStill.capsTick)
     const gl = ghostLayers(swapper)
     kv("anim.ghost.layers", gl.length)
     if (gl.length === 3) {
@@ -1436,6 +1625,18 @@ Window {
     for (let i = 0; i < all.length; i++) {
       const n = all[i]
       if (n && typeof n.count === "number" && typeof n.itemAt === "function") return n
+    }
+    return null
+  }
+
+  // InputField's caps echo owns both the tick and the pose helpers; finding
+  // it by its two members keeps the probe independent of its position in the
+  // tree.
+  function capsEchoOf(p) {
+    const all = descendants(p, [])
+    for (let i = 0; i < all.length; i++) {
+      const n = all[i]
+      if (n && typeof n.tick === "number" && typeof n.jitterX === "function") return n
     }
     return null
   }

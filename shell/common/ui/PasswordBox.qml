@@ -40,14 +40,18 @@ Rectangle {
   // glyph without touching the model and delegates never rebuild.
   property int capsTick: 0
 
+  // This box is CapsJitter's reference field (44px box, 24px echo), so its
+  // share of the reference pose is exactly 1.
+  readonly property real _capsScale: 1
+
   function jitterX(i) {
     if (!MotionPolicy.enabled || !root.capsActive) return 0
-    return CapsJitter.offsetX(i, root.capsTick)
+    return CapsJitter.offsetX(i, root.capsTick, root._capsScale)
   }
 
   function jitterY(i) {
     if (!MotionPolicy.enabled || !root.capsActive) return 0
-    return CapsJitter.offsetY(i, root.capsTick)
+    return CapsJitter.offsetY(i, root.capsTick, root._capsScale)
   }
 
   // Irregular cadence: a steady metronome reads as a wobble, while the point
@@ -63,9 +67,13 @@ Rectangle {
     interval: 110
     onTriggered: {
       root.capsTick += 1
-      interval = CapsJitter.nextInterval()
+      interval = CapsJitter.nextInterval(root._capsScale)
     }
   }
+
+  // The tick clock, exposed so a probe can drive consecutive poses without
+  // the random cadence moving underneath it.
+  readonly property alias capsTimer: capsJitter
 
   // Silences border fades and the shake for minimal setups.
   property bool animated: true
@@ -408,28 +416,32 @@ Rectangle {
             }
           }
 
-          // Caps on: each glyph jumps to its own pose on every tick. A
-          // transform only, so the row's measure and its eased recentring
-          // never see the motion. With animations running the pose glides and
-          // the path is followable; with the global switch off the same pose
-          // lands in one frame.
+          // Caps on: the tick is the only source of the pose. The one shared
+          // leg smooths between two poses and deliberately outlives a tick,
+          // so consecutive poses blend - the original look. A transform
+          // only, so the row's measure and its eased recentring never see the
+          // motion.
           property real jx: root.jitterX(glyphCell.index)
           property real jy: root.jitterY(glyphCell.index)
 
           Behavior on jx {
             enabled: MotionPolicy.enabled && root.animated
             NumberAnimation {
-              duration: 220
+              id: capsJxAnim
+              duration: MotionPolicy.duration(CapsJitter.poseMs())
               easing.type: Easing.OutCubic
             }
           }
           Behavior on jy {
             enabled: MotionPolicy.enabled && root.animated
             NumberAnimation {
-              duration: 220
+              id: capsJyAnim
+              duration: MotionPolicy.duration(CapsJitter.poseMs())
               easing.type: Easing.OutCubic
             }
           }
+          readonly property int poseDuration: capsJxAnim.duration
+          readonly property int poseDurationY: capsJyAnim.duration
 
           transform: Translate {
             x: glyphCell.jx

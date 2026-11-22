@@ -715,6 +715,10 @@ Rectangle {
         }
       }
 
+      // The tick clock, exposed so a probe can drive consecutive poses
+      // without the random cadence moving underneath it.
+      readonly property alias jitterTimer: capsJitter
+
       Row {
         id: capsRow
 
@@ -747,23 +751,30 @@ Rectangle {
               }
             }
 
+            // The tick is the only source of the pose. The one shared leg
+            // smooths between two poses and deliberately outlives a tick, so
+            // consecutive poses blend - the original look.
             property real jx: capsEcho.jitterX(capsCell.index)
             property real jy: capsEcho.jitterY(capsCell.index)
 
             Behavior on jx {
               enabled: MotionPolicy.enabled
               NumberAnimation {
-                duration: 220
+                id: capsJxAnim
+                duration: MotionPolicy.duration(CapsJitter.poseMs())
                 easing.type: Easing.OutCubic
               }
             }
             Behavior on jy {
               enabled: MotionPolicy.enabled
               NumberAnimation {
-                duration: 220
+                id: capsJyAnim
+                duration: MotionPolicy.duration(CapsJitter.poseMs())
                 easing.type: Easing.OutCubic
               }
             }
+            readonly property int poseDuration: capsJxAnim.duration
+            readonly property int poseDurationY: capsJyAnim.duration
 
             transform: Translate {
               x: capsCell.jx

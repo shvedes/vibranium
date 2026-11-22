@@ -47,3 +47,12 @@ function nextInterval(scale) {
   const s = scale > 0 ? Math.sqrt(scale) : 1
   return Math.max(35, Math.round((70 + Math.random() * 90) / s))
 }
+
+// The one smoothing leg between two poses. It deliberately outlives a tick:
+// the next pose arrives before the current tween has finished, so consecutive
+// poses blend into each other. That blend is the look, not a bug - a leg
+// shorter than the cadence reads as a jump instead. The value lives here so
+// both fields agree on it instead of each carrying a copy.
+function poseMs() {
+  return 220
+}
