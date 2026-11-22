@@ -578,15 +578,12 @@ WlSessionLockSurface {
     anchors.rightMargin: Ui.outerPad
     anchors.bottomMargin: Ui.outerPad
     spacing: Ui.s / 2
+    // Rides the panel's own entry value like the pill above: appearK is
+    // already animated and gated, so a second tween here would trail it and
+    // would still fade when motion is off.
     opacity: panel.appearK
 
     readonly property real maxLineW: surface.width * 0.45
-
-    Behavior on opacity {
-      NumberAnimation {
-        duration: 200
-      }
-    }
 
     Text {
       width: Math.min(implicitWidth, caffeineHint.maxLineW)
