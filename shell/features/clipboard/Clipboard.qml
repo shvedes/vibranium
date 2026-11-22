@@ -1599,11 +1599,16 @@ Singleton {
     dimProc.running = true
   }
   function _dequeueDim() {
-    if (root.dimQueue.length === 0) return
-    const next = root.dimQueue[0]
-    root.dimQueue = root.dimQueue.slice(1)
-    // Defer to avoid reentrancy with onExited
-    Qt.callLater(() => root._probeDims(next))
+    // A queued id can be deleted before its turn. A declined probe starts no
+    // child, so no later onExited would ever drain the rest - skip the ids
+    // that no longer resolve instead of stranding the queue behind the first
+    // one. This runs one turn after onExited, so calling the probe here is
+    // already out of the child's signal.
+    while (root.dimQueue.length > 0 && !dimProc.running) {
+      const next = root.dimQueue[0]
+      root.dimQueue = root.dimQueue.slice(1)
+      root._probeDims(next)
+    }
   }
 
   // --- dimension probe (ImageMagick ships in vb-base.pkgs) ---
