@@ -1065,7 +1065,9 @@ Item {
       focusCtrl.grabList()
     }
     onEscaped: panel.escapeSearch()
-    onFocusedChanged: focusCtrl.mode = themeSearch.focused ? "filter" : "list"
+    // Mode ownership stays with PanelFocus: its searchField Connections
+    // reasserts on the same focus edge, so a request that never wins the
+    // keyboard grant cannot declare filter mode here.
   }
 
   function _key(name, color) {

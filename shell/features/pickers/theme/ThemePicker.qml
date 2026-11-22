@@ -472,16 +472,21 @@ Singleton {
   function _finishScan(st) {
     if (st.gen !== root._scanGen) return
     root._scanJob = null
+    // A refresh or dir change that landed mid-scan is newer than every row in
+    // st. Publishing those rows now would show a set read before that request
+    // for one frame, so retire st and start the queued scan instead: the last
+    // completed cache stays up until the new scan lands. The reader is shared,
+    // so only one job is ever live at a time (see _doScan).
+    if (root._scanQueued) {
+      root._scanQueued = false
+      root._doScan()
+      return
+    }
     const out = st.out
     out.sort((a, b) => root._compareAlpha(a.label, b.label))
 
     root._cached = out
     root.rows = root._buildRows(out)
-
-    if (root._scanQueued) {
-      root._scanQueued = false
-      root._doScan()
-    }
   }
 
   // --- public API ---
