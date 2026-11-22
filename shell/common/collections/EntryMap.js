@@ -9,9 +9,14 @@
 //
 // A missing or non-object map reads as empty, so a first write after a reset
 // does not throw into a change handler.
+//
+// Every copy is a null-prototype map. A key named "constructor", "toString" or
+// "__proto__" is then an ordinary own entry instead of a prototype member, so
+// a caller's hasOwnProperty test is the only membership question it has to
+// ask. This holds across mutations: each copy is allocated the same way.
 function withEntry(entries, key, entry) {
   const base = entries !== null && typeof entries === "object" ? entries : {}
-  const next = Object.assign({}, base)
+  const next = Object.assign(Object.create(null), base)
   next[key] = entry
   return next
 }
@@ -21,7 +26,7 @@ function withEntry(entries, key, entry) {
 // binding still sees a new value.
 function withoutEntry(entries, key) {
   const base = entries !== null && typeof entries === "object" ? entries : {}
-  const next = Object.assign({}, base)
+  const next = Object.assign(Object.create(null), base)
   delete next[key]
   return next
 }

@@ -1,14 +1,20 @@
 #!/usr/bin/env node
-// Suite: common/collections/ - the two bounded stores and the pure row
-// geometry.
+// Suite: common/collections/ - the two bounded stores, the copy-on-write
+// entry map and the pure row geometry.
 //
-// Three files with no Qt imports, so a plain node harness can drive all of
+// Four files with no Qt imports, so a plain node harness can drive all of
 // them. Every one of them is small and every one of them has a documented
 // contract that is easy to get subtly wrong:
 //
 //   BoundedCache    in place, capacity floor 1, recency refreshed by reads
 //   FrozenFootprint copy on write, refuses a collapsed measurement
+//   EntryMap        copy on write, null-prototype maps with no inherited keys
 //   ZoneGeometry    pure numbers, a row identified by (kind, id)
+//
+// OptimisticSet.qml is a QML component and cannot be loaded by this harness;
+// there is no collections QML probe pattern to extend. Its side of the same
+// contract (null-prototype seed, own-property membership tests) is pinned as
+// a static assertion below, next to the EntryMap behavior it depends on.
 //
 // The two bounded stores are the interesting pair: they are both LRU maps
 // with the same capacity floor and the same exempt-written-key rule, and they
@@ -37,9 +43,10 @@ const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const SRC = (name) => path.join(SHELL, 'common/collections', name)
 const BC = loadLib(SRC('BoundedCache.js'))
 const FF = loadLib(SRC('FrozenFootprint.js'))
+const EM = loadLib(SRC('EntryMap.js'))
 const ZG = loadLib(SRC('ZoneGeometry.js'))
 
-suite('common/collections', 'BoundedCache, FrozenFootprint, ZoneGeometry')
+suite('common/collections', 'BoundedCache, FrozenFootprint, EntryMap, ZoneGeometry')
 
 // ---------------------------------------------------------------------------
 section('BoundedCache.create - the capacity is the contract')
@@ -1103,6 +1110,65 @@ group('the geometry functions require the caller\'s real arrays and maps', () =>
     ZG.rowIndexMap([])
     ZG.dropCandidates([], [], [0], [], () => false)
   })
+})
+
+// ---------------------------------------------------------------------------
+section('EntryMap - copy-on-write maps have no inherited keys')
+// ---------------------------------------------------------------------------
+group('every mutation allocates a null-prototype map', () => {
+  const first = EM.withEntry(undefined, 'a', 1)
+  is('an absent base is a null-prototype map', first, (m) => Object.getPrototypeOf(m) === null, 'null prototype')
+  eq('and holds the written key', { ...first }, { a: 1 })
+  const fromPlain = EM.withEntry({}, 'a', 1)
+  is('a plain-object base is copied into a null-prototype map', fromPlain, (m) => Object.getPrototypeOf(m) === null, 'null prototype')
+  const second = EM.withEntry(fromPlain, 'b', 2)
+  is('a second mutation keeps the null prototype', second, (m) => Object.getPrototypeOf(m) === null, 'null prototype')
+  eq('both writes survive', { ...second }, { a: 1, b: 2 })
+  is('the input map is not mutated', fromPlain, (m) => Object.keys(m).length === 1, 'one key')
+})
+group('a prototype name is an ordinary own key, write and remove', () => {
+  // `pending[key] !== undefined` answers true for every key on
+  // Object.prototype. The map must have no prototype and the value written
+  // under a prototype name must be a real own entry, not a shadow of one.
+  for (const key of ['constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__']) {
+    const written = EM.withEntry(undefined, key, true)
+    is(`${key}: the map has a null prototype`, written, (m) => Object.getPrototypeOf(m) === null, 'null prototype')
+    is(`${key}: the key is own`, written, (m) => Object.prototype.hasOwnProperty.call(m, key), 'own key')
+    eq(`${key}: reads back its stored value`, written[key], true)
+    const removed = EM.withoutEntry(written, key)
+    is(`${key}: the key can be removed`, removed, (m) => !Object.prototype.hasOwnProperty.call(m, key), 'absent')
+    eq(`${key}: reads back undefined after removal`, removed[key], undefined)
+  }
+})
+group('withoutEntry keeps the null prototype, including on a miss', () => {
+  const base = EM.withEntry(undefined, 'a', 1)
+  const miss = EM.withoutEntry(base, 'absent')
+  is('a miss still returns a null-prototype map', miss, (m) => Object.getPrototypeOf(m) === null, 'null prototype')
+  is('and a new object, so a QML property assignment notifies', miss, (m) => m !== base, 'not the input map')
+  eq('the original still holds its key', base.a, 1)
+  for (const [label, bad] of [['null', null], ['undefined', undefined], ['a number', 7], ['a string', 'x']]) {
+    const afterPut = EM.withEntry(bad, 'k', 1)
+    is(`withEntry on ${label} is null-prototype`, afterPut, (m) => Object.getPrototypeOf(m) === null, 'null prototype')
+    const afterDrop = EM.withoutEntry(bad, 'k')
+    is(`withoutEntry on ${label} is null-prototype`, afterDrop, (m) => Object.getPrototypeOf(m) === null, 'null prototype')
+  }
+})
+
+// ---------------------------------------------------------------------------
+section('OptimisticSet.qml - the QML side of the same contract')
+// ---------------------------------------------------------------------------
+group('the seed and all four membership tests bypass the prototype chain', () => {
+  // No collections QML probe pattern exists to extend, and this harness cannot
+  // load a QtObject. The static assertion pins the source shape: a
+  // null-prototype seed, four own-property membership tests, and no test that
+  // can mistake an inherited Object.prototype member for a marked key.
+  const src = fs.readFileSync(SRC('OptimisticSet.qml'), 'utf8')
+  contains('pending is seeded with Object.create(null)', src, 'property var pending: Object.create(null)')
+  is('all four membership tests use hasOwnProperty.call', src.match(/Object\.prototype\.hasOwnProperty\.call\(root\.pending, key\)/g) || [], (found) => found.length === 4, 'four calls')
+  notMatch('no !== undefined membership test remains', src, /root\.pending\[key\]\s*!==\s*undefined/)
+  notMatch('no === undefined membership test remains', src, /root\.pending\[key\]\s*===\s*undefined/)
+  contains('mark still writes through the shared primitive', src, 'EntryMap.withEntry')
+  contains('confirm and cancel still use the shared primitive', src, 'EntryMap.withoutEntry')
 })
 
 // ---------------------------------------------------------------------------
