@@ -33,7 +33,8 @@ Singleton {
   // Maintained alongside _slots: count is read from a binding, and
   // Object.keys().length rebuilt the key list on every evaluation of every
   // reader. One increment at the mutation boundary is cheaper than a key
-  // enumeration per read.
+  // enumeration per read. _setSlots() is that boundary and the only writer
+  // of both fields, so the mirror cannot drift.
   property var _slots: ({})
   property int _count: 0
   property string _helperState: "absent"
@@ -50,6 +51,13 @@ Singleton {
     return String(value === undefined || value === null ? "" : value)
   }
 
+  // The single writer of the slot map and its mirror: assign both in one call
+  // so _count can never describe a different map than the one just published.
+  function _setSlots(next, delta) {
+    root._slots = next
+    root._count = root._count + delta
+  }
+
   // A handle is an opaque caller-side name, never the value itself: it is
   // safe to log, compare, and put in a DTO.
   function stash(handle, value) {
@@ -59,8 +67,7 @@ Singleton {
     const next = Object.assign({}, root._slots)
     const added = next[key] === undefined
     next[key] = text
-    root._slots = next
-    if (added) root._count += 1
+    root._setSlots(next, added ? 1 : 0)
     return true
   }
 
@@ -103,8 +110,7 @@ Singleton {
     if (key === "" || root._slots[key] === undefined) return false
     const next = Object.assign({}, root._slots)
     delete next[key]
-    root._slots = next
-    root._count = Math.max(0, root._count - 1)
+    root._setSlots(next, -1)
     return true
   }
 
@@ -120,8 +126,7 @@ Singleton {
 
   function clear() {
     const n = root._count
-    root._slots = ({})
-    root._count = 0
+    root._setSlots({}, -n)
     return n
   }
 

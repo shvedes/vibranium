@@ -6,9 +6,10 @@
 // is reassigned rather than mutated, an empty handle is a no-op, and every
 // drop is named in string form because that is what the tracking list holds.
 
+import fs from 'node:fs'
 import path from 'node:path'
 import { loadLib } from '../../lib/qmlloader.mjs'
-import { suite, section, group, eq, is, finish } from '../../lib/assert.mjs'
+import { suite, section, group, eq, is, contains, notContains, finish } from '../../lib/assert.mjs'
 
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const SO = loadLib(path.join(SHELL, 'common', 'security', 'SecretOwnership.js'))
@@ -107,6 +108,41 @@ group('an empty or missing list drops nothing', () => {
   eq('empty releases to empty', SO.releaseAll(store, []).length, 0)
   eq('null releases to empty', SO.releaseAll(store, null).length, 0)
   eq('no drops happened', store.dropped.length, 0)
+})
+
+// ---------------------------------------------------------------------------
+section('LCK-8 - SecretStore has one mutation boundary')
+// ---------------------------------------------------------------------------
+
+// The store is a QML singleton with no offscreen backend, so its counters are
+// pinned at the source: _slots and _count must be assigned in the same single
+// function, and every caller must go through it.
+const STORE_SRC = fs.readFileSync(path.join(SHELL, 'common', 'security', 'SecretStore.qml'), 'utf8')
+
+group('both mirrors have exactly one writer', () => {
+  contains('the single boundary exists', STORE_SRC, 'function _setSlots(next, delta)')
+  eq('one boundary definition', (STORE_SRC.match(/function _setSlots\(/g) || []).length, 1)
+  eq('one _slots assignment', (STORE_SRC.match(/root\._slots\s*=/g) || []).length, 1)
+  eq('one _count assignment', (STORE_SRC.match(/root\._count\s*=/g) || []).length, 1)
+  contains('the boundary assigns them together', STORE_SRC,
+    'root._slots = next\n    root._count = root._count + delta')
+})
+
+group('all three mutations funnel through it', () => {
+  eq('three callers', (STORE_SRC.match(/root\._setSlots\(/g) || []).length, 3)
+  contains('stash routes through it', STORE_SRC, 'root._setSlots(next, added ? 1 : 0)')
+  contains('drop routes through it', STORE_SRC, 'root._setSlots(next, -1)')
+  contains('clear routes through it', STORE_SRC, 'root._setSlots({}, -n)')
+  notContains('drop no longer masks a desync', STORE_SRC, 'Math.max')
+})
+
+group('the credential and helper contracts survive', () => {
+  contains('the count is still a derivation in the header', STORE_SRC, 'readonly property int count: root._count')
+  contains('the performance trade is still documented', STORE_SRC, 'Object.keys().length')
+  contains('the slot-before-sink order survives', STORE_SRC, 'root.drop(key)')
+  contains('the helper state latch survives', STORE_SRC, 'property string _helperState: "absent"')
+  contains('the helper nonce latch survives', STORE_SRC, 'property string _helperNonce: ""')
+  contains('the helper verdict record survives', STORE_SRC, '{ ok: true, code: "verified" }')
 })
 
 finish()
