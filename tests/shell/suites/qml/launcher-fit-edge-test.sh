@@ -102,4 +102,17 @@ qp_assert "open seat bumped the generation" "swap.genBumped" "true"
 qp_assert "open seat installed once" "swap.installsAfterSeat" "1"
 qp_assert "stale deferred install retired" "swap.staleRetired" "true"
 
+t_section "LNC-11: cursor decisions read the live model"
+qp_assert "cursor readers were found in source" "cursor.source.found" "true"
+qp_assert "currentRecord derives from the live model" "cursor.source.live" "true"
+qp_assert "no cursor reader indexes panel.rows" "cursor.source.noProducer" "true"
+qp_assert "first-normal and selectable read the live view" "cursor.source.seatLive" "true"
+qp_assert "the seat index is taken after installRows" "cursor.source.seatAfterInstall" "true"
+qp_assert "first normal names the live set" "cursor.first" "1"
+qp_assert "selectable walks the live set" "cursor.selectable" "false,true"
+qp_assert "current row names the live record" "cursor.record" "app:live"
+qp_assert "delete key reads the live record" "cursor.deleteLive" "true"
+qp_assert "info names the live record" "cursor.info" "1"
+qp_assert "activation names the live record" "cursor.activated" "app:live"
+
 t_summary

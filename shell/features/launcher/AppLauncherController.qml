@@ -267,10 +267,10 @@ Item {
   // _requestTime); entries older than _timeTtlMs re-probe on demand and tick
   // while visible.
   property var timeCache: ({})
-  // Zone waiting for the probe while another zone's run is in flight.
-  // Serializes requests so an aborted run can never attribute its output
-  // to the wrong timezone.
-  property string _timePendingZone: ""
+  // Zones asked while a probe is in flight. One slot overwrote a pending
+  // second when a third arrived; the queue keeps every intent, in demand
+  // order, so a run can never attribute its output to the wrong timezone.
+  property var _timePendingZones: []
   readonly property int _timeTtlMs: 15000
 
   // Response bodies for the "value <CUR> in <CUR>" rows: URL ->
@@ -635,9 +635,9 @@ Item {
   // "01:00 PM|CDT|-0500|..." where the zone keeps a 12-hour dial). The dial
   // comes from the zone, not from the OS, so the row reads the way the place
   // reads however this machine is set up. The verdict lands in timeCache
-  // keyed by zone; a run already in flight for the same zone is left alone, a
-  // different zone waits its turn via _timePendingZone so outputs can never
-  // swap zones.
+  // keyed by zone; a run already in flight for the same zone is left alone,
+  // and different zones wait their turn in _timePendingZones so outputs can
+  // never swap zones.
   function requestTime(tz) {
     // Fresh cache answers without spawning: items() asks on every
     // recompute, so an unguarded probe re-arms itself forever
@@ -649,7 +649,9 @@ Item {
     }
     if (timeProc.running) {
       if (timeProc.zone === tz) return
-      root._timePendingZone = tz
+      if (root._timePendingZones.indexOf(tz) < 0) {
+        root._timePendingZones = root._timePendingZones.concat([tz])
+      }
       return
     }
     timeProc.zone = tz
@@ -710,10 +712,20 @@ Item {
         changed = true
       }
     }
-    const pending = root._timePendingZone
-    root._timePendingZone = ""
-    if (pending !== "" && pending !== tz) root.requestTime(pending)
+    root._drainTimeQueue()
     if (changed && AppLauncher.visible) root.recompute()
+  }
+
+  // One queued zone per exit. A warm cache answers without a run, so keep
+  // walking until a probe actually starts or the queue is empty.
+  function _drainTimeQueue() {
+    if (timeProc.running) return
+    while (root._timePendingZones.length > 0) {
+      const next = root._timePendingZones[0]
+      root._timePendingZones = root._timePendingZones.slice(1)
+      root.requestTime(next)
+      if (timeProc.running) return
+    }
   }
 
   // On-demand fetch for a granted plugin (see requestNet in AppLauncher.qml).
@@ -797,7 +809,7 @@ Item {
       if (budget > 0) xhr.timeout = budget
       xhr.open("GET", u)
       xhr.send()
-    } catch (e) { root._settleNet(u, "") }
+    } catch (e) { finish("") }
   }
 
   function _settleNet(url, body) {
@@ -1959,6 +1971,9 @@ Item {
   Process {
     id: tryExecProc
 
+    // StdioCollector.text is read-only and has no clear method; Quickshell
+    // replaces it with the new run's buffer at stream end, and the verdict
+    // reads it only from onExited. No stale text can reach the registry.
     stdout: StdioCollector { id: tryExecOut }
     stderr: StdioCollector {}
 
@@ -1973,6 +1988,7 @@ Item {
   Process {
     id: binProc
 
+    // Per-run buffer, as for tryExecOut: the verdict reads text only at exit.
     stdout: StdioCollector { id: binOut }
     stderr: StdioCollector {}
 

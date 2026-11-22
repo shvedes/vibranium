@@ -236,8 +236,8 @@ PanelCard {
   // suggestion row (kind "file" with clip:true) sits above the idle list
   // but must never be the automatic focus on open - see AppLauncher.
   function _firstNormalIndex() {
-    for (let i = 0; i < panel.rows.length; i++) {
-      const r = panel.rows[i]
+    for (let i = 0; i < panel._records.length; i++) {
+      const r = panel.currentRecord(i)
       if (!r) continue
       if (r.clip === true) continue
       if (r.kind === "separator") continue
@@ -272,16 +272,12 @@ PanelCard {
   // Stamping the synthesized key onto the record would hide it, at the
   // price of the panel writing a field into a record the service owns.
   //
-  // The view's rows and `panel.rows` are two arrays that agree only
-  // immediately after a successful install. Six readers index one by the
-  // other's index - _firstNormalIndex and isSelectable take a view index into
-  // panel.rows, and toggleInfoCurrent, toggleDeleteCurrent and
-  // activateCurrent take list.currentIndex into panel.rows - so a refused
-  // install leaves the view on the previous set with panel.rows already moved
-  // on, and a cursor action would name the record the cursor is not on.
-  // Nothing the shipped producers emit can refuse an install, and every
-  // other keyed panel accepts the same exposure, so this inherits that
-  // discipline rather than inventing a second scheme.
+  // Cursor decisions read this array, never panel.rows. A refused install
+  // leaves the producer array ahead of the view, so a key action that indexed
+  // it would name a record the cursor is not on. panel.rows is producer input
+  // to keyedRows() only; every seat and key action resolves its record through
+  // currentRecord() on the model the view holds.
+  //
   // The live row objects the view shows. The List reads this array
   // directly as its model: ListView diffs array swaps by index, so a filter
   // tick that mints fresh records updates each slot in place and drops only
@@ -289,6 +285,13 @@ PanelCard {
   // they do under a keyed ScriptModel with pooled reuse. The records reach
   // the delegate whole, as modelData - there is no wrapper role to unwrap.
   property var _records: []
+  // The view's row at an index (default: under the cursor). One read behind
+  // every cursor decision and every seat: the view holds _records, while
+  // panel.rows is producer input that can be ahead of it after a refusal.
+  function currentRecord(idx) {
+    const i = idx === undefined ? list.currentIndex : idx
+    return i >= 0 && i < panel._records.length ? panel._records[i] : null
+  }
   // Identity epoch for the height table. A plain array reports neither a
   // revision nor a key-set flag, so the panel owns the counter: installRows
   // folds the key sequence into _lastSeq and every sequence that differs from
@@ -575,15 +578,16 @@ PanelCard {
     // otherwise re-measure from nothing.
     if (panel._openSeat === true) {
       panel._openSeat = false
-      const openIdx = panel._firstNormalIndex()
       list.beginSwap()
       panel.installRows()
+      // Seat from the model that was just installed: a refusal left the old
+      // set in the view, and that is the set the cursor has to name.
+      const openIdx = panel._firstNormalIndex()
       list.seat(openIdx >= 0 ? openIdx : -1, "land")
       list.seatTo(0, false, "launcher-open")
       list.endSwap()
       return true
     }
-    const idx = panel._firstNormalIndex()
     // Durations are zeroed around the install either way so the seat never
     // glides, and an identical row set needs no separate skip: the model's
     // `values` reassignment is the diff and a re-rank that keeps the key
@@ -592,6 +596,8 @@ PanelCard {
     panel._maybeSwapFade()
     list.beginSwap()
     panel.installRows()
+    // Read the seat from the installed model, not the pending producer rows.
+    const idx = panel._firstNormalIndex()
     list.seat(idx >= 0 ? idx : -1, "land")
     list.seatTo(0, false, "launcher-swap")
     list.endSwap()
@@ -681,7 +687,6 @@ PanelCard {
       const clipHeaded = panel.rows.length > 0 && panel.rows[0].clip === true
       panel._swapGen++
       const g = panel._swapGen
-      const idx = panel._firstNormalIndex()
       if (clipHeaded) {
         // Clipboard suggestion heads the list: rest at the top without
         // fighting centerCursor. settle(idx, true) snaps instantly with
@@ -689,6 +694,9 @@ PanelCard {
         list.swapRun(g, v => v === panel._swapGen, () => {
           panel._maybeSwapFade()
           panel.installRows()
+          // The seat names the row the view now holds, even if the install
+          // was refused and this is the previous set.
+          const idx = panel._firstNormalIndex()
           panel._openSeat = false
           if (idx >= 0) list.settle(idx, true)
           else list.seat(-1, "land")
@@ -713,6 +721,7 @@ PanelCard {
           // here, the diff applied below in the same block).
           panel._maybeSwapFade()
           panel.installRows()
+          const idx = panel._firstNormalIndex()
           // Head-stable filter tick: the head record survived with the same
           // key AND the cursor already sits on it, so keep cursor, scroll
           // and highlight parked instead of re-settling row 0. The open
@@ -755,8 +764,7 @@ PanelCard {
   property int _infoIndex: -1
   function toggleInfoCurrent() {
     const idx = list.currentIndex
-    if (idx < 0 || idx >= panel.rows.length) return
-    const rec = panel.rows[idx]
+    const rec = panel.currentRecord()
     if (!rec || rec.desc === "") return
     _infoIndex = _infoIndex === idx ? -1 : idx
     list.autoRevealIndex = _infoIndex
@@ -766,8 +774,7 @@ PanelCard {
   // field arms its destructive keys from this, so with nothing removable under
   // the cursor Delete keeps editing the query instead of being swallowed.
   readonly property bool deleteKeyAvailable: {
-    const idx = list.currentIndex
-    const rec = idx >= 0 && idx < panel.rows.length ? panel.rows[idx] : null
+    const rec = panel.currentRecord()
     return !!rec && rec.kind === "app" && rec.removable === true
   }
 
@@ -829,12 +836,12 @@ PanelCard {
         return
       }
       _deleteStage++
-      if (_deleteStage === 1) AppLauncher.requestDelete(panel.rows[idx])
+      if (_deleteStage === 1) AppLauncher.requestDelete(panel.currentRecord())
       list.autoRevealIndex = idx
       return
     }
     // Fresh open.
-    const rec = idx >= 0 && idx < panel.rows.length ? panel.rows[idx] : null
+    const rec = panel.currentRecord()
     if (rec && rec.removable === true) {
       _deleteIndex = idx
       _deleteStage = 1
@@ -864,14 +871,14 @@ PanelCard {
   function activateCurrent() {
     // The delete confirmation takes precedence over row activation.
     if (panel._deleteIndex >= 0) { panel.acceptDelete(); return }
-    const idx = list.currentIndex
-    if (idx < 0 || idx >= panel.rows.length) {
+    const rec = panel.currentRecord()
+    if (!rec) {
       const fb = panel._firstNormalIndex()
       if (fb >= 0) list.settle(fb, true)
-      else if (panel.rows.length > 0) list.seat(-1, "land")
+      else if (panel._records.length > 0) list.seat(-1, "land")
       return
     }
-    AppLauncher.activate(panel.rows[idx])
+    AppLauncher.activate(rec)
   }
 
   function escapeChain() {
@@ -1203,7 +1210,7 @@ PanelCard {
         // big-list teleport in List clamps overshoot so a wrap landing can
         // never strand the cursor below the window.
         isSelectable: i => {
-          const r = i >= 0 && i < panel.rows.length ? panel.rows[i] : null
+          const r = panel.currentRecord(i)
           return !(r && r.kind === "separator")
         }
         trailSpace: 0

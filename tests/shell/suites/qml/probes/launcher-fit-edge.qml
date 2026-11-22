@@ -280,6 +280,116 @@ Item {
       root, "launcher_entry_stub.qml")
   }
 
+  // LNC-11: cursor decisions must read the view's model, not the producer's
+  // pending array. The functions and the two callbacks are lifted verbatim;
+  // only the component boundaries (panel, list, AppLauncher) are rewritten.
+  function cursorStrings() {
+    return {
+      current: extract(root.source, "currentRecord"),
+      first: extract(root.source, "_firstNormalIndex"),
+      info: extract(root.source, "toggleInfoCurrent"),
+      del: extractBlock(root.source, "readonly property bool deleteKeyAvailable:"),
+      toggleDel: extract(root.source, "toggleDeleteCurrent"),
+      activate: extract(root.source, "activateCurrent"),
+      select: extractBlock(root.source, "isSelectable: i =>")
+    }
+  }
+
+  function buildCursor(b) {
+    let parts = "\n" + b.current + "\n" + b.first + "\n" + b.info + "\n"
+      + "readonly property bool deleteKeyAvailable: " + b.del + "\n"
+      + b.toggleDel + "\n" + b.activate + "\n"
+      + "function isSelectable(i)" + b.select + "\n"
+    parts = parts.replace(/\bpanel\./g, "m.")
+      .replace(/\blist\./g, "m.list.")
+      .replace(/\bAppLauncher\./g, "m.app.")
+
+    return Qt.createQmlObject([
+      'import QtQml',
+      'QtObject {',
+      '  id: m',
+      '  property var _records: [',
+      '    { uid: "sep:", kind: "separator" },',
+      '    { uid: "app:live", kind: "app", removable: true, desc: "live desc" }',
+      '  ]',
+      '  property var rows: [',
+      '    { uid: "app:producer", kind: "app", removable: true, desc: "" },',
+      '    { uid: "sep:", kind: "separator", desc: "" }',
+      '  ]',
+      '  property int _infoIndex: -1',
+      '  property int _deleteIndex: -1',
+      '  property int _deleteStage: 0',
+      '  property var activated: null',
+      '  property int settles: 0',
+      '  property int settleIdx: -1',
+      '  property QtObject list: QtObject {',
+      '    id: lst',
+      '    property int currentIndex: 1',
+      '    property int autoRevealIndex: -1',
+      '    function isSelectable(i) { return m.isSelectable(i) }',
+      '    function settle(i, now) { m.settles++; m.settleIdx = i }',
+      '    function seat(i, how) {}',
+      '  }',
+      '  property QtObject app: QtObject {',
+      '    function activate(rec) { m.activated = rec ? rec.uid : "none" }',
+      '    function requestDelete(rec) {}',
+      '    function confirmDelete() {}',
+      '  }',
+      '  function closeDelete() { m._deleteIndex = -1; m._deleteStage = 0 }',
+      '  function acceptDelete() {}',
+      '  function flashNotDeletable(idx) {}',
+      parts,
+      '}'
+    ].join("\n"), root, "launcher_cursor_slice.qml")
+  }
+
+  function driveCursor() {
+    const b = cursorStrings()
+    let found = true
+    for (const k in b) if (b[k] === "") found = false
+    kv("cursor.source.found", found)
+    if (!found) {
+      kv("cursor.source.live", false)
+      kv("cursor.source.noProducer", false)
+      kv("cursor.source.seatLive", false)
+      kv("cursor.source.seatAfterInstall", false)
+      kv("cursor.first", "missing")
+      kv("cursor.selectable", "missing")
+      kv("cursor.record", "missing")
+      kv("cursor.deleteLive", "missing")
+      kv("cursor.info", "missing")
+      kv("cursor.activated", "missing")
+      return
+    }
+    const code = codeOnly(root.source)
+    kv("cursor.source.live", /function currentRecord\b/.test(code)
+      && /_records\[/.test(b.current))
+    let readers = ""
+    for (const k in b) readers += b[k]
+    kv("cursor.source.noProducer", readers.indexOf("panel.rows") < 0)
+    kv("cursor.source.seatLive", /_records\[/.test(b.current)
+      && /currentRecord/.test(b.first) && /currentRecord/.test(b.select))
+    const syncNow = b.syncNow || extract(root.source, "syncRowsNow")
+    const sync = b.sync || extract(root.source, "syncRows")
+    kv("cursor.source.seatAfterInstall", syncNow !== "" && sync !== ""
+      && syncNow.indexOf("installRows()") < syncNow.indexOf("_firstNormalIndex()")
+      && sync.indexOf("installRows()") < sync.indexOf("_firstNormalIndex()"))
+
+    try {
+      const m = buildCursor(b)
+      kv("cursor.first", m._firstNormalIndex())
+      kv("cursor.selectable", m.isSelectable(0) + "," + m.isSelectable(1))
+      kv("cursor.record", m.currentRecord() ? m.currentRecord().uid : "none")
+      kv("cursor.deleteLive", m.deleteKeyAvailable)
+      m.toggleInfoCurrent()
+      kv("cursor.info", m._infoIndex)
+      m.activateCurrent()
+      kv("cursor.activated", m.activated ? m.activated : "none")
+    } catch (e) {
+      root.error = String(e && e.message ? e.message : e)
+    }
+  }
+
   function sourceFacts(bodies) {
     const src = root.source
     const from = src.indexOf("function _fitCandidate")
@@ -489,6 +599,11 @@ Item {
   Component.onCompleted: {
     try {
       drive()
+    } catch (e) {
+      root.error = String(e && e.message ? e.message : e)
+    }
+    try {
+      driveCursor()
     } catch (e) {
       root.error = String(e && e.message ? e.message : e)
     }

@@ -68,4 +68,27 @@ qp_assert "no raw auto-select deferral remains" "later.source.noRawAuto" "true"
 qp_assert "no raw try-exec deferral remains" "later.source.noRawTryExec" "true"
 qp_assert "a callback after teardown is a no-op" "later.afterTeardown" "0"
 
+t_section "LNC-12: zone intents are queued, not overwritten"
+qp_assert "pending zones are a queue" "time.source.queue" "true"
+qp_assert "the queue drains one zone per exit" "time.source.drain" "true"
+qp_assert "all requestTime bodies were found" "time.source.found" "true"
+qp_assert "first zone starts" "time.first" "A"
+qp_assert "second intent is queued" "time.pendingAfterSecond" "B"
+qp_assert "third intent is queued too" "time.pendingAfterThird" "B,C"
+qp_assert "second zone runs after the first exits" "time.afterFirst" "B"
+qp_assert "third zone runs after the second exits" "time.afterSecond" "C"
+qp_assert "no zone is probed twice" "time.sequence" "A,B,C"
+
+t_section "LNC-12: a send failure goes through finish"
+qp_assert "the send catch calls finish" "net.source.sendCatch" "true"
+qp_assert "the send catch does not settle directly" "net.source.noDirectSettle" "true"
+qp_assert "the failure settles once" "net.settled" "http://x="
+qp_assert "the handle is removed from the live set" "net.live" "0"
+qp_assert "finish marked the handle done" "net.doneHandles" "1"
+
+t_section "LNC-12: collector text is read from the run just exited"
+qp_assert "try-exec verdict is read in the exit callback" "collector.source.tryExec" "true"
+qp_assert "bin verdict is read in the exit callback" "collector.source.bin" "true"
+qp_assert "collector text is fresh on the next exit" "collector.runtime.freshAtExit" "true"
+
 t_summary

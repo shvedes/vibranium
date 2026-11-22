@@ -18,6 +18,7 @@
 //          it was scheduled, so a torn-down controller cannot be touched.
 
 import QtQuick
+import Quickshell.Io
 
 Item {
   id: root
@@ -27,6 +28,46 @@ Item {
   property string error: ""
   property string ctl: ""
   property string facade: ""
+
+  // The collector fact needs a real child process, so the sentinel waits for
+  // both the source slices and that two-run probe to finish.
+  property bool factsDone: false
+  property bool collectorDone: false
+  property int collectorExits: 0
+
+  function maybeDone() {
+    if (!root.factsDone || !root.collectorDone) return
+    kv("probe.error", root.error)
+    console.log("##DONE##")
+  }
+
+  Process {
+    id: collectorProc
+    stdout: StdioCollector { id: collectorOut }
+    onExited: {
+      root.collectorExits++
+      if (root.collectorExits === 1) {
+        Qt.callLater(function () {
+          collectorProc.command = ["sh", "-c", "true"]
+          collectorProc.running = true
+        })
+        return
+      }
+      kv("collector.runtime.freshAtExit", collectorOut.text === "")
+      root.collectorDone = true
+      root.maybeDone()
+    }
+  }
+  Timer {
+    id: collectorWatchdog
+    interval: 4000
+    onTriggered: {
+      if (root.collectorDone) return
+      kv("collector.runtime.freshAtExit", "unverified")
+      root.collectorDone = true
+      root.maybeDone()
+    }
+  }
 
   function kv(key, value) {
     console.log("##KV## " + key + "=" + String(value).replace(/\n/g, "\\n"))
@@ -109,6 +150,12 @@ Item {
       prewarm: extract(f, "_prewarm"),
       open: extract(f, "open"),
       replay: blockAfter(f, comp < 0 ? 0 : comp, "if (root.visible)"),
+      timeAsk: extract(c, "requestTime"),
+      timeExit: extract(c, "_onTimeProbed"),
+      timeDrain: extract(c, "_drainTimeQueue"),
+      net: extract(c, "requestNet"),
+      tryExec: extract(c, "_onTryExecScanned"),
+      binScan: extract(c, "_onBinariesScanned"),
     }
   }
 
@@ -229,6 +276,79 @@ Item {
     ].join("\n"), root, "launcher_later_slice.qml")
   }
 
+  // ---- LNC-12: zone intent queue slice ----------------------------------
+  function buildTime(b) {
+    const ask = b.timeAsk
+      .replace(/\btimeProc\.running = true\b/g,
+        "timeProc.running = true; root.started.push(timeProc.zone)")
+      .replace(/\broot\./g, "m.")
+      .replace(/\btimeProc\./g, "m.proc.")
+      .replace(/\bLauncherLib\.timeProbeFormat\(tz\)/g, "m.fmt(tz)")
+      .replace(/\bLauncherLib\.timeVerdict\([^)]*\)/g, "m.verdict()")
+      .replace(/\bAppLauncher\.visible\b/g, "m.visible")
+    const exit = b.timeExit.replace(/\broot\./g, "m.")
+      .replace(/\bAppLauncher\.visible\b/g, "m.visible")
+      .replace(/\btimeProc\./g, "m.proc.")
+      .replace(/\bLauncherLib\.timeVerdict\([^)]*\)/g, "m.verdict()")
+    let lines = [
+      'import QtQml',
+      'QtObject {',
+      '  id: m',
+      '  property bool visible: false',
+      '  property var timeCache: ({})',
+      '  property int _timeTtlMs: 1000',
+      '  property string _timePendingZone: ""',
+      '  property var _timePendingZones: []',
+      '  property var started: []',
+      '  property QtObject proc: QtObject {',
+      '    id: tp',
+      '    property bool running: false',
+      '    property string zone: ""',
+      '    property string out: ""',
+      '    property var environment: ({})',
+      '    property var command: []',
+      '  }',
+      '  function fmt(tz) { return "%H:%M" }',
+      '  function verdict() { return { changed: false, reading: {} } }',
+      '  function recompute() {}',
+      '  ' + ask,
+      '  ' + exit,
+    ]
+    if (b.timeDrain !== "") {
+      lines.push('  ' + b.timeDrain.replace(/\broot\./g, "m.").replace(/\btimeProc\./g, "m.proc."))
+    }
+    lines.push('  function fireExited() { m.proc.running = false; m._onTimeProbed() }')
+    lines.push('}')
+    return Qt.createQmlObject(lines.join("\n"), root, "launcher_time_slice.qml")
+  }
+
+  // ---- LNC-12: send-failure slice ----------------------------------------
+  function buildNet(b) {
+    const n = b.net.replace(/\broot\./g, "m.")
+      .replace(/new XMLHttpRequest\(\)/g, "m.newXhr()")
+      .replace(/\bAppLauncher\._netLogPathLimit\b/g, "m.netLogLimit")
+      .replace(/\bLog\.at\(\)/g, "m.logAt()")
+    return Qt.createQmlObject([
+      'import QtQml',
+      'QtObject {',
+      '  id: m',
+      '  property var netCache: ({})',
+      '  property var _netPending: ({})',
+      '  property var _netLive: []',
+      '  property var settled: []',
+      '  property int _netRetryMs: 1000',
+      '  property int _netTtlMs: 5000',
+      '  property int netLogLimit: 40',
+      '  function _settleNet(u, body) { m.settled.push(u + "=" + body) }',
+      '  function newXhr() {',
+      '    return { readyState: 0, open: function () {}, send: function () { throw new Error("boom") } }',
+      '  }',
+      '  function logAt() { return { allows: function () { return false } } }',
+      '  ' + n,
+      '}'
+    ].join("\n"), root, "launcher_net_slice.qml")
+  }
+
   function sourceFacts(b) {
     const c = codeOnly(root.ctl)
     const f = codeOnly(root.facade)
@@ -267,6 +387,25 @@ Item {
     kv("later.source.wrapper", /function _later\(/.test(c) && /life\.alive/.test(b.later))
     kv("later.source.noRawAuto", c.indexOf("Qt.callLater(root._maybeAutoSelect)") < 0)
     kv("later.source.noRawTryExec", c.indexOf("Qt.callLater(() => root._scanTryExec())") < 0)
+
+    // LNC-12: queued zone intents.
+    kv("time.source.queue", /property var _timePendingZones/.test(c)
+      && b.timeAsk.indexOf("_timePendingZones") >= 0)
+    kv("time.source.drain", b.timeDrain !== ""
+      && b.timeExit.indexOf("_drainTimeQueue") >= 0)
+    kv("time.source.found", b.timeAsk !== "" && b.timeExit !== "")
+
+    // LNC-12: a throwing send must go through the handle's finish().
+    const sendAt = b.net.indexOf("xhr.send()")
+    const tail = sendAt >= 0 ? b.net.slice(sendAt) : ""
+    kv("net.source.sendCatch", /catch \(e\) \{ finish\(""\) \}/.test(tail))
+    kv("net.source.noDirectSettle", tail.indexOf("catch (e) { root._settleNet") < 0)
+
+    // LNC-12: the collector verdicts are read only from the run that exited.
+    kv("collector.source.tryExec", b.tryExec.indexOf("tryExecOut.text") >= 0
+      && /onExited: root\._onTryExecScanned\(\)/.test(c))
+    kv("collector.source.bin", b.binScan.indexOf("binOut.text") >= 0
+      && /onExited: root\._onBinariesScanned\(\)/.test(c))
   }
 
   function drive() {
@@ -337,6 +476,45 @@ Item {
       l.drain()
       kv("later.afterTeardown", l.calls)
     }
+
+    // LNC-12: three zones while one probe is in flight: none may be lost.
+    if (b.timeAsk !== "" && b.timeExit !== "" && b.timeDrain !== "") {
+      const t = buildTime(b)
+      const pending = () => t._timePendingZones.length > 0
+        ? t._timePendingZones.join(",") : t._timePendingZone
+      t.requestTime("A")
+      kv("time.first", t.proc.zone)
+      t.requestTime("B")
+      kv("time.pendingAfterSecond", pending())
+      t.requestTime("C")
+      kv("time.pendingAfterThird", pending())
+      t.fireExited()
+      kv("time.afterFirst", t.proc.zone)
+      t.fireExited()
+      kv("time.afterSecond", t.proc.zone)
+      t.fireExited()
+      kv("time.sequence", t.started.join(","))
+    } else {
+      kv("time.first", "missing")
+      kv("time.pendingAfterSecond", "missing")
+      kv("time.pendingAfterThird", "missing")
+      kv("time.afterFirst", "missing")
+      kv("time.afterSecond", "missing")
+      kv("time.sequence", "missing")
+    }
+
+    // LNC-12: a throwing send settles through handle.done, not around it.
+    if (b.net !== "") {
+      const n = buildNet(b)
+      n.requestNet("http://x", 0)
+      kv("net.settled", n.settled.join("|"))
+      kv("net.live", n._netLive.filter(h => !h.done).length)
+      kv("net.doneHandles", n._netLive.filter(h => h.done).length)
+    } else {
+      kv("net.settled", "missing")
+      kv("net.live", "missing")
+      kv("net.doneHandles", "missing")
+    }
   }
 
   Component.onCompleted: {
@@ -345,7 +523,10 @@ Item {
     } catch (e) {
       root.error = String(e && e.message ? e.message : e)
     }
-    kv("probe.error", root.error)
-    console.log("##DONE##")
+    root.factsDone = true
+    collectorWatchdog.start()
+    collectorProc.command = ["sh", "-c", "printf first"]
+    collectorProc.running = true
+    root.maybeDone()
   }
 }
