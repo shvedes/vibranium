@@ -45,6 +45,12 @@
 #   tests/shell/demos/notification-showcase.sh            # dry run
 #   tests/shell/demos/notification-showcase.sh --send     # post the cards
 #   tests/shell/demos/notification-showcase.sh --send --only progress
+#   tests/shell/demos/notification-showcase.sh --send --lifetimes
+#
+# --lifetimes posts one burst instead of the catalogue: eight cards with
+# staggered deadlines and two that never expire. It holds the desktop long
+# enough to watch each card arrive, each deadline reflow the pile, and the two
+# persistent cards slide out when they are dismissed at the end.
 #
 # The dry run is the default because the cards appear on the user's desktop and
 # a critical card is, by design, persistent.
@@ -61,9 +67,11 @@ SELF="${0##*/}"
 SEND=false
 LIST=false
 KEEP=false
+LIFETIMES=false
 ONLY=""
 DELAY=1.0
 DWELL=4.0
+LIFETIME_OBSERVE=12
 
 # Counters, reported at the end of the run.
 PLANNED=0
@@ -114,6 +122,8 @@ Options:
                         is cleared before the next one starts.
       --keep            Do not dismiss the waves; leave every card up.
       --list            Print the case catalogue and exit.
+      --lifetimes       Post one burst of staggered deadlines and persistent
+                        cards, then hold while they expire.
   -v, --verbose           Enable verbose output
   -h, --help              Show this help message and exit
 EOF
@@ -127,6 +137,10 @@ while (($# > 0)); do
       ;;
     --keep)
       KEEP=true
+      shift
+      ;;
+    --lifetimes)
+      LIFETIMES=true
       shift
       ;;
     --list)
@@ -664,6 +678,53 @@ case_replace_id() {
     "The same card, new content."
 }
 
+# --- the lifetime pile -----------------------------------------------------
+#
+# One burst rather than a wave per feature. The first two and the last one
+# never expire, so they stay while the six timed cards drop out in a different
+# order from the one they arrived in. That is the case the catalogue cannot
+# show: a pile reflowing around persistent cards as deadlines land one by one.
+#
+# Each entry is "timeout|urgency|summary|body". A zero timeout is the D-Bus
+# "never expire" value; critical is persistent whatever it asks for.
+
+LIFETIME_CARDS=(
+  "0|critical|Persistent, critical|Red and never expiring, whatever timeout it sent"
+  "0|normal|Persistent, normal|expire_timeout 0: no deadline at all"
+  "1500|normal|Short, 1.5s|The first timed card to go"
+  "3000|normal|Medium, 3s|Its exit reflows the cards above it"
+  "5000|normal|Mid, 5s|The shell's default deadline"
+  "8000|normal|Long, 8s|Outlives the three shorter cards"
+  "12000|normal|Longest, 12s|The last timed card to drop"
+  "0|normal|Persistent, last|A second normal card that stays"
+)
+
+run_lifetimes() {
+  printf '  %s%-24s%s %s\n' "$BOLD" "lifetime-pile" "$RESET" \
+    "$DIM${#LIFETIME_CARDS[@]} cards, two persistent, six staggered deadlines$RESET"
+
+  local entry timeout urgency summary body
+  for entry in "${LIFETIME_CARDS[@]}"; do
+    IFS='|' read -r timeout urgency summary body <<<"$entry"
+    local -a argv=(notify-send -p -a "Vibranium Lifetimes" -t "$timeout")
+    if [[ "$urgency" != "normal" ]]; then
+      argv+=(-u "$urgency")
+    fi
+    argv+=("$summary" "$body")
+    post "$summary" "" "${argv[@]}"
+
+    if [[ "$SEND" == true && "$DELAY" != "0" ]]; then
+      sleep "$DELAY"
+    fi
+  done
+
+  if [[ "$SEND" == true ]]; then
+    printf '  %sholding %ss while the deadlines land%s\n' \
+      "$DIM" "$LIFETIME_OBSERVE" "$RESET"
+    sleep "$LIFETIME_OBSERVE"
+  fi
+}
+
 # The catalogue, in the order the cases run. Each entry is "name|note", and
 # a "---" entry ends a wave.
 CATALOGUE=(
@@ -774,33 +835,37 @@ _dismiss_wave() {
   WAVE_START=${#POSTED_IDS[@]}
 }
 
-for entry in "${CATALOGUE[@]}"; do
-  if [[ "$entry" == "---" ]]; then
-    if [[ "$KEEP" != true && "$SEND" == true ]]; then
-      sleep "$DWELL"
-      _dismiss_wave
+if [[ "$LIFETIMES" == true ]]; then
+  run_lifetimes
+else
+  for entry in "${CATALOGUE[@]}"; do
+    if [[ "$entry" == "---" ]]; then
+      if [[ "$KEEP" != true && "$SEND" == true ]]; then
+        sleep "$DWELL"
+        _dismiss_wave
+      fi
+      WAVE=$((WAVE + 1))
+      continue
     fi
-    WAVE=$((WAVE + 1))
-    continue
-  fi
 
-  name="${entry%%|*}"
-  note="${entry#*|}"
-  _selected "$name" || continue
+    name="${entry%%|*}"
+    note="${entry#*|}"
+    _selected "$name" || continue
 
-  fn="case_${name//-/_}"
-  if ! declare -F "$fn" >/dev/null; then
-    log Error "no such case: $name"
-    continue
-  fi
+    fn="case_${name//-/_}"
+    if ! declare -F "$fn" >/dev/null; then
+      log Error "no such case: $name"
+      continue
+    fi
 
-  printf '  %s%-24s%s %s\n' "$BOLD" "$name" "$RESET" "$DIM$note$RESET"
-  "$fn"
+    printf '  %s%-24s%s %s\n' "$BOLD" "$name" "$RESET" "$DIM$note$RESET"
+    "$fn"
 
-  if [[ "$SEND" == true && "$DELAY" != "0" ]]; then
-    sleep "$DELAY"
-  fi
-done
+    if [[ "$SEND" == true && "$DELAY" != "0" ]]; then
+      sleep "$DELAY"
+    fi
+  done
+fi
 
 if [[ "$KEEP" != true && "$SEND" == true ]]; then
   sleep "$DWELL"

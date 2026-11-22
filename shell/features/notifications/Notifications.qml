@@ -70,11 +70,12 @@ Singleton {
   // cards than this and the pile runs into the bar it is docked to, and on a
   // short screen into the desktop itself.
   //
-  // The bound is the PILE's, not one caller's: `_enforceCardBound()` runs after
-  // every arrival as well as after every do-not-disturb flush. It runs on the
-  // arrival path too, so a client firing forty notifications with no interval
-  // does not put forty cards on screen where the same forty through the buffer
-  // get eight. A bound that only one path applies is not a bound.
+  // The bound is the PILE's, not one caller's: `_reflowSlots()` runs after every
+  // arrival, release and do-not-disturb flush. It runs on the arrival path too,
+  // so a client firing forty notifications with no interval does not put forty
+  // cards on screen where the same forty through the buffer get eight. A bound
+  // that only one path applies is not a bound. A no-deadline card is never the
+  // victim here: transients go first, and pinned newcomers wait in overflow.
   readonly property int maxCards: 8
   // The daemon's own history. Bounded for the same reason every history in
   // this shell is: a session that never clears it must not grow it without
@@ -112,10 +113,38 @@ Singleton {
 
   // --- placement ----------------------------------------------------------
   //
-  // The pile follows the bar: a top bar puts the pile under the bar, a bottom
-  // bar puts it above, and no bar (or a hidden one) leaves the default, top.
-  readonly property bool atTop: DesktopLayoutState.barEnabled
-    ? DesktopLayoutState.barPosition === "top" : true
+  // Position is a Settings > General option. "follow-statusbar" is the rule
+  // this pile originally had: the vertical side comes from the bar, the
+  // horizontal side is always right, and a disabled bar falls back to top
+  // right. The four corners pin both sides outright, independent of the bar.
+  readonly property string _rawPosition: String(Settings.value("shell.notifications.position") ?? "follow-statusbar")
+  readonly property string _position: {
+    const known = ["top-right", "top-left", "bottom-right", "bottom-left", "follow-statusbar"]
+    return known.indexOf(root._rawPosition) >= 0 ? root._rawPosition : "follow-statusbar"
+  }
+  // A dock change reverses the pile order, so every card's slot changes at
+  // once. Suppress both geometry tweens across it: there is no meaningful
+  // motion between the two arrangements, and tweening through the intermediate
+  // heights left empty slots in the stack.
+  property bool snapReflow: false
+  Timer {
+    id: snapReflowTimer
+    interval: 150
+    repeat: false
+    onTriggered: root.snapReflow = false
+  }
+  function _armSnapReflow(): void {
+    root.snapReflow = true
+    snapReflowTimer.restart()
+  }
+  on_RawPositionChanged: root._armSnapReflow()
+  onAtTopChanged: root._armSnapReflow()
+  onAtRightChanged: root._armSnapReflow()
+  readonly property bool atTop: root._position === "follow-statusbar"
+    ? (DesktopLayoutState.barEnabled ? DesktopLayoutState.barPosition === "top" : true)
+    : root._position === "top-right" || root._position === "top-left"
+  readonly property bool atRight: root._position === "follow-statusbar"
+    || root._position === "top-right" || root._position === "bottom-right"
 
   // The bar clock's own hour format, read off the shared verdict rather
   // than the key: a notification's clock is a timestamp of the same wall
@@ -169,39 +198,14 @@ Singleton {
   // toward a bottom bar, reversed when it grows downward from the top.
   // `arrivalOrder` is named in the chain because the storage order and the
   // drawing order are two different claims about the same list.
-  readonly property var pile: NotificationsLib.pileOrder(
+  readonly property var pile: NotificationsLib.pinnedPileOrder(
     NotificationsLib.arrivalOrder(root._shown()), root.atTop)
   // A card that is fading out is still in `pile` - the release path keeps it
   // there until the fade lands - so the "is a card up" test and the "is a card
   // fading" test are the same test here.
   readonly property bool surfaceVisible: root.pile.length > 0
 
-  // How many cards the last change to the pile put on screen at once, and the
-  // length that number was measured against.
-  //
-  // Counted from the pile's own length rather than carried through the two
-  // admission paths on purpose: there are more than two - an arrival, a
-  // do-not-disturb release, the re-bound after either - and a count set at each
-  // is a claim that has to be kept true by hand at every one of them. The
-  // length delta is the fact itself.
-  //
-  // Read by `isArriving`, which is what decides whether a card is placed by the
-  // pile's current geometry or its final one. It survives a change that does not
-  // alter the length - a card re-measuring rebuilds the derived list without
-  // adding anything - and is cleared by one that shortens it, because a
-  // dismissal means whatever was arriving has already been dealt with.
-  property int arriving: 0
-  property int _pileLength: 0
-
-  function _noteGrowth(): void {
-    const n = root.pile.length
-    if (n > root._pileLength) root.arriving = n - root._pileLength
-    else if (n < root._pileLength) root.arriving = 0
-    root._pileLength = n
-  }
-
   onPileChanged: {
-    root._noteGrowth()
     // -> Pile reassign/arrival/dismiss invalidates the geometry cache.
     root._bumpGeom()
     root._ensureGeom()
@@ -209,56 +213,40 @@ Singleton {
 
   // Is this entry one of the cards the pile is currently growing room for?
   //
-  // The bottom dock is the only dock with a question here, and the reason is the
-  // box the cards live in. At the top dock the box's y is the constant
-  // `topInset`, so a newcomer placed at its own offset is already where it
-  // belongs and nothing has to be second-guessed. At the bottom dock the pile is
-  // anchored by its BOTTOM edge: adding a card moves the box's y target up by a
-  // slot while its height - which is what says how far up the pile reaches -
-  // only catches up over the length of the slide. A card placed by `yOf` in that
-  // window is laid out against the box's OLD top and hangs a full card height
-  // below the bar, off the bottom of the screen, until the box carries it up.
-  // Measured at the bottom dock with the bar edge at 386 and the screen ending
-  // at 426: a newcomer drawn at 392..446 for six frames, which is the
-  // "slides in from outside the screen and over the statusbar" report.
+  // Reconcile the pile with `maxCards` after any membership change.
   //
-  // An arriving card is therefore placed against the box's CURRENT height
-  // rather than its final one - `yOf` plus the box's shortfall, which cancels
-  // the box's motion exactly. It then sits flush against the bar edge from its
-  // first frame and the cards above it do the sliding, which is the part that
-  // should move.
-  function isArriving(entry): bool {
-    if (!entry || root.atTop || root.arriving <= 0) return false
-    const cards = root.pile
-    return cards.indexOf(entry) >= cards.length - root.arriving
-  }
-
-  // Drop the oldest cards until the pile is within `maxCards`. Called after every
-  // arrival and after every do-not-disturb flush, because both are ways for the
-  // pile to grow.
+  // No-deadline cards own their slot until the user dismisses them, so an
+  // arrival never displaces one: oldest transient cards are expired first, and
+  // if the pile is all persistent the newcomer waits in overflow instead. As
+  // soon as a slot opens - a release frees it immediately, before the exit
+  // fade lands - the longest-waiting overflow card is promoted in arrival order.
   //
-  // `expire()` rather than `dismiss()`: the client is told the notification
-  // timed out, which is the honest answer for one the pile has no room for. The
-  // history record was written at admission, so nothing is lost - the card is
-  // simply not on screen any more.
-  function _enforceCardBound(): void {
-    // Counted the same way the DND flush counted them: every tracked entry that
-    // is neither held nor already fading. A held entry is in the buffer, not on
-    // the pile, so expiring it to make room for a card that IS on the pile would
-    // be dropping a notification the user has not been shown yet in order to
-    // keep one they are looking at.
-    const live = []
-    for (let i = 0; i < root._tracked.length; i++) {
-      const entry = root._tracked[i]
-      if (!entry || entry.held || entry.leaving) continue
-      live.push(entry)
+  // `expire()` rather than `dismiss()` for a displaced transient: the client is
+  // told it timed out, which is the honest answer for one the pile has no room
+  // for. The history was written at admission, so nothing is lost.
+  property bool _reflowing: false
+  function _reflowSlots(): void {
+    if (root._reflowing) return
+    root._reflowing = true
+    let live = root._liveShown()
+    let excess = live.length - root.maxCards
+    if (excess > 0) {
+      const moving = live.filter(entry => entry && !entry.persistent)
+      for (let i = 0; i < Math.min(excess, moving.length); i++) root._expire(moving[i])
+      // A DND lift can release more pinned cards than there are slots. The
+      // newest of them wait rather than displacing cards already on screen.
+      live = root._liveShown()
+      excess = live.length - root.maxCards
+      if (excess > 0) {
+        const newest = live.slice().reverse()
+        for (let i = 0; i < excess; i++) newest[i].overflow = true
+      }
     }
-    const excess = live.length - root.maxCards
-    if (excess <= 0) return
-    // Oldest first. Arrival order puts them at the front of this list, and the
-    // card that falls off the far end from the bar is the oldest one whichever
-    // end of the pile that is.
-    for (let i = 0; i < excess; i++) root._expire(live[i])
+    const room = root.maxCards - root._liveShown().length
+    const waiting = root._overflow()
+    const promote = Math.min(room, waiting.length)
+    for (let i = 0; i < promote; i++) waiting[i].overflow = false
+    root._reflowing = false
   }
 
   readonly property int trackedCount: root._tracked.length
@@ -394,11 +382,29 @@ Singleton {
     // entry is parented to this singleton, so its lifetime is the daemon's:
     // there is nothing else that would destroy it if a notification were
     // somehow never closed.
+    // Pin decision is frozen here, from the deadline the daemon actually
+    // armed: critical urgency and an expire_timeout of 0 both answer 0. A
+    // replacement can rewrite the hints later without moving the card (see
+    // onEntryChanged), so it never revisits this answer.
+    const noDeadline = NotificationsLib.timeoutMs(
+      notification.expireTimeout,
+      notification.urgency === NotificationUrgency.Critical,
+      root.defaultTimeoutMs) === 0
+    // A full pile of pinned cards has no slot to give. The newcomer waits in
+    // overflow instead of displacing a card the user asked to keep; a full
+    // pile with any transient still on it can drop that transient instead.
+    const live = root._liveShown()
+    let transientUp = false
+    for (let i = 0; i < live.length; i++) {
+      if (live[i] && !live[i].persistent) { transientUp = true; break }
+    }
     const entry = entryComp.createObject(root, {
       notif: notification,
       notifId: Number(notification.id),
       arrivedAt: Date.now(),
       held: root.dnd,
+      persistent: noDeadline,
+      overflow: !root.dnd && live.length >= root.maxCards && !transientUp,
       replaceTag: tag
     })
     if (!entry) return null
@@ -420,11 +426,9 @@ Singleton {
     // would otherwise be told nothing at all. `closed` below finalises the
     // record; it does not create it.
     root._publishHistory(snapshot)
-    // Every arrival is a way for the pile to grow, so every arrival is checked.
-    // Held entries are skipped inside the call, which is what makes a burst
-    // arriving during do-not-disturb wait in the buffer rather than being
-    // expired on the way in.
-    root._enforceCardBound()
+    // Reconcile slots: a transient may be displaced by the newcomer, but a
+    // pinned card is never pushed off by an arrival.
+    root._reflowSlots()
     root._arm(entry)
     root._armDeadline()
     return entry
@@ -453,6 +457,9 @@ Singleton {
       // in-place replacement: keep the entry's match key current, or the
       // next tagged arrival will not find this card.
       if (snapshot && typeof snapshot.replaceTag === "string") entry.replaceTag = snapshot.replaceTag
+      // An in-place replacement may change the expiry hints, but the card
+      // keeps its pin decision and therefore its slot. It drifts toward the
+      // bar end on its own as transient cards above it leave.
       root._arm(entry)
       root._publishHistory(snapshot)
     }
@@ -511,6 +518,9 @@ Singleton {
   function _release(entry) {
     if (!entry || entry.leaving) return
     entry.leaving = true
+    // A release frees its slot now, before the exit fade lands, so a waiting
+    // card can take it on the same frame the pile starts to close the gap.
+    root._reflowSlots()
     exitTimer.restart()
   }
 
@@ -533,6 +543,7 @@ Singleton {
     }
     if (gone.length === 0) return
     root._tracked = keep
+    root._reflowSlots()
     root._armDeadline()
     Qt.callLater(() => {
       for (let i = 0; i < gone.length; i++) {
@@ -648,11 +659,37 @@ Singleton {
 
   // --- pile queries -------------------------------------------------------
 
+  // Everything drawn: held cards wait in the DND buffer and overflow cards
+  // wait for a pinned slot, so neither belongs to the pile. Leaving cards stay
+  // until their exit lands, so the survivors have something to slide into.
   function _shown() {
     const out = []
     for (let i = 0; i < root._tracked.length; i++) {
       const entry = root._tracked[i]
-      if (!entry || entry.held) continue
+      if (!entry || entry.held || entry.overflow) continue
+      out.push(entry)
+    }
+    return out
+  }
+
+  // The cards actually holding a slot: shown, but not fading out. A released
+  // card frees its slot to the waiting queue while it is still on screen.
+  function _liveShown() {
+    const out = []
+    for (let i = 0; i < root._tracked.length; i++) {
+      const entry = root._tracked[i]
+      if (!entry || entry.held || entry.overflow || entry.leaving) continue
+      out.push(entry)
+    }
+    return out
+  }
+
+  // No-deadline cards waiting in arrival order for a pinned slot to open.
+  function _overflow() {
+    const out = []
+    for (let i = 0; i < root._tracked.length; i++) {
+      const entry = root._tracked[i]
+      if (!entry || !entry.overflow || entry.held || entry.leaving) continue
       out.push(entry)
     }
     return out
@@ -767,11 +804,34 @@ Singleton {
   // a step below Ui.s so a full pile sits closer together - the pile is read as
   // one stack, and Ui.s gaps drew eight separate cards rather than a stack.
   readonly property real cardSpacing: 6
+  // The vertical leg of the diagonal entrance, in pixels. A fixed distance
+  // rather than the arriving card's own height: a delegate measures a couple
+  // of frames short before its body wraps, and a distance read from that would
+  // jump mid-slide. At the bottom dock the growing box already carries the
+  // card up from below, so only the top dock needs this extra leg.
+  readonly property int entrySlideY: 80
 
-  // -> Single source for the exit lifetime: the card fade and the drop timer
-  // -> both read this, so a fade retune cannot desync the drop. Same value as
-  // -> the Ui.fastMs both read before.
-  readonly property int exitMs: Ui.fastMs
+  // The one clock for every notification motion: the card's slide and fade on
+  // arrival and exit, the pile's reflow, the box's growth, and the drop timer.
+  // A corner pile reads as one system only when they all move on the same beat;
+  // a fast reflow under a slow card is the odd one out. Longer than the Ui.fastMs
+  // the rest of the shell reflows on, because a notification that arrives and
+  // leaves in 120ms reads as a flicker and the easing needs room for its tail.
+  readonly property int motionMs: Ui.slowMs + Ui.fastMs
+  // One easing for all of it too. OutQuint commits earlier than OutQuart: most
+  // of the distance is covered in the first quarter of the clock, then the
+  // remaining pixels ease in, so the card reads as arriving quickly and then
+  // settling rather than gliding at an even pace. OutExpo goes further still
+  // but spends its last fifth covering a handful of pixels, which reads as a
+  // hold followed by a hop.
+  readonly property int motionEasing: Easing.OutQuint
+  // Drop a released card when it is visually gone, not when its clock ends.
+  // OutQuint puts opacity under 2% and leaves under 1% of the slide a little
+  // past half of motionMs. Waiting for the full duration held the vacated slot
+  // empty for ~200ms after the card disappeared, which read as the cards above
+  // it pausing before they settled. At this point the remaining pixels are
+  // both off screen and transparent, so cutting the tween is invisible.
+  readonly property int exitDropMs: Math.round(root.motionMs * 0.55)
 
   // --- public actions -----------------------------------------------------
 
@@ -854,7 +914,9 @@ Singleton {
       const entry = root._tracked[i]
       // A released entry is already out of the business of showing and is
       // held for its fade; putting it in the buffer would resurrect it.
-      if (!entry || entry.held || entry.leaving) continue
+      // An overflow card is already out of the pile; marking it held would
+      // leave it in neither queue and never promote it.
+      if (!entry || entry.held || entry.leaving || entry.overflow) continue
       entry.held = true
     }
   }
@@ -871,7 +933,7 @@ Singleton {
     }
     const held = root._held()
     for (let i = 0; i < held.length; i++) held[i].held = false
-    root._enforceCardBound()
+    root._reflowSlots()
   }
 
   // A plain object, and it has to be plain: the Notification is destroyed the
@@ -958,8 +1020,9 @@ Singleton {
 
   Timer {
     id: exitTimer
-    // -> Reads the shared exit token so the drop lands with the card fade.
-    interval: root.exitMs
+    // -> Drops at the visible end of the exit, not the end of its clock, so the
+    // -> pile gets the slot back the moment the card is gone.
+    interval: root.exitDropMs
     repeat: false
     onTriggered: root._dropLeaving()
   }
@@ -1074,7 +1137,9 @@ Singleton {
         dndForcedFullscreen: root.dndForcedFullscreen,
         dndForcedShare: root.dndForcedShare,
         dndForcedLock: root.dndForcedLock,
+        position: root._position,
         atTop: root.atTop,
+        atRight: root.atRight,
         surfaceVisible: root.surfaceVisible,
         // Both halves, because "is a deadline frozen" has a cause and a state
         // and they differ while the surface is down: the hover flag can outlive
@@ -1085,6 +1150,10 @@ Singleton {
         tracked: root.trackedCount,
         shown: root.pile.length,
         leaving: root._leaving(),
+        // No-deadline cards are pinned to the bar end of the pile. The ones
+        // that arrived with every slot taken wait here for a slot to open.
+        persistent: root.pile.filter(entry => entry && entry.persistent).length,
+        overflow: root._overflow().length,
         // The pile's own summaries, top to bottom. The counts above say how
         // many cards there are; this says which they are and in what order,
         // which is the one property of the surface a caller cannot otherwise

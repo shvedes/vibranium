@@ -83,17 +83,13 @@ LayerSurface {
   // that most notifications spent a line on nothing.
   readonly property real cardWidth: Range.clamp(win.width - 2 * win.margin, 200, 330)
 
-  // Whether the pile has been placed at its dock yet. The box's tween is gated
-  // on this so the first layout lands rather than growing up from nothing; see
-  // the Behavior on `pile.height`.
-  property bool placed: false
-
-  // The pile is docked to the bar side. Which side that is comes from the
-  // layout the bar publishes, not from a setting of this feature's own: a top
-  // bar puts the pile under the bar, a bottom bar puts it above, and no bar
-  // (or a hidden one) leaves the default, top. The two insets are written as
-  // one question rather than two, so the pile cannot end up docked to the top
-  // while its bottom inset clears a bar it is not next to.
+  // Vertical dock. The bar's height is reserved only when the bar is actually
+  // on the side the pile chose: "follow statusbar" always is, and an explicit
+  // corner is when it names the bar's side. A corner on the opposite side gets
+  // just the margin - reserving the bar there left a bar-sized empty band
+  // between the cards and the screen edge. The two insets are written as one
+  // question rather than two, so the pile cannot end up docked to the top while
+  // its bottom inset clears a bar it is not next to.
   //
   // An island that overlaps the pile's column adopts the dock (see
   // islandSharing below): the pile parks past the island's far edge instead
@@ -103,7 +99,9 @@ LayerSurface {
   // edge with the pile but not its column. Not held until the island closes -
   // shifted past it - and following resizes live, because the edge below is
   // plain data republished on every park.
-  readonly property real barDock: (DesktopLayoutState.barEnabled ? DesktopLayoutState.barHeight : 0) + win.margin
+  readonly property bool barOnPileSide: DesktopLayoutState.barEnabled
+    && DesktopLayoutState.barPosition === (Notifications.atTop ? "top" : "bottom")
+  readonly property real barDock: (win.barOnPileSide ? DesktopLayoutState.barHeight : 0) + win.margin
   // The island host serving this screen, if any: one IslandHost per bar
   // view registers itself in DesktopLayoutState under its screen name.
   // The island record for this screen ({showing, top, bottom, left, right})
@@ -113,10 +111,13 @@ LayerSurface {
   readonly property string pileScreen: win.screen ? String(win.screen.name || "") : ""
   readonly property var islandRect: DesktopLayoutState.islandFor(win.pileScreen)
   // The pile's own column in the same full-screen coordinates as the island
-  // footprint: right-docked, one card wide, with the same margin on both
-  // sides. This is what decides whether an island is actually near the pile.
-  readonly property real pileLeft: win.width - win.margin - win.cardWidth
-  readonly property real pileRight: win.width - win.margin
+  // footprint: one card wide at the chosen side, with the same margin on the
+  // screen edge. This is what decides whether an island is actually near the
+  // pile, and it follows a left-side setting just as the box itself does.
+  readonly property real pileLeft: Notifications.atRight
+    ? win.width - win.margin - win.cardWidth : win.margin
+  readonly property real pileRight: Notifications.atRight
+    ? win.width - win.margin : win.margin + win.cardWidth
   // An open island on this screen shifts the pile past its far edge, but only
   // when the island's footprint overlaps the pile's column: an island under a
   // module in the middle of the bar shares the bar edge with the pile, not its
@@ -124,8 +125,11 @@ LayerSurface {
   // middle of the screen. Anything else is the bar dock alone: records carry
   // showing=false after close, and a null record (no island, torn-down host)
   // is the same answer.
+  // The island belongs to the bar, so it can only push a pile that is on the
+  // bar's side. A corner chosen opposite the bar has no island to slide past.
   readonly property bool islandSharing: win.islandRect !== null
     && win.islandRect.showing === true
+    && win.barOnPileSide
     && NotificationsLib.islandOverlapsPile(win.islandRect.left, win.islandRect.right,
       win.pileLeft, win.pileRight)
   // The island's far edge in pile coordinates (same screen, so the same
@@ -189,81 +193,23 @@ LayerSurface {
     // a second.
     y: Notifications.atTop ? win.topInset : win.height - win.bottomInset - height
 
-    // Arm the slide once, on the first layout.
-    //
-    // An Item's height starts at 0, so a Behavior armed at construction would
-    // animate the box up from nothing to its first card on every notification
-    // the shell shows - measured at 919.5 settling to 754, which is a
-    // card-height drop-in. The first layout is a placement, not a change of
-    // arrangement; this only disarms the tween afterwards, so the SECOND change
-    // - and every change after it - is the one that animates.
-    function place() {
-      win.placed = true
-    }
-
-    // The box has to move on the same curve as the cards inside it, or the two
-    // disagree and the pile appears to jump.
-    //
-    // Traced at the bottom dock. The box's height is `pileHeight()`, so its
-    // target moves by one card height every time a card is added or removed.
-    // Left to snap, that target is reached in ONE FRAME while the cards inside
-    // glide over `Ui.fastMs`, and the two motions do not cancel:
-    //
-    //   removing a card from three:  the box's height drops 98px instantly
-    //   the card that was below it:   its own y 196 -> 98, i.e. -98px smoothly
-    //   so its ABSOLUTE position went 950 -> 1048 in one frame and then back
-    //   to 950 over the tween - down across the bar and up again
-    //
-    // That is the "jumps over the bar, then goes up again" this fixes, and it
-    // is invisible at the top dock: there the box's y is the constant
-    // `topInset`, so only the height changes and no card's position depends on
-    // it.
-    //
-    // The box's own HEIGHT is the one animated property, and it is animated rather
-    // than left to snap because that is what lets the pile's bottom edge stand
-    // still.
-    //
-    // The defect, measured at the bottom dock. The box's y is anchored by its
-    // bottom edge, so a card arriving moves its target up by a slot, while its
-    // height - which is what says how far up the pile reaches - snapped to the
-    // new total the instant the card arrived. For the length of the y tween the
-    // box was therefore taller than its position accounted for and its bottom
-    // edge hung past the bar: traced at 1189 with the bar edge at 1040, i.e.
-    // 149px below it and off the bottom of the screen, taking seven frames to
-    // settle, with the arriving card drawn down there - the "slides in from
-    // outside the screen and over the statusbar" report.
-    //
-    // Animating the height on the same `Glide` makes the pile grow UPWARD out of
-    // the bar's space instead of arriving from below it, and - because `y` above
-    // is written against this height rather than against `pileHeight()` a second
-    // time - it holds the bar edge exactly, which is also what makes it possible
-    // for a card to cancel the box's motion and sit flush against the bar while
-    // the cards above it do the sliding. That half is in NotificationCard, under
-    // `Notifications.isArriving`; the two are one change.
-    //
-    // No Behavior on `y`, deliberately: it is not an independent quantity to
-    // animate but the bar edge minus the height above it. Animating both is how
-    // the edge drifts.
-    //
-    // Gated on `placed` so the first layout lands instead of animating up from
-    // height 0 - the same reason as the cards, which are constructed at their
-    // bound values. `place()` arms it once and never again; every later change is
-    // this binding's own doing.
+    // The height glides with the cards so a bottom-docked pile grows upward
+    // out of the bar instead of snapping. `y` is still the bar edge minus this
+    // height at every frame, so the bottom edge stays put. Both are suppressed
+    // across a dock change, where the card order reverses and there is nothing
+    // meaningful to glide between.
     Behavior on height {
-      enabled: win.placed && Notifications.animationsEnabled
-      Glide {}
+      enabled: !Notifications.snapReflow && Notifications.animationsEnabled
+      NumberAnimation { duration: Notifications.motionMs; easing.type: Notifications.motionEasing }
     }
     // The cards' box, not the window's: this is what the input region follows.
     height: Notifications.pileHeight()
-    anchors.right: parent.right
-    anchors.rightMargin: win.margin
-
-    // The only call site for place(), and it is deliberate: the box is armed
-    // exactly once, after its first layout, and never again. Every LATER move
-    // is the `y` binding's own doing and is animated by the Behavior above -
-    // including the ones no explicit connection could have listed, which is the
-    // point of the binding.
-    Component.onCompleted: pile.place()
+    // The pile docks straight to the chosen side. No animation on a switch:
+    // an entrance or exit already owns each card's motion, and moving the
+    // whole pile at the same time fights one that is in flight. Snapping also
+    // lands the card reorder on the same frame as the move.
+    x: Notifications.atRight
+      ? parent.width - width - win.margin : win.margin
 
     // Each row carries one role, `entry`: the NotificationEntry its card draws.
     // A role holding the live object rather than a key into a lookup, because

@@ -46,6 +46,15 @@ QtObject {
 
   // True while DND holds it out of the pile.
   property bool held: false
+  // No deadline: critical urgency or an expire_timeout of 0. Frozen at
+  // admission and used to pin the card to the bar end of the visible pile. An
+  // in-place replacement can change its hints without moving the card; it
+  // keeps this answer until it leaves the pile.
+  property bool persistent: false
+  // True while a card waits for a free pinned slot. Kept out of the pile like
+  // a held card, but promoted in arrival order the moment a slot opens rather
+  // than waiting for DND to lift.
+  property bool overflow: false
   // True once the notification has been released and the entry is only still
   // here for the exit fade. The card fades on this and the controller drops
   // the entry when the fade lands, which is what lets the rest of the pile

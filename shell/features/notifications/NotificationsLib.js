@@ -303,6 +303,29 @@ function pileOrder(entries, atTop) {
   return list.slice().reverse()
 }
 
+// Visual order with no-deadline cards pinned to the bar end of the pile.
+// Entries arrive oldest-first. Each bucket keeps its own arrival order,
+// reversed at a top dock so its newest sits nearest the bar. The pinned bucket
+// goes to index 0 at a top dock and to the last index at a bottom dock, which
+// is the bar end in both cases. An entry changes buckets only by leaving the
+// pile: `persistent` is frozen at admission so a replacement that changes the
+// expiry hints keeps the card where it is.
+function pinnedPileOrder(entries, atTop) {
+  const list = StoreGuards.asList(entries)
+  const pinned = []
+  const moving = []
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i]
+    if (!e) continue
+    if (e.persistent === true) pinned.push(e)
+    else moving.push(e)
+  }
+  if (atTop === true) {
+    return pinned.slice().reverse().concat(moving.slice().reverse())
+  }
+  return moving.concat(pinned)
+}
+
 // Newest first, bounded at `limit`.
 //
 // A notification whose id is already recorded is overwritten where it stands

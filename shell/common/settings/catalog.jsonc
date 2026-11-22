@@ -20,6 +20,16 @@
                 },
                 {
                     "type": "group",
+                    "id": "generalNotifications",
+                    "label": "Notifications",
+                    "sub": "Where cards appear",
+                    "icon": "chat",
+                    "children": [
+                        "shell.notifications.position"
+                    ]
+                },
+                {
+                    "type": "group",
                     "id": "generalPrivacy",
                     "label": "Privacy dots",
                     "sub": "On-screen privacy indicators",
@@ -272,6 +282,28 @@
                     "valueLabels": {
                         "12": "12h",
                         "24": "24h"
+                    }
+                },
+                {
+                    "key": "shell.notifications.position",
+                    "type": "string",
+                    "default": "follow-statusbar",
+                    "label": "Position",
+                    "sub": "Position of notifications",
+                    "desc": "Position of notifications",
+                    "values": [
+                        "top-right",
+                        "top-left",
+                        "bottom-right",
+                        "bottom-left",
+                        "follow-statusbar"
+                    ],
+                    "valueLabels": {
+                        "top-right": "Top right",
+                        "top-left": "Top left",
+                        "bottom-right": "Bottom right",
+                        "bottom-left": "Bottom left",
+                        "follow-statusbar": "Follow bar"
                     }
                 },
                 {

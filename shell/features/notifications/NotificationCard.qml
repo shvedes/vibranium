@@ -41,6 +41,11 @@ Rectangle {
   required property var modelData
 
   readonly property var entry: root.modelData
+  // A delegate can briefly outlive its entry when a dismissal and a dock flip
+  // land in the same turn: Qt hands over an empty JS object for the dead role.
+  // Nothing may paint from that object - not even a border on an empty card.
+  readonly property bool hasEntry: !!root.entry && Number(root.entry.notifId) > 0
+  visible: root.hasEntry
 
   // A complete empty snapshot, so every read below is a read of a field that
   // exists. A half-built `{}` makes each of those bindings evaluate to
@@ -226,39 +231,71 @@ Rectangle {
   // this card publishes its own below: a card's height is its content - the
   // six-line body cap, the buttons - and nothing else knows it.
   //
-  // Two placements, and the difference is the bottom dock. At the top dock
-  // `yOf` is the answer on its own: the box's y is the constant `topInset`, so a
-  // newcomer is already in its final place and the pile grows downward from a
-  // fixed edge. At the bottom dock the pile is anchored by its bottom edge, so
-  // the box's y climbs a slot per arrival while its height catches up over the
-  // slide, and a card placed by `yOf` in that window is laid out against the
-  // box's old top - a full card height below the bar, off the bottom of the
-  // screen, until the box carries it up. Measured at the bottom dock: a
-  // newcomer at 392..446 against a bar edge of 386 and a screen ending at 426,
-  // for six frames.
+  // `yOf` is the whole answer at either dock. At the top the box's y is the
+  // constant `topInset` and the pile grows downward from it. At the bottom the
+  // box is anchored by its bottom edge and grows upward, so a card placed at
+  // its final `yOf` starts below the bar while the box catches up - that is
+  // the vertical half of its entrance, and it is off screen horizontally for
+  // that window so it reads as arriving from the corner.
   //
-  // An arriving card is therefore placed against the box's CURRENT height
-  // rather than its final one: `yOf` plus how much the box has still to grow.
-  // That cancels the box's own motion exactly, so the card holds the bar edge
-  // from its first frame and the cards above it do the sliding.
+  // The old correction against the box's shortfall is gone on purpose: it read
+  // the pile total the frame a new card reported its measured height, and a
+  // slide distance derived from that same first-frame height jumped with it.
+  // Together they parked the card a slot out of place at deeper stacks.
+  y: Notifications.yOf(root.entry)
+
+  // The push when the pile grows or shrinks glides here. The dock change is the
+  // one exception: the order reverses there, so the cards take their new slots
+  // on one frame instead of passing through each other.
+  Behavior on y {
+    enabled: !Notifications.snapReflow && Notifications.animationsEnabled
+    NumberAnimation { duration: Notifications.motionMs; easing.type: Notifications.motionEasing }
+  }
+
+  // The card animates itself on both ends of its life: it slides in from just
+  // off the right screen edge and fades up, and on release it slides straight
+  // back out to the right and fades down - no vertical leg on the way out.
+  // The offset lives in a transform, not in x/y, so the reflow layout above
+  // stays the single owner of the card's geometry.
   //
-  // `parent.height` rather than a height passed in: this card is the box's
-  // delegate, the box is its parent, and `width: parent.width` above already
-  // reads it the same way. The `growing` half is what keeps the answer honest
-  // afterwards - once the box has caught up the two placements are the same
-  // number, and `arriving` alone is a stale claim that must not move a card
-  // that is merely re-measuring.
-  readonly property bool arriving: Notifications.isArriving(root.entry)
-  readonly property bool growing: parent.height < Notifications.pileHeight() - 0.5
+  // Every card enters on the diagonal: it starts a slot off its own y on the
+  // bar's side - a top bar brings it down out of the top-right corner, a bottom
+  // bar brings it up out of the bottom-right corner - so it appears to come
+  // from the corner its pile is docked against, whether it opens the pile or
+  // joins one already up. Departure drops that leg entirely: every card leaves
+  // on the same horizontal line, whatever path it arrived on.
+  //
+  // `entered` is false for the frame the delegate is built and flipped on the
+  // next turn, giving the start offset a frame to land before the Behavior
+  // carries it home. With motion off there is no offset and no fade: the card
+  // snaps straight to its place, and snaps out on release.
+  property bool entered: false
+  readonly property bool departing: root.entry ? root.entry.leaving : false
+  readonly property real _dirY: Notifications.atTop ? -Notifications.entrySlideY : 0
+  // One card plus the pile margin (win.margin is Ui.s) puts the card's near
+  // edge at the screen edge, just outside the visible area. The sign follows
+  // the chosen side: a right-docked pile slides in from the right, a left-
+  // docked one from the left. Exit is the same offset in reverse.
+  readonly property real _slideX: (Notifications.atRight ? 1 : -1) * (parent.width + Ui.s)
 
-  y: root.arriving && root.growing
-    ? Notifications.yOf(root.entry) + parent.height - Notifications.pileHeight()
-    : Notifications.yOf(root.entry)
+  property real slideX: !Notifications.animationsEnabled ? 0
+    : (!root.entered || root.departing) ? root._slideX : 0
+  // Only admission has a vertical leg. A departing card holds its y at rest so
+  // it leaves along one horizontal line whatever its entrance looked like.
+  property real slideY: (!Notifications.animationsEnabled || root.departing || root.entered) ? 0
+    : root._dirY
 
-  // Not tweened while it is being placed against a moving box: the slide
-  // already IS the box's, and a tween here would chase a target that is itself
-  // animating - a card that opened a gap to the bar edge and then closed it.
-  Behavior on y { enabled: !(root.arriving && root.growing) && Notifications.animationsEnabled; Glide {} }
+  // All notification motion shares one clock and one curve. Each Behavior is
+  // gated on animationsEnabled, so a direct NumberAnimation loses no policy.
+  Behavior on slideX { enabled: Notifications.animationsEnabled; NumberAnimation { duration: Notifications.motionMs; easing.type: Notifications.motionEasing } }
+  Behavior on slideY { enabled: Notifications.animationsEnabled; NumberAnimation { duration: Notifications.motionMs; easing.type: Notifications.motionEasing } }
+
+  transform: Translate {
+    x: root.slideX
+    y: root.slideY
+  }
+
+  Component.onCompleted: Qt.callLater(() => { root.entered = true })
 
   // The height this card publishes to the pile. A freshly constructed delegate
   // measures a few pixels short for one frame - the body has not wrapped - and
@@ -269,15 +306,22 @@ Rectangle {
     if (root.entry) Notifications.noteCardHeight(root.entry, root.height)
   }
 
-  // Fade in on admission and out on release. The controller keeps a released
-  // entry in the pile until this has landed, so the slide above has a gap to
-  // slide into and the window stays mapped until the last card has gone.
-  opacity: root.entry ? (root.entry.leaving ? 0 : 1) : 1
+
+  // Fade with the slide: up on admission, down on release. The controller
+  // keeps a released entry in the pile until this has landed, so the slide has
+  // a gap to move into and the window stays mapped until the last card goes.
+  // `entered` gates the fade-in to the same turn the slide starts, so a card
+  // is never solid before it begins moving.
+  opacity: {
+    if (!root.hasEntry || root.departing) return 0
+    if (!Notifications.animationsEnabled) return 1
+    return root.entered ? 1 : 0
+  }
 
   Behavior on opacity {
     enabled: Notifications.animationsEnabled
-    // -> Shared exit token so the fade cannot desync the controller drop.
-    NumberAnimation { duration: Notifications.exitMs; easing.type: Easing.OutCubic }
+    // -> The shared notification clock and curve, so the fade lands with the slide.
+    NumberAnimation { duration: Notifications.motionMs; easing.type: Notifications.motionEasing }
   }
 
   // Hover is a HoverHandler on the card itself (see border.color), and the two
