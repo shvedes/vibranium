@@ -348,6 +348,10 @@ Item {
   property string speedtestStderr: ""
   property bool speedtestExpectedStop: false
   property bool speedtestPending: false
+  // A queued restart from a child's exit. A Stop landing in the same window
+  // retires it: the deferred callback re-checks this live fact instead of
+  // starting a test the user just cancelled.
+  property bool _speedtestRestartQueued: false
 
   // Drop the whole result state: closing the island always lands the next
   // open on a fresh section (no stale figures, no "Run Again").
@@ -360,9 +364,11 @@ Item {
     root._speedtestStderrDone = false
     root.speedtestStderr = ""
     root.speedtestPending = false
+    root._speedtestRestartQueued = false
   }
 
   function startSpeedtest() {
+    root._speedtestRestartQueued = false
     if (speedtestProc.running) {
       // A previous run's SIGTERM is still landing; queue the fresh run.
       if (root.speedtestExpectedStop) root.speedtestPending = true
@@ -1084,7 +1090,15 @@ Item {
       if (root.speedtestPending) {
         root.speedtestPending = false
         root.speedtestExpectedStop = false
-        if (root.hasLink) Qt.callLater(root.startSpeedtest)
+        if (root.hasLink) {
+          root._speedtestRestartQueued = true
+          Qt.callLater(() => {
+            // Re-check inside the lambda: the Stop may have landed after the
+            // exit edge but before this turn.
+            if (!root._speedtestRestartQueued) return
+            root.startSpeedtest()
+          })
+        }
         else {
           root.speedtestRunning = false
           root.speedtestPhase = ""
