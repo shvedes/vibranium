@@ -4514,8 +4514,9 @@ group('the decoded picture arrives on one shared clock', () => {
     'opacity: status === Image.Ready ? 1 : 0')
   eq('exactly one Behaviour on the preview opacity',
     count(PREVIEW, /Behavior on opacity/g), 1)
-  contains('the Behaviour uses the shared Glide token', PREVIEW,
-    'Glide { duration: Ui.fastMs }')
+  contains('the Behaviour uses the shared normal Glide token', PREVIEW,
+    'Glide { duration: Ui.normalMs }')
+  notContains('the short token is not used', PREVIEW, 'Ui.fastMs')
   contains('the Behaviour honours the global motion switch', PREVIEW,
     'enabled: MotionPolicy.enabled')
   eq('no per-tile timer', count(PREVIEW, /Timer/g), 0)

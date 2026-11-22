@@ -115,7 +115,7 @@ Rectangle {
       opacity: status === Image.Ready ? 1 : 0
       Behavior on opacity {
         enabled: MotionPolicy.enabled
-        Glide { duration: Ui.fastMs }
+        Glide { duration: Ui.normalMs }
       }
     }
 
