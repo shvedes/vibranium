@@ -18,8 +18,8 @@ import "../../../../common/math/Range.js" as Range
 //
 // The composition is ratio-driven rather than pixel-driven, so 16:9, 16:10
 // and 3:2 outputs all read the same: a cover column on the left with the track
-// and artist on their own centred lines under it, then the seek lane, the
-// volume row and the transport pads, and the synced transcript running
+// and artist on their own centred lines under it, then the seek lane and the
+// transport pads, and the synced transcript running
 // the full height of the window on the right, its top and bottom edges blurred.
 // The cover box is
 // derived from the cover's own aspect ratio, drawn at 97.75% of the fit its
@@ -27,7 +27,8 @@ import "../../../../common/math/Range.js" as Range
 // neither cropped nor left in a letterbox. Three chrome buttons sit at the top
 // left: fullscreen, backdrop transparency and the idle hold.
 //
-// Esc closes it, or leaves the enlarged artwork first.
+// F toggles fullscreen, Esc returns to tiled, Q closes the window. Clicking
+// the enlarged artwork leaves that view.
 //
 // A regular toplevel, not a layer surface, like the audio mixer and the image
 // viewer. The transcript is an app-like view: it seeks, it takes keys and can
@@ -441,28 +442,42 @@ QtObject {
     anchors.fill: parent
     focus: root.opened
 
-    // Transport mirrors the island's keys: Space toggles playback, Ctrl plus
-    // an arrow skips a track and Shift plus an arrow steps a seek. Modifiers
-    // are masked so a combined chord cannot be read as a plain arrow.
+    // F toggles fullscreen, Esc returns a fullscreen window to tiled, Q
+    // closes the window, Space toggles playback, Ctrl plus an arrow skips a
+    // track and Shift plus an arrow steps a seek. Modifiers are masked so a
+    // combined chord cannot be read as a plain key.
     Keys.onPressed: event => {
       const key = event.key
-      if (key === Qt.Key_Escape) {
-        if (root.artExpanded) root.artExpanded = false
-        else root.close()
-        event.accepted = true
-        return
+      const mods = event.modifiers & (Qt.ShiftModifier | Qt.ControlModifier
+        | Qt.AltModifier | Qt.MetaModifier)
+      if (mods === Qt.NoModifier) {
+        if (key === Qt.Key_Escape) {
+          // Esc only leaves fullscreen; a tiled window stays as it is. Q is
+          // the close verb, so no key can be read as both an exit and a mode
+          // change by accident.
+          if (root.fullscreen) root.toggleFullscreen()
+          event.accepted = true
+          return
+        }
+        if (key === Qt.Key_F) {
+          root.toggleFullscreen()
+          event.accepted = true
+          return
+        }
+        if (key === Qt.Key_Q) {
+          root.close()
+          event.accepted = true
+          return
+        }
       }
       if (key === Qt.Key_Space) {
-        if (event.modifiers & (Qt.ShiftModifier | Qt.ControlModifier
-          | Qt.AltModifier | Qt.MetaModifier)) return
+        if (mods !== Qt.NoModifier) return
         root.togglePlaying()
         event.accepted = true
         return
       }
       if (key !== Qt.Key_Left && key !== Qt.Key_Right) return
 
-      const mods = event.modifiers & (Qt.ShiftModifier | Qt.ControlModifier
-        | Qt.AltModifier | Qt.MetaModifier)
       if (mods === Qt.ShiftModifier) {
         root.commitSeek(root.shownPosition + (key === Qt.Key_Right ? 5 : -5))
         event.accepted = true
@@ -491,8 +506,9 @@ QtObject {
       x: Ui.s
       y: Ui.s
       spacing: Ui.s / 2
-      // The chrome stays reachable above the standby view.
-      z: 11
+      // Above standby, below the enlarged artwork: standby keeps the chrome
+      // usable, while the artwork view dims it with the rest of the surface.
+      z: 9
 
       IconButton {
         name: root.fullscreen ? "minimize" : "maximize"
@@ -556,24 +572,27 @@ QtObject {
     readonly property real chromeSlot: Math.round(Range.clamp(padSlot * 0.7, 32, 56))
     readonly property real timePx: Math.max(Ui.fontS, Math.round(Ui.fontS * 1.45))
     readonly property real progressH: Math.round(timePx * 1.6)
-    // The volume row copies the island's [icon][lane][level] shape at this
-    // presentation scale, under the progress lane.
-    readonly property int volSlot: Math.round(Range.clamp(padSlot * 0.45, 28, 44))
-    readonly property real volumeH: volSlot
     readonly property real stackGap: Math.round(gap * 0.35)
-    // The volume row belongs to the progress lane, not to the transport group:
-    // its lead is only a hair while the pads keep a full gap below it.
-    readonly property real volGap: Math.max(2, Math.round(stackGap * 0.3))
+    // The cover's own shape, so the box is exactly the painted image rather
+    // than a square the artwork has to letterbox inside. A cover that has not
+    // landed yet is treated as square, which is what the shipped art is.
+    readonly property real artAspect: art.status === Image.Ready && art.implicitHeight > 0
+      ? art.implicitWidth / art.implicitHeight : 1
+    // The height available before the name block is deducted. It depends only
+    // on fixed tokens, so type and pads can scale from the artwork's width
+    // without feeding back into the cover's own size.
+    readonly property real artBudgetH: Math.max(80,
+      availH - chromeSlot - padSlot - progressH - 3 * stackGap)
+    readonly property real artRefW: Range.clamp(artBudgetH * artAspect, 0, coverW)
+      * artScale
     // Track and artist own one centred line each between the cover and the
-    // lane; progress, volume and the pads follow underneath.
-    readonly property real trackPx: Math.round(timePx * 1.45)
-    readonly property real artistPx: timePx
+    // lane; their type and the transport pads follow the artwork's width.
+    readonly property real trackPx: Math.max(14,
+      Math.min(Math.round(timePx * 1.45), Math.round(artRefW * 0.12)))
+    readonly property real artistPx: Math.max(11,
+      Math.min(timePx, Math.round(artRefW * 0.085)))
     readonly property real metaH: Math.round(trackPx * 1.3 + artistPx * 1.3 + 2)
-    // The band the cover may occupy: the column minus the header, the two
-    // name lines, the lanes, the pads and the gaps between them.
-    readonly property real artMaxH: Math.max(80,
-      availH - chromeSlot - padSlot - progressH - volumeH - metaH
-        - 3 * stackGap - volGap)
+    readonly property real artMaxH: Math.max(80, artBudgetH - metaH)
     // Presentation type: the pane's own base sizes multiplied, bounded so a
     // 4K output does not turn one cue into a headline.
     readonly property real lyricsScale: Range.clamp(availH / 460, 1.5, 3.2)
@@ -581,21 +600,19 @@ QtObject {
     readonly property real lyricsW: Math.max(0, width - lyricsX - pad)
     readonly property real emptyIcon: Math.round(Math.max(64,
       Math.min(lyricsW, availH) * 0.24))
-    // The cover's own shape, so the box is exactly the painted image rather
-    // than a square the artwork has to letterbox inside. A cover that has not
-    // landed yet is treated as square, which is what the shipped art is.
-    readonly property real artAspect: art.status === Image.Ready && art.implicitHeight > 0
-      ? art.implicitWidth / art.implicitHeight : 1
     // The cover sits at 97.75% of the fit its column and height allow, which
     // is the size the transport and the seek lane are measured from.
     readonly property real artScale: 0.9775
     readonly property real coverBoxW: Range.clamp(artMaxH * artAspect, 0, coverW) * artScale
     readonly property real coverBoxH: artAspect > 0 ? coverBoxW / artAspect : coverBoxW
-    // Cover, names, both lanes and transport are one group centred in the
-    // column: a short wide cover leaves no gap above the pads, and a tall one
-    // does not push them off the bottom.
-    readonly property real stackH: coverBoxH + metaH + progressH + volGap
-      + volumeH + padSlot + 3 * stackGap
+    readonly property real artBoxX: pad + Math.round((coverW - coverBoxW) / 2)
+    // Five pads share the artwork's width, so they grow and shrink with it.
+    readonly property int transportSlot: Math.round(Range.clamp(artRefW * 0.16, 32, padSlot))
+    // Cover, names, lane and transport are one group centred in the column:
+    // a short wide cover leaves no gap above the pads, and a tall one does not
+    // push them off the bottom.
+    readonly property real stackH: coverBoxH + metaH + progressH
+      + transportSlot + 3 * stackGap
     readonly property real stackY: pad + chromeSlot
       + Math.max(0, Math.round((availH - chromeSlot - stackH) / 2))
     // The blur bands run from each screen edge past the artwork's top and
@@ -608,291 +625,426 @@ QtObject {
     readonly property real blurBottom: Math.max(0.60,
       (content.stackY + content.coverBoxH) / Math.max(1, height) - 0.10)
 
-    // Faint all-direction halo, declared before the frame so it paints behind
-    // the cover instead of being clipped by it. The shadow tracks the cover's
-    // own ratio-driven geometry through the shared host contract.
-    SoftShadow {
-      host: artFrame
-      radius: 0
-    }
-
-    Rectangle {
-      id: artFrame
-
-      x: content.pad + Math.round((content.coverW - width) / 2)
-      y: content.stackY
-      width: content.coverBoxW
-      height: content.coverBoxH
-      color: Ui.solid("background_1")
-      border.width: 1
-      border.color: Ui.tint("foreground_1", 0.25)
-      clip: true
-
-      // Settled cover: follows the url on its own, and retainWhileLoading
-      // keeps the previous pixmap painted while the next one decodes, so a
-      // track switch never blanks the frame.
-      Image {
-        id: art
-
-        anchors.fill: parent
-        visible: opacity > 0.01
-        opacity: 0
-        asynchronous: true
-        cache: true
-        retainWhileLoading: true
-        fillMode: Image.PreserveAspectFit
-        // One decode wide enough for the box. The height is left to the
-        // loader so the source keeps its own aspect ratio.
-        sourceSize.width: 1024
-
-        // The settled layer takes a cover only when the incoming layer has
-        // faded in over it (see artFade), never by following the url. A base
-        // that followed the track would swap the frame the new cover decodes,
-        // leaving the crossfade to fade an identical image over itself.
-        onStatusChanged: {
-          if (status === Image.Ready && root.artUrl !== "") {
-            art.opacity = 1
-            if (String(art.source) === root.artUrl) artNext.opacity = 0
-          } else if (status === Image.Error) {
-            art.opacity = 0
-          }
-        }
-      }
-
-      // Incoming cover: crossfades over the settled layer on a track change
-      // instead of swapping the frame.
-      Image {
-        id: artNext
-
-        anchors.fill: parent
-        visible: opacity > 0.01
-        opacity: 0
-        asynchronous: true
-        cache: true
-        fillMode: Image.PreserveAspectFit
-        sourceSize.width: 1024
-
-        onStatusChanged: {
-          if (status === Image.Ready && String(artNext.source) === root.artUrl
-            && root.artUrl !== "") artFade.restart()
-        }
-      }
-
-      NumberAnimation {
-        id: artFade
-
-        target: artNext
-        property: "opacity"
-        from: 0
-        to: 1
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.InOutCubic
-        onFinished: {
-          if (String(artNext.source) !== root.artUrl) return
-          // Commit the cover to the settled layer now, but keep the incoming
-          // layer up until the base reports it ready: hiding it here would
-          // expose the retained old pixmap for the frames the base decodes.
-          art.source = root.artUrl
-        }
-      }
-
-      // No cover for this client: the same glyph the island's empty frame
-      // uses, scaled to the box.
-      Icon {
-        anchors.centerIn: parent
-        visible: art.opacity <= 0.01 && artNext.opacity <= 0.01
-        name: "eighth-note"
-        colorKey: "foreground_1"
-        size: Math.round(Math.min(artFrame.width, artFrame.height) * 0.4)
-      }
-
-      // The cover is the entrance to the enlarged view. Kept over both image
-      // layers so a click reaches it regardless of which one is settled.
-      MouseArea {
-        anchors.fill: parent
-        cursorShape: root.artUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
-        onClicked: root.toggleArtExpanded()
-      }
-    }
-
-    // The recording's own name, one centred line each, directly under the
-    // cover. An empty field keeps its line so the lane below never jumps.
-    Column {
-      x: content.pad
-      y: content.stackY + content.coverBoxH + content.stackGap
-      width: content.coverW
-      spacing: 2
-
-      Text {
-        width: parent.width
-        horizontalAlignment: Text.AlignHCenter
-        text: root.player ? String(root.player.trackTitle ?? "") : ""
-        color: Ui.tint("foreground_0", 0.95)
-        font.pixelSize: content.trackPx
-        font.family: Ui.fontFamily
-        font.bold: true
-        elide: Text.ElideRight
-        textFormat: Text.PlainText
-      }
-
-      Text {
-        width: parent.width
-        horizontalAlignment: Text.AlignHCenter
-        text: root.player ? String(root.player.trackArtist ?? "") : ""
-        color: Ui.tint("foreground_1", 0.7)
-        font.pixelSize: content.artistPx
-        font.family: Ui.fontFamily
-        elide: Text.ElideRight
-        textFormat: Text.PlainText
-      }
-    }
-
-    // Transport: previous, play/pause, next - centred under the cover at a
-    // size that belongs on this surface rather than in the bar.
-    Row {
-
-      x: content.pad + Math.round((content.coverW - width) / 2)
-      y: content.stackY + content.coverBoxH + content.stackGap
-        + content.metaH + content.stackGap + content.progressH + content.volGap
-        + content.volumeH + content.stackGap
-      height: content.padSlot
-      spacing: Math.round(content.padSlot * 0.22)
-
-      Core.PlayerModePad {
-        player: root.player
-        mode: "shuffle"
-        slotSize: content.padSlot
-        iconSize: content.padIcon
-        animationsEnabled: root.animOn
-        onActivated: content.forceActiveFocus()
-      }
-
-      IconButton {
-        name: "skip-back"
-        iconSize: content.padIcon
-        slotSize: content.padSlot
-        flat: true
-        cornerRadius: RoundingPolicy.radius
-        animationsEnabled: root.animOn
-        actionable: root.hasTrack && root.player?.canGoPrevious !== false
-        opacity: root.hasTrack ? 1 : 0.4
-        onClicked: {
-          root.previousTrack()
-          // A clicked button keeps focus and would consume Space itself;
-          // hand keys back so Space still toggles playback.
-          content.forceActiveFocus()
-        }
-      }
-
-      IconButton {
-        // The glyph lives in the CrossfadeIcon below; the button keeps its
-        // native chrome and interaction with no icon of its own.
-        slotSize: content.padSlot
-        flat: true
-        cornerRadius: RoundingPolicy.radius
-        animationsEnabled: root.animOn
-        actionable: root.canTogglePlaying
-        opacity: root.canTogglePlaying ? 1 : 0.4
-        onClicked: {
-          root.togglePlaying()
-          content.forceActiveFocus()
-        }
-
-        // Same transport slide-fade as the bar module: play arrives from the
-        // right, pause from the left, and each glyph leaves the way its
-        // counterpart came from. The slot is clipped so the travel stays
-        // inside the pad.
-        Item {
-          anchors.fill: parent
-          clip: true
-
-          CrossfadeIcon {
-            anchors.centerIn: parent
-            name: root.playing ? "pause" : "play"
-            colorKey: "foreground_0"
-            size: content.padIcon
-            slideX: Ui.s
-            durationMs: Ui.slowMs
-            fadeEasing: Easing.OutCubic
-            directionFor: glyph => glyph === "play" ? 1 : -1
-          }
-        }
-      }
-
-      IconButton {
-        name: "skip-forward"
-        iconSize: content.padIcon
-        slotSize: content.padSlot
-        flat: true
-        cornerRadius: RoundingPolicy.radius
-        animationsEnabled: root.animOn
-        actionable: root.hasTrack && root.player?.canGoNext !== false
-        opacity: root.hasTrack ? 1 : 0.4
-        onClicked: {
-          root.nextTrack()
-          content.forceActiveFocus()
-        }
-      }
-
-      Core.PlayerModePad {
-        player: root.player
-        mode: "loop"
-        slotSize: content.padSlot
-        iconSize: content.padIcon
-        animationsEnabled: root.animOn
-        onActivated: content.forceActiveFocus()
-      }
-    }
-
-    // Elapsed, seek lane, total: the island's lane contract under the two
-    // name lines,
-    // at presentation scale. The block is 70% of the artwork's width and
-    // centred on it, which leaves ~15% of free space on each side.
+    // One switch hides the whole player composition in standby. The surface
+    // then only paints its backdrop and the standby answer, so a translucent
+    // preference shows the desktop instead of a dead cover and transport.
     Item {
-      id: progressBlock
+      anchors.fill: parent
+      visible: !root.standby
 
-      x: content.pad + Math.round((content.coverW - width) / 2)
-      y: content.stackY + content.coverBoxH + content.stackGap
-        + content.metaH + content.stackGap
-      width: Math.round(content.coverBoxW * 0.7)
-      height: content.progressH
-
-      TextMetrics {
-        id: timeMetrics
-
-        font.family: Ui.fontFamily
-        font.pixelSize: content.timePx
-        text: root.lengthSec > 0 ? NP.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
+      // Faint all-direction halo, declared before the frame so it paints behind
+      // the cover instead of being clipped by it. The shadow tracks the cover's
+      // own ratio-driven geometry through the shared host contract.
+      SoftShadow {
+        host: artFrame
+        radius: 0
       }
 
-      readonly property real timeW: Math.ceil(timeMetrics.advanceWidth)
+      Rectangle {
+        id: artFrame
 
-      Row {
-        id: laneRow
+        x: content.artBoxX
+        y: content.stackY
+        width: content.coverBoxW
+        height: content.coverBoxH
+        color: Ui.solid("background_1")
+        border.width: 1
+        border.color: Ui.tint("foreground_1", 0.25)
+        clip: true
 
-        width: parent.width
-        height: Math.round(content.timePx * 1.4)
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: Ui.s
+        // Settled cover: follows the url on its own, and retainWhileLoading
+        // keeps the previous pixmap painted while the next one decodes, so a
+        // track switch never blanks the frame.
+        Image {
+          id: art
+
+          anchors.fill: parent
+          visible: opacity > 0.01
+          opacity: 0
+          asynchronous: true
+          cache: true
+          retainWhileLoading: true
+          fillMode: Image.PreserveAspectFit
+          // One decode wide enough for the box. The height is left to the
+          // loader so the source keeps its own aspect ratio.
+          sourceSize.width: 1024
+
+          // The settled layer takes a cover only when the incoming layer has
+          // faded in over it (see artFade), never by following the url. A base
+          // that followed the track would swap the frame the new cover decodes,
+          // leaving the crossfade to fade an identical image over itself.
+          onStatusChanged: {
+            if (status === Image.Ready && root.artUrl !== "") {
+              art.opacity = 1
+              if (String(art.source) === root.artUrl) artNext.opacity = 0
+            } else if (status === Image.Error) {
+              art.opacity = 0
+            }
+          }
+        }
+
+        // Incoming cover: crossfades over the settled layer on a track change
+        // instead of swapping the frame.
+        Image {
+          id: artNext
+
+          anchors.fill: parent
+          visible: opacity > 0.01
+          opacity: 0
+          asynchronous: true
+          cache: true
+          fillMode: Image.PreserveAspectFit
+          sourceSize.width: 1024
+
+          onStatusChanged: {
+            if (status === Image.Ready && String(artNext.source) === root.artUrl
+              && root.artUrl !== "") artFade.restart()
+          }
+        }
+
+        NumberAnimation {
+          id: artFade
+
+          target: artNext
+          property: "opacity"
+          from: 0
+          to: 1
+          duration: MotionPolicy.duration(Ui.slowMs)
+          easing.type: Easing.InOutCubic
+          onFinished: {
+            if (String(artNext.source) !== root.artUrl) return
+            // Commit the cover to the settled layer now, but keep the incoming
+            // layer up until the base reports it ready: hiding it here would
+            // expose the retained old pixmap for the frames the base decodes.
+            art.source = root.artUrl
+          }
+        }
+
+        // No cover for this client: the same glyph the island's empty frame
+        // uses, scaled to the box.
+        Icon {
+          anchors.centerIn: parent
+          visible: art.opacity <= 0.01 && artNext.opacity <= 0.01
+          name: "eighth-note"
+          colorKey: "foreground_1"
+          size: Math.round(Math.min(artFrame.width, artFrame.height) * 0.4)
+        }
+
+        // The cover is the entrance to the enlarged view. Kept over both image
+        // layers so a click reaches it regardless of which one is settled.
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: root.artUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
+          onClicked: root.toggleArtExpanded()
+        }
+      }
+
+      // The recording's own name, one centred line each, directly under the
+      // cover. An empty field keeps its line so the lane below never jumps.
+      Column {
+        x: content.artBoxX
+        y: content.stackY + content.coverBoxH + content.stackGap
+        width: content.coverBoxW
+        spacing: 2
 
         Text {
-          width: progressBlock.timeW
-          anchors.verticalCenter: parent.verticalCenter
-          text: root.lengthSec > 0 ? NP.fmtTime(root.shownPosition, root.lengthSec) : "--:--"
-          color: Ui.tint("foreground_1", 0.7)
-          font.pixelSize: content.timePx
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: root.player ? String(root.player.trackTitle ?? "") : ""
+          color: Ui.tint("foreground_0", 0.95)
+          font.pixelSize: content.trackPx
           font.family: Ui.fontFamily
-          textFormat: Text.PlainText
+          font.bold: true
           elide: Text.ElideRight
+          textFormat: Text.PlainText
         }
 
-        Item {
+        Text {
+          width: parent.width
+          horizontalAlignment: Text.AlignHCenter
+          text: root.player ? String(root.player.trackArtist ?? "") : ""
+          color: Ui.tint("foreground_1", 0.7)
+          font.pixelSize: content.artistPx
+          font.family: Ui.fontFamily
+          elide: Text.ElideRight
+          textFormat: Text.PlainText
+        }
+      }
 
-          width: Math.max(0, progressBlock.width - 2 * progressBlock.timeW - 2 * laneRow.spacing)
-          height: laneRow.height
+      // Transport: previous, play/pause, next - centred under the cover at a
+      // size that belongs on this surface rather than in the bar.
+      Row {
+
+        x: content.artBoxX + Math.round((content.coverBoxW - width) / 2)
+        y: content.stackY + content.coverBoxH + content.stackGap
+          + content.metaH + content.stackGap + content.progressH + content.stackGap
+        width: 5 * content.transportSlot
+          + 4 * Math.round(content.transportSlot * 0.22)
+        height: content.transportSlot
+        spacing: Math.round(content.transportSlot * 0.22)
+
+        Core.PlayerModePad {
+          player: root.player
+          mode: "shuffle"
+          slotSize: content.transportSlot
+          iconSize: Math.round(content.transportSlot * 0.5)
+          animationsEnabled: root.animOn
+          onActivated: content.forceActiveFocus()
+        }
+
+        IconButton {
+          name: "skip-back"
+          iconSize: Math.round(content.transportSlot * 0.5)
+          slotSize: content.transportSlot
+          flat: true
+          cornerRadius: RoundingPolicy.radius
+          animationsEnabled: root.animOn
+          actionable: root.hasTrack && root.player?.canGoPrevious !== false
+          opacity: root.hasTrack ? 1 : 0.4
+          onClicked: {
+            root.previousTrack()
+            // A clicked button keeps focus and would consume Space itself;
+            // hand keys back so Space still toggles playback.
+            content.forceActiveFocus()
+          }
+        }
+
+        IconButton {
+          // The glyph lives in the CrossfadeIcon below; the button keeps its
+          // native chrome and interaction with no icon of its own.
+          slotSize: content.transportSlot
+          flat: true
+          cornerRadius: RoundingPolicy.radius
+          animationsEnabled: root.animOn
+          actionable: root.canTogglePlaying
+          opacity: root.canTogglePlaying ? 1 : 0.4
+          onClicked: {
+            root.togglePlaying()
+            content.forceActiveFocus()
+          }
+
+          // Same transport slide-fade as the bar module: play arrives from the
+          // right, pause from the left, and each glyph leaves the way its
+          // counterpart came from. The slot is clipped so the travel stays
+          // inside the pad.
+          Item {
+            anchors.fill: parent
+            clip: true
+
+            CrossfadeIcon {
+              anchors.centerIn: parent
+              name: root.playing ? "pause" : "play"
+              colorKey: "foreground_0"
+              size: Math.round(content.transportSlot * 0.5)
+              slideX: Ui.s
+              durationMs: Ui.slowMs
+              fadeEasing: Easing.OutCubic
+              directionFor: glyph => glyph === "play" ? 1 : -1
+            }
+          }
+        }
+
+        IconButton {
+          name: "skip-forward"
+          iconSize: Math.round(content.transportSlot * 0.5)
+          slotSize: content.transportSlot
+          flat: true
+          cornerRadius: RoundingPolicy.radius
+          animationsEnabled: root.animOn
+          actionable: root.hasTrack && root.player?.canGoNext !== false
+          opacity: root.hasTrack ? 1 : 0.4
+          onClicked: {
+            root.nextTrack()
+            content.forceActiveFocus()
+          }
+        }
+
+        Core.PlayerModePad {
+          player: root.player
+          mode: "loop"
+          slotSize: content.transportSlot
+          iconSize: Math.round(content.transportSlot * 0.5)
+          animationsEnabled: root.animOn
+          onActivated: content.forceActiveFocus()
+        }
+      }
+
+      // Elapsed, seek lane, total: the island's lane contract under the two
+      // name lines,
+      // at presentation scale. The block is 70% of the artwork's width and
+      // centred on it, which leaves ~15% of free space on each side.
+      Item {
+        id: progressBlock
+
+        x: content.artBoxX + Math.round((content.coverBoxW - width) / 2)
+        y: content.stackY + content.coverBoxH + content.stackGap
+          + content.metaH + content.stackGap
+        width: Math.round(content.coverBoxW * 0.7)
+        height: content.progressH
+
+        TextMetrics {
+          id: timeMetrics
+
+          font.family: Ui.fontFamily
+          font.pixelSize: content.timePx
+          text: root.lengthSec > 0 ? NP.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
+        }
+
+        readonly property real timeW: Math.ceil(timeMetrics.advanceWidth)
+
+        Row {
+          id: laneRow
+
+          width: parent.width
+          height: Math.round(content.timePx * 1.4)
           anchors.verticalCenter: parent.verticalCenter
-          opacity: root.canSeekPosition ? 1 : 0.5
+          spacing: Ui.s
 
+          Text {
+            width: progressBlock.timeW
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.lengthSec > 0 ? NP.fmtTime(root.shownPosition, root.lengthSec) : "--:--"
+            color: Ui.tint("foreground_1", 0.7)
+            font.pixelSize: content.timePx
+            font.family: Ui.fontFamily
+            textFormat: Text.PlainText
+            elide: Text.ElideRight
+          }
+
+          Item {
+
+            width: Math.max(0, progressBlock.width - 2 * progressBlock.timeW - 2 * laneRow.spacing)
+            height: laneRow.height
+            anchors.verticalCenter: parent.verticalCenter
+            opacity: root.canSeekPosition ? 1 : 0.5
+
+            Behavior on opacity {
+              enabled: root.animOn
+              NumberAnimation {
+                duration: Ui.fastMs
+                easing.type: Easing.OutCubic
+              }
+            }
+
+            Rectangle {
+              width: parent.width
+              height: 8
+              anchors.verticalCenter: parent.verticalCenter
+              color: Ui.tint("foreground_1", 0.25)
+
+              Rectangle {
+                width: parent.width * root.progressRatio
+                height: parent.height
+                // Paused, the fill steps back to a tint: the elapsed share is
+                // still legible, but it no longer reads as time advancing.
+                color: root.playing ? Ui.solid("accent") : Ui.tint("accent", 0.55)
+
+                Behavior on color {
+                  enabled: root.animOn
+                  ColorAnimation {
+                    duration: Ui.normalMs
+                    easing.type: Easing.OutCubic
+                  }
+                }
+
+                Behavior on width {
+                  enabled: root.animOn && root.lengthSec > 0 && !root._seeking
+                  NumberAnimation {
+                    duration: Ui.normalMs
+                    easing.type: Easing.OutCubic
+                  }
+                }
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: root.canSeekPosition ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+              onPressed: mouse => {
+                if (!root.canSeekPosition) return
+                root._pressX = mouse.x
+              }
+              onPositionChanged: mouse => {
+                if (!root.canSeekPosition || !pressed) return
+                if (Math.abs(mouse.x - root._pressX) > 6) {
+                  root._seeking = true
+                  root.scrubTo(mouse.x, width)
+                }
+              }
+              onReleased: mouse => {
+                if (root._seeking) root.commitSeek(root.shownPosition)
+                else root.seekAt(mouse.x, width)
+                root._seeking = false
+              }
+              onCanceled: {
+                root._seeking = false
+                root.reanchor()
+              }
+            }
+
+            WheelHandler {
+              acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+              onWheel: event => {
+                if (event.angleDelta.y === 0) return
+                if (!root.canSeekPosition) return
+                const d = event.angleDelta.y > 0 ? 5 : -5
+                root.commitSeek(root.shownPosition + d)
+                event.accepted = true
+              }
+            }
+          }
+
+          Text {
+            width: progressBlock.timeW
+            anchors.verticalCenter: parent.verticalCenter
+            horizontalAlignment: Text.AlignRight
+            text: root.lengthSec > 0 ? NP.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
+            color: Ui.tint("foreground_1", 0.7)
+            font.pixelSize: content.timePx
+            font.family: Ui.fontFamily
+            textFormat: Text.PlainText
+            elide: Text.ElideRight
+          }
+        }
+      }
+
+      // The transcript is not a box beside the cover: it runs the full height of
+      // the screen, so the cue under the playhead stays centred while the lines
+      // above and below it reach the edges.
+      Item {
+        id: lyricsSide
+
+        x: content.lyricsX
+        y: 0
+        width: content.lyricsW
+        height: content.height
+        // Track-switch entrance: the transcript fades in place while the cover
+        // crossfades, so a switch reads as one new track rather than one
+        // element swapping. Derived from the swap scalar, not written by the
+        // animation: the four effect copies below read this one live value, and
+        // an interrupted swap can never leave it stuck at zero.
+        opacity: root.opened ? root.swapK : 0
+
+        LyricsPane {
+          id: pane
+
+          anchors.fill: parent
+          // The pane answers "no lyrics" in one small line of its own; an empty
+          // state above it says the same thing at presentation scale. With a
+          // translucent backdrop that line would read through the cover, so the
+          // pane steps out of the way while a cover is over it.
+          //
+          // A ready transcript is painted by the effect passes below: the pane
+          // is their capture source, kept at zero opacity so the sharp and
+          // blurred copies are the only transcript on screen. Zero (not
+          // invisible): the item still renders for the capture and still takes
+          // the reader's scroll and taps. Loading and error text stay on the
+          // pane itself.
+          opacity: pane.ready ? 0 : (pane.status === "none" || !root.hasTrack ? 0 : 1)
+          // The placeholder carries its own fade, but this host hides the whole
+          // pane on an answer: without a tween here "Getting lyrics..." leaves
+          // on the frame the sheet arrives instead of fading with it.
           Behavior on opacity {
             enabled: root.animOn
             NumberAnimation {
@@ -900,430 +1052,278 @@ QtObject {
               easing.type: Easing.OutCubic
             }
           }
+          player: root.player
+          position: root.shownPosition
+          active: root.opened
+          playing: root.playing
+          seekable: root.canSeekPosition
+          // A presentation surface has nothing to dismiss back to, so a
+          // right-click stays inert and the reader's scroll is the only
+          // gesture that moves the transcript.
+          dismissable: false
+          scrollable: true
+          textScale: content.lyricsScale
+          onSeekRequested: seconds => root.seekTo(seconds)
+        }
 
-          Rectangle {
+        // The pane's own empty state is one line of text. The surface says it
+        // at presentation scale instead; the pane stays
+        // underneath so its fetch and cache states are unchanged. An idle
+        // client has its own surface-level answer below, and its "none" status
+        // is not an answer about lyrics, so this block stays out of the way
+        // there rather than stacking two centred messages on one spot.
+        Rectangle {
+          anchors.fill: parent
+          visible: root.hasTrack && pane.status === "none"
+          color: root.emptyStateColor
+
+          Column {
+            anchors.centerIn: parent
             width: parent.width
-            height: 8
-            anchors.verticalCenter: parent.verticalCenter
-            color: Ui.tint("foreground_1", 0.25)
+            spacing: Ui.l
 
-            Rectangle {
-              width: parent.width * root.progressRatio
-              height: parent.height
-              // Paused, the fill steps back to a tint: the elapsed share is
-              // still legible, but it no longer reads as time advancing.
-              color: root.playing ? Ui.solid("accent") : Ui.tint("accent", 0.55)
+            Icon {
+              anchors.horizontalCenter: parent.horizontalCenter
+              name: "eighth-note"
+              colorKey: "foreground_1"
+              size: content.emptyIcon
+            }
 
-              Behavior on color {
-                enabled: root.animOn
-                ColorAnimation {
-                  duration: Ui.normalMs
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              Behavior on width {
-                enabled: root.animOn && root.lengthSec > 0 && !root._seeking
-                NumberAnimation {
-                  duration: Ui.normalMs
-                  easing.type: Easing.OutCubic
-                }
-              }
-            }
-          }
-
-          MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: root.canSeekPosition ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-            onPressed: mouse => {
-              if (!root.canSeekPosition) return
-              root._pressX = mouse.x
-            }
-            onPositionChanged: mouse => {
-              if (!root.canSeekPosition || !pressed) return
-              if (Math.abs(mouse.x - root._pressX) > 6) {
-                root._seeking = true
-                root.scrubTo(mouse.x, width)
-              }
-            }
-            onReleased: mouse => {
-              if (root._seeking) root.commitSeek(root.shownPosition)
-              else root.seekAt(mouse.x, width)
-              root._seeking = false
-            }
-            onCanceled: {
-              root._seeking = false
-              root.reanchor()
-            }
-          }
-
-          WheelHandler {
-            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-            onWheel: event => {
-              if (event.angleDelta.y === 0) return
-              if (!root.canSeekPosition) return
-              const d = event.angleDelta.y > 0 ? 5 : -5
-              root.commitSeek(root.shownPosition + d)
-              event.accepted = true
+            Text {
+              width: parent.width
+              horizontalAlignment: Text.AlignHCenter
+              text: "No lyrics available"
+              color: Ui.tint("foreground_1", 0.7)
+              font.pixelSize: Math.round(Ui.fontM * Math.min(2, content.lyricsScale))
+              font.family: Ui.fontFamily
+              wrapMode: Text.Wrap
+              textFormat: Text.PlainText
             }
           }
         }
 
-        Text {
-          width: progressBlock.timeW
-          anchors.verticalCenter: parent.verticalCenter
-          horizontalAlignment: Text.AlignRight
-          text: root.lengthSec > 0 ? NP.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
-          color: Ui.tint("foreground_1", 0.7)
-          font.pixelSize: content.timePx
-          font.family: Ui.fontFamily
-          textFormat: Text.PlainText
-          elide: Text.ElideRight
+        // Nothing queued at all: the client is alive with an empty playlist or
+        // stopped on nothing. It outranks the lyrics answer, which reads "none"
+        // for a track that no longer exists.
+        Rectangle {
+          anchors.fill: parent
+          visible: !root.hasTrack
+          color: root.emptyStateColor
+
+          Column {
+            anchors.centerIn: parent
+            width: parent.width
+            spacing: Ui.l
+
+            Icon {
+              anchors.horizontalCenter: parent.horizontalCenter
+              name: "eighth-note"
+              colorKey: "foreground_1"
+              size: content.emptyIcon
+            }
+
+            Text {
+              width: parent.width
+              horizontalAlignment: Text.AlignHCenter
+              text: "Nothing playing"
+              color: Ui.tint("foreground_1", 0.7)
+              font.pixelSize: Math.round(Ui.fontM * Math.min(2, content.lyricsScale))
+              font.family: Ui.fontFamily
+              wrapMode: Text.Wrap
+              textFormat: Text.PlainText
+            }
+          }
+        }
+
+        Connections {
+          target: pane
+
+          function onTrackKeyChanged() {
+            if (root.opened) trackSwap.restart()
+          }
         }
       }
-    }
 
-    // The shared player-volume row: the one gate, write path and gesture
-    // contract the island uses, at this surface's presentation scale.
-    Core.PlayerVolumeRow {
-      id: volumeRow
+      // Edge blur: the transcript is painted from the pane (its capture source,
+      // see its opacity) in four passes. The sharp copy fills the centre; the
+      // three blurred copies stack toward each screen edge with a different
+      // radius, each masked to a shorter band than the one below it. The result
+      // is a gradient of blur strength: light where the transcript meets the
+      // sharp centre, heavy at the edge, with no sharp text left underneath.
+      // The masks are the house MultiEffect idiom: hidden rectangles whose
+      // alpha ramps, softened by the threshold spread.
+      MultiEffect {
 
-      x: content.pad + Math.round((content.coverW - width) / 2)
-      y: content.stackY + content.coverBoxH + content.stackGap
-        + content.metaH + content.stackGap + content.progressH + content.volGap
-      width: Math.round(content.coverBoxW * 0.7)
-      player: root.player
-      // The glyph and the track follow the volume row's own scale: a small
-      // speaker with a bar as thick as the seek lane's 8px track.
-      slotSize: Math.max(16, Math.round(content.volumeH * 0.6))
-      fontPx: content.timePx
-      laneGap: Ui.s / 2
-      rowHeight: content.volumeH
-      trackHeight: 8
-      // The seek lane is inset by the elapsed time column on both sides;
-      // mirror that here so both bars share the same left and right edges.
-      leadInset: Math.max(0, progressBlock.timeW + Ui.s
-        - volumeRow.slotSize - 2 * volumeRow.laneGap)
-      trailInset: Math.max(0, progressBlock.timeW + Ui.s
-        - volumeRow.percentW - 2 * volumeRow.laneGap)
-      animationsEnabled: root.animOn
-      onActivated: content.forceActiveFocus()
-    }
-
-    // The transcript is not a box beside the cover: it runs the full height of
-    // the screen, so the cue under the playhead stays centred while the lines
-    // above and below it reach the edges.
-    Item {
-      id: lyricsSide
-
-      x: content.lyricsX
-      y: 0
-      width: content.lyricsW
-      height: content.height
-      // Track-switch entrance: the transcript fades in place while the cover
-      // crossfades, so a switch reads as one new track rather than one
-      // element swapping. Derived from the swap scalar, not written by the
-      // animation: the four effect copies below read this one live value, and
-      // an interrupted swap can never leave it stuck at zero.
-      opacity: root.opened ? root.swapK : 0
-
-      LyricsPane {
-        id: pane
-
-        anchors.fill: parent
-        // The pane answers "no lyrics" in one small line of its own; an empty
-        // state above it says the same thing at presentation scale. With a
-        // translucent backdrop that line would read through the cover, so the
-        // pane steps out of the way while a cover is over it.
-        //
-        // A ready transcript is painted by the effect passes below: the pane
-        // is their capture source, kept at zero opacity so the sharp and
-        // blurred copies are the only transcript on screen. Zero (not
-        // invisible): the item still renders for the capture and still takes
-        // the reader's scroll and taps. Loading and error text stay on the
-        // pane itself.
-        opacity: pane.ready ? 0 : (pane.status === "none" || !root.hasTrack ? 0 : 1)
-        // The placeholder carries its own fade, but this host hides the whole
-        // pane on an answer: without a tween here "Getting lyrics..." leaves
-        // on the frame the sheet arrives instead of fading with it.
-        Behavior on opacity {
-          enabled: root.animOn
-          NumberAnimation {
-            duration: Ui.fastMs
-            easing.type: Easing.OutCubic
-          }
-        }
-        player: root.player
-        position: root.shownPosition
-        active: root.opened
-        playing: root.playing
-        seekable: root.canSeekPosition
-        // A presentation surface has nothing to dismiss back to, so a
-        // right-click stays inert and the reader's scroll is the only
-        // gesture that moves the transcript.
-        dismissable: false
-        scrollable: true
-        textScale: content.lyricsScale
-        onSeekRequested: seconds => root.seekTo(seconds)
+        anchors.fill: lyricsSide
+        visible: root.opened && pane.ready
+        opacity: lyricsSide.opacity
+        source: pane
+        autoPaddingEnabled: false
+        maskEnabled: true
+        maskSource: lyricsSharpMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 0.5
       }
 
-      // The pane's own empty state is one line of text. The surface says it
-      // at presentation scale instead; the pane stays
-      // underneath so its fetch and cache states are unchanged. An idle
-      // client has its own surface-level answer below, and its "none" status
-      // is not an answer about lyrics, so this block stays out of the way
-      // there rather than stacking two centred messages on one spot.
+      MultiEffect {
+
+        anchors.fill: lyricsSide
+        visible: root.opened && pane.ready
+        opacity: lyricsSide.opacity
+        source: pane
+        autoPaddingEnabled: false
+        blurEnabled: true
+        blur: 0.3
+        blurMax: 32
+        maskEnabled: true
+        maskSource: lyricsBlurLightMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 0.5
+      }
+
+      MultiEffect {
+
+        anchors.fill: lyricsSide
+        visible: root.opened && pane.ready
+        opacity: lyricsSide.opacity
+        source: pane
+        autoPaddingEnabled: false
+        blurEnabled: true
+        blur: 0.6
+        blurMax: 32
+        maskEnabled: true
+        maskSource: lyricsBlurMediumMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 0.5
+      }
+
+      MultiEffect {
+
+        anchors.fill: lyricsSide
+        visible: root.opened && pane.ready
+        opacity: lyricsSide.opacity
+        source: pane
+        autoPaddingEnabled: false
+        blurEnabled: true
+        blur: 0.95
+        blurMax: 32
+        maskEnabled: true
+        maskSource: lyricsBlurHeavyMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin: 0.5
+      }
+
+      // Sharp centre: full between the bands, gone where the light blur takes
+      // over.
       Rectangle {
-        anchors.fill: parent
-        visible: root.hasTrack && pane.status === "none"
-        color: root.emptyStateColor
+        id: lyricsSharpMask
 
-        Column {
-          anchors.centerIn: parent
-          width: parent.width
-          spacing: Ui.l
+        anchors.fill: lyricsSide
+        visible: false
+        layer.enabled: true
+        layer.smooth: true
 
-          Icon {
-            anchors.horizontalCenter: parent.horizontalCenter
-            name: "eighth-note"
-            colorKey: "foreground_1"
-            size: content.emptyIcon
-          }
-
-          Text {
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            text: "No lyrics available"
-            color: Ui.tint("foreground_1", 0.7)
-            font.pixelSize: Math.round(Ui.fontM * Math.min(2, content.lyricsScale))
-            font.family: Ui.fontFamily
-            wrapMode: Text.Wrap
-            textFormat: Text.PlainText
-          }
+        gradient: Gradient {
+          GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurTop * 0.7; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurTop; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurBottom; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.3; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 0) }
         }
       }
 
-      // Nothing queued at all: the client is alive with an empty playlist or
-      // stopped on nothing. It outranks the lyrics answer, which reads "none"
-      // for a track that no longer exists.
+      // Light blur: the whole band, handing over from the sharp copy.
       Rectangle {
-        anchors.fill: parent
-        visible: !root.hasTrack
-        color: root.emptyStateColor
+        id: lyricsBlurLightMask
 
-        Column {
-          anchors.centerIn: parent
-          width: parent.width
-          spacing: Ui.l
+        anchors.fill: lyricsSide
+        visible: false
+        layer.enabled: true
+        layer.smooth: true
 
-          Icon {
-            anchors.horizontalCenter: parent.horizontalCenter
-            name: "eighth-note"
-            colorKey: "foreground_1"
-            size: content.emptyIcon
+        gradient: Gradient {
+          GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurTop * 0.7; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurTop; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurBottom; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.3; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
+        }
+      }
+
+      // Medium blur: the outer two-thirds of the band.
+      Rectangle {
+        id: lyricsBlurMediumMask
+
+        anchors.fill: lyricsSide
+        visible: false
+        layer.enabled: true
+        layer.smooth: true
+
+        gradient: Gradient {
+          GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurTop * 0.3; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurTop * 0.65; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.35; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.7; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
+        }
+      }
+
+      // Heavy blur: the outer edge, where the transcript leaves the screen.
+      Rectangle {
+        id: lyricsBlurHeavyMask
+
+        anchors.fill: lyricsSide
+        visible: false
+        layer.enabled: true
+        layer.smooth: true
+
+        gradient: Gradient {
+          GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurTop * 0.12; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: content.blurTop * 0.45; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.55; color: Qt.rgba(1, 1, 1, 0) }
+          GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.88; color: Qt.rgba(1, 1, 1, 1) }
+          GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
+        }
+      }
+
+      // The fade itself. The script leg clears the transcript in place; the
+      // short hold makes it read as a fade rather than a frame that happened to
+      // be dim. Both legs write the one swapK scalar, and lyricsSide.opacity is
+      // derived from it, so an interrupted animation leaves no stale value on
+      // the item. With motion off nothing is staged and the tween is
+      // zero-length, so the swap is a single frame.
+      SequentialAnimation {
+        id: trackSwap
+
+        ScriptAction {
+          script: {
+            if (!root.animOn) return
+            root.swapK = 0
           }
-
-          Text {
-            width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            text: "Nothing playing"
-            color: Ui.tint("foreground_1", 0.7)
-            font.pixelSize: Math.round(Ui.fontM * Math.min(2, content.lyricsScale))
-            font.family: Ui.fontFamily
-            wrapMode: Text.Wrap
-            textFormat: Text.PlainText
-          }
+        }
+        PauseAnimation {
+          duration: root.animOn ? 60 : 0
+        }
+        NumberAnimation {
+          target: root
+          property: "swapK"
+          to: 1
+          duration: MotionPolicy.duration(Ui.slowMs)
+          easing.type: Easing.InOutCubic
         }
       }
 
-      Connections {
-        target: pane
-
-        function onTrackKeyChanged() {
-          if (root.opened) trackSwap.restart()
-        }
-      }
-    }
-
-    // Edge blur: the transcript is painted from the pane (its capture source,
-    // see its opacity) in four passes. The sharp copy fills the centre; the
-    // three blurred copies stack toward each screen edge with a different
-    // radius, each masked to a shorter band than the one below it. The result
-    // is a gradient of blur strength: light where the transcript meets the
-    // sharp centre, heavy at the edge, with no sharp text left underneath.
-    // The masks are the house MultiEffect idiom: hidden rectangles whose
-    // alpha ramps, softened by the threshold spread.
-    MultiEffect {
-
-      anchors.fill: lyricsSide
-      visible: root.opened && pane.ready
-      opacity: lyricsSide.opacity
-      source: pane
-      autoPaddingEnabled: false
-      maskEnabled: true
-      maskSource: lyricsSharpMask
-      maskThresholdMin: 0.5
-      maskSpreadAtMin: 0.5
-    }
-
-    MultiEffect {
-
-      anchors.fill: lyricsSide
-      visible: root.opened && pane.ready
-      opacity: lyricsSide.opacity
-      source: pane
-      autoPaddingEnabled: false
-      blurEnabled: true
-      blur: 0.3
-      blurMax: 32
-      maskEnabled: true
-      maskSource: lyricsBlurLightMask
-      maskThresholdMin: 0.5
-      maskSpreadAtMin: 0.5
-    }
-
-    MultiEffect {
-
-      anchors.fill: lyricsSide
-      visible: root.opened && pane.ready
-      opacity: lyricsSide.opacity
-      source: pane
-      autoPaddingEnabled: false
-      blurEnabled: true
-      blur: 0.6
-      blurMax: 32
-      maskEnabled: true
-      maskSource: lyricsBlurMediumMask
-      maskThresholdMin: 0.5
-      maskSpreadAtMin: 0.5
-    }
-
-    MultiEffect {
-
-      anchors.fill: lyricsSide
-      visible: root.opened && pane.ready
-      opacity: lyricsSide.opacity
-      source: pane
-      autoPaddingEnabled: false
-      blurEnabled: true
-      blur: 0.95
-      blurMax: 32
-      maskEnabled: true
-      maskSource: lyricsBlurHeavyMask
-      maskThresholdMin: 0.5
-      maskSpreadAtMin: 0.5
-    }
-
-    // Sharp centre: full between the bands, gone where the light blur takes
-    // over.
-    Rectangle {
-      id: lyricsSharpMask
-
-      anchors.fill: lyricsSide
-      visible: false
-      layer.enabled: true
-      layer.smooth: true
-
-      gradient: Gradient {
-        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurTop * 0.7; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurTop; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurBottom; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.3; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 0) }
-      }
-    }
-
-    // Light blur: the whole band, handing over from the sharp copy.
-    Rectangle {
-      id: lyricsBlurLightMask
-
-      anchors.fill: lyricsSide
-      visible: false
-      layer.enabled: true
-      layer.smooth: true
-
-      gradient: Gradient {
-        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurTop * 0.7; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurTop; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurBottom; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.3; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
-      }
-    }
-
-    // Medium blur: the outer two-thirds of the band.
-    Rectangle {
-      id: lyricsBlurMediumMask
-
-      anchors.fill: lyricsSide
-      visible: false
-      layer.enabled: true
-      layer.smooth: true
-
-      gradient: Gradient {
-        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurTop * 0.3; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurTop * 0.65; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.35; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.7; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
-      }
-    }
-
-    // Heavy blur: the outer edge, where the transcript leaves the screen.
-    Rectangle {
-      id: lyricsBlurHeavyMask
-
-      anchors.fill: lyricsSide
-      visible: false
-      layer.enabled: true
-      layer.smooth: true
-
-      gradient: Gradient {
-        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurTop * 0.12; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: content.blurTop * 0.45; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.55; color: Qt.rgba(1, 1, 1, 0) }
-        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.88; color: Qt.rgba(1, 1, 1, 1) }
-        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
-      }
-    }
-
-    // The fade itself. The script leg clears the transcript in place; the
-    // short hold makes it read as a fade rather than a frame that happened to
-    // be dim. Both legs write the one swapK scalar, and lyricsSide.opacity is
-    // derived from it, so an interrupted animation leaves no stale value on
-    // the item. With motion off nothing is staged and the tween is
-    // zero-length, so the swap is a single frame.
-    SequentialAnimation {
-      id: trackSwap
-
-      ScriptAction {
-        script: {
-          if (!root.animOn) return
-          root.swapK = 0
-        }
-      }
-      PauseAnimation {
-        duration: root.animOn ? 60 : 0
-      }
-      NumberAnimation {
-        target: root
-        property: "swapK"
-        to: 1
-        duration: MotionPolicy.duration(Ui.slowMs)
-        easing.type: Easing.InOutCubic
-      }
     }
 
     // Artwork-only view: a cover click fades this over the whole surface. The
     // image keeps its own aspect ratio and fits inside the window with the
     // same screen-relative padding as the composition, so a portrait or wide
-    // cover scales up without cropping. A click or Esc goes back to the
-    // transcript. The overlay is the last child so it paints over the lyrics,
+    // cover scales up without cropping. A click goes back to the transcript.
+    // The overlay is the last child so it paints over the lyrics,
     // their effect passes and the transport.
     Rectangle {
       id: artView
@@ -1365,11 +1365,11 @@ QtObject {
     // is left behind. The corner chrome stays above it.
     Rectangle {
       anchors.fill: parent
-      // Standby hides a dead composition, so it stays opaque even when the
-      // transcript's backdrop preference is translucent.
-      color: Ui.solid("background_0")
+      // The composition is hidden in standby, so this only has to repeat the
+      // surface backdrop: transparent when the dim preference is on.
+      color: root.emptyStateColor
       visible: root.standby
-      z: 9
+      z: 8
 
       Column {
         anchors.centerIn: parent
