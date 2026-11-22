@@ -87,9 +87,18 @@ Item {
 
   // Open fade and the deck's own settle. `_settled` keeps geometry tweens
   // off until the surface has taken the screen's size, so the first frame
-  // cannot animate the deck out of zero-sized cards.
+  // cannot animate the deck out of zero-sized cards. That size is a live
+  // fact, not a one-frame timer guess.
   property bool _fade: false
   property bool _settled: false
+  readonly property bool _sized: width > 0 && height > 0
+  // One fade for the WHOLE overlay, inherited by every child. Nothing inside
+  // animates its own presence.
+  opacity: panel._fade ? 1 : 0
+  Behavior on opacity {
+    enabled: MotionPolicy.enabled
+    Glide { duration: Ui.fastMs }
+  }
   property bool _seated: false
   // The focused folder across a row-set change (a rescan, a theme switch),
   // so the deck does not jump back to the active theme.
@@ -460,17 +469,20 @@ Item {
   function reveal() {
     panel._fade = false
     panel._settled = false
-    revealTimer.restart()
-  }
-
-  Timer {
-    id: revealTimer
-    interval: 16
-    onTriggered: {
-      if (!ThemePicker.visible) return
+    // The panel can already be sized from a previous open, in which case no
+    // size edge will fire: re-check the live fact on the next turn. A panel
+    // that is still unsized is armed by on_SizedChanged when it lands.
+    Qt.callLater(() => {
+      if (!ThemePicker.visible || !panel._sized) return
       panel._settled = true
       panel._fade = true
-    }
+    })
+  }
+
+  on_SizedChanged: {
+    if (!panel._sized || !ThemePicker.visible || panel._fade) return
+    panel._settled = true
+    panel._fade = true
   }
 
   Connections {
@@ -485,7 +497,6 @@ Item {
         // Keep the query and filtered deck through the fade. Clearing it here
         // rebuilds the deck as all rows while it is still fading out, so the
         // card visibly jumps to the first theme (Antix) on every close.
-        revealTimer.stop()
         return
       }
       panel._seated = false
@@ -650,7 +661,6 @@ Item {
     width: panel.width
     height: panel.stageH
     clip: true
-    opacity: panel._fade ? 1 : 0
 
     Behavior on y {
       enabled: MotionPolicy.enabled && panel._settled
@@ -659,10 +669,6 @@ Item {
     Behavior on height {
       enabled: MotionPolicy.enabled && panel._settled
       Glide { duration: Ui.slowMs }
-    }
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.fastMs }
     }
 
     // ---- the main deck ----------------------------------------------------
@@ -909,12 +915,6 @@ Item {
     // labels readable.
     width: Math.min(900, Math.max(0, panel.width - 2 * Ui.outerPad))
     visible: panel.filteredRows.length > 0
-    opacity: panel._fade ? 1 : 0
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.fastMs }
-    }
 
     // Two pills, not one stepped shape: the theme's name and its palette line
     // are separate labels, each on the footer's island. The deck sits on a
@@ -1010,7 +1010,6 @@ Item {
     anchors.centerIn: parent
     width: Math.max(0, panel.width - 64)
     visible: panel.rows.length === 0 || panel.filteredRows.length === 0
-    opacity: panel._fade ? 1 : 0
     text: panel.rows.length === 0 ? "Loading themes" : "No matching themes"
     iconName: "theme"
     iconColorKey: "foreground_1"
@@ -1054,7 +1053,6 @@ Item {
     height: Ui.filterH
     z: 200
     visible: panel.rows.length > 0
-    opacity: panel._fade ? 1 : 0
     inputRole: "search"
     // The deck keeps keyboard focus while filtering, so the field's own
     // activeFocus never lights up. A live query is the same engaged state.
@@ -1068,11 +1066,6 @@ Item {
     }
     onEscaped: panel.escapeSearch()
     onFocusedChanged: focusCtrl.mode = themeSearch.focused ? "filter" : "list"
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.fastMs }
-    }
   }
 
   function _key(name, color) {
@@ -1118,15 +1111,9 @@ Item {
     color: Qt.rgba(0, 0, 0, 0.62)
     border.width: 1
     border.color: Qt.rgba(1, 1, 1, 0.18)
-    opacity: panel._fade ? 1 : 0
 
     Accessible.role: Accessible.StaticText
     Accessible.name: panel._legendPlain()
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.fastMs }
-    }
 
     Text {
       id: footerText
