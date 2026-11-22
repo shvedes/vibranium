@@ -18,8 +18,8 @@
 #     other rises in, the enter holding a short pause so total light dips
 #     mid-swap), so the pair is mid-flight on the second turn and landed
 #     by 600ms
-#   * the failure border cross-fades over 150ms, so a color read too early is
-#     a blend of the two ends rather than either of them
+#   * the failure border cross-fades over Ui.fastMs, so a color read too early
+#     is a blend of the two ends rather than either of them
 #   * PasswordBox.failure is `failureTimer.running` and the window is 1400ms,
 #     so "still failing" and "expired" are 1400ms apart and the driver samples
 #     both ends of that range
@@ -598,6 +598,75 @@ else
   t_ok "no literal 220 remains in either widget"
 fi
 
+t_section "UI-2: one feedback clock for the border, shake and recenter"
+qp_assert "the feedback clock is the shared fast token" \
+  feedback.tokenIsUiFast true
+t_eq "literally Ui.fastMs" "120" "$(qp_get feedback.token)"
+t_eq "the four shake legs keep their original choreography" \
+  "45,80,60,50" "$(qp_get feedback.legs)"
+t_eq "and every leg is derived from that one clock" \
+  "true" "$(qp_get feedback.legsFromToken)"
+if [[ "$(qp_get probe.motion.enabled)" == "true" ]]; then
+  qp_assert "the border fade reads the same clock" \
+    feedback.borderMsFromToken true
+  t_eq "with the token's duration, not a copied 150" "120" \
+    "$(qp_get feedback.borderMs)"
+  qp_assert "the border tween is the ColorAnim template" \
+    feedback.borderTemplate ColorAnim
+  qp_assert "and its stop released the target" \
+    feedback.borderTargetReleased true
+  qp_assert "the shake translation moves through in-flight frames" \
+    feedback.shakeMoved true
+  qp_assert "and comes home by the time the palette settles" \
+    feedback.shakeReturned true
+  qp_assert "the glyph row's recentre moves through in-flight frames" \
+    feedback.rowMoved true
+else
+  t_eq "the border fade is granted zero by the policy" "0" \
+    "$(qp_get feedback.borderMs)"
+  t_eq "from the same clock" "true" \
+    "$(qp_get feedback.borderMsFromToken)"
+  t_skip "the ColorAnim target release" \
+    "MotionPolicy is disabled on this host, so the tween never runs"
+  t_skip "the shake and recentre frame samples" \
+    "MotionPolicy is disabled on this host, so the recentre snaps"
+fi
+qp_assert "the glyph row's recenter reads the same clock" \
+  feedback.rowMsFromToken true
+t_eq "at the token's duration" "120" "$(qp_get feedback.rowMs)"
+qp_assert "the border gate follows the per-instance switch" \
+  feedback.gateDefault "$(qp_get probe.motion.enabled)"
+t_eq "animated: false closes the gate" "false" "$(qp_get feedback.gateOff)"
+t_eq "and the clock does not move with the switch" "true" \
+  "$(qp_get feedback.gateMsUnchanged)"
+qp_assert "restoring animated opens the gate again" \
+  feedback.gateBackOn "$(qp_get probe.motion.enabled)"
+# Values alone cannot prove which template or which switches a Behavior was
+# written with, so the structural half of the finding is read from the source.
+token_lines="$(grep -c 'property int feedbackMs: Ui.fastMs' \
+  "$SHELL_DIR/common/ui/PasswordBox.qml")"
+t_eq "the clock is declared once from Ui.fastMs" "1" "$token_lines"
+if grep -q 'ColorAnim {' "$SHELL_DIR/common/ui/PasswordBox.qml" \
+  && ! grep -q 'ColorAnimation {' "$SHELL_DIR/common/ui/PasswordBox.qml"; then
+  t_ok "the border tween is written with the ColorAnim template"
+else
+  t_no "the border tween is written with the ColorAnim template" \
+    "expected one ColorAnim and no raw ColorAnimation"
+fi
+if grep -q 'enabled: root.animated && MotionPolicy.enabled' \
+  "$SHELL_DIR/common/ui/PasswordBox.qml"; then
+  t_ok "the border Behavior carries both gates"
+else
+  t_no "the border Behavior carries both gates" \
+    "expected enabled: root.animated && MotionPolicy.enabled"
+fi
+if grep -q 'duration: 150' "$SHELL_DIR/common/ui/PasswordBox.qml"; then
+  t_no "no copied 150 duration remains in the feedback family" \
+    "$(grep -n 'duration: 150' "$SHELL_DIR/common/ui/PasswordBox.qml")"
+else
+  t_ok "no copied 150 duration remains in the feedback family"
+fi
+
 t_section "a failure re-masks a revealed password without clearing it"
 t_eq "the reveal is dropped on failure" "false" "$(qp_get fail.revealed.stillRevealed)"
 t_eq "the display row paints only the mask" "******" "$(qp_get fail.revealed.glyphText)"
@@ -667,12 +736,12 @@ t_eq "so the two borders differ" "true" "$(qp_get tick1.fail.borderDiffersFromId
 # same turn.
 t_eq "both boxes start on the idle border" "true" "$(qp_get settle.border.preFail.equal)"
 t_eq "which is the unfocused palette entry" "true" "$(qp_get settle.border.preFail.isBackground3)"
-t_eq "the failure border is still cross-fading 120ms in" "false" "$(qp_get mid.late.quiet.landed)"
+t_eq "the failure border is still cross-fading 60ms in" "false" "$(qp_get mid.late.quiet.landed)"
 t_eq "and has moved off the idle color" "true" "$(qp_get mid.late.quiet.movedOffPre)"
 t_eq "with animated: false it has already landed" "true" "$(qp_get mid.late.still.landed)"
 t_eq "and is the palette's red" "true" "$(qp_get land.late.quiet.onRed)"
 t_eq "for the still box too" "true" "$(qp_get land.late.still.onRed)"
-t_note "animated: false disables the border fade, not the border: the Behavior is enabled: root.animated (PasswordBox.qml:106), so a minimal-setup consumer gets the same red border with no fade. Asserted as the difference between a mid-fade color and the landed one on the two boxes, in the same turn, which is the only way to see a tween without a compositor."
+t_note "animated: false disables the border fade, not the border: the Behavior is enabled: root.animated && MotionPolicy.enabled, so a minimal-setup consumer gets the same red border with no fade. Asserted as the difference between a mid-fade color and the landed one on the two boxes, in the same turn, which is the only way to see a tween without a compositor."
 
 t_section "the failure window expires on its own"
 t_eq "at 320ms the 300ms window has closed" "false" "$(qp_get tick8.fail.shortExpired)"

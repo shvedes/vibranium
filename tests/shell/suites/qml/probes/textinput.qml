@@ -11,7 +11,7 @@
 //
 //   * the mode chip fades through `Behavior on opacity`, so `opacity` is
 //     mid-flight on the first turn and 1 on a later one;
-//   * the failure border cross-fades over 150ms through `Behavior on
+//   * the failure border cross-fades over Ui.fastMs through `Behavior on
 //     border.color`, so mid-flash its value is a blend of the two ends;
 //   * `PasswordBox.failure` is `failureTimer.running` and the window is
 //     1400ms, so "still failing" and "expired" are 1400ms apart and the
@@ -59,6 +59,13 @@ Window {
   property real inTick: 0
   property string pwSamples: ""
   property string inSamples: ""
+
+  // UI-2 frame samples: the shake translation and the glyph row's recentre
+  // are the two visible legs the border's grouped color cannot show here.
+  property real fbShakePeak: 0
+  property real fbRowFirst: 0
+  property real fbRowLast: 0
+  property bool fbRowChanged: false
 
   // Signal bookkeeping. `edited` is the one InputField signal a caller can
   // reach without a key event, and the property worth asserting is the count:
@@ -182,6 +189,7 @@ Window {
     running: true
     onTriggered: {
       root.phase++
+      root.sampleFeedbackFrames()
       if (root.phase === 1) onFirstTick()
       else if (root.phase === 2) onSecondTick()
       else if (root.phase === 8) onEighthTick()
@@ -191,9 +199,9 @@ Window {
   // 600ms: the palette has landed and every tween has finished, so this is
   // the first moment a border color means what it says.
   Timer { id: settle; interval: 600; onTriggered: onSettle() }
-  // 120ms into a 150ms cross-fade.
-  Timer { id: mid; interval: 720; onTriggered: onMid() }
-  // 500ms into that cross-fade: landed.
+  // 60ms into the feedback clock's 120ms cross-fade: still in flight.
+  Timer { id: mid; interval: 660; onTriggered: onMid() }
+  // Well past that cross-fade: landed.
   Timer { id: land; interval: 1100; onTriggered: onLand() }
   // Past the 1400ms window armed at construction, short of the one re-armed
   // at 600ms.
@@ -239,6 +247,7 @@ Window {
     reportAffordances()
     reportPasswordBox()
     reportErase()
+    reportFeedback()
   }
 
   // ---- InputField: text, placeholder ----------------------------------
@@ -1075,6 +1084,59 @@ Window {
     kv("erase.failure", pwErase.failure)
   }
 
+  // ---- UI-2: one feedback clock for border, shake and recenter ---------
+
+  // The border fade, the four shake legs and the glyph row's recentre are one
+  // choreography on one clock. Read the clock and every reader from the box,
+  // then flip the per-instance switch to show it gates the Behavior instead
+  // of starting a second clock of its own.
+  function sampleFeedbackFrames() {
+    if (root.phase > 8) return
+    const sx = pwWindow.shakeXOffset
+    if (Math.abs(sx) > Math.abs(root.fbShakePeak)) root.fbShakePeak = sx
+    const rx = pwMask.glyphRowX
+    if (root.phase === 1) root.fbRowFirst = rx
+    else if (rx !== root.fbRowLast) root.fbRowChanged = true
+    root.fbRowLast = rx
+  }
+
+  function reportFeedback() {
+    const ms = pwMask.feedbackMs
+    const anim = pwMask.borderFadeAnim
+    const row = pwMask.recenterAnim
+    const legs = [pwMask.shakeOutMs, pwMask.shakeBackMs,
+      pwMask.shakeSettleMs, pwMask.shakeHomeMs]
+    const granted = MotionPolicy.enabled ? ms : 0
+
+    kv("feedback.token", ms)
+    kv("feedback.tokenIsUiFast", ms === Ui.fastMs)
+    kv("feedback.legs", legs.join(","))
+    kv("feedback.legsFromToken", legs.join(",") ===
+      [Math.round(ms * 3 / 8), Math.round(ms * 2 / 3),
+        Math.round(ms / 2), Math.round(ms * 5 / 12)].join(","))
+    kv("feedback.borderMs", anim ? anim.duration : "missing")
+    kv("feedback.borderMsFromToken", !!anim && anim.duration === granted)
+    // ColorAnim is a QML component, so its string starts with its type name;
+    // a raw ColorAnimation reports QQuickColorAnimation instead.
+    kv("feedback.borderTemplate", anim ? String(anim).split("_")[0] : "missing")
+    kv("feedback.rowMs", row ? row.duration : "missing")
+    kv("feedback.rowMsFromToken", !!row && row.duration === ms)
+
+    const gate = pwMask.borderFade
+    kv("feedback.gateDefault", gate ? gate.enabled : "missing")
+    if (gate) {
+      pwMask.animated = false
+      kv("feedback.gateOff", gate.enabled)
+      kv("feedback.gateMsUnchanged", anim.duration === granted)
+      pwMask.animated = true
+      kv("feedback.gateBackOn", gate.enabled)
+    } else {
+      kv("feedback.gateOff", "missing")
+      kv("feedback.gateMsUnchanged", "missing")
+      kv("feedback.gateBackOn", "missing")
+    }
+  }
+
   // PasswordBox has no releaseFocus(), so the probe hands focus back to a
   // field that has one and the rest of the run starts unfocused.
   function releaseFocusForTest() {
@@ -1421,9 +1483,15 @@ Window {
     lateStill.fail()
     kv("settle.late.quiet.failure", lateQuiet.failure)
     kv("settle.late.still.failure", lateStill.failure)
+
+    // The shake and the row's recentre are plain translations, so their
+    // frames are observable here even though border.color is not.
+    kv("feedback.shakeMoved", Math.abs(root.fbShakePeak) > 0.5)
+    kv("feedback.shakeReturned", Math.abs(pwWindow.shakeXOffset) < 0.001)
+    kv("feedback.rowMoved", root.fbRowChanged)
   }
 
-  // 120ms into a 150ms cross-fade.
+  // Halfway into the feedback clock's 120ms cross-fade.
   function onMid() {
     kv("mid.late.quiet.border", String(lateQuiet.border.color))
     kv("mid.late.still.border", String(lateStill.border.color))
@@ -1443,8 +1511,8 @@ Window {
   }
 
   // Past 1400ms from construction, short of the 600 + 1400 deadline. The
-  // border is still cross-fading back here (100ms into 150ms), so its color
-  // is read once everything has settled, in onRest.
+  // border is still cross-fading back here, so its color is read again once
+  // everything has settled, in onRest.
   function onHalf() {
     kv("half.window.expired", pwWindow.failure)
     kv("half.double.stillOn", pwDouble.failure)
@@ -1476,6 +1544,10 @@ Window {
     kv("rest.window.border", String(pwWindow.border.color))
     kv("rest.window.borderBackToIdle", String(pwWindow.border.color) === Theme.color("background_3"))
     kv("rest.short.borderBackToIdle", String(pwShort.border.color) === Theme.color("background_3"))
+    // The ColorAnim template hands its target back on stop; a raw
+    // ColorAnimation would still be holding the border here.
+    kv("feedback.borderTargetReleased", pwWindow.borderFadeAnim
+      ? pwWindow.borderFadeAnim.target === null : "missing")
     kv("rest.done", true)
     console.log("##DONE##")
   }

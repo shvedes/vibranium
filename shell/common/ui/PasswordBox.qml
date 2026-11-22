@@ -78,6 +78,16 @@ Rectangle {
   // Silences border fades and the shake for minimal setups.
   property bool animated: true
 
+  // One clock for the failure-feedback family. The border fade, the glyph
+  // row's recentre and every shake leg read this token, so a change to it
+  // moves the whole choreography instead of one leg at a time. The fractions
+  // keep the original 45/80/60/50 leg shape at Ui.fastMs.
+  readonly property int feedbackMs: Ui.fastMs
+  readonly property int shakeOutMs: Math.round(feedbackMs * 3 / 8)
+  readonly property int shakeBackMs: Math.round(feedbackMs * 2 / 3)
+  readonly property int shakeSettleMs: Math.round(feedbackMs / 2)
+  readonly property int shakeHomeMs: Math.round(feedbackMs * 5 / 12)
+
   // Shown while empty; failureText replaces it while failure lasts.
   property string placeholder: "PASSWORD"
   property string failureText: "Wrong password!"
@@ -173,9 +183,15 @@ Rectangle {
                                                                        : Theme.color("background_3")))
 
   Behavior on border.color {
-    enabled: root.animated
-    ColorAnimation {
-      duration: 150
+    id: borderFadeBehavior
+
+    // Both switches gate the fade; neither owns a clock. ColorAnim carries
+    // the policy duration and hands its target back on stop, which a raw
+    // ColorAnimation would not do.
+    enabled: root.animated && MotionPolicy.enabled
+    ColorAnim {
+      id: borderFadeColorAnim
+      duration: MotionPolicy.duration(root.feedbackMs)
     }
   }
 
@@ -190,8 +206,7 @@ Rectangle {
   // of them is what a reader needs to tell "the prompt is on the wrong
   // screen" from "the prompt is the wrong size".
 
-  // The border and the echo both move on a 150ms color tween that reads
-  // neither the global motion policy nor the field's own `animated` switch.
+  // The border now fades on the one feedback clock under both switches.
   // `border.color` is a grouped property with no change signal of its own, so
   // the tween it runs is not observable per frame from here; the shake
   // translation below and the glyph row's recentring are, and they are what
@@ -211,25 +226,25 @@ Rectangle {
       target: shakeX
       property: "x"
       to: -6
-      duration: 45
+      duration: root.shakeOutMs
     }
     NumberAnimation {
       target: shakeX
       property: "x"
       to: 6
-      duration: 80
+      duration: root.shakeBackMs
     }
     NumberAnimation {
       target: shakeX
       property: "x"
       to: -4
-      duration: 60
+      duration: root.shakeSettleMs
     }
     NumberAnimation {
       target: shakeX
       property: "x"
       to: 0
-      duration: 50
+      duration: root.shakeHomeMs
     }
   }
 
@@ -374,7 +389,8 @@ Rectangle {
       Behavior on x {
         enabled: MotionPolicy.enabled
         NumberAnimation {
-          duration: 150
+          id: rowRecenterAnim
+          duration: root.feedbackMs
           easing.type: Easing.OutCubic
         }
       }
@@ -492,6 +508,15 @@ Rectangle {
       }
     }
   }
+
+  // Readback handles for the one feedback clock: the combined gate on the
+  // border Behavior, the color tween that owns the border, and the row's
+  // recentring leg. Each is a live view, not a copied duration.
+  readonly property alias borderFade: borderFadeBehavior
+  readonly property alias borderFadeAnim: borderFadeColorAnim
+  readonly property alias recenterAnim: rowRecenterAnim
+  readonly property alias shakeXOffset: shakeX.x
+  readonly property alias glyphRowX: glyphRow.x
 
   Text {
     anchors.fill: passwordInput
