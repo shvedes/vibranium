@@ -7,39 +7,51 @@ import qs.common
 import "../text/UnitIpc.js" as UnitIpc
 
 // System GTK font provider for the entire shell.
-// Reads the GTK font from gsettings (GNOME) or from gtk-3.0/gtk-4.0 settings.ini,
-// falling back to "Sans 11" if nothing is found. The ini files are watched live
-// via FileView; gsettings itself is probed once at boot (a mid-session gsettings
-// change needs a shell restart). The old 5s re-poll was pure process churn -
-// ~17k forked gsettings processes per day for a setting that almost never changes.
+// One source record wins: gsettings (GNOME, rank 0), gtk-4.0 settings.ini
+// (rank 1), gtk-3.0 settings.ini (rank 2), with "Sans 11" as the floor. Arrival
+// order cannot demote a better source: a late ini write never clobbers a
+// gsettings font, and a late gsettings answer still takes over from ini.
+// The ini files are watched live via FileView; gsettings is probed once at boot
+// (a mid-session gsettings change needs a shell restart). A periodic re-poll
+// would be pure process churn - ~17k forks a day for a rarely changed setting.
 Singleton {
   id: root
 
   readonly property string tag: "systemFont"
 
-  // Raw GTK font string, e.g. "Cantarell 11" or "Noto Sans 10"
-  property string raw: "Sans 11"
-  property string family: "Sans"
-  property int pointSize: 11
+  // One writer: _offer. Lower rank wins; 99 is the "no answer yet" floor.
+  property var _fontSource: ({ rank: 99, raw: "Sans 11" })
 
-  function parseRaw(v) {
-    const s = String(v || "").trim().replace(/^'|'$/g, "").replace(/^"|"$/g, "")
+  // The three public values are derivations of that one record.
+  readonly property string raw: root._fontSource.raw
+  readonly property var _fontParsed: _parse(root._fontSource.raw)
+  readonly property string family: root._fontParsed.family
+  readonly property int pointSize: root._fontParsed.pointSize
+
+  // Offer one font string. Rank 0 = gsettings, 1 = gtk4, 2 = gtk3. An empty
+  // answer is ignored without spending the rank; only a strictly better rank
+  // replaces the current winner.
+  function _offer(rank, value) {
+    const s = String(value || "").trim().replace(/^'|'$/g, "").replace(/^"|"$/g, "")
     if (s === "") return
-    // GTK font is "<family> <size>" where family may contain spaces.
-    const m = s.match(/^(.+)\s+(\d+(?:\.\d+)?)$/)
-    if (m) {
-      root.family = m[1].trim()
-      const sz = parseFloat(m[2])
-      if (!isNaN(sz) && sz > 0) root.pointSize = Math.round(sz)
-      root.raw = s
-    } else if (s !== "") {
-      root.family = s
-      root.raw = s
-    }
+    if (rank >= root._fontSource.rank) return
+    root._fontSource = { rank: rank, raw: s }
   }
 
-  // Try gsettings first (GNOME), then ini files. Direct argv: the old
-  // `tr -d "\n"` pipe lives in JS below (newline strip plus trim).
+  // Pure "<family> <size>" split; family may contain spaces. Local to this
+  // file because no other reader parses a GTK font string.
+  function _parse(value) {
+    const s = String(value || "").trim()
+    const m = s.match(/^(.+)\s+(\d+(?:\.\d+)?)$/)
+    if (m) {
+      const sz = parseFloat(m[2])
+      return { family: m[1].trim(), pointSize: (!isNaN(sz) && sz > 0) ? Math.round(sz) : 11 }
+    }
+    return { family: s, pointSize: 11 }
+  }
+
+  // gsettings is the primary probe; ini files are the fallback. Direct argv:
+  // the newline strip and trim happen in the collector handler below.
   Process {
     id: gsettingsProc
     command: ["gsettings", "get", "org.gnome.desktop.interface", "font-name"]
@@ -48,9 +60,9 @@ Singleton {
       onStreamFinished: {
         const out = String(text || "").replace(/\n/g, "").trim()
         if (out !== "" && out.indexOf("No such") < 0) {
-          root.parseRaw(out)
+          root._offer(0, out)
         } else {
-          // Fallback to ini files
+          // gsettings has no answer: publish the ini fallback now.
           gtk3File.reload()
           gtk4File.reload()
         }
@@ -61,9 +73,9 @@ Singleton {
   // FileView hands out its body through the text() accessor. The bare `text`
   // identifier resolves to that function object, so String(text) yields the
   // wrapper source and never matches the ini key.
-  function applyIni(text) {
+  function applyIni(rank, text) {
     const m = String(text || "").match(/gtk-font-name\s*=\s*([^\n\r]+)/)
-    if (m) root.parseRaw(m[1])
+    if (m) root._offer(rank, m[1])
   }
 
   FileView {
@@ -77,7 +89,7 @@ Singleton {
     // holds the pre-change body when it arrives, so the reload is what
     // republishes the content for the loaded handler.
     onFileChanged: gtk3File.reload()
-    onLoaded: root.applyIni(gtk3File.text())
+    onLoaded: root.applyIni(2, gtk3File.text())
   }
 
   FileView {
@@ -86,7 +98,7 @@ Singleton {
     watchChanges: true
     printErrors: false
     onFileChanged: gtk4File.reload()
-    onLoaded: root.applyIni(gtk4File.text())
+    onLoaded: root.applyIni(1, gtk4File.text())
   }
 
   Component.onCompleted: {
@@ -100,16 +112,12 @@ Singleton {
         "ping",
       ]
     })
-    // These three are floor work: this singleton is constructed in the eager
-    // pass, before anything paints, and each is a fork (gsettings) or a
-    // synchronous file read. The default family is already a valid value, so
-    // one callLater moves all of them past the first frame and the store
-    // updates through its own bindings when they land.
-    Qt.callLater(() => {
-      gsettingsProc.running = true
-      gtk3File.reload()
-      gtk4File.reload()
-    })
+    // gsettings is the authoritative probe on GNOME. The ini FileViews load
+    // themselves and their watchers stay live; only the failure branch reloads
+    // them. Starting gsettings alone here keeps its rank-0 answer from being
+    // pre-empted by an unnecessary ini reload. One callLater moves the fork
+    // past the first frame - the default family is already a valid value.
+    Qt.callLater(() => { gsettingsProc.running = true })
   }
 
   // For debugging: allow `qs ipc call systemFont dump`

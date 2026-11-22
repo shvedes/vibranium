@@ -5,14 +5,25 @@
 // reads MiscSettings and CursorPicker used to duplicate: one parser,
 // one quote rule, one fallback contract. The shell's own cursor state
 // JSON stays the first source; this file pins the shared INI fallback.
+import fs from 'node:fs'
 import path from 'node:path'
 import { loadLib } from '../../lib/qmlloader.mjs'
 import {
-  suite, section, group, eq, finish,
+  suite, section, group, eq, finish, contains, notMatch, match,
 } from '../../lib/assert.mjs'
 
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const G = loadLib(path.join(SHELL, 'common/settings/GtkSettings.js'))
+const SYSFONT_QML = fs.readFileSync(
+  path.join(SHELL, 'common/settings/SystemFont.qml'), 'utf8'
+)
+
+// The block text of a named QML handler/object, up to its closing brace at the
+// given indent. Used for source assertions on SystemFont's completion path.
+function block(src, header, indent) {
+  const m = src.match(new RegExp(`${header}:\\s*\\{([\\s\\S]*?)\\n${indent}\\}`))
+  return m ? m[1] : ''
+}
 
 suite('gtk-settings', 'GtkSettings.parseIni, cursorThemeOf, cursorSizeOf')
 
@@ -47,6 +58,83 @@ group('size or fallback', () => {
   eq('a plain size', G.cursorSizeOf(INI, 0), 24)
   eq('absent reads the fallback', G.cursorSizeOf('[Settings]\n', 32), 32)
   eq('a non-number reads the fallback', G.cursorSizeOf('gtk-cursor-theme-size = big\n', 32), 32)
+})
+
+// ---------------------------------------------------------------------------
+// SET-3: three uncoordinated SystemFont writers let completion order decide
+// the font; one source record with a rank gate now governs it. Headless has no
+// gsettings and no GTK ini files, so these are source-level assertions: the
+// rank gate is extracted from the real QML and executed against a stub root.
+section('SystemFont - one source record, rank wins over arrival order')
+
+group('onCompleted starts only gsettings, not all three readers', () => {
+  const body = block(SYSFONT_QML, 'Component\\.onCompleted', '  ')
+  contains('onCompleted still spawns gsettings', body, 'gsettingsProc.running = true')
+  notMatch('onCompleted does not reload gtk3', body, /gtk3File\.reload/)
+  notMatch('onCompleted does not reload gtk4', body, /gtk4File\.reload/)
+})
+
+group('ini reloads stay in the gsettings failure branch', () => {
+  const body = block(SYSFONT_QML, 'onStreamFinished', '      ')
+  contains('the failure branch reloads gtk3', body, 'gtk3File.reload()')
+  contains('the failure branch reloads gtk4', body, 'gtk4File.reload()')
+  // The watchers stay live for mid-session ini writes.
+  contains('gtk3 still watches for changes', SYSFONT_QML, 'onFileChanged: gtk3File.reload()')
+  contains('gtk4 still watches for changes', SYSFONT_QML, 'onFileChanged: gtk4File.reload()')
+})
+
+group('the rank gate: lower rank wins, later ini cannot clobber', () => {
+  const m = SYSFONT_QML.match(/function _offer\([^)]*\)\s*\{[\s\S]*?\n  \}/)
+  eq('SystemFont declares _offer', !!m, true)
+  if (!m) return
+  // Execute the real gate against a stub root: _offer is plain JS, so the
+  // extracted declaration evaluates with the injected root in scope.
+  const offer = new Function('root', `${m[0]}; return _offer`)
+  const fresh = () => ({ _fontSource: { rank: 99, raw: 'Sans 11' } })
+
+  let root = fresh()
+  let put = offer(root)
+  put(0, 'Cantarell 11') // gsettings
+  put(1, 'Noto Sans 10') // gtk4
+  put(2, 'DejaVu Sans 9') // gtk3
+  eq('gsettings wins the boot race', root._fontSource.raw, 'Cantarell 11')
+  eq('and its rank is kept', root._fontSource.rank, 0)
+
+  root = fresh()
+  put = offer(root)
+  put(1, 'Noto Sans 10') // gtk4 first
+  put(2, 'DejaVu Sans 9') // gtk3 second
+  put(0, 'Cantarell 11') // later gsettings answer
+  eq('a later gsettings answer still wins', root._fontSource.raw, 'Cantarell 11')
+
+  root = fresh()
+  put = offer(root)
+  put(2, 'DejaVu Sans 9') // gtk3 first
+  put(1, 'Noto Sans 10') // gtk4 outranks it
+  put(1, 'Liberation 12') // a later equal-rank ini answer
+  eq('gtk4 outranks gtk3', root._fontSource.raw, 'Noto Sans 10')
+  eq('a later equal-rank ini cannot clobber', root._fontSource.rank, 1)
+
+  root = fresh()
+  put = offer(root)
+  put(0, 'Cantarell 11')
+  put(2, 'DejaVu Sans 9') // mid-session ini write
+  eq('a mid-session ini write cannot clobber gsettings', root._fontSource.raw, 'Cantarell 11')
+
+  root = fresh()
+  put = offer(root)
+  put(99, 'Sans 11')
+  eq('an offer at the floor rank is ignored', root._fontSource.rank, 99)
+})
+
+group('family and pointSize derive from the one raw string', () => {
+  notMatch('no imperative family write', SYSFONT_QML, /root\.family\s*=/)
+  notMatch('no imperative pointSize write', SYSFONT_QML, /root\.pointSize\s*=/)
+  notMatch('no imperative raw write', SYSFONT_QML, /root\.raw\s*=/)
+  match('raw binds from _fontSource', SYSFONT_QML, /property string raw:\s*root\._fontSource\.raw/)
+  match('family binds from the parsed record', SYSFONT_QML, /property string family:\s*root\._fontParsed\.family/)
+  match('pointSize binds from the parsed record', SYSFONT_QML, /property int pointSize:\s*root\._fontParsed\.pointSize/)
+  match('the default record is the floor', SYSFONT_QML, /rank: 99, raw: "Sans 11"/)
 })
 
 finish()
