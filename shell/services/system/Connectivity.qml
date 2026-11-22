@@ -133,20 +133,10 @@ Singleton {
   // on every fresh association (roam) so the grace always measures the
   // network that is up now, never the one just left.
   property double _linkUpAtMs: 0
-  // Link-loss moment behind the deferred optimistic edge, 0 when the link
-  // is up or no loss is pending. Armed on an unexpected drop, cleared on
-  // heal: a roam gap heals before the grace lapses and stays silent.
-  property double _linkDownAtMs: 0
-  // Whether the wifi radio carried the link when the pending loss armed
-  // (the previous signal's wifiUp). A radio toggle that lands while the
-  // edge is still pending explains a wifi-carried loss even when it arrives
-  // second, so the toggle retires it; a wired loss survives the toggle.
-  property bool _linkDownWifi: false
-  // Link and radio memory for the optimistic edge. Null until the first
-  // signal, so boot never announces on state it never saw up.
+  // Previous link reading for fresh-association detection in kick(). Null
+  // until the first signal, so boot never restamps the grace on state it
+  // never saw go up. The offline card itself is the poll verdict's.
   property var _prevLinkUp: null
-  property var _prevWifiUp: null
-  property var _prevWifiOn: null
   // The blocked metered sender (its stdout is the mute button) and the
   // in-flight connectivity-URI read. At most one of each; killed on
   // episode end and on teardown.
@@ -307,16 +297,12 @@ Singleton {
   // Fresh association: the link just (re)associated, possibly onto a new
   // SSID. Re-stamps the offline grace for the network that is up now, so a
   // roam A->B waits out the grace on B instead of announcing instantly on
-  // A's old stamp. Cancels a pending link-loss edge (the gap healed); the
-  // next dark poll then defers and, if still dark after the grace,
-  // announces with the current name. A standing card stays: same-network
-  // flaps keep it instead of flashing. Idempotent.
+  // A's old stamp. The next dark poll then defers and, if still dark after
+  // the grace, announces with the current name. A standing card stays:
+  // same-network flaps keep it instead of flashing. Idempotent.
   function _noteFreshLink() {
     root._linkUpAtMs = Date.now()
     root._prevLinked = false
-    optimisticTimer.stop()
-    root._linkDownAtMs = 0
-    root._linkDownWifi = false
   }
 
   // Transition effects live here; the decisions live in the library as
@@ -633,63 +619,15 @@ Singleton {
     }
   }
 
-  // Deferred link-loss edge: fires when an unexpected drop survives the
-  // grace, so a roam gap (down then up to a new AP within seconds) stays
-  // silent while a genuine loss still surfaces seconds in rather than on
-  // the next cadence. Cancelled on heal; the poll verdict owns everything
-  // after the grace.
-  Timer {
-    id: optimisticTimer
-
-    interval: Lib.OFFLINE_GRACE_MS
-    repeat: false
-    onTriggered: root._fireOptimistic()
-  }
-
   // A link signal arrived (verdict moved, radio toggled, device set or
   // device state moved): poll now unless one just ran, in which case arm
   // the trailing edge. The heartbeat stays the backstop; kicks are what
-  // make a drop or a join land in seconds rather than on the cadence.
-  //
-  // The loss edge is deferred through the grace: it arms a timer instead of
-  // sending at once, so a roam gap (down then up to a new AP within seconds)
-  // heals before it fires and stays silent, while a genuine loss still
-  // surfaces seconds in without waiting for NM's verdict to catch up. A loss
-  // explained by a radio toggle in the same breath stays silent.
+  // make a drop or a join land in seconds rather than on the cadence. A
+  // drop is silence: the poll verdict owns the offline card.
   function kick() {
     const up = root._anyLinkUp()
-    const wifiUp = root._wifiUp()
-    const wifiOn = Networking.wifiEnabled
     const wasUp = root._prevLinkUp
-    if (Lib.linkLostEdge(root._prevLinkUp, up, root._prevWifiUp, wifiOn,
-      root._hasReading, root._offlineShown)) {
-      if (!optimisticTimer.running) {
-        root._linkDownAtMs = Date.now()
-        root._linkDownWifi = (root._prevWifiUp === true)
-        optimisticTimer.start()
-      }
-    } else if (up === true) {
-      if (optimisticTimer.running) optimisticTimer.stop()
-      root._linkDownAtMs = 0
-      root._linkDownWifi = false
-    }
-    // Mirror ordering of the toggle race: the device update landed first
-    // and armed (or fired) optimistically, then the toggle arrived. A radio
-    // toggle explains a wifi-carried loss even when it arrives second, so it
-    // cancels the pending edge - otherwise the deferred edge fires minutes
-    // of intent later with a false card, and toggling everything off is
-    // silence, not news. A pending wired loss survives the toggle: it was
-    // unexpected either way.
-    if (root._prevWifiOn === true && wifiOn === false) {
-      if (optimisticTimer.running && root._linkDownWifi) {
-        optimisticTimer.stop()
-        root._linkDownAtMs = 0
-        root._linkDownWifi = false
-      }
-    }
     root._prevLinkUp = up
-    root._prevWifiUp = wifiUp
-    root._prevWifiOn = wifiOn
     // Join toast live on the signal: it needs no verdict, only the
     // backend name, so it skips the poll, the floor and the forks
     // below. Shares state with the evaluate backstop, so whichever
@@ -702,9 +640,9 @@ Singleton {
     }
     // Fresh association re-arms the offline grace for the network just
     // joined: a link that healed (down->up, including first up after boot)
-    // or a wifi SSID that changed restamps the grace and cancels a pending
-    // loss, so the next dark poll defers on the new link instead of
-    // announcing instantly on the old link's stamp.
+    // or a wifi SSID that changed restamps the grace, so the next dark poll
+    // defers on the new link instead of announcing instantly on the old
+    // link's stamp.
     if ((wasUp === false && up === true) || (wasUp === null && up === true)
       || joined.announce) {
       root._noteFreshLink()
@@ -739,34 +677,6 @@ Singleton {
   function _wifiSsid() {
     return Lib.wifiSsid(Networking.devices ? Networking.devices.values : [], DeviceType.Wifi)
   }
-
-  // Whether the wifi radio currently carries the link. Decides if a
-  // drop belongs to a radio toggle, independently of signal order.
-  function _wifiUp() {
-    return Lib.wifiUp(Networking.devices ? Networking.devices.values : [], DeviceType.Wifi)
-  }
-
-  // Deferred link-loss edge firing: an unexpected drop that survived the
-  // grace. Re-checks the link - healing in the meantime is silence, never
-  // a flash - then posts through the same card path as the poll verdict.
-  // A wifi-carried loss that ends with the radio off is silence too: the
-  // toggle explains it even when it arrived after the drop armed the edge.
-  function _fireOptimistic() {
-    // A full disconnect (no AP / no connected network) never raises the
-    // "No internet connection" card: that card answers a network that is up
-    // but dark. Stay silent on a link loss and let the poll verdict (which
-    // gates on an actual association) own the transition.
-    const downWifi = root._linkDownWifi
-    root._linkDownAtMs = 0
-    root._linkDownWifi = false
-    return
-  }
-
-  // Link-loss card, without waiting for the verdict: marks the episode
-  // first so a poll landing mid-resolve cannot double-send. Only ever runs
-  // from the deferred edge above, so a roam gap that healed in the meantime
-  // never reaches here; a false alarm that still slips through costs a flash
-  // and no toast, since the recovery close is silent.
 
   // One watcher per network device, mirroring BatteryAlert's per-device
   // set: the devices model only moves as a SET, while association moves
@@ -855,7 +765,6 @@ Singleton {
     pollTimer.stop()
     kickTimer.stop()
     graceTimer.stop()
-    optimisticTimer.stop()
     for (let i = 0; i < root._devWatchers.length; i++) {
       const watcher = root._devWatchers[i].watcher
       if (watcher !== null && watcher !== undefined) watcher.destroy()

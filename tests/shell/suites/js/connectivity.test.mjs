@@ -6,6 +6,7 @@
 // tables, the busctl reply shape, the print-config parse and the argv it
 // hands to notify-send. A wrong table or a malformed argv is a silent
 // feature, so both are pinned.
+import fs from 'node:fs'
 import path from 'node:path'
 import { loadLib } from '../../lib/qmlloader.mjs'
 import {
@@ -610,6 +611,33 @@ group('every export is covered above', () => {
   for (const name of names) {
     eq(`export ${name} exists`, CL[name] !== undefined, true)
   }
+})
+
+// ---------------------------------------------------------------------------
+section('SVC-4 - the optimistic link-loss machine is gone')
+
+// The watcher is a Boot-resident Singleton: offscreen Qt has no NetworkManager
+// signals to burst and no notification daemon to observe, so only the
+// mechanism can be pinned here. linkLostEdge stays a pure helper that never
+// fires; what must disappear is the QML machine that armed a timer on it. The
+// poll verdict (Lib.offlineStep) is the sole owner of the offline card.
+const CONNECTIVITY_QML = fs.readFileSync(
+  path.join(SHELL, 'services/system/Connectivity.qml'), 'utf8')
+
+group('no leftover optimistic edge', () => {
+  notContains('no optimisticTimer', CONNECTIVITY_QML, 'optimisticTimer')
+  notContains('no _fireOptimistic', CONNECTIVITY_QML, '_fireOptimistic')
+  notContains('no _linkDownAtMs', CONNECTIVITY_QML, '_linkDownAtMs')
+  notContains('no _linkDownWifi', CONNECTIVITY_QML, '_linkDownWifi')
+  notContains('the watcher no longer calls linkLostEdge', CONNECTIVITY_QML, 'Lib.linkLostEdge')
+})
+
+group('the poll verdict still owns the offline card', () => {
+  contains('offlineStep drives the verdict', CONNECTIVITY_QML, 'Lib.offlineStep(')
+  contains('the poll sequence is kept', CONNECTIVITY_QML, '_pollSeq')
+  contains('the offline episode sequence is kept', CONNECTIVITY_QML, '_offlineSeq')
+  contains('the five-second grace is kept', CONNECTIVITY_QML, 'Lib.OFFLINE_GRACE_MS')
+  contains('real link edges still coalesce kicks', CONNECTIVITY_QML, 'function kick()')
 })
 
 finish()
