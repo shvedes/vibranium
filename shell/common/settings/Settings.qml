@@ -331,12 +331,14 @@ Singleton {
     return typeof v === "number" && v >= 2000 && v <= 20000 ? Math.round(v) : 6000
   }
 
+  // Schema-managed key: read the shard-backed option, not the raw map. The
+  // raw view is owned by the flush echo, so it still holds the previous
+  // position for one tick after a commit; the bar reads the option directly.
+  // Guarded like the other projections so a malformed persisted value cannot
+  // collapse the bar off-screen.
   readonly property string statusbarPosition: {
-    root.rev
-    const raw = root._lastRaw || {}
-    const sb = raw.shell && typeof raw.shell === "object" ? raw.shell.statusbar : null
-    const pos = sb && typeof sb === "object" ? sb.position : null
-    return root.statusbarPositions.indexOf(pos) >= 0 ? pos : "top"
+        const v = root.value("shell.statusbar.position")
+    return root.statusbarPositions.indexOf(v) >= 0 ? v : "top"
   }
 
   // Zone layout: single source of truth for the bar (shell.statusbar.layout,
@@ -1054,21 +1056,28 @@ Singleton {
   // side. Hypr pages belong to HyprlandSettings; this half carries shell/env
   // (and the misc.* options, whose live values ride the shards above).
   //
-  // Cached on the store generation, MiscSettings' included: a cursor change
-  // rewrites two rows, not the whole catalog.
+  // Signed on synchronous identity, not on `rev`: a commit replaces `values`
+  // in the same turn but bumps `rev` a turn later, so a rev-signed cache builds
+  // the menu from stale rows for one frame. The misc values map is the other
+  // synchronous input - MiscSettings owns the two cursor options and projects
+  // them into the shards; its own `rev` stays a coarse diagnostic only.
   property var _pageCache: null
-  property int _pageRev: -1
-  property int _pageMiscRev: -1
+  property var _pageValues: null
+  property var _pageSchema: null
+  property var _pageMisc: null
   function menuPages() {
     if (!root._schema || !root.ready) return null
-    const miscRev = (typeof MiscSettings !== "undefined" && MiscSettings.ready) ? MiscSettings.rev : -1
-    if (root._pageCache !== null && root._pageRev === root.rev
-      && root._pageMiscRev === miscRev) return root._pageCache
+    const sval = root.values
+    const schema = root._schema
+    const mval = root._miscValues()
+    if (root._pageCache !== null && root._pageValues === sval
+      && root._pageSchema === schema && root._pageMisc === mval) return root._pageCache
     // Shared with the menu's page cache, so nothing may write to the pages
     // returned here: the one reorder copies the page it touches.
-    root._pageCache = SL.buildPages(root._schema, root.values)
-    root._pageRev = root.rev
-    root._pageMiscRev = miscRev
+    root._pageCache = SL.buildPages(schema, sval)
+    root._pageValues = sval
+    root._pageSchema = schema
+    root._pageMisc = mval
     return root._pageCache
   }
 
