@@ -336,7 +336,15 @@ Item {
   property string speedtestUp: ""
   property real speedtestScaleDown: 100
   property real speedtestScaleUp: 100
-  property string speedtestError: ""
+  // The failure line is derived from two real edges: the child's exit says
+  // whether this phase failed, and the stderr collector says what it said.
+  // Writing the generic message from exit alone showed it first and corrected
+  // it a few frames later; nothing publishes until both edges have landed.
+  property bool _speedtestFailed: false
+  property bool _speedtestStderrDone: false
+  readonly property string speedtestError: root._speedtestFailed && root._speedtestStderrDone
+    ? (root.speedtestStderr !== "" ? root.speedtestStderr : "Speed test failed")
+    : ""
   property string speedtestStderr: ""
   property bool speedtestExpectedStop: false
   property bool speedtestPending: false
@@ -348,7 +356,8 @@ Item {
     root.speedtestUp = ""
     root.speedtestScaleDown = Model.initialSpeedScale()
     root.speedtestScaleUp = Model.initialSpeedScale()
-    root.speedtestError = ""
+    root._speedtestFailed = false
+    root._speedtestStderrDone = false
     root.speedtestStderr = ""
     root.speedtestPending = false
   }
@@ -359,7 +368,8 @@ Item {
       if (root.speedtestExpectedStop) root.speedtestPending = true
       return
     }
-    root.speedtestError = ""
+    root._speedtestFailed = false
+    root._speedtestStderrDone = false
     root.speedtestStderr = ""
     root.speedtestDown = ""
     root.speedtestUp = ""
@@ -372,10 +382,31 @@ Item {
   function startSpeedtestPhase(nextPhase) {
     root.speedtestExpectedStop = false
     root.speedtestPhase = nextPhase
+    root._speedtestFailed = false
+    root._speedtestStderrDone = false
     root.speedtestStderr = ""
+    speedtestProc.startedOk = false
     speedtestProc.command = ["vb-network-speedtest", nextPhase]
     speedtestProc.running = true
+    speedtestSpawnWatch.restart()
     speedtestTimer.restart()
+  }
+
+  // Terminal verdict for a child that never started. The failure fact and the
+  // collector fact are both settled here: there is no stream to finish, so
+  // waiting on it would hang the phase forever.
+  function failSpeedtestStart() {
+    // A failed spawn leaves running already false; only a confirmed start
+    // means this watchdog is stale.
+    if (speedtestProc.startedOk) return
+    speedtestSpawnWatch.stop()
+    speedtestTimer.stop()
+    root._speedtestFailed = true
+    root._speedtestStderrDone = true
+    root.speedtestStderr = "Speed test failed to start"
+    root.speedtestPhase = ""
+    root.speedtestRunning = false
+    speedtestProc.running = false
   }
 
   function stopSpeedtestPhase() {
@@ -772,11 +803,16 @@ Item {
   }
 
   // Named intervals (no bare numbers on any Timer): confirmation
-  // beat, MAC copy hold, action timeout, speedtest slice.
+  // beat, MAC copy hold, action timeout, speedtest slice, spawn confirmation.
   readonly property int profileConfirmMs: 500
   readonly property int macCopyHoldMs: 3000
   readonly property int actionTimeoutMs: 30000
   readonly property int speedtestSliceMs: 15000
+  // A child that cannot be spawned (missing or non-executable binary) emits
+  // neither started nor exited. ProcessJob has this watchdog for every job it
+  // owns; this raw Process keeps the live stdout parser, so it needs the same
+  // confirmation deadline to report a failure instead of hanging in a phase.
+  readonly property int speedtestSpawnMs: 1000
 
   // Confirmation beat after a toggle write (see writeProfile).
   Timer {
@@ -1023,18 +1059,24 @@ Item {
   Process {
     id: speedtestProc
 
+    // Spawn confirmation: set by started, read by the watchdog below.
+    property bool startedOk: false
+    onStarted: {
+      speedtestProc.startedOk = true
+      speedtestSpawnWatch.stop()
+    }
+
     stdout: SplitParser {
       onRead: line => root.updateSpeedtestLine(line)
     }
-    // Exit and stream-finished have no guaranteed order: when a failed exit
-    // beat the collector and published the generic message, replace it with
-    // the specific one once it lands.
+    // Exit and stream-finished have no guaranteed order. The collector is
+    // the only writer of the stderr text; the failure verdict comes from the
+    // exit, and the displayed line is derived from both (see speedtestError).
     stderr: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
         root.speedtestStderr = String(text || "").trim()
-        if (root.speedtestError !== "" && root.speedtestStderr !== "")
-          root.speedtestError = root.speedtestStderr
+        root._speedtestStderrDone = true
       }
     }
     onExited: function(exitCode) {
@@ -1050,7 +1092,7 @@ Item {
         return
       }
       if (!root.speedtestExpectedStop && exitCode !== 0) {
-        root.speedtestError = root.speedtestStderr || "Speed test failed"
+        root._speedtestFailed = true
         root.speedtestPhase = ""
         root.speedtestRunning = false
         return
@@ -1067,6 +1109,13 @@ Item {
     interval: root.speedtestSliceMs
     repeat: false
     onTriggered: root.stopSpeedtestPhase()
+  }
+
+  Timer {
+    id: speedtestSpawnWatch
+    interval: root.speedtestSpawnMs
+    repeat: false
+    onTriggered: root.failSpeedtestStart()
   }
 
   // --- content lent to the shared host ---
