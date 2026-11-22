@@ -14,7 +14,9 @@ import "../math/Range.js" as Range
 // the sweep state.
 //
 // Settle and sweep mirror the List contract: snap seats instantly with
-// zeroed motion, a plain step cancels any in-flight sweep.
+// zeroed motion, a plain step cancels any in-flight sweep. Every programmatic
+// seat - keyboard step, page, settle, reveal, jump and the wrap release -
+// goes through seatTo, the one funnel for the view position.
 //
 // Keep-bespoke, not Grid adopters: TrayMenu pointer-only Repeater,
 // WeatherIsland suggestion Repeater. Neither is a grid page.
@@ -87,12 +89,18 @@ GridView {
   }
 
   // Wrap-sweep state. The wrap cursor lands on the opposite end while
-  // the viewport teleports; the sweep rewinds past that snap deferred
-  // and eases end to end instead. Targets are the ends, never a cell
-  // lookup: headers and spacers make per-item math unreliable.
+  // the viewport teleports; the sweep waits for that seat's contentY edge
+  // and eases end to end from the live offset. Targets are the ends, never
+  // a cell lookup: headers and spacers make per-item math unreliable.
   property bool sweeping: false
   property real sweepY0: 0
   property real sweepTo: 0
+  // Generation for the wrap's edge release. A newer seat retires the pending
+  // release, so a late contentY edge cannot start a stale sweep.
+  property int _sweepGen: 0
+  // One increment per programmatic seat, so a consumer can check that every
+  // entry point takes the same funnel. Mirrors List._seatWrites.
+  property int _seatWrites: 0
 
   NumberAnimation {
     id: sweep
@@ -110,29 +118,69 @@ GridView {
   }
 
   // A plain step, settle or drag supersedes any in-flight wrap sweep.
+  // Bumping the generation retires the pending edge release with it: a newer
+  // intent must not start a stale sweep when contentY next changes.
   function cancelSweep() {
     root.sweeping = false
+    root._sweepGen++
     sweep.stop()
+  }
+
+  // The single funnel for the view position. Every seat cancels any in-flight
+  // wrap, clamps the target to the live scroll range, then applies it, so no
+  // call site owns a cancellation of its own. `snap === true` (or a cell
+  // index) seats that cell with positionViewAtIndex, which is cell-accurate
+  // across headers and spacers; "sweep" starts the wrap tween from the view's
+  // LIVE offset; otherwise `y` is clamped and assigned outright.
+  function seatTo(y, snap) {
+    root.cancelSweep()
+    root._seatWrites++
+    const maxY = Math.max(0, root.contentHeight - root.height)
+    const target = isFinite(y) ? Range.clamp(y, 0, maxY) : 0
+    if (snap === "sweep") {
+      // No rewind to a captured value. The sweep's from is the live contentY
+      // at the seat edge, so a step that landed after the gesture is kept.
+      sweep.to = target
+      sweep.restart()
+      return target
+    }
+    if (snap === true || (typeof snap === "number" && snap >= 0)) {
+      root.positionViewAtIndex(y, GridView.Contain)
+      return root.contentY
+    }
+    root.contentY = target
+    return target
   }
 
   function sweepToEnd(toEnd) {
     if (!MotionPolicy.enabled || root.count === 0) return
     const maxY = Math.max(0, root.contentHeight - root.height)
     const target = toEnd ? maxY : 0
-    // Pre-snap position: gotoCell's Contain snap lands on next polish.
     const y0 = root.contentY
     if (Math.abs(target - y0) < root.height) return
+    root.cancelSweep()
+    // sweepY0 feeds the tween's live duration; there is no rewind write. The
+    // seat's contentY edge releases the sweep from the offset it lands on,
+    // guarded by this generation so an older edge cannot fire it.
     root.sweepY0 = y0
     root.sweepTo = target
     root.sweeping = true
-    Idle.run(() => {
-      if (!root.sweeping) return
-      root.sweeping = false
-      sweep.stop()
-      root.contentY = root.sweepY0
-      sweep.to = root.sweepTo
-      sweep.restart()
-    }, 2)
+  }
+
+  // The wrap gesture seats the cursor at the far end; the view's contentY
+  // edge is the signal that the seat actually landed. That is the release -
+  // not a turn budget - so no deferred rewind can undo a seat that arrived
+  // after the gesture. The sweep animation's own writes are excluded because
+  // `sweeping` is cleared before the tween restarts.
+  onContentYChanged: {
+    if (!root.sweeping) return
+    root._releaseSweep(root._sweepGen)
+  }
+
+  function _releaseSweep(gen) {
+    if (gen !== root._sweepGen || !root.sweeping) return
+    root.sweeping = false
+    root.seatTo(root.sweepTo, "sweep")
   }
 
   // The current cell as an untyped value. `currentItem` is declared as
@@ -151,17 +199,16 @@ GridView {
     idx = Range.clamp(idx, 0, n - 1)
     if (idx === root.currentIndex) return false
     root.currentIndex = idx
-    // A wrap owns the viewport through sweepToEnd. A Contain snap here would
-    // land on the opposite end a polish before the sweep rewinds, painting
-    // one frame at the destination and then jumping back to start the glide.
-    if (snap !== false) root.positionViewAtIndex(idx, GridView.Contain)
+    // A wrap owns the viewport through sweepToEnd, so it takes no seat. Any
+    // other step seats this cell through the funnel, which also retires a
+    // pending wrap release.
+    if (snap !== false) root.seatTo(idx, true)
     return true
   }
 
   function moveCell(step) {
     const n = root.count
     if (n === 0) return false
-    root.cancelSweep()
     let idx = root.currentIndex
     if (idx < 0 || idx >= n) idx = step < 0 ? n : -1
     const start = idx
@@ -179,7 +226,6 @@ GridView {
   function moveRow(step) {
     const n = root.count
     if (n === 0) return false
-    root.cancelSweep()
     const cols = Math.max(1, root.cols)
     let idx = root.currentIndex
     // Unseated cursor: Down lands on the very first cell, Up on the last.
@@ -212,7 +258,6 @@ GridView {
   function moveColumn(step) {
     const n = root.count
     if (n === 0) return false
-    root.cancelSweep()
     const idx = root.currentIndex
     // Unseated cursor lands on the first selectable cell, the same answer
     // moveRow gives before it has a row to step from.
@@ -258,7 +303,6 @@ GridView {
   function settle(idx, snap) {
     const count = root.count
     if (count === 0) return
-    root.cancelSweep()
     const start = Range.clamp(idx, 0, count - 1)
     let target = start
     for (let k = 0; k < count; k++) {
@@ -269,30 +313,24 @@ GridView {
       }
     }
     root.currentIndex = target
-    root.positionViewAtIndex(target, GridView.Contain)
+    root.seatTo(target, true)
   }
 
   // Bring a cell into view without moving the cursor.
   function reveal(idx) {
     if (idx < 0 || idx >= root.count) return
-    root.positionViewAtIndex(idx, GridView.Contain)
+    root.seatTo(idx, true)
   }
 
-  // Page motions: a page step clamps contentY by a factor of the
-  // viewport height, an end jump seats the cursor on the selectable end
-  // cell. Both take the view position outright, and both drop an
-  // in-flight sweep on the way: that sweep writes contentY a second
-  // time, on the next turn, snapping back to the end the cursor just
-  // left, so a page step taken without the cancel would be undone a
-  // frame after it landed.
+  // Page motions: a page step clamps contentY by a factor of the viewport
+  // height, an end jump seats the cursor on the selectable end cell. Both
+  // take the funnel, so both retire a pending wrap release on the way; the
+  // sweep can no longer write contentY a second time and undo a step that
+  // just landed.
 
-  // A page step writes contentY outright rather than driving the sweep.
-  // List routes a page through seatTo because seatTo is that file's only
-  // contentY writer; a grid page has no such funnel, its cursor steps
-  // seat with positionViewAtIndex, and the one tween this file owns is
-  // the wrap sweep - whose targets are the ends and which gives up below
-  // a full viewport, so it cannot express a partial step at all. The
-  // write is the same hard cut every other grid seat takes.
+  // A page step is a hard cut through the funnel, not the wrap tween: that
+  // tween's targets are the ends and it gives up below a full viewport, so
+  // it cannot express a partial step at all.
   function pageBy(factor) {
     if (root.count === 0) return
     const maxY = Math.max(0, root.contentHeight - root.height)
@@ -302,8 +340,7 @@ GridView {
     // NaN offset for the rest of the view's life.
     const target = isFinite(raw) ? Range.clamp(raw, 0, maxY) : 0
     if (Math.abs(target - root.contentY) < 0.5) return
-    root.cancelSweep()
-    root.contentY = target
+    root.seatTo(target, false)
   }
 
   // List.jumpEnd still pre-arms a content-tween FLOOR from the follow
@@ -317,7 +354,6 @@ GridView {
     if (n === 0) return
     const target = last ? root.lastSelectable() : root.firstSelectable()
     if (target < 0) return
-    root.cancelSweep()
     // An end the cursor already sits on is re-seated rather than
     // refused: a page step moves the view without the cursor, so the
     // cursor can already be the end cell while the view is not, and the
