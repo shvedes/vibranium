@@ -71,8 +71,8 @@ Rectangle {
     }
   }
 
-  // The tick clock, exposed so a probe can drive consecutive poses without
-  // the random cadence moving underneath it.
+  // probe hook: capsTimer -> read by textinput.qml for
+  // tick sampling; inert in production
   readonly property alias capsTimer: capsJitter
 
   // Silences border fades and the shake for minimal setups.
@@ -456,7 +456,11 @@ Rectangle {
               easing.type: Easing.OutCubic
             }
           }
+          // probe hook: poseDuration -> read by textinput.qml for
+          // capsPose.behaviorMs; inert in production
           readonly property int poseDuration: capsJxAnim.duration
+          // probe hook: poseDurationY -> read by textinput.qml for
+          // capsPose.behaviorYMs; inert in production
           readonly property int poseDurationY: capsJyAnim.duration
 
           transform: Translate {
@@ -509,13 +513,19 @@ Rectangle {
     }
   }
 
-  // Readback handles for the one feedback clock: the combined gate on the
-  // border Behavior, the color tween that owns the border, and the row's
-  // recentring leg. Each is a live view, not a copied duration.
+  // probe hook: borderFade -> read by textinput.qml for gate flag; inert in production
   readonly property alias borderFade: borderFadeBehavior
+  // probe hook: borderFadeAnim -> read by textinput.qml for
+  // feedback borderMs; inert in production
   readonly property alias borderFadeAnim: borderFadeColorAnim
+  // probe hook: recenterAnim -> read by textinput.qml for
+  // feedback rowMs; inert in production
   readonly property alias recenterAnim: rowRecenterAnim
+  // probe hook: shakeXOffset -> read by textinput.qml for
+  // feedback shake peak; inert in production
   readonly property alias shakeXOffset: shakeX.x
+  // probe hook: glyphRowX -> read by textinput.qml for
+  // feedback row motion; inert in production
   readonly property alias glyphRowX: glyphRow.x
 
   Text {

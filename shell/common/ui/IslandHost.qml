@@ -414,6 +414,8 @@ LayerSurface {
     Card {
       id: cardItem
 
+      // probe hook: islandCard -> read by host-button.qml for
+      // keepsCard source assertion; inert in production
       objectName: "islandCard"
       // Live content size while anything is loaded; the frozen footprint
       // once it is gone.

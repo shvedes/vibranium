@@ -1955,6 +1955,8 @@ Item {
 
             List {
               id: histList
+              // probe hook: historyList -> read by downloader-island.qml for
+              // history geometry; inert in production
               objectName: "historyList"
 
               // The table stops at its band; the remove rail owns the width
@@ -1994,6 +1996,8 @@ Item {
             // anchor to histList is only a sibling anchor here, so the note
             // centers on the table box instead of parking under the header.
             EmptyState {
+              // probe hook: historyEmpty -> read by downloader-island.qml for
+              // empty-note centering; inert in production
               objectName: "historyEmpty"
               anchors.centerIn: histList
               width: histList.width

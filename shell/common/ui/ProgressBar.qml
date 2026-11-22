@@ -52,6 +52,7 @@ Rectangle {
   // `on x` registers the group as a property value source, not a QObject data
   // child, so a probe cannot reach the legs by objectName. This handle is
   // read-only and mirrors the `slides` handle on SlideSwap.
+  // probe hook: sweepLegs -> read by ui.qml for sweep leg timing; inert in production
   readonly property var sweepLegs: [sweepOut, sweepBack]
 
   // The sweep's `running` is imperative, not bound: calling restart() on a

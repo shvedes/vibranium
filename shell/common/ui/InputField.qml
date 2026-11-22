@@ -471,6 +471,8 @@ Rectangle {
   // duration. MotionPolicy gates every tween, like the rest.
   Item {
     id: ghostBox
+    // probe hook: ghost -> read by textinput.qml and MenuPanel.qml for
+    // overlay lookup; inert in production
     objectName: "ghost"
     x: root.leadInset
     width: parent.width - root.leadInset - root.rightInset
@@ -484,12 +486,12 @@ Rectangle {
     opacity: root._ghostShown
       && (root.handoff === 0 || root.handoff >= 0.5) ? 1 : 0
 
-    // The synchronous show state underneath the animated paint above,
-    // for tests and readers that must not sample a tween mid-flight.
+    // probe hook: shown -> read by textinput.qml for
+    // ghost show rule; inert in production
     readonly property bool shown: root._ghostShown
-    // The string currently fading (or faded) in, for the same readers.
+    // probe hook: text -> read by textinput.qml for ghost text; inert in production
     readonly property string text: swap.currentText
-    // The three slide layers, A first (see SlideSwap.slides).
+    // probe hook: slides -> read by textinput.qml for ghost layers; inert in production
     readonly property var slides: swap.slides
 
     Behavior on x { Glide {} }
@@ -517,6 +519,8 @@ Rectangle {
   // (focused, where its own caret scrolling belongs).
   Item {
     id: textViewport
+    // probe hook: textViewport -> read by textinput.qml for
+    // viewportOf lookup; inert in production
     objectName: "textViewport"
 
     x: root.leadInset
@@ -725,8 +729,8 @@ Rectangle {
         }
       }
 
-      // The tick clock, exposed so a probe can drive consecutive poses
-      // without the random cadence moving underneath it.
+      // probe hook: jitterTimer -> read by textinput.qml for
+      // tick sampling; inert in production
       readonly property alias jitterTimer: capsJitter
 
       Row {
@@ -783,7 +787,11 @@ Rectangle {
                 easing.type: Easing.OutCubic
               }
             }
+            // probe hook: poseDuration -> read by textinput.qml for
+            // capsPose.behaviorMs; inert in production
             readonly property int poseDuration: capsJxAnim.duration
+            // probe hook: poseDurationY -> read by textinput.qml for
+            // capsPose.behaviorYMs; inert in production
             readonly property int poseDurationY: capsJyAnim.duration
 
             transform: Translate {

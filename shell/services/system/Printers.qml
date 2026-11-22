@@ -854,7 +854,7 @@ Singleton {
   // Test page: armed then confirmed within 3 s (two presses), then a
   // fresh arm is required. Arm state clears on queue change/close.
   property string _testArm: ""
-  // Read-only view for the island's armed-color binding.
+  // Production alias consumed by the island's armed-color binding.
   readonly property alias testArm: root._testArm
   function armTestPage(name): bool {
     if (root._testArm === name) return false

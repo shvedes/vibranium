@@ -63,6 +63,8 @@ Item {
   // The three slide layers, A first: each carries .text, .rise
   // (0 at rest, +slide staged below, -slide exiting above) and
   // .opacity for drivers that sample the travel itself.
+  // probe hook: slides -> read by textinput.qml for
+  // ghost snapshot readback; inert in production
   readonly property var slides: [slideA, slideB, slideC]
 
   // The front layer tracks `text` so the first paint lands without
@@ -246,6 +248,8 @@ Item {
   // rest values, so the tweens land and stay without any binding.
   NumberAnimation {
     id: fadeOutA
+    // probe hook: slideSwapFadeOutA -> read by ui.qml for
+    // finished-edge exit mark; inert in production
     objectName: "slideSwapFadeOutA"
     property int stamp: -1
     target: slideA
@@ -259,7 +263,6 @@ Item {
   }
   NumberAnimation {
     id: fadeOutB
-    objectName: "slideSwapFadeOutB"
     property int stamp: -1
     target: slideB
     property: "opacity"
@@ -272,7 +275,6 @@ Item {
   }
   NumberAnimation {
     id: fadeOutC
-    objectName: "slideSwapFadeOutC"
     property int stamp: -1
     target: slideC
     property: "opacity"

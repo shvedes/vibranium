@@ -759,10 +759,6 @@ Item {
         InputField {
           id: codeField
 
-          // The test hook: a probe reaches the field through the name
-          // rather than through the tree it sits in.
-          objectName: "codeField"
-
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.top: parent.top

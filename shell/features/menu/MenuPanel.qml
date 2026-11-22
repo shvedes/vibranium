@@ -82,7 +82,6 @@ Rectangle {
     serviceVisible: Menu.open
   }
   property alias mode: focusCtrl.mode
-  readonly property alias keySink: focusCtrl.keySink
   // Public handle for the list view (debug verbs drive cursor/scroll
   // through it); ids are component-scoped, so external callers need this.
   property alias listView: list
@@ -5637,6 +5636,6 @@ Rectangle {
     y: Math.round(panel.y * 10) / 10, h: Math.round(panel.height * 10) / 10
   })
 
-  // keySink now lives inside PanelFocus (focusCtrl.keySink) so
-  // panel.keySink alias above stays compatible with tests.
+  // keySink lives inside PanelFocus (focusCtrl.keySink); callers use it
+  // directly, with no panel-level alias.
 }
