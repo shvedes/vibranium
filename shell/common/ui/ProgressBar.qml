@@ -41,6 +41,32 @@ Rectangle {
   // NotificationCard and the menu Entry keep their own gates unchanged.
   property bool animationsEnabled: MotionPolicy.enabled
 
+  // Indeterminate sweep: one token for the full left-right-left period, so
+  // both legs derive their clock from it instead of each carrying a copy.
+  property int sweepMs: 1800
+  readonly property int sweepLegMs: sweepMs / 2
+  // The block is this share of the track. The travel derives from the live
+  // width, so a resized card sweeps the new distance on its next leg.
+  readonly property real blockWidthRatio: 0.3
+  readonly property real sweepDistance: Math.max(0, root.width - root.width * root.blockWidthRatio)
+  // `on x` registers the group as a property value source, not a QObject data
+  // child, so a probe cannot reach the legs by objectName. This handle is
+  // read-only and mirrors the `slides` handle on SlideSwap.
+  readonly property var sweepLegs: [sweepOut, sweepBack]
+
+  // The sweep's `running` is imperative, not bound: calling restart() on a
+  // bound `running` drops the binding, which would leave the block sweeping
+  // after indeterminate/visible/animationsEnabled go false. One sync point
+  // keeps the gate and the restart on the same path.
+  function _syncSweep(): void {
+    const run = root.indeterminate && root.visible && root.animationsEnabled
+    if (run) {
+      if (!sweepAnim.running) sweepAnim.start()
+    } else if (sweepAnim.running) {
+      sweepAnim.stop()
+    }
+  }
+
   implicitWidth: 160
   height: 6
   clip: true
@@ -90,8 +116,17 @@ Rectangle {
     if (root.placed || root.width <= 0) return
     Qt.callLater(root._armPlaced)
   }
-  onWidthChanged: root._considerPlace()
-  Component.onCompleted: root._considerPlace()
+  onWidthChanged: {
+    root._considerPlace()
+    if (sweepAnim.running) sweepAnim.restart()
+  }
+  onIndeterminateChanged: root._syncSweep()
+  onVisibleChanged: root._syncSweep()
+  onAnimationsEnabledChanged: root._syncSweep()
+  Component.onCompleted: {
+    root._considerPlace()
+    root._syncSweep()
+  }
 
   Behavior on shownRatio {
     enabled: root.animationsEnabled && root.placed
@@ -125,25 +160,27 @@ Rectangle {
     id: block
 
     visible: root.indeterminate
-    width: parent.width * 0.3
+    width: parent.width * root.blockWidthRatio
     height: parent.height
     color: root.fillColor
     radius: RoundingPolicy.radius
 
     SequentialAnimation on x {
-      running: root.indeterminate && root.visible && root.animationsEnabled
+      id: sweepAnim
       loops: Animation.Infinite
 
       NumberAnimation {
+        id: sweepOut
         from: 0
-        to: block.parent.width - block.width
-        duration: 900
+        to: root.sweepDistance
+        duration: root.sweepLegMs
         easing.type: Easing.InOutSine
       }
       NumberAnimation {
-        from: block.parent.width - block.width
+        id: sweepBack
+        from: root.sweepDistance
         to: 0
-        duration: 900
+        duration: root.sweepLegMs
         easing.type: Easing.InOutSine
       }
     }

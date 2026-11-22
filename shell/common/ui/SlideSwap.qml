@@ -73,10 +73,11 @@ Item {
   property string _b: ""
   property string _c: ""
   property int _front: 0
-  // One exiting mark per layer. exitRetire restarts on every flip and
-  // fires `duration` after the last one, at which point every live exit
-  // is old enough to have landed - so one timer releases them all, and
-  // the release itself needs no motion gate (invisible either way).
+  // One exiting mark per layer. Each layer retires its own mark in its
+  // fadeOutX.onFinished, so a mark is never held past the tween that owns
+  // it: no wall-clock guess, and a finished layer is idle again at once.
+  // The stamp written on each flip guards that edge - a finish from an
+  // older exit cannot clear a mark a newer flip has re-stamped.
   // A layer is idle when it is neither front nor exiting, and the next
   // flip always enters from an idle one.
   property bool _exitA: false
@@ -123,9 +124,9 @@ Item {
     root._setLayerExit(target, false)
     root._setLayerSeq(target, -1)
     root._setLayerExit(outgoing, true)
-    if (outgoing === 0) root._seqA = root._exitSeq++
-    else if (outgoing === 1) root._seqB = root._exitSeq++
-    else root._seqC = root._exitSeq++
+    const stamp = root._exitSeq++
+    root._setLayerSeq(outgoing, stamp)
+    root._fadeOutFor(outgoing).stamp = stamp
     root._front = target
     if (MotionPolicy.enabled) {
       // The shared enter tween is interrupted exactly once per flip,
@@ -154,9 +155,7 @@ Item {
       root._setLayerExit(0, false)
       root._setLayerExit(1, false)
       root._setLayerExit(2, false)
-      exitRetire.stop()
     }
-    exitRetire.restart()
   }
 
   implicitWidth: Math.max(slideA.implicitWidth, slideB.implicitWidth, slideC.implicitWidth)
@@ -233,19 +232,10 @@ Item {
     }
   }
 
-  // Releases every live exit once the last flip's tween has landed (see
-  // the mark above). The layers are invisible throughout, so this is
-  // bookkeeping, not motion - and it returns each layer to the staging
-  // slot below, so the next flip always enters from below.
-  Timer {
-    id: exitRetire
-    interval: MotionPolicy.duration(root.duration)
-    onTriggered: {
-      root._exitA = false
-      root._exitB = false
-      root._exitC = false
-    }
-  }
+  // No wall-clock retire: a layer that keeps an exit mark also owns a
+  // fadeOutX running to opacity 0, so `finished` is a real edge for it.
+  // A tween that is stopped is the flip's target and is unmarked at that
+  // same moment, so no marked tween can miss its edge - no fallback timer.
 
   // One exit tween per layer: concurrent exits each run to zero, so a
   // flip landing mid-flight never freezes a fading layer. The shared
@@ -256,27 +246,42 @@ Item {
   // rest values, so the tweens land and stay without any binding.
   NumberAnimation {
     id: fadeOutA
+    objectName: "slideSwapFadeOutA"
+    property int stamp: -1
     target: slideA
     property: "opacity"
     to: 0
     duration: root.duration
     easing.type: Easing.OutCubic
+    onFinished: {
+      if (root._seqA === fadeOutA.stamp) root._exitA = false
+    }
   }
   NumberAnimation {
     id: fadeOutB
+    objectName: "slideSwapFadeOutB"
+    property int stamp: -1
     target: slideB
     property: "opacity"
     to: 0
     duration: root.duration
     easing.type: Easing.OutCubic
+    onFinished: {
+      if (root._seqB === fadeOutB.stamp) root._exitB = false
+    }
   }
   NumberAnimation {
     id: fadeOutC
+    objectName: "slideSwapFadeOutC"
+    property int stamp: -1
     target: slideC
     property: "opacity"
     to: 0
     duration: root.duration
     easing.type: Easing.OutCubic
+    onFinished: {
+      if (root._seqC === fadeOutC.stamp) root._exitC = false
+    }
   }
   SequentialAnimation {
     id: fadeIn

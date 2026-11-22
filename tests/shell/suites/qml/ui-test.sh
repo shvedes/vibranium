@@ -110,6 +110,16 @@ t_eq "a negative value clamps to 0" "0" "$(qp_get bar.clamped.low)"
 t_eq "and the ratio is 0, never negative" "0" "$(qp_get bar.ratio.low)"
 t_eq "the bar starts determinate" "false" "$(qp_get bar.indeterminate)"
 
+t_section "UI-5: both indeterminate sweep legs read one derived duration"
+t_eq "both legs were found" "true" "$(qp_get ui5.legs.found)"
+t_eq "the round trip is one token" "400" "$(qp_get ui5.sweepMs)"
+t_eq "each leg is half that token" "200" "$(qp_get ui5.sweepLegMs)"
+t_eq "the leg duration derives from the token" "true" "$(qp_get ui5.legMs.halfOfToken)"
+t_eq "the outbound leg uses the derived duration" "200" "$(qp_get ui5.leg.out.duration)"
+t_eq "the return leg uses the same derived duration" "200" "$(qp_get ui5.leg.back.duration)"
+t_eq "no leg carries its own copied duration" "true" "$(qp_get ui5.leg.durations.match)"
+t_eq "the end points come from the live track width" "true" "$(qp_get ui5.leg.usesLiveWidth)"
+
 t_section "Divider sizes itself with height, not implicitHeight"
 # The type sets `implicitWidth: 200` and `height: 1`; a layout pass gives it
 # no implicit height because it never sets one. Asserting implicitHeight would
@@ -180,6 +190,14 @@ else
   t_eq "the tween completed rather than being left mid-flight" "true" "$(qp_get anim.alpha.reachedTarget)"
   t_note "the tween finished before the first sample this run, so the in-flight assertions were not applicable; the machine was too slow to catch a 120ms tween at a 5ms sample rate"
 fi
+
+t_section "UI-4: an exit mark is retired by its own fade finishing"
+# A second flip restarts the old wall-clock retire past A's fade, so the mark
+# can only be clear at the `finished` edge if the edge itself retires it. The
+# probe reads the mark on that edge, not after a timer could have caught up.
+t_eq "the outgoing fade was found" "true" "$(qp_get ui4.fadeA.found)"
+t_eq "the mark was clear on the fade's finished edge" "false" "$(qp_get ui4.exitA.atFinish)"
+t_eq "the front still holds the newest string" "three" "$(qp_get ui4.currentText)"
 
 t_section "layout settles rather than oscillating"
 # The chip's width at Component.onCompleted (35.84) differs from its width on

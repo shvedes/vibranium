@@ -68,6 +68,44 @@ Item {
   // sampled in flight.
   Chip { id: animatedChip; text: "x"; selected: false }
 
+  // UI-4 and UI-5: two primitives whose correctness lives in how a tween
+  // retires and how a duration is shared. Both need a real event loop, so
+  // they live in the extended pump below rather than in a synchronous report.
+  SlideSwap {
+    id: swap
+    width: 200
+    height: 30
+    duration: 1200
+    text: "one"
+  }
+  ProgressBar {
+    id: sweepBar
+    width: 200
+    indeterminate: true
+    animationsEnabled: true
+  }
+
+  // Non-visual objects (animations) are QObject data children, not visual
+  // `children`, so walk `data` to reach them by objectName. objectName is the
+  // stable probe handle; SlideSwap needs no extra property for the test.
+  function findNamed(obj, name) {
+    if (!obj) return null
+    const data = obj.data || []
+    for (let i = 0; i < data.length; i++) {
+      const n = data[i]
+      if (!n) continue
+      if (n.objectName === name) return n
+      const found = findNamed(n, name)
+      if (found) return found
+    }
+    return null
+  }
+
+  property var fadeA: null
+  property var exitAAtFinish: "not-sampled"
+  property int extTick: 0
+  property bool extDone: false
+
   // ---- the event loop -------------------------------------------------
 
   // The pump interval sits well under Ui.fastMs (120ms), so all three samples
@@ -94,8 +132,10 @@ Item {
     try {
       reportTokens()
       reportLayout()
+      reportSweep()
       reportStateMachines()
       reportAnimationSetup()
+      setupExtended()
     } catch (e) {
       kv("ui.error", "" + (e && e.message ? e.message : e))
     }
@@ -241,6 +281,71 @@ Item {
     kv("title.level2Differs", title1.implicitHeight !== title2.implicitHeight)
   }
 
+  // UI-5: the indeterminate block's two legs must read ONE derived duration,
+  // not two copies of 900. The endpoints must also come from the live track
+  // width rather than a value frozen at construction.
+  function reportSweep() {
+    // The pre-fix tree has no token; assigning it there would abort the
+    // probe, so set it only when the property exists and let the assertions
+    // report the missing derivation instead.
+    if (sweepBar.sweepMs !== undefined) sweepBar.sweepMs = 400
+    const legs = sweepBar.sweepLegs || []
+    const out = legs.length > 0 ? legs[0] : null
+    const back = legs.length > 1 ? legs[1] : null
+    kv("ui5.legs.found", out !== null && back !== null)
+    kv("ui5.sweepMs", sweepBar.sweepMs)
+    kv("ui5.sweepLegMs", sweepBar.sweepLegMs)
+    kv("ui5.legMs.halfOfToken", sweepBar.sweepLegMs === sweepBar.sweepMs / 2)
+    if (out && back) {
+      kv("ui5.leg.out.duration", out.duration)
+      kv("ui5.leg.back.duration", back.duration)
+      kv("ui5.leg.durations.match",
+        out.duration === sweepBar.sweepLegMs && back.duration === sweepBar.sweepLegMs)
+      kv("ui5.leg.out.to", out.to)
+      kv("ui5.leg.back.from", back.from)
+      kv("ui5.leg.usesLiveWidth", out.to === sweepBar.width - sweepBar.width * 0.3)
+    }
+  }
+
+  // UI-4: hook the outgoing layer's fade so the exit mark can be read on the
+  // `finished` edge itself. A wall-clock retire can only clear the mark later
+  // than this edge when a second flip restarts its timer; two flips with a gap
+  // shorter than the tween create exactly that window.
+  function setupExtended() {
+    root.fadeA = findNamed(swap, "slideSwapFadeOutA")
+    kv("ui4.fadeA.found", root.fadeA !== null)
+    if (root.fadeA) {
+      root.fadeA.finished.connect(function () {
+        Qt.callLater(function () {
+          if (root.exitAAtFinish === "not-sampled")
+            root.exitAAtFinish = String(swap._exitA)
+        })
+      })
+    }
+  }
+
+  Timer {
+    id: extPump
+    interval: 50
+    repeat: true
+    running: true
+    onTriggered: {
+      root.extTick++
+      // tick 1: A exits (fadeOutA runs for 1200ms). tick 9: a second flip
+      // pushes the old wall-clock retire to 9+24 ticks, past A's finish at 25.
+      if (root.extTick === 1) swap.text = "two"
+      if (root.extTick === 9) swap.text = "three"
+      if (root.extTick === 32) {
+        root.kv("ui4.exitA.atFinish", root.exitAAtFinish)
+        root.kv("ui4.currentText", swap.currentText)
+        root.kv("ui4.exitA.now", swap._exitA)
+        root.extDone = true
+        extPump.stop()
+        root.finish()
+      }
+    }
+  }
+
   // Derived state and signals. These are pure functions of their inputs and
   // a signal is a real event under the pump, so both are directly assertable.
   function reportStateMachines() {
@@ -379,6 +484,7 @@ Item {
   }
 
   function finish() {
+    if (!root.extDone) return
     kv("anim.completed", true)
     console.log("##DONE##")
   }
