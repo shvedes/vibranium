@@ -144,8 +144,6 @@ LayerSurface {
   ScreencopyView {
     id: view
 
-    property int attempts: 0
-
     anchors.fill: parent
     captureSource: overlay.visible ? overlay.screen : null
     live: false
@@ -159,8 +157,10 @@ LayerSurface {
     // Opacity carries the show/hide so the node exists for the grab below.
     opacity: hasContent ? 1 : 0
     onStopped: {
-      // Re-request only while the frame is still missing; a stop after
-      // a good capture must not loop.
+      // The compositor ended the stream without a frame: that is the real
+      // readiness edge, so every later request rides it and nothing here
+      // guesses a delay. visible is the liveness gate - closing the overlay
+      // stops the chain - and a stop after a good capture cannot loop.
       if (overlay.visible && !view.hasContent) view.captureFrame()
     }
     onHasContentChanged: {
@@ -191,38 +191,32 @@ LayerSurface {
   }
 
   // Arm on map, reset the cursor so the magnifier only appears after the
-  // first real move of this pick, and start the capture cycle: no
-  // immediate captureFrame (the layer surface is not committed yet on
-  // the map event and the compositor refuses with "no recording
-  // context"); first attempt 120 ms in, retries at 250 ms, bounded at
-  // eight attempts.
+  // first real move of this pick, and start the capture cycle with one
+  // deferred request. The 120 ms grace is a real compositor constraint: on
+  // the map event the layer surface is not committed yet and captureFrame is
+  // refused with "no recording context". Every later request rides
+  // view.onStopped - the compositor's own end-of-stream edge - rather than a
+  // timer guessing readiness.
   onVisibleChanged: {
     overlay.aimX = -1
     overlay.aimY = -1
     overlay.frameUrl = ""
-    if (visible) {
-      view.attempts = 0
-      capTimer.interval = 120
-      capTimer.restart()
-    } else {
-      capTimer.stop()
-    }
+    if (visible) capTimer.restart()
+    else capTimer.stop()
   }
 
   Timer {
     id: capTimer
 
+    // One-shot compositor grace, one captureFrame per pick. No retry ladder
+    // and no secondary interval: a frame that never lands is reported by
+    // view.onStopped, which is where the next request belongs.
     interval: 120
-    repeat: true
+    repeat: false
     running: false
     onTriggered: {
-      if (!overlay.visible || view.hasContent || view.attempts >= 8) {
-        capTimer.stop()
-        return
-      }
-      view.attempts++
+      if (!overlay.visible || view.hasContent) return
       view.captureFrame()
-      capTimer.interval = 250
     }
   }
 
@@ -487,16 +481,16 @@ LayerSurface {
     readonly property int pad: 8
     readonly property int cardHeight: 26
     readonly property int cardWidth: Math.ceil(codeText.implicitWidth) + 2 * pad
-    readonly property var spot: PreviewPlacement.place(
-      { x: magnifier.x, y: magnifier.y, width: magnifier.width, height: magnifier.height },
-      { width: cardWidth, height: cardHeight },
-      { width: overlay.width, height: overlay.height },
-      10)
 
     z: 2
     visible: overlay.previewEnabled && magnifier.shown && overlay.previewCode !== ""
-    x: spot.x
-    y: spot.y
+    // Two scalar calls on the pointer path: no box/card/screen literals and
+    // no answer object per pointer sample. Placement.js decides the side
+    // from the same nine scalars on both axes.
+    x: PreviewPlacement.placeX(magnifier.x, magnifier.y, magnifier.width,
+      magnifier.height, cardWidth, cardHeight, overlay.width, overlay.height, 10)
+    y: PreviewPlacement.placeY(magnifier.x, magnifier.y, magnifier.width,
+      magnifier.height, cardWidth, cardHeight, overlay.width, overlay.height, 10)
     width: cardWidth
     height: cardHeight
 

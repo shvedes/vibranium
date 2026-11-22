@@ -2798,63 +2798,70 @@ group('a sheet read again survives the cold prune', () => {
 })
 
 // ---------------------------------------------------------------------------
-section('PreviewPlacement.place - the floating code readout')
+section('PreviewPlacement - the floating code readout')
 
-const SCREEN = { width: 1600, height: 900 }
-const CARD = { width: 140, height: 26 }
-const box = (x, y, w, h) => ({ x: x, y: y, width: w, height: h })
+// Scalar API: (bx, by, bw, bh, cw, ch, sw, sh, gap) -> one number per axis.
+// The side is a scalar too, so the call site needs no box/card/screen objects
+// and no answer object per pointer sample.
+const CARD_W = 140
+const CARD_H = 26
+const SCREEN_W = 1600
+const SCREEN_H = 900
+const SIDE = ['top', 'bottom', 'right', 'left']
+const place = (bx, by, bw, bh, cw, ch, sw, sh, gap) => ({
+  side: PP.side(bx, by, bw, bh, cw, ch, sw, sh, gap),
+  x: PP.placeX(bx, by, bw, bh, cw, ch, sw, sh, gap),
+  y: PP.placeY(bx, by, bw, bh, cw, ch, sw, sh, gap),
+})
 
 group('the preferred side is above, centred on the lens', () => {
-  const r = PP.place(box(700, 400, 150, 150), CARD, SCREEN, 10)
-  eq('top wins with room', r.side, 'top')
+  const r = place(700, 400, 150, 150, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10)
+  eq('top wins with room', SIDE[r.side], 'top')
   eq('centred over the box', r.x, 700 + 75 - 70)
   eq('one gap above the box', r.y, 400 - 10 - 26)
 })
 
 group('a flattened lens teleports to the side with room', () => {
   // Top edge: the box starts at y 0, so no card fits above it.
-  const top = PP.place(box(700, 0, 150, 75), CARD, SCREEN, 10)
-  eq('top edge goes below', top.side, 'bottom')
+  const top = place(700, 0, 150, 75, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10)
+  eq('top edge goes below', SIDE[top.side], 'bottom')
   eq('below the flattened box', top.y, 0 + 75 + 10)
   // Bottom edge: the mirror case.
-  const bottom = PP.place(box(700, 750, 150, 150), CARD, SCREEN, 10)
-  eq('bottom edge goes above', bottom.side, 'top')
+  const bottom = place(700, 750, 150, 150, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10)
+  eq('bottom edge goes above', SIDE[bottom.side], 'top')
   eq('above the box', bottom.y, 750 - 10 - 26)
   // No vertical room either (a short screen), but room on the right.
-  const narrow = PP.place(box(0, 0, 150, 150), CARD, { width: 1600, height: 180 }, 10)
-  eq('a short screen goes right', narrow.side, 'right')
+  const narrow = place(0, 0, 150, 150, CARD_W, CARD_H, 1600, 180, 10)
+  eq('a short screen goes right', SIDE[narrow.side], 'right')
   eq('right of the box', narrow.x, 150 + 10)
   // And the left mirror.
-  const flushRight = PP.place(box(1450, 0, 150, 150), CARD, { width: 1600, height: 180 }, 10)
-  eq('a flush right box goes left', flushRight.side, 'left')
+  const flushRight = place(1450, 0, 150, 150, CARD_W, CARD_H, 1600, 180, 10)
+  eq('a flush right box goes left', SIDE[flushRight.side], 'left')
   eq('left of the box', flushRight.x, 1450 - 10 - 140)
 })
 
 group('the card is clamped inside the screen', () => {
   // The box hugs the left edge and is much narrower than the card, so a
   // centred top placement would start off-screen and has to be clamped.
-  const r = PP.place(box(0, 200, 20, 150), { width: 300, height: 26 }, SCREEN, 10)
-  eq('top still wins', r.side, 'top')
+  const r = place(0, 200, 20, 150, 300, 26, SCREEN_W, SCREEN_H, 10)
+  eq('top still wins', SIDE[r.side], 'top')
   eq('x never goes negative', r.x, 0)
-  const atRight = PP.place(box(1580, 200, 20, 150), CARD, SCREEN, 10)
-  eq('x never passes the right edge', atRight.x, SCREEN.width - CARD.width)
-  const atTop = PP.place(box(700, 5, 150, 150), CARD, SCREEN, 10)
+  const atRight = place(1580, 200, 20, 150, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10)
+  eq('x never passes the right edge', atRight.x, SCREEN_W - CARD_W)
+  const atTop = place(700, 5, 150, 150, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10)
   eq('side placement never goes above the screen', atTop.y >= 0, true)
 })
 
-group('the answer is total and leaves its inputs alone', () => {
-  const b = box(NaN, undefined, 150, 150)
-  const c = { width: NaN, height: -5 }
-  const s = { width: 0, height: 0 }
-  const r = PP.place(b, c, s, -3)
-  eq('a usable side is still named', typeof r.side === 'string' && r.side !== '', true)
-  eq('x is finite', Number.isFinite(r.x), true)
-  eq('y is finite', Number.isFinite(r.y), true)
-  eq('box untouched', b.x !== b.x && b.y === undefined && b.width === 150 && b.height === 150, true)
-  eq('card untouched', c.width !== c.width && c.height === -5, true)
-  eq('screen untouched', s.width === 0 && s.height === 0, true)
-  const once = PP.place(box(700, 400, 150, 150), CARD, SCREEN, 10)
-  eq('a fresh answer each call', once === PP.place(box(700, 400, 150, 150), CARD, SCREEN, 10), false)
+group('the scalar answers are total and pairwise stable', () => {
+  const x = PP.placeX(NaN, undefined, 150, 150, NaN, -5, 0, 0, -3)
+  const y = PP.placeY(NaN, undefined, 150, 150, NaN, -5, 0, 0, -3)
+  eq('a usable side is still named',
+    typeof SIDE[PP.side(NaN, undefined, 150, 150, NaN, -5, 0, 0, -3)] === 'string', true)
+  eq('x is finite', Number.isFinite(x), true)
+  eq('y is finite', Number.isFinite(y), true)
+  const once = PP.placeX(700, 400, 150, 150, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10)
+  eq('repeated calls return the same scalar',
+    once === PP.placeX(700, 400, 150, 150, CARD_W, CARD_H, SCREEN_W, SCREEN_H, 10), true)
 })
 
 // One thing neither copy does, recorded so the gap is visible in the total

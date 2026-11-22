@@ -89,10 +89,14 @@ Item {
 
   readonly property var hsv: Color.rgbToHsv(root.picked.r, root.picked.g, root.picked.b)
 
-  // Report every preview change to the module, which holds it and flushes
-  // on a debounce. The alpha slider reports per pointer move, so this is
-  // the hottest writer in the module; the module's timer is what makes it
-  // one file write per settle rather than one per frame.
+  // Report the preview to the module, which holds it and flushes on a
+  // debounce. One call from one edge: every setter that moves hue also moves
+  // picked, and writes hue first, so the picked change is the single point
+  // where both halves of the pair are final. A hue edge on its own would
+  // report the new hue beside the old color - a pair no user ever saw.
+  // The alpha slider changes picked per pointer move, so this is the hottest
+  // writer in the module; the module's timer makes it one file write per
+  // settle rather than one per frame.
   function _reportPreview() {
     if (root._restoringWorking) return
     root.reportWorking(root.picked, root.hue)
@@ -102,7 +106,6 @@ Item {
     root._reportPreview()
     root._syncCode()
   }
-  onHueChanged: root._reportPreview()
   // The format chip is a format of the same color, so the code in the
   // field is the same color written the other way.
   onFmtChanged: root._syncCode()
@@ -891,10 +894,10 @@ Item {
   function restoreWorking() {
     const w = root.workingState
     if (w === null || typeof w !== "object" || w.picked === undefined) return
-    // Applying these writes them through onPickedChanged/onHueChanged, so
-    // the report is suppressed for the duration: an open that changes
-    // nothing must not schedule a flush, and a hand-edited cache value is
-    // normalized on the next real edit rather than by reopening the picker.
+    // Applying these runs the picked change handler, so the report is
+    // suppressed for the duration: an open that changes nothing must not
+    // schedule a flush, and a hand-edited cache value is normalized on the
+    // next real edit rather than by reopening the picker.
     root._restoringWorking = true
     root.picked = {
       r: w.picked.r, g: w.picked.g, b: w.picked.b, a: w.picked.a
