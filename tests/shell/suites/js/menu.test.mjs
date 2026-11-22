@@ -247,8 +247,11 @@ group('scopedResultRows: nested filter hits are flat rows with a landing chain',
     ['g-menus/shadow', 'g-menus/shadow/deep'])
 
   const direct = M.scopedResultRows(pg, 'cursor')
-  eq('a group matched by its own label stays a group', direct.length, 1)
-  eq('and keeps its subtree', direct[0].label, 'Cursor')
+  eq('a group matched by its own label is one result row', direct.length, 1)
+  eq('it shows the group', direct[0].label, 'Cursor')
+  eq('it is flat too', direct[0].scopedResult, true)
+  eq('it carries no subtree', direct[0].children, undefined)
+  eq('its chain opens the group on the page', direct[0].childUids, ['g-cursor'])
   eq('an empty query keeps the page rows', M.scopedResultRows(pg, '').length, 3)
 })
 

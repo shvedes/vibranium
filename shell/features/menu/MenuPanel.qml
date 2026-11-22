@@ -197,6 +197,11 @@ Rectangle {
   property int _fitGen: 0
   property int _transitionGen: 0
   property bool _transitionActive: false
+  // Bumped on a search/filter mode edge. A nested row that sees a new value
+  // is being torn down by the projection swap, not left by a child step, so
+  // it must not fold the outgoing child's canonical state (Entry.qml reads
+  // this through _projectionRev).
+  property int projectionRev: 0
   // True while the transition in flight is a summon rather than a navigation.
   // The two are sized from opposite answers: a navigation glides from the
   // height the user can see, a summon has no card on screen yet and is born
@@ -439,6 +444,10 @@ Rectangle {
     panel._committedListH = panel._handoffReveal && target > 0
       ? target : panel._modelListH()
     panel._handoffReveal = false
+    if (panel._modeFadeAwaitFit) {
+      panel._modeFadeAwaitFit = false
+      panel._startModeFadeIn()
+    }
     if (gen >= 0) Qt.callLater(() => panel._finishPageTransition(gen))
   }
 
@@ -795,7 +804,12 @@ Rectangle {
         fitGen, panel._fitTransGen)
       return
     }
-    if (panel._restFitReady()) {
+    // A fit queued while a slot is open cannot reach _fitSettled: the slot
+    // keeps expansionNeedH above zero until it closes, which is exactly the
+    // state a result landing or a mode restore installs into. The model's
+    // resting height is final and the slot's growth is carried by the region,
+    // so commit from the model now instead of leaving a fit pending forever.
+    if (panel._restFitReady() || (!panel._transitionActive && panel._anyRowOpen(rows))) {
       panel._fitModelFromPending()
       return
     }
@@ -1274,30 +1288,68 @@ Rectangle {
         panel._swapPendingGen = -1
         list.endSwap()
       }
-      if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
-      else {
-        if (typeof list.unpinHighlight === "function") list.unpinHighlight()
-        list._keepCursor = false
-        // Search restore installs the page's rows through this same-turn
-        // branch. Search entry drops the claim; re-derive it against the
-        // restored rows so the fit reads a claim naming a live row.
-        panel._rearmOpenSlot()
-      }
       const returnIdx = panel._searchReturnIdx
       const returnY = panel._searchReturnY
       panel._searchReturnIdx = -1
       panel._searchReturnY = -1
+      if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
+      else {
+        if (typeof list.unpinHighlight === "function") list.unpinHighlight()
+        list._keepCursor = false
+        // A search restore installs the page's rows through this same-turn
+        // branch. Arming the claim here would let pursuit read the projection's
+        // transient short viewport and scroll a row that was already in view;
+        // the fit sizes the card from the restored rows in this turn. With no
+        // saved seat to honour, the ordinary path still arms immediately.
+        if (returnIdx < 0) panel._rearmOpenSlot()
+      }
       Idle.run(() => {
         panel._reseatFrameSel()
+        if (panel.searching) {
+          panel._restoreSeatPending = false
+          return
+        }
         // The frame does not always hold this page's seat. When the row held
         // at search entry is still expanded, restore the cursor and the scroll
         // offset: the bar is the slot's only background, and the offset keeps
         // the unfolded list inside the viewport.
-        if (panel.searching || returnIdx < 0 || returnIdx >= panel.rowsModel.length) return
-        const it = panel.rowsModel[returnIdx]
-        if (it && (Menu.isExpanded(it) || Menu.infoOpen(it))) {
-          if (returnY >= 0) list.restoreAt(returnIdx, returnY)
-          else if (list.currentIndex !== returnIdx) list.seat(returnIdx, "land")
+        if (returnIdx >= 0 && returnIdx < panel.rowsModel.length) {
+          const it = panel.rowsModel[returnIdx]
+          if (it && (Menu.isExpanded(it) || Menu.infoOpen(it))) {
+            if (returnY >= 0) list.restoreAt(returnIdx, returnY)
+            else if (list.currentIndex !== returnIdx) list.seat(returnIdx, "land")
+          }
+        }
+        if (panel._fadeRestoreOwed) panel._startModeFadeIn()
+        if (returnIdx >= 0) {
+          // A fit queued by the projection can never settle while an open
+          // slot holds expansionNeedH above zero. Retire it here: the
+          // restored model is the final size, and committing it directly is
+          // what lets the claim arm against the viewport the page will show.
+          panel._fitPending = false
+          panel._fitGen++
+          panel._recommitRestingH()
+          panel._restoreSeatPending = false
+          // Arm the claim only when the restored card has stopped moving.
+          // Arming against the projection's short viewport seats the row
+          // past its saved offset and leaves the page scrolled wrong.
+          panel.whenSettled(function() {
+            // A result can clear the query and jump to another page. This
+            // waiter was armed for the searched page; restoring its seat on
+            // the destination moves the cursor off the landing the jump chose.
+            if (panel._searchReturnPage !== ""
+              && Menu.frame && Menu.frame.id !== panel._searchReturnPage) {
+              panel._searchReturnPage = ""
+              if (panel._fadeRestoreOwed) panel._startModeFadeIn()
+              return
+            }
+            panel._searchReturnPage = ""
+            panel._rearmOpenSlot()
+            panel._followSlotRow()
+            panel._latchClaim()
+            if (returnY >= 0) list.restoreAt(returnIdx, returnY)
+            if (panel._fadeRestoreOwed) panel._startModeFadeIn()
+          })
         }
       }, 2)
       return
@@ -1515,6 +1567,7 @@ Rectangle {
   }
 
   onSearchingChanged: {
+    panel.projectionRev++
     // A query is the user asking for something else, so the launch that
     // wanted the head is over - whether or not the projection ever moves
     // the cursor, which a query with no hits does not.
@@ -1526,6 +1579,8 @@ Rectangle {
     if (panel.searching) {
       panel._searchReturnIdx = list.currentIndex
       panel._searchReturnY = list.contentY
+      panel._searchReturnPage = Menu.frame ? Menu.frame.id : ""
+      panel._restoreSeatPending = list.currentIndex >= 0
       // A search re-projects the row set: a claim from the previous projection
       // (or an open slot on the page being searched) names no row in this one.
       // Keeping it sends pursuit after a ghost index when the model is narrow
@@ -1654,6 +1709,10 @@ Rectangle {
   // original rows in a separate pass. Both paths need this derivation so an
   // expanded row always has a reveal claim, a grown card and a region.
   function _rearmOpenSlot() {
+    // A mode swap still owes the page its saved seat. Any arm here would read
+    // the projection's short viewport and move a row that was already in view;
+    // the restore edge clears this gate once the card has settled.
+    if (panel._restoreSeatPending) return
     // A nested close holds the claim clear until its restore has settled;
     // re-arming sooner chases a shrinking target and moves the view again.
     if (panel._nestedSeatPending) return
@@ -1692,6 +1751,25 @@ Rectangle {
     }
   }
 
+  // A mode swap replaces the row set while an open slot keeps expansionNeedH
+  // above zero, so the "last slot closed" commit never runs for the restored
+  // page. Recommit the resting size from the restored model here instead:
+  // _committedListH is the base every size derivation reads, and leaving the
+  // projection's one-row latch there made the card and window resize from a
+  // height no restored row owns.
+  function _recommitRestingH() {
+    if (panel._transitionActive || panel._fitPending) return
+    // A restore can land while the card is still easing from the projection's
+    // size. The new model is the final resting answer; letting the old tween
+    // keep ownership here would latch the claim against the outgoing height.
+    if (panel._heightAnimating) {
+      heightAnim.stop()
+      panel._heightAnimating = false
+    }
+    panel._latchedListH = -1
+    panel._committedListH = panel._modelListH()
+  }
+
   // One route for every service-side trigger of recompute/refresh/open.
   Connections {
     target: Menu
@@ -1716,6 +1794,7 @@ Rectangle {
     }
 
     function onScopedActiveChanged() {
+      panel.projectionRev++
       // The "/" filter trims the page it was armed on, so the launch that
       // wanted the head of the untrimmed page is over - same reason as the
       // query above.
@@ -1728,6 +1807,7 @@ Rectangle {
         // that survives until the page comes back.
         panel._scopedReturnIdx = list.currentIndex
         panel._scopedReturnY = list.contentY
+        panel._restoreSeatPending = list.currentIndex >= 0
         const it = list.currentIndex >= 0 && list.currentIndex < panel.rowsModel.length
           ? panel.rowsModel[list.currentIndex] : null
         panel._scopedReturnUid = it && it.uid !== undefined ? String(it.uid) : ""
@@ -1771,6 +1851,12 @@ Rectangle {
         panel._scopedReturnChild = -1
         if (panel._scopedClearByAction) {
           panel._scopedClearByAction = false
+          panel._restoreSeatPending = false
+          // The filter's fit was queued for the trimmed row set and can never
+          // settle while the result's group is open. Retire it so the landing
+          // owns the reveal and its settled waiter can run.
+          panel._fitPending = false
+          panel._fitGen++
           // A flat result's landing owns the reveal: its group expands AFTER
           // the rows are restored and Entry arms the claim on that edge,
           // when the row's settled height already includes the dropdown.
@@ -1778,7 +1864,10 @@ Rectangle {
           // leave the page scrolled short of the manual reveal.
           return
         }
-        if (Menu.scopedActive || !Menu.open || !samePage) return
+        if (Menu.scopedActive || !Menu.open || !samePage) {
+          panel._restoreSeatPending = false
+          return
+        }
         let at = uid !== "" ? panel.indexOfUid(uid) : -1
         if (at < 0) at = idx
         if (at >= 0 && at < panel.rowsModel.length) {
@@ -1799,8 +1888,39 @@ Rectangle {
         }
         // The row the cursor came back to may still own an open slot. The
         // filter projection dropped its reveal claim; re-derive it against the
-        // restored rows so the card, region and bar grow back together.
-        panel._rearmOpenSlot()
+        // restored rows so the card, region and bar grow back together. Its
+        // resting size is likewise the restored model's, not the trim's: no
+        // slot closed on this edge to commit it through the usual path.
+        // A fit queued by an intermediate filter query never settles while
+        // the restored group is open. Retire it and commit the restored
+        // model's size here, then re-arm against that final viewport.
+        panel._fitPending = false
+        panel._fitGen++
+        panel._recommitRestingH()
+        panel._restoreSeatPending = false
+        panel.whenSettled(function() {
+          if (y >= 0) list.restoreAt(at, y, panel._modelListH())
+          // The filter left a claim and growth sized for its one-row trim.
+          // Clear them before re-arming, or the stale growth makes pursuit
+          // seat the restored group at its row top instead of the saved
+          // scroll offset.
+          // The row's reveal rose while the filter was being cleared, before
+          // the stale claim was released. No edge remains to re-latch it, so
+          // do it here with the row's final geometry - but only when the
+          // restored page actually had a growth claim to begin with.
+          const hadClaim = panel._claimListH > 0
+          panel._releaseSlotRegion()
+          panel._followSlotRow()
+          if (hadClaim) panel._latchClaim()
+          if (panel._fadeRestoreOwed) panel._startModeFadeIn()
+          Qt.callLater(function() {
+            if (Menu.scopedActive || list.autoRevealIndex >= 0) return
+            // The projection cleared the claim along with the filter rows.
+            // Restore it now that the card and scroll are final, so an open
+            // group keeps its bar/background without re-seating the page.
+            list.autoRevealIndex = at
+          })
+        })
       }, 2)
     }
 
@@ -3377,10 +3497,24 @@ Rectangle {
   // of that frame; the field still echoes the key immediately and the results
   // land one turn later.
   function onFieldEdited(text) {
-    Qt.callLater(() => {
-      if (panel.scopedSearching) Menu.setScopedQuery(text)
-      else Menu.setQuery(text)
-    })
+    const publish = () => {
+      if (panel.scopedSearching) {
+        // An empty query leaves the filter armed by design only when it was
+        // armed with no query at all. Erasing a real query is a cancel: the
+        // scope must go, or its arm-time seat is never handed back.
+        if (text === "") Menu.clearScoped()
+        else Menu.setScopedQuery(text)
+      } else Menu.setQuery(text)
+    }
+    const query = panel.scopedSearching ? Menu.scopedQuery : Menu.query
+    // Only the first character of a mode and its erase are edges. Re-ranking
+    // a live query installs its rows immediately, as before.
+    if ((text === "") !== (query === "")) {
+      // Only an erase owes the page its old seat. The fade-in waits for that
+      // restore; entering a mode starts it as soon as the swap lands.
+      panel._fadeRestoreOwed = text === ""
+      panel.fadeModeChange(publish)
+    } else Qt.callLater(publish)
   }
 
   function currentRow() {
@@ -3678,6 +3812,7 @@ Rectangle {
   // background - sits on another row. Restore the entry position.
   property int _searchReturnIdx: -1
   property real _searchReturnY: -1
+  property string _searchReturnPage: ""
   // Same contract for the "/" filter. Its projection is a trim of the current
   // page, so a hit that is not on the page (a nested child shown at the top
   // register) destroys the delegate the cursor was on. Capture the page seat
@@ -3688,10 +3823,32 @@ Rectangle {
   property string _scopedReturnUid: ""
   property string _scopedReturnPage: ""
   property int _scopedReturnChild: -1
+  // Armed while a mode swap owes the page its old cursor and scroll seat.
+  // Every claim rearm waits for this to clear: an arm made against the
+  // projection's transient short viewport seats the restored row past where
+  // the user left it. The restore edge owns the claim until it has settled.
+  property bool _restoreSeatPending: false
   // Set by a row that cleared the filter by ACTING on a result. That row is
   // now open (or its command ran), so the arm-time seat belongs to a different
   // intent and must not pull the cursor back off it.
   property bool _scopedClearByAction: false
+
+  // A programmatic landing moves the cursor without the gesture's
+  // "leaving a row collapses it" step. Fold every other open slot on the page
+  // so an expansion from before the query cannot trail the result row.
+  function _collapseOtherOpenRows(keepUid) {
+    for (let i = 0; i < panel.rowsModel.length; i++) {
+      const it = panel.rowsModel[i]
+      if (!it || String(it.uid) === keepUid) continue
+      if (!Menu.isExpanded(it) && !Menu.infoOpen(it)) continue
+      const row = list.itemAtIndex(i)
+      if (row && typeof row.collapse === "function") row.collapse()
+      else {
+        Menu.setExpanded(it, false)
+        Menu.setInfo(it, false)
+      }
+    }
+  }
 
   function closeTrailingInfo() {
     const idx = list.currentIndex
@@ -3740,14 +3897,23 @@ Rectangle {
     const w = panel._settledWaiters[0]
     // Dropping the waiter first so the binding cannot re-enter on the same
     // frame; the row is captured before any callback can change the cursor.
-    panel._settledWaiters = panel._settledWaiters.slice(1)
     const row = panel.currentRow()
+    // A waiter queued by a waiter drains in the SAME call, before the
+    // _settledReady binding has re-evaluated its guard against the row the
+    // seat just chose. Checking the guard here as well keeps that re-entrant
+    // drain from consuming the waiter with a stale row and abandoning the
+    // landing it was waiting for.
+    if (w.guard && !w.guard(row)) return
+    panel._settledWaiters = panel._settledWaiters.slice(1)
     if (w && row) w.fn(row)
   }
 
   function whenSettled(fn, guard) {
     panel._settledWaiters = panel._settledWaiters.concat([{ fn: fn, guard: guard }])
-    panel._drainSettled()
+    // A deferred drain lets the _settledReady binding see the new waiter
+    // (and its guard) before it decides anything; draining inline here let a
+    // nested waiter run against the previous frame's cursor.
+    Qt.callLater(panel._drainSettled)
   }
 
   Connections {
@@ -3761,6 +3927,16 @@ Rectangle {
         panel._settledWaiters = []
         // A close mid-fade otherwise leaves the text input invisible.
         panel.finishResultFade()
+        // A mode edge abandoned by a close owes no seat. Leaving the gate
+        // armed would silence every claim rearm on the next summon, and a
+        // staged action could publish onto a closed panel.
+        panel._restoreSeatPending = false
+        panel._searchReturnPage = ""
+        panel._fadeRestoreOwed = false
+        panel._viewFadeAction = null
+        viewFadeOut.stop()
+        viewFadeIn.stop()
+        panel.viewFade = 1
       }
     }
   }
@@ -3863,6 +4039,77 @@ Rectangle {
     duration: Ui.fastMs
     easing.type: Easing.Linear
     onFinished: panel.finishResultFade()
+  }
+
+  // Entering or leaving search/filter mode is the same kind of handoff as a
+  // result landing, with the row-set swap at the hidden midpoint instead of a
+  // page jump. ONE value drives it; the page view, the query text, the ghost
+  // and the field's accent border are functions of that value, so none of
+  // them can fade on a clock of its own or land a frame apart.
+  property real viewFade: 1
+  property var _viewFadeAction: null
+  // Set when the state change staged by a mode fade owns a cursor/seat
+  // restore. The fade-in waits for that restore so the bar is not seen
+  // moving from the result row to the saved page row.
+  property bool _fadeRestoreOwed: false
+  property bool _modeFadeAwaitFit: false
+
+  function _startModeFadeIn() {
+    panel._fadeRestoreOwed = false
+    viewFadeIn.restart()
+  }
+
+  function fadeModeChange(action) {
+    if (!MotionPolicy.enabled) {
+      action()
+      return
+    }
+    // A mode edge already in flight owns the clock. Replacing its action
+    // without restarting keeps fast typing from holding the view hidden.
+    if (panel._viewFadeAction !== null) {
+      panel._viewFadeAction = action
+      return
+    }
+    panel._viewFadeAction = action
+    viewFadeOut.from = panel.viewFade
+    viewFadeOut.restart()
+  }
+
+  // The curve is the result handoff's: a full shared clock down to zero,
+  // then a reveal that starts at 0.3 so the first frame is never an empty
+  // card. A mode swap and a result landing read as the same motion.
+  NumberAnimation {
+    id: viewFadeOut
+    target: panel
+    property: "viewFade"
+    to: 0
+    duration: Math.max(1, Math.floor(Ui.fastMs / 2))
+    easing.type: Easing.Linear
+    onFinished: {
+      const action = panel._viewFadeAction
+      panel._viewFadeAction = null
+      if (action) action()
+      if (!panel._fadeRestoreOwed) {
+        // Entering a mode swaps the row set here. The card can still be
+        // easing to the new fit; hold the fade-in until that tween lands so
+        // the window reaches its size while the view is hidden.
+        Qt.callLater(function() {
+          if (panel._heightAnimating || panel._fitPending)
+            panel._modeFadeAwaitFit = true
+          else panel._startModeFadeIn()
+        })
+      }
+    }
+  }
+
+  NumberAnimation {
+    id: viewFadeIn
+    target: panel
+    property: "viewFade"
+    from: 0.3
+    to: 1
+    duration: Math.max(1, Math.ceil(Ui.fastMs / 2))
+    easing.type: Easing.OutCubic
   }
 
   function consumePendingResult() {
@@ -3986,7 +4233,8 @@ Rectangle {
       // Seat each level by uid, opening the nested group on the way down.
       // Gated children drop out of the live dropdown, so resolve against
       // what each level actually lists. `rows` holds the group rows already
-      // arrived; the next level queues a settled waiter when it is expanded.
+      // walked; a nested group is read from its parent's loader after the
+      // expansion has published its children.
       const seatRows = []
       function seatLevel(n, rows) {
         const r2 = rows[n]
@@ -4015,26 +4263,40 @@ Rectangle {
         rows[n + 1] = childRow
         seatLevel(n + 1, rows)
       }
-      // Opening the group is a slot claim against the row's own geometry. Do
-      // it on the settled gate every landing uses: jumping here arrives mid
-      // page-transition/fit, and expanding into that window makes the slot
-      // land (snap) instead of easing, which both stiffens the resize and
-      // leaves the slot held so its later close snaps too.
-      panel.whenSettled(function() {
+      // The filter's fit can stay pending while the result's group is open,
+      // which would hold a settled waiter shut forever. The restored page
+      // rows are installed in this turn; resolve the target by index on the
+      // next one instead of waiting on a gate the new opening invalidates.
+      Qt.callLater(function() {
         const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
-        if (idx >= 0 && list && list.currentIndex !== idx) list.seat(idx, "land")
-        seatRows[0] = panel.currentRow()
-        if (!groupUidMatches(seatRows[0], targetUid)) return
+        if (idx >= 0 && list) {
+          if (list.currentIndex !== idx) list.seat(idx, "land")
+          list.forceLayout()
+        }
+        // A landing owns the whole page: a group left open by the row the
+        // user was on before the query has no reason to stay unfolded once
+        // the result puts the cursor on a different group.
+        panel._collapseOtherOpenRows(targetUid)
+        const row = idx >= 0 && list ? list.itemAtIndex(idx) : null
+        if (!groupUidMatches(row, targetUid)) return
+        seatRows[0] = row
         if (list) list.suppressIndexFollow = false
-        seatRows[0].setExpanded(true)
-        if (chain.length === 0) return
-        // The row may have been pulled back while the query cleared; wait for
-        // it to be current again before walking the chain.
-        panel.whenSettled(function(r2) {
-          seatRows[0] = r2
+        row.setExpanded(true)
+        // The child delegates load in the group's own Loader. One turn after
+        // the expansion is enough for the focused child to exist; waiting on
+        // the fit here would inherit the filter's still-pending measurement.
+        Qt.callLater(function() {
+          seatRows[0] = row
           seatLevel(0, seatRows)
-        }, function(r2) { return groupUidMatches(r2, targetUid) })
-      }, function(row) { return groupUidMatches(row, targetUid) })
+          // A programmatic landing has no gesture to arm the reveal claim.
+          // Re-derive it from the now-expanded row or a dropdown near the
+          // bottom of the page stays clipped by the viewport.
+          if (list && idx >= 0) {
+            list.autoRevealIndex = idx
+            panel._latchClaim()
+          }
+        })
+      })
       return
     }
     // Input rows land focused like every other entry: the query selects the
@@ -4155,13 +4417,13 @@ Rectangle {
         focusCtrl.grabList()
         return
       }
-      Menu.clearScoped()
+      panel.onFieldEdited("")
       searchField.text = ""
       focusCtrl.grabList()
       return
     }
     if (panel.searching) {
-      Menu.clearQuery()
+      panel.onFieldEdited("")
       if (searchField.text !== "") searchField.text = ""
       focusCtrl.grabList()
       return
@@ -4231,13 +4493,13 @@ Rectangle {
   // full page), which is exactly what has to go.
   function backspaceEmptyChain() {
     if (panel.scopedSearching) {
-      Menu.clearScoped()
+      panel.onFieldEdited("")
       if (searchField.text !== "") searchField.text = ""
       focusCtrl.grabList()
       return
     }
     if (panel.searching) {
-      Menu.clearQuery()
+      panel.onFieldEdited("")
       if (searchField.text !== "") searchField.text = ""
       focusCtrl.grabList()
       return
@@ -4500,6 +4762,8 @@ Rectangle {
         // "/" arms the in-page quick-filter: focus the box and trim the
         // CURRENT page's rows. The trigger itself is not part of the
         // query.
+        // Arming an empty filter projects the same rows: no content changes,
+        // so nothing fades. The first character is the edge that does.
         Menu.beginScoped()
         searchField.text = ""
         focusCtrl.grabFilter()
@@ -4862,9 +5126,11 @@ Rectangle {
     anchors.margins: Ui.outerPad
     height: Ui.filterH
     scoped: panel.scopedSearching
-    // The same value fans out into the field's border/ghost and query text.
-    handoff: panel.handoff
-    queryOpacity: panel.handoffTextOpacity
+    // The result handoff and the mode fade are two readings of one field
+    // contract: the border and ghost leave with whichever transition is
+    // running, and the query text fades with the view it belongs to.
+    handoff: Math.max(panel.handoff, 1 - panel.viewFade)
+    queryOpacity: panel.handoffTextOpacity * panel.viewFade
 
     onEdited: text => panel.onFieldEdited(text)
     // TextInput consumes Enter to emit accepted; route it here since it
@@ -5000,10 +5266,11 @@ Rectangle {
       y: 0
       width: listBox.width
       height: listBox.height
-      // One presentation of the shared handoff value. Outside a handoff the
-      // ordinary submenu slide value shows through unchanged.
-      opacity: panel.handoffActive
-        ? panel.handoffPageOpacity : panel._pageSlideOpacity
+      // One presentation of the two shared progress values: the result
+      // handoff owns the page-swap edges, and viewFade masks a mode switch.
+      // Outside both, the ordinary submenu slide value shows through.
+      opacity: (panel.handoffActive
+        ? panel.handoffPageOpacity : panel._pageSlideOpacity) * panel.viewFade
 
       List {
         id: list

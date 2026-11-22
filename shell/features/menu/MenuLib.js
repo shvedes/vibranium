@@ -745,8 +745,10 @@ function substituteQuoted(command, value) {
 // user actually typed ("drop shadow" showed "Menus"). This flattens matched
 // descendants into top-level result rows in the same visual language as
 // global search, while carrying the group chain the landing walks to open
-// their real nesting. A row that matches in its own right keeps its whole
-// subtree, so browsing a group by its own name is unchanged.
+// their real nesting. While a query is live the projection is ALWAYS a flat
+// list of top-level result rows: a group matched by its own label is a result
+// row too, not a page group carrying its whole subtree. Activating any row
+// walks its chain to open the real nesting on the restored page.
 function scopedResultRows(page, text) {
   const out = []
   if (!page || !Array.isArray(page.items)) return out
@@ -763,13 +765,23 @@ function scopedResultRows(page, text) {
     const uid = item.uid !== undefined && item.uid !== null ? String(item.uid) : ""
     if (uid !== "" && seen[uid] === true) return
     if (uid !== "") seen[uid] = true
-    if (!owner) {
+    // With no query the filter shows the page itself, unchanged.
+    if (tokens.length === 0) {
+      out.push(item)
+      return
+    }
+    // A leaf already on the page needs no landing chain; only groups and
+    // nested hits are result rows that walk back into the real nesting.
+    if (!owner && !Array.isArray(item.children)) {
       out.push(item)
       return
     }
     const flat = Object.assign({}, item)
+    // Never carry the subtree into the projection: the page shows result
+    // rows only while a query is live, regardless of which label matched.
+    delete flat.children
     flat.type = "group"
-    flat.groupUid = owner.uid
+    flat.groupUid = owner ? owner.uid : uid
     flat.childUid = uid
     flat.childUids = chain.slice()
     flat.pageId = page.id
@@ -783,7 +795,7 @@ function scopedResultRows(page, text) {
       const it = list[i]
       if (!it || typeof it !== "object" || Array.isArray(it)) continue
       if (tokens.length === 0 || matches(it)) {
-        push(it, owner, ownerIndex, chain.concat(
+        push(it, owner, i, chain.concat(
           it.uid !== undefined && it.uid !== null ? [String(it.uid)] : []))
         continue
       }

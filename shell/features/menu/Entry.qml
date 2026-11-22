@@ -54,6 +54,13 @@ Item {
   property bool sel: false
   property bool searchResult: false
 
+  // The projection epoch this delegate was built under. A mode edge swaps
+  // the row set and destroys group delegates; their childIndex churn is not
+  // a child step and must not fold the outgoing child's stored state. A
+  // snapshot, not a binding: a live read would move with the very edge it
+  // has to detect.
+  property int _projectionRev: -1
+
   // --- type helpers ---
   readonly property string ptype: itm && itm.type === "separator"
     ? "separator" : searchResult ? "result" : (itm ? itm.type : "")
@@ -309,6 +316,21 @@ Item {
   // other reader.
   property int _revEcho: Menu.rev
 
+  // A delegate reused for a result row keeps its previous page row's
+  // expansion: syncExpanded declines to write result rows, so the slot stays
+  // open and leaves a band of empty height in the flat projection. A result
+  // is a top-level row by contract and owns no slot.
+  onSearchResultChanged: {
+    if (searchResult) {
+      expanded = false
+      infoOpen = false
+    } else {
+      // The same delegate may be reused for the page row once the projection
+      // clears; re-read the canonical state that the result never wrote.
+      syncExpanded()
+    }
+  }
+
   on_RevEchoChanged: {
     syncExpanded()
     if (!row.dropdownOpen) return
@@ -321,6 +343,8 @@ Item {
     else row.optionIndex = Range.clamp(row.optionIndex, 0, optList.length - 1)
   }
   Component.onCompleted: {
+    const p = Menu.panel || Menu.probeSource
+    row._projectionRev = p ? p.projectionRev : 0
     syncExpanded()
   }
 
@@ -488,6 +512,15 @@ Item {
     const target = row.childIndex
     const outgoing = row._prevChildIndex
     row._prevChildIndex = target
+    const p = Menu.panel || Menu.probeSource
+    if (p && p.projectionRev !== row._projectionRev) {
+      // A search/filter edge is retargeting the row set under this group.
+      // Nothing here is a user leaving a child: the delegate is about to be
+      // replaced, and folding now would erase the child's canonical state
+      // that the restored page must grow back.
+      Menu.trace("grp.child", { idx: target, swap: true })
+      return
+    }
     Menu.trace("grp.child", {
       idx: target, outgoing: outgoing,
       extra: row._groupView ? Math.round(row._groupView.liveExtra * 10) / 10 : 0,
@@ -2380,7 +2413,12 @@ Item {
       if (view) {
         if (typeof view.unpinHighlight === "function") view.unpinHighlight()
         view._keepCursor = false
-        view.autoRevealIndex = index
+        // A restored delegate reports its stored expansion before the panel
+        // has put the page's cursor and scroll back. The panel owns the claim
+        // on that edge: arming here would pursue against the projection's
+        // transient short viewport and scroll a row already in view.
+        const panel = Menu.panel || Menu.probeSource
+        if (!panel || !panel._restoreSeatPending) view.autoRevealIndex = index
       }
     } else {
       // Drop the nested follow at the close edge. The verdict is about the
