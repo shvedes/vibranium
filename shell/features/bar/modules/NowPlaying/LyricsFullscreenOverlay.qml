@@ -65,6 +65,14 @@ QtObject {
   property bool _seeking: false
   property real _pressX: 0
 
+  // The transcript's presence during a track swap: 1 shown, 0 cleared while
+  // the new sheet lands. The swap animation owns this one scalar; the four
+  // effect copies derive their opacity from lyricsSide.opacity below, which is
+  // a pure function of it. Nothing leaves a raw 0 on the item, so closing
+  // mid-swap and reopening the SAME track (no new trackKey edge) cannot bring
+  // the transcript back dim.
+  property real swapK: 1
+
   // Backdrop density. The surface paints the theme background solid under the
   // transcript; a double click on empty space swaps it for the same color at
   // 80% opacity, which lets the desktop read faintly behind the lyrics while
@@ -126,14 +134,24 @@ QtObject {
     root.shownPosition = NP.reanchorPosition(root.player, root.lengthSec)
   }
 
-  function seekAt(x, w) {
-    if (!root.canSeekPosition || w <= 0) return
-    const t = NP.scrubPosition(x, w, root.lengthSec)
+  // The one position-commit path. Every seek on this surface - lane click,
+  // drag release, wheel step and the transcript's own seek requests - funnels
+  // through here: one gate, one clamp, one write of the player's position and
+  // the shown lane, one notify, one release of the drag. An optimistic adopt
+  // makes the lane jump at once; the daemon's notify corrects it a moment
+  // later. `scrubTo` stays the only preview writer of shownPosition.
+  function commitSeek(seconds) {
+    if (!root.canSeekPosition || root.player === null) return
+    const t = Range.clamp(Number(seconds) || 0, 0, root.lengthSec)
     root.player.position = t
-    // Optimistic adopt so the lane jumps at once; the daemon's notify
-    // corrects it a moment later.
     root.shownPosition = t
-    if (root.player) root.player.positionChanged()
+    root._seeking = false
+    root.player.positionChanged()
+  }
+
+  function seekAt(x, w) {
+    if (w <= 0) return
+    root.commitSeek(NP.scrubPosition(x, w, root.lengthSec))
   }
 
   // Scrub preview: moves the lane only, writes nothing. A per-move position
@@ -145,11 +163,7 @@ QtObject {
   }
 
   function seekTo(seconds) {
-    if (!root.canSeekPosition) return
-    const t = Range.clamp(Number(seconds) || 0, 0, root.lengthSec)
-    root.player.position = t
-    root.shownPosition = t
-    if (root.player) root.player.positionChanged()
+    root.commitSeek(seconds)
   }
 
   function togglePlaying() {
@@ -178,6 +192,10 @@ QtObject {
       root.reanchor()
       root._holdStart()
     } else {
+      // Teardown is an edge too: retire any staged fade so a later reopen of
+      // the same track starts from a fully shown transcript.
+      trackSwap.stop()
+      root.swapK = 1
       root._holdStop()
     }
   }
@@ -666,14 +684,8 @@ QtObject {
               }
             }
             onReleased: mouse => {
-              if (root.canSeekPosition) {
-                if (root._seeking) {
-                  root.player.position = root.shownPosition
-                  root.player.positionChanged()
-                } else {
-                  root.seekAt(mouse.x, width)
-                }
-              }
+              if (root._seeking) root.commitSeek(root.shownPosition)
+              else root.seekAt(mouse.x, width)
               root._seeking = false
             }
             onCanceled: {
@@ -688,10 +700,7 @@ QtObject {
               if (event.angleDelta.y === 0) return
               if (!root.canSeekPosition) return
               const d = event.angleDelta.y > 0 ? 5 : -5
-              const t = Range.clamp(root.shownPosition + d, 0, root.lengthSec)
-              root.player.position = t
-              root.shownPosition = t
-              if (root.player) root.player.positionChanged()
+              root.commitSeek(root.shownPosition + d)
               event.accepted = true
             }
           }
@@ -723,7 +732,10 @@ QtObject {
       height: content.height
       // Track-switch entrance: the transcript fades in place while the cover
       // crossfades, so a switch reads as one new track rather than one
-      // element swapping.
+      // element swapping. Derived from the swap scalar, not written by the
+      // animation: the four effect copies below read this one live value, and
+      // an interrupted swap can never leave it stuck at zero.
+      opacity: root.opened ? root.swapK : 0
 
       LyricsPane {
         id: pane
@@ -981,23 +993,25 @@ QtObject {
 
     // The fade itself. The script leg clears the transcript in place; the
     // short hold makes it read as a fade rather than a frame that happened to
-    // be dim. With motion off nothing is staged and the tween is zero-length,
-    // so the swap is a single frame.
+    // be dim. Both legs write the one swapK scalar, and lyricsSide.opacity is
+    // derived from it, so an interrupted animation leaves no stale value on
+    // the item. With motion off nothing is staged and the tween is
+    // zero-length, so the swap is a single frame.
     SequentialAnimation {
       id: trackSwap
 
       ScriptAction {
         script: {
           if (!root.animOn) return
-          lyricsSide.opacity = 0
+          root.swapK = 0
         }
       }
       PauseAnimation {
         duration: root.animOn ? 60 : 0
       }
       NumberAnimation {
-        target: lyricsSide
-        property: "opacity"
+        target: root
+        property: "swapK"
         to: 1
         duration: MotionPolicy.duration(Ui.slowMs)
         easing.type: Easing.InOutCubic

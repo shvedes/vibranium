@@ -95,6 +95,13 @@ Item {
   // The clock never takes the view back on its own: a transcript that pulls
   // itself to the cue after a pause cannot be read ahead in.
   property bool _pinnedByUser: false
+  // A cue edge can arrive while the reader's flick is still travelling. The
+  // view is left alone until the movement-end edge, and the return it asked
+  // for is remembered here so it can glide once the view is still.
+  property bool _returnPending: false
+  // Live state of the reader's interaction. A placement must never be made
+  // while either flag is up: that is the one-frame positionViewAtIndex jump.
+  readonly property bool _scrolling: view.moving || view.flicking
   // True for the synchronous moment a placement changes contentY, so that
   // change is not mistaken for the reader scrolling.
   property bool _placing: false
@@ -119,6 +126,7 @@ Item {
   Component.onCompleted: root._load()
   Component.onDestruction: root._abort()
   onActiveChanged: {
+    root._returnPending = false
     if (!root.active) return
     // A surface opens showing the clock, not whatever the previous showing
     // left the view scrolled to.
@@ -156,6 +164,7 @@ Item {
       root.synced = false
       root.activeIndex = -1
       root._pinnedByUser = false
+      root._returnPending = false
       root.status = "idle"
       return
     }
@@ -240,6 +249,7 @@ Item {
     // A freshly answered track is read from the top of its first cue, not
     // from wherever the last transcript was left.
     root._pinnedByUser = false
+    root._returnPending = false
     root._freshSheet = true
     const switched = root._shownKey !== "" && root._shownKey !== key
     root._shownKey = key
@@ -267,6 +277,15 @@ Item {
     // follows again with the view up.
     if (!root.active) return
     if (root.synced && root.currentIndex >= 0) {
+      // A drag or flick owns the view until it actually stops. Placing a cue
+      // under a moving view used to snap contentY in one frame; arm the return
+      // on the real movement-end edge instead and leave the reader's scroll
+      // alone until then.
+      if (root._scrolling) {
+        root._returnPending = true
+        scrollTo.stop()
+        return
+      }
       // A scrolled transcript yields to its reader; a presentation surface
       // disables scrolling, so its pin never sets.
       if (root._pinnedByUser && root.glide) {
@@ -298,9 +317,8 @@ Item {
     // line instead of gliding there from the offset the previous track left.
     // The flag stays up through the layout settle, so a placement made before
     // the delegates exist is corrected in place rather than gliding into view.
-    // A row the view has not created yet is the same case - it has only a
-    // guessed y, so the move is the view's own placement.
-    if (root._freshSheet || row === null || !root.animOn || !root.glide) {
+    // No motion policy, or a caller that disables gliding, is a cut too.
+    if (root._freshSheet || !root.animOn || !root.glide) {
       root._placing = true
       view.positionViewAtIndex(index, ListView.Center)
       root._placing = false
@@ -309,8 +327,29 @@ Item {
     // `row.y` is already in content coordinates, so the resting offset is the
     // row's centre pulled to the middle of the viewport. Adding the live
     // contentY here would count the current scroll twice and overshoot.
-    scrollTo.to = row.y + row.height / 2 - view.height / 2
+    // A cue the view has not created yet has only an estimated y from the
+    // laid-out sheet; even that return glides. The view's own placement is a
+    // one-frame teleport and is never used to hand a scroll back to the cue.
+    const restY = row !== null ? row.y : root._estimatedCueY(index)
+    const rowH = row !== null ? row.height : 0
+    const target = restY + rowH / 2 - view.height / 2
+    scrollTo.to = Math.max(0, Math.min(
+      Math.max(0, view.contentHeight - view.height), target))
     scrollTo.start()
+  }
+
+  // Where an uncreated cue row sits, from live sheet geometry: the header, the
+  // footer and the shared row height are all published by the view. Wrapped
+  // lines make this an estimate that the next cue edge corrects, which is a
+  // small follow-up glide rather than a jump.
+  function _estimatedCueY(index) {
+    const n = view.count
+    if (!(n > 0)) return 0
+    const headerH = view.headerItem ? view.headerItem.height : 0
+    const footerH = view.footerItem ? view.footerItem.height : 0
+    const rowH = Math.max(1,
+      (view.contentHeight - headerH - footerH - (n - 1) * view.spacing) / n)
+    return headerH + index * (rowH + view.spacing) + rowH / 2
   }
 
   NumberAnimation {
@@ -325,17 +364,29 @@ Item {
   // A layout settle - the first delegates, a track's sheet, a weight change on
   // a wrapped line - moves contentY without the reader touching it. Those
   // moves are not a scroll and must not claim the view, or a freshly opened
-  // pane would sit off centre until the idle timer handed it back. The timer
-  // restarts on every height change, holds the fresh-sheet cut until the layout
-  // is still, and releases it after the last recentre.
+  // pane would sit off centre until the timer handed it back. The timer also
+  // re-arms on the real movement-end and bounds edges; its trigger is gated on
+  // live moving state, so it cannot fire mid-flick and centre in one frame.
+  // When it does fire it releases the fresh-sheet cut and glides any return a
+  // cue edge armed while the reader was scrolling.
   Timer {
     id: settleGuard
 
     interval: 150
     repeat: false
     onTriggered: {
-      if (root.synced) root._follow()
+      if (root._scrolling) {
+        // The stop edge re-arms this; never place under a moving view.
+        return
+      }
       root._freshSheet = false
+      if (root._returnPending) {
+        root._returnPending = false
+        root._pinnedByUser = false
+        root._centre(root.currentIndex)
+        return
+      }
+      if (root.synced) root._follow()
     }
   }
 
@@ -448,8 +499,16 @@ Item {
       // clicked.
       onMovementStarted: {
         scrollTo.stop()
+        // A new drag supersedes any return a previous flick had armed.
+        root._returnPending = false
         root._pinnedByUser = true
       }
+      // The flick has actually stopped. StopAtBounds means reaching either end
+      // ends the movement too, so this is the single "reader is still" edge:
+      // arm the settle timer here rather than letting it fire during travel.
+      onMovementEnded: settleGuard.restart()
+      onAtYBeginningChanged: if (view.atYBeginning) settleGuard.restart()
+      onAtYEndChanged: if (view.atYEnd) settleGuard.restart()
       // Every contentY change that is not ours is the reader's - a drag, a
       // flick, or the wheel. Pinned means "the current line is not under the
       // middle of the slot", measured in line heights rather than in screen
