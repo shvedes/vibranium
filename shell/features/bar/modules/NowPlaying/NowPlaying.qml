@@ -533,7 +533,12 @@ CollapsibleSlot {
     { icon: "music-track", text: root.title !== "" ? root.title : "--" },
     { icon: "music-artist", text: root.artist !== "" ? root.artist : "--" },
     { icon: "music-album", text: root.album !== "" ? root.album : "--" },
-    { icon: "volume-max", text: root.player ? Format.percent(root.player.volume ?? 0) : "--" }
+    // MPRIS -1 means "unknown": Format.percent would print -100%, which
+    // contradicts the island's muted-style fill and the gate every writer
+    // uses. Read the same normalized level, and show "--" when there is no
+    // level to report at all.
+    { icon: "volume-max", text: root.player !== null && NP.volumeKnown(root.player.volume)
+      ? Format.percent(NP.normalizeVolume(root.player.volume)) : "--" }
   ]
 
   barTipActive: root.hovered && !root.islandOpen
