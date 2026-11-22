@@ -90,6 +90,56 @@ Item {
   property string _leavingFile: ""
   property real _leaveProgress: 0
 
+  // The deck's one animated source. selIndex is the committed selection (what
+  // Enter applies, what the footer names, what a delete repairs); deckPos is
+  // where the cascade is actually looking. They agree at rest. A step off an
+  // end keeps selIndex at the destination but walks deckPos across every
+  // intervening entry, so the wrap is a journey through the list rather than
+  // a one-frame re-dress of the window.
+  property real deckPos: 0
+  // Duration for the one Behavior below, armed BEFORE the deckPos write - the
+  // same pre-arm List.qml uses for _sweepMs, because a tween launched on an
+  // assignment ignores a duration changed afterwards. Long for a wrap,
+  // Ui.slowMs for a step, 0 for the instant re-seat of a new row set.
+  property int _deckTravelMs: 0
+  property int _nextMoveMs: 0
+  // The integer centre the current window was built for. The window only needs
+  // re-diffing when this changes; tile geometry itself reads deckPos live.
+  property int _windowCenter: 0
+
+  // One clock for the whole deck. Tile x/y/width/height are pure functions of
+  // deckPos below; no cell runs a second tween that could chase a re-aimed
+  // window frame by frame. The fade gate keeps geometry off until the panel is
+  // settled, as it did when the cells owned their own Behaviours.
+  Behavior on deckPos {
+    // A zero duration is the instant case: the tween lands in the tick it
+    // starts, so an in-flight wrap replaced by a new row set cannot keep
+    // driving deckPos towards a target from the old listing.
+    enabled: MotionPolicy.enabled && panel._deckLive
+    Glide { duration: panel._deckTravelMs }
+  }
+
+  // The single place deckPos is written. Callers arm the duration first, then
+  // come through here, so the Behavior reads the right clock on the write.
+  function _seatDeck(value, ms) {
+    panel._deckTravelMs = ms
+    panel.deckPos = value
+  }
+
+  // One place for every selection commit. The duration is parked on
+  // _nextMoveMs and picked up by onSelIndexChanged, which is the only handler
+  // that seats the deck for a selection change.
+  function _commitSelection(next, ms) {
+    panel._nextMoveMs = ms
+    if (next === panel.selIndex) {
+      // A row-set change can move the list under an unchanged index; the deck
+      // still has to be re-seated, instantly, on the file that index now names.
+      panel._seatDeck(next, 0)
+      return
+    }
+    panel.selIndex = next
+  }
+
   Component.onCompleted: { WallpaperPicker._attachPanel(panel); panel.syncRows() }
   Component.onDestruction: WallpaperPicker._detachPanel(panel)
 
@@ -114,25 +164,40 @@ Item {
   readonly property int decodeW: Math.round(panel.bigW * panel._dpr * 0.6)
   readonly property int decodeH: Math.round(panel.bigH * panel._dpr * 0.6)
 
+  // Tile geometry is a pure function of a CONTINUOUS rel = abs - deckPos. At
+  // rel 0 a tile is the big card; at |rel| >= 1 it is a slice. Between the two
+  // the size and the x/y offsets interpolate, which is what makes a wrap leg
+  // show the same moving picture on every frame instead of a tween restarted
+  // on each integer step. There is deliberately no Behavior on these - the
+  // deckPos clock above is the only motion.
   function tileW(rel) {
-    return rel === 0 ? panel.bigW : panel.sliceW
+    const a = Math.abs(rel)
+    return a >= 1 ? panel.sliceW
+      : Math.round(panel.bigW + (panel.sliceW - panel.bigW) * a)
   }
   function tileH(rel) {
-    return rel === 0 ? panel.bigH : panel.sliceH
+    const a = Math.abs(rel)
+    return a >= 1 ? panel.sliceH
+      : Math.round(panel.bigH + (panel.sliceH - panel.bigH) * a)
   }
   function tileX(rel) {
-    if (rel === 0) return panel.deckCenterX - panel.bigW / 2
-    if (rel < 0) {
-      return panel.deckCenterX - panel.bigW / 2 - panel.sliceW + panel.sliceOverlap
-        + (rel + 1) * panel.sliceStep
-    }
-    return panel.deckCenterX + panel.bigW / 2 - panel.sliceOverlap + (rel - 1) * panel.sliceStep
+    const a = Math.abs(rel)
+    const centreX = panel.deckCenterX - panel.bigW / 2
+    if (a < 0.0001) return centreX
+    if (rel < 0) return Math.round(centreX - a * panel.sliceStep)
+    const sliceX = panel.deckCenterX + panel.bigW / 2 - panel.sliceOverlap
+    if (a >= 1) return Math.round(sliceX + (a - 1) * panel.sliceStep)
+    return Math.round(centreX + (sliceX - centreX) * a)
   }
   // A gentle downward cascade outward, kept inside the slice's own inset so a
-  // tile never leaves the deck's band.
+  // slice never leaves the deck's band. The first unit of rel is the same
+  // interpolation the card's size takes; past it the slice only steps down.
   function tileY(rel) {
-    if (rel === 0) return 0
-    return Math.round((panel.bigH - panel.sliceH) / 2 + Math.min(Math.abs(rel), 8) * 3)
+    const a = Math.abs(rel)
+    if (a < 0.0001) return 0
+    const one = Math.round((panel.bigH - panel.sliceH) / 2 + 3)
+    if (a < 1) return Math.round(one * a)
+    return Math.round((panel.bigH - panel.sliceH) / 2 + Math.min(a, 8) * 3)
   }
 
   // A picture is decoded exactly while it has any part of the screen: the deck
@@ -178,14 +243,15 @@ Item {
     return rec ? rec.disabled === true : false
   }
 
-  // The rows the deck instantiates: the window around the selection. It is
-  // wider than the cascade shows, so a slide that is still animating in from the
-  // edge has a tile to come from.
+  // The rows the deck instantiates: the window around where the deck is
+  // LOOKING, not around the committed index. During a wrap the two differ:
+  // deckPos walks every entry between the ends, so the window follows it and
+  // a tile to come from always exists on the side the motion is heading.
   function _windowAbss() {
     const n = panel.rows ? panel.rows.length : 0
     const out = []
     if (n === 0) return out
-    const sel = Math.max(0, Math.min(panel.selIndex, n - 1))
+    const sel = Math.max(0, Math.min(Math.round(panel.deckPos), n - 1))
     const start = Math.max(0, sel - panel.windowRadius)
     const end = Math.min(n - 1, sel + panel.windowRadius)
     for (let abs = start; abs <= end; abs++) out.push(abs)
@@ -210,14 +276,16 @@ Item {
     if (panel._leavingFile !== "") {
       // An empty dir lets the tile fall back to the user overlay: the
       // departing picture is already gone from the listing either way.
-      want.push({ abs: -1, file: panel._leavingFile, rel: 0, dir: "", disabled: false })
+      want.push({ abs: -1, file: panel._leavingFile, dir: "", disabled: false })
     }
     const abss = panel._windowAbss()
+    if (abss.length > 0) {
+      panel._windowCenter = Math.round(panel.deckPos)
+    }
     for (let i = 0; i < abss.length; i++) {
       want.push({
         abs: abss[i],
         file: panel._rowFile(abss[i]),
-        rel: abss[i] - panel.selIndex,
         dir: panel._rowDir(abss[i]),
         disabled: panel._rowDisabled(abss[i])
       })
@@ -239,7 +307,6 @@ Item {
       const row = deck.get(i)
       if (row && String(row.file) === want[i].file) {
         deck.setProperty(i, "abs", want[i].abs)
-        deck.setProperty(i, "rel", want[i].rel)
         deck.setProperty(i, "dir", want[i].dir)
         deck.setProperty(i, "disabled", want[i].disabled)
       } else {
@@ -280,7 +347,9 @@ Item {
     // belongs to drops out of it.
     if (carried !== "" && keep < 0 && panel.pendingDeleteIndex >= 0) panel._leave(carried)
     const next = n === 0 ? 0 : (keep >= 0 ? keep : Math.min(panel.selIndex, n - 1))
-    if (next !== panel.selIndex) panel.selIndex = next
+    // A new row set is a new coordinate space: the deck re-seats instantly
+    // rather than gliding across indices that no longer name the same files.
+    panel._commitSelection(next, 0)
     panel._keepFile = panel._currentFile()
     panel._syncWindow()
   }
@@ -289,7 +358,18 @@ Item {
 
   onSelIndexChanged: {
     panel._keepFile = panel._currentFile()
-    panel._syncWindow()
+    panel._seatDeck(panel.selIndex, panel._nextMoveMs)
+  }
+
+  // The window follows the live deck position, so a wrap leg creates the next
+  // slice just before the moving card needs it and retires the old one as it
+  // leaves. Only an integer centre crossing diffs the model; between crossings
+  // the delegates derive their own rel from deckPos with no per-frame churn.
+  onDeckPosChanged: {
+    const n = panel.rows ? panel.rows.length : 0
+    if (n === 0) return
+    const centre = Math.max(0, Math.min(Math.round(panel.deckPos), n - 1))
+    if (centre !== panel._windowCenter) panel._syncWindow()
   }
 
   // ---- selection / apply ---------------------------------------------------
@@ -297,7 +377,7 @@ Item {
     const n = panel.rows ? panel.rows.length : 0
     if (n === 0) return
     const next = Math.max(0, Math.min(index, n - 1))
-    if (next !== panel.selIndex) panel.selIndex = next
+    panel._commitSelection(next, Ui.slowMs)
   }
 
   function moveSelection(dir) {
@@ -305,13 +385,21 @@ Item {
     if (panel._confirmOpen) panel.cancelDelete()
     const n = panel.rows ? panel.rows.length : 0
     if (n === 0) return
-    // A step off either end of the listing lands on the other end, and that is
-    // the whole of the wrap: the deck anchors on the selection, so the index is
-    // the only thing that moves. Paging keeps its clamp instead.
+    const cur = panel.selIndex
     const next = dir === 1 || dir === -1
-      ? (panel.selIndex + dir + n) % n
-      : Math.max(0, Math.min(panel.selIndex + dir, n - 1))
-    if (next !== panel.selIndex) panel.selIndex = next
+      ? (cur + dir + n) % n
+      : Math.max(0, Math.min(cur + dir, n - 1))
+    const wrapped = (dir === 1 && next < cur) || (dir === -1 && next > cur)
+    let ms = Ui.slowMs
+    if (wrapped) {
+      // A lap crosses every entry between the ends. Keep the committed index
+      // at the destination (Enter applies what the user asked for) but let the
+      // one deck clock traverse the whole list, the way the old List picker's
+      // wrap lap glided contentY across the rows instead of jumping to them.
+      // The span, not a fixed delay, sets the length of the journey.
+      ms = Math.min(1600, Ui.slowMs + Math.abs(cur - next) * 20)
+    }
+    panel._commitSelection(next, ms)
   }
 
   function _isApplied(file) {
@@ -432,7 +520,9 @@ Item {
     const applied = SU.basename(String(Wallpaper.current))
     const index = panel._indexOf(applied)
     panel._keepFile = index >= 0 ? applied : ""
-    panel.selIndex = index >= 0 ? index : 0
+    // A new visit is a fresh seat, never a journey from the last visit's
+    // position through a listing that may have changed while closed.
+    panel._commitSelection(index >= 0 ? index : 0, 0)
     panel._syncWindow()
   }
 
@@ -606,17 +696,21 @@ Item {
     Repeater {
       model: deck
 
-      // The cell owns the deck arithmetic and the motion; the tile owns the
-      // picture. Required properties are the model's own roles, so the engine
-      // initializes them per row and a window step updates these bindings in
-      // place - the tile keeps its decoded image and glides to its new slot.
+      // The cell owns the deck arithmetic; the tile owns the picture. rel is
+      // derived live from the one deckPos clock, not stored per frame, and the
+      // geometry functions below are pure in it. No cell owns a tween, so a
+      // wrap cannot leave one behind or start a second clock chasing another.
       delegate: Item {
         id: cell
 
-        required property int rel
+        required property int abs
         required property string file
         required property string dir
         required property bool disabled
+
+        // The departed tile is docked at the centre for its whole exit; the
+        // rest are positioned by the live difference from the deck's position.
+        readonly property real deckRel: cell.abs < 0 ? 0 : cell.abs - panel.deckPos
 
         // The tile a removal just took out of the listing. It keeps the slot it
         // was read in - the selection does not move on a removal - and leaves
@@ -627,36 +721,20 @@ Item {
         // belongs to, and it is already the selection.
         enabled: !cell.leaving
 
-        x: panel.tileX(cell.rel)
-        y: panel.tileY(cell.rel)
-        width: panel.tileW(cell.rel)
-        height: panel.tileH(cell.rel)
-        z: cell.leaving ? 200 : (cell.rel === 0 ? 100 : 50 - Math.min(Math.abs(cell.rel), 40))
+        x: panel.tileX(cell.deckRel)
+        y: panel.tileY(cell.deckRel)
+        width: panel.tileW(cell.deckRel)
+        height: panel.tileH(cell.deckRel)
+        z: cell.leaving ? 200
+          : (Math.abs(cell.deckRel) < 0.5 ? 100 : 50 - Math.min(Math.floor(Math.abs(cell.deckRel)), 40))
         // A tile is still about its own presence: the overlay's fade owns the
         // open and close, and the only per-tile opacity here is the delete
         // exit, which the controller drives through _leaveProgress.
         opacity: cell.leaving ? 1 - panel._leaveProgress : 1
 
-        Behavior on x {
-          enabled: panel._deckLive
-          Glide { duration: Ui.slowMs }
-        }
-        Behavior on y {
-          enabled: panel._deckLive
-          Glide { duration: Ui.slowMs }
-        }
-        Behavior on width {
-          enabled: panel._deckLive
-          Glide { duration: Ui.slowMs }
-        }
-        Behavior on height {
-          enabled: panel._deckLive
-          Glide { duration: Ui.slowMs }
-        }
-
-        // The exit's lift rides a translate and not the y binding above: that
-        // binding is re-aimed on every deck step and its glide would be
-        // restarted on every frame of the fade.
+        // The exit's lift rides a translate rather than the y binding: y is
+        // re-derived from deckPos on every frame and a second tween on it
+        // would chase the one clock the deck already has.
         transform: Translate {
           y: cell.leaving ? -Math.round(panel.bigH * 0.10) * panel._leaveProgress : 0
         }
@@ -688,7 +766,9 @@ Item {
           anchors.fill: parent
           file: cell.file
           dir: cell.dir
-          rel: cell.rel
+          // The veil is a state (selected or not), not a continuous value: let
+          // it change once, at the midpoint, while the card itself moves.
+          rel: Math.round(cell.deckRel)
           disabled: cell.disabled
           pending: WallpaperPicker.optimistic.isPending(cell.file)
           deleteArmed: panel._confirmOpen && panel._confirmFile === cell.file
@@ -696,7 +776,7 @@ Item {
           // a tile built before the deck has a size has to pick its picture up
           // when that size lands, and a direct read is what makes that re-run
           // certain rather than dependent on a read made inside a function.
-          decode: panel.width > 0 && panel.tileVisible(cell.rel)
+          decode: panel.width > 0 && panel.tileVisible(cell.deckRel)
           decodeW: panel.decodeW
           decodeH: panel.decodeH
           onChosen: panel.choose(cell.file)
