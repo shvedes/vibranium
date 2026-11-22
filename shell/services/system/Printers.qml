@@ -59,6 +59,9 @@ Singleton {
   property string errorText: ""
   // Last failed job action, as the IPP status-code token.
   property string actionError: ""
+  // One generation per job action: a callback that lands after a newer
+  // action started is stale and must not publish an error or order a refresh.
+  property int _actionGen: 0
   // Local display aliases: queueName -> label (ShellState section
   // "printers", key "aliases"). Pure display; queue names stay canonical.
   property var aliases: ({})
@@ -691,15 +694,17 @@ Singleton {
   // --- actions ---
 
   function _jobAction(testFile, printerName, jobId) {
+    const g = ++root._actionGen
     const puri = "ipp://localhost/printers/" + printerName
     root.runIpp(testFile, { user: root._userName(), puri: puri, jobid: String(jobId) }, puri,
       (code, text) => {
+        // A concurrent action supersedes this one before its reply lands;
+        // its verdict and its refresh are the only ones still current.
+        if (g !== root._actionGen) return
         const st = Model.statusCode(text)
-        // Clear at the start of every action, set on failure: the action's own
-        // follow-up refresh must not wipe a fresh error. A job that already
-        // vanished (completed and purged between listing and clicking) is the
-        // desired end state, not an error; anything else that failed keeps the
-        // IPP status token on screen.
+        // A job that already vanished (completed and purged between listing
+        // and clicking) is the desired end state, not an error; anything
+        // else that failed keeps the IPP status token on screen.
         root.actionError = (code !== 0 && st !== "client-error-not-found")
           ? (st || "ipptool failed") : ""
         _coalesceTimer.restart()
