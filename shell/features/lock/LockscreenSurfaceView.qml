@@ -549,10 +549,8 @@ WlSessionLockSurface {
   // bottom edge - proportional on any display. Rides the same entry fade
   // (and its gate) as the panel above.
   //
-  // NOTE: the track gate lives HERE, not inside NowPlaying.qml. QML lets
-  // this `visible:` assignment clobber the component-internal
-  // `visible: root.hasTrack` binding, so gating internally alone never
-  // hid the pill - it has to be and-ed at the instantiation site.
+  // The track gate lives HERE: the pill derives its visibility from the
+  // setting and the live track in one place, and NowPlaying.qml owns none.
   NowPlaying {
     id: nowPlaying
 

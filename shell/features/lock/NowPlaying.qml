@@ -146,9 +146,9 @@ Item {
     }
   }
 
-  // Hide entirely when no media is detected - parent gates via
-  // Settings.lockscreenNowPlaying, we additionally hide when there is no track.
-  visible: root.hasTrack
+  // Visibility belongs to the host: it gates on the setting AND on hasTrack.
+  // Writing it here too would only install a binding the host's assignment
+  // drops, leaving a second, silently wrong definition of the same contract.
 
   // Compact for track data, roomier only while the transcript is up. The
   // height drives everything inside the card, so the lyrics, their type and
