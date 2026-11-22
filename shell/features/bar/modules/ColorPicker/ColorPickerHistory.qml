@@ -200,7 +200,7 @@ Item {
     displaced: Transition {
       NumberAnimation {
         property: "y"
-        duration: MotionPolicy.enabled ? Ui.normalMs : 0
+        duration: MotionPolicy.duration(Ui.normalMs)
         easing.type: Easing.OutCubic
       }
     }

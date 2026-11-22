@@ -1143,7 +1143,7 @@ BarModule {
   fillButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
   onClicked: mouse => {
     if (mouse.button === Qt.LeftButton) {
-      root.beginPick("island")
+      root.beginPick()
     } else if (mouse.button === Qt.MiddleButton) {
       root.clearHistory()
     } else if (mouse.button === Qt.RightButton) {

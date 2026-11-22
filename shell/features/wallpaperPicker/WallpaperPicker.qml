@@ -572,7 +572,7 @@ Singleton {
 
     Timer {
         id: gitRerun
-        interval: 300
+        interval: root._gitRerunMs
         onTriggered: {
             const queued = root._gitRerun
             root._gitRerun = null

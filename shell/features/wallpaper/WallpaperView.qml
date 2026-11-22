@@ -113,6 +113,9 @@ LayerSurface {
   // of the push reading as a slow drift of an already-settled image, so the
   // first paint gets a longer reveal. Later swaps keep their configured time.
   readonly property int bootFadeMs: 1000
+  // Grace for the mask FBOs and the receiver layer to render once before a
+  // cached decode's tween starts sampling them.
+  readonly property int maskWarmupFboReceiverMs: 50
 
   // Theme background shows through while disabled and before the first
   // image decodes, so the surface never flashes plain black.
@@ -716,7 +719,7 @@ LayerSurface {
   Timer {
     id: warmupTimer
 
-    interval: 50
+    interval: win.maskWarmupFboReceiverMs
     repeat: false
     onTriggered: win.startTrans()
   }
