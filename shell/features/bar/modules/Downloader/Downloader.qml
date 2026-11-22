@@ -43,37 +43,25 @@ BarModule {
   property string sortDir: "desc"
 
   // Three red blinks for a download that failed while the island was closed:
-  // the bar glyph is the only surface left to say so, and the cadence is the
-  // connectivity glyph's own (Ui.blinkMs), counted rather than held.
-  property int _blinkLeft: 0
-  property bool _blinkOn: false
-  // The blink snaps between two real colors, so each blink is one data URL
-  // (Icons.url), not the ~30 a tween through intermediate hex colors would
-  // decode; the retained raster covers the single decode per endpoint.
-  property color glyphColor: root._blinkOn ? Ui.solid("red")
-    : Ui.solid("foreground_0")
+  // the bar glyph is the only surface left to say so. The cadence is the
+  // connectivity glyph's own (Ui.blinkMs), counted by the shared clock rather
+  // than held by a second timer here.
+  RevealFlash {
+    id: failureFlash
+
+    active: !root.islandOpen
+    count: 5
+    // The blink snaps between two real colors, so each blink is one data URL
+    // (Icons.url), not the ~30 a tween through intermediate hex colors would
+    // decode; the retained raster covers the single decode per endpoint.
+    greenColor: Ui.solid("red")
+    restingColor: Ui.solid("foreground_0")
+    blinkMs: Ui.blinkMs
+  }
+  readonly property color glyphColor: failureFlash.glyphColor
 
   function _flashFailure() {
-    root._blinkLeft = 5
-    root._blinkOn = true
-    blinkTimer.restart()
-  }
-
-  Timer {
-    id: blinkTimer
-
-    interval: Ui.blinkMs
-    repeat: true
-    running: false
-    onTriggered: {
-      if (root._blinkLeft <= 0) {
-        root._blinkOn = false
-        blinkTimer.stop()
-        return
-      }
-      root._blinkLeft--
-      root._blinkOn = !root._blinkOn
-    }
+    failureFlash.pulse()
   }
 
   function rememberSort(key, dir) {

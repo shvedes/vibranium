@@ -303,10 +303,9 @@ BarModule {
     islandReveal: root.islandReveal
     greenColor: Ui.solid("green")
     restingColor: Ui.solid(root.iconColor)
-    slowMs: Ui.slowMs
     blinkMs: Ui.blinkMs
   }
-  property real nameSlide: reveal.nameSlide
+  property real nameSlide: (root.revealed || root.islandReveal) ? 1 : 0
   Behavior on nameSlide {
     Glide { duration: Ui.slowMs }
   }
