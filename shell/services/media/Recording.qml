@@ -27,14 +27,33 @@ Singleton {
 
   readonly property string tag: "recording"
 
-  // Live state - watched from the state file so both the shell and
-  // external `vb-core-recording` invocations stay in sync.
+  // Live state - written only by _refresh() from the watched state file, so
+  // both the shell and external `vb-core-recording` invocations stay in sync.
+  // No click verb writes these three: a coalesced watch tick landing while the
+  // marker still exists must not re-publish a state a click just retired.
   property bool ongoing: false
   property bool confirmed: false
   // Epoch ms when the current recording started (detection time for
   // external starts - the state file carries only the PID). Stamped
   // before `ongoing` flips so the bus payload always pairs them.
   property double startedAtMs: 0
+
+  // Click feedback is a separate observable fact. The menu guard and its
+  // armed colour read shownOngoing, which folds this intent over the file
+  // reading until the file catches up; the bus still publishes file truth.
+  // null or { want: "start" | "stop", since: epoch ms, id: generation }.
+  property var pendingIntent: null
+  readonly property bool shownOngoing: root.pendingIntent
+    ? root.pendingIntent.want === "start"
+    : root.ongoing
+  property int _intentSeq: 0
+
+  // The stop helper waits up to 5 s for the recorder to exit, then finalizes
+  // the container before it removes the marker. The grace must outlive all of
+  // that or a late expiry would re-open a menu the click already collapsed.
+  // One deadline only: the real retirement edge is _refresh() seeing the file
+  // reach the intended state.
+  readonly property int _intentGraceMs: 8000
 
   function _publish() {
     Bus.publish("recording.bus", {
@@ -47,6 +66,17 @@ Singleton {
   onOngoingChanged: root._publish()
   onConfirmedChanged: root._publish()
 
+  // Bounded fallback for a helper that never changes the marker. The captured
+  // id retires a late fire that belongs to an older click.
+  Timer {
+    id: intentExpiry
+    property int intentId: -1
+    interval: root._intentGraceMs
+    onTriggered: {
+      if (root.pendingIntent && root.pendingIntent.id === intentExpiry.intentId)
+        root.pendingIntent = null
+    }
+  }
 
   // Menu provider surface: overlays recording-row semantics onto the
   // bundle-declared row by id. ProviderHost holds the surface under this
@@ -54,8 +84,8 @@ Singleton {
   // order does not gate the row.
   function _registerMenuProvider() {
     ProviderHost.claimProvider("recording", {
-      sub: () => root.ongoing ? "Select to stop recording" : null,
-      confirm: () => root.ongoing ? {
+      sub: () => root.shownOngoing ? "Select to stop recording" : null,
+      confirm: () => root.shownOngoing ? {
         stages: 1,
         hint: "Press <b>Enter</b> again to stop recording",
         armed: "",
@@ -102,6 +132,7 @@ Singleton {
     // root, so a survivor would keep a dead confirm closure.
     ProviderHost.unregisterProvider("recording", root)
     if (root._watchUnsub) root._watchUnsub()
+    intentExpiry.stop()
     Bus.publish("recording.bus", {
       ongoing: false,
       startedAt: 0,
@@ -128,14 +159,32 @@ Singleton {
     return probeFile.text().trim() !== ""
   }
 
+  function _setIntent(want) {
+    root._intentSeq++
+    root.pendingIntent = { want: want, since: Date.now(), id: root._intentSeq }
+    intentExpiry.intentId = root._intentSeq
+    intentExpiry.restart()
+  }
+
   function _refresh() {
     const live = root._syncOngoing()
+    // The file is the only writer of these values. A stale tick that lands
+    // while the marker still exists re-reads the same state and publishes
+    // nothing, instead of undoing the click's intent. No optimistic write is
+    // left here, so the watcher needs no epoch guard.
     if (live !== root.ongoing) {
       root.startedAtMs = live ? Date.now() : 0
       root.ongoing = live
     }
     if (live !== root.confirmed) {
       root.confirmed = live
+    }
+    // A one-shot bridge: retire only when the file reaches the requested
+    // state. The deadline in intentExpiry covers a helper that never does.
+    const intent = root.pendingIntent
+    if (intent && live === (intent.want === "start")) {
+      root.pendingIntent = null
+      intentExpiry.stop()
     }
   }
 
@@ -146,22 +195,17 @@ Singleton {
   function _stopOngoing() {
     const cmd = Paths.vibraniumHome + "/bin/vb-core-recording"
     Quickshell.execDetached([cmd, "--stop"])
-    // Optimistic - watcher will confirm via file disappearance, but
-    // the menu's guard re-evaluates on a timer (Menu.refreshGuards)
-    // and the toggle's checked is file-based, so immediate UI
-    // feedback comes from the optimistic guard stamp in Entry.qml
-    // (like caffeine/timer). We also flip here so the dropdown
-    // collapses instantly even before the file watcher fires.
-    root.startedAtMs = 0
-    root.ongoing = false
+    // Instant collapse comes from pendingIntent through shownOngoing. The
+    // watcher owns the three file-backed values, so a coalesced tick during
+    // finalization cannot publish stop -> start -> stop.
+    root._setIntent("stop")
   }
 
   function _start() {
     const cmd = Paths.vibraniumHome + "/bin/vb-core-recording"
     Quickshell.execDetached([cmd])
-    // Optimistic - file will appear shortly; watcher will confirm.
-    root.startedAtMs = Date.now()
-    root.ongoing = true
+    // Same route as stop: spawn, then record the click as a pending intent.
+    root._setIntent("start")
   }
 
   // Public API --------------------------------------------------------------
