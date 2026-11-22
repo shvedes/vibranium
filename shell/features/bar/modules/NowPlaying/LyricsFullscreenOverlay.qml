@@ -109,6 +109,11 @@ QtObject {
   Component.onCompleted: root._readBackdrop()
 
   readonly property color backdropColor: Ui.tint("background_0", root.backdropAlpha)
+  // The empty-state fills sit on top of the surface backdrop. Painting the
+  // same translucent color there would stack a second layer and read as
+  // solid, so a dimmed backdrop leaves them transparent instead.
+  readonly property color emptyStateColor: root.backdropAlpha < 1
+    ? "transparent" : root.backdropColor
 
   function toggleBackdrop() {
     const next = root.backdropAlpha >= 1 ? root.dimBackdropAlpha : 1
@@ -834,6 +839,16 @@ QtObject {
         // the reader's scroll and taps. Loading and error text stay on the
         // pane itself.
         opacity: pane.ready ? 0 : (pane.status === "none" || !root.hasTrack ? 0 : 1)
+        // The placeholder carries its own fade, but this host hides the whole
+        // pane on an answer: without a tween here "Getting lyrics..." leaves
+        // on the frame the sheet arrives instead of fading with it.
+        Behavior on opacity {
+          enabled: root.animOn
+          NumberAnimation {
+            duration: Ui.fastMs
+            easing.type: Easing.OutCubic
+          }
+        }
         player: root.player
         position: root.shownPosition
         active: root.opened
@@ -857,7 +872,7 @@ QtObject {
       Rectangle {
         anchors.fill: parent
         visible: root.hasTrack && pane.status === "none"
-        color: root.backdropColor
+        color: root.emptyStateColor
 
         Column {
           anchors.centerIn: parent
@@ -890,7 +905,7 @@ QtObject {
       Rectangle {
         anchors.fill: parent
         visible: !root.hasTrack
-        color: root.backdropColor
+        color: root.emptyStateColor
 
         Column {
           anchors.centerIn: parent
