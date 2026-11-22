@@ -9,7 +9,7 @@ import "Model.js" as WSM
 
 // Barebones workspaces: plain numbers, flashing red for urgents.
 // No occupied/empty states, no opacity dimming, no timers - the strip
-// syncs off compositor events instead. While a keybind submap is active
+// follows the live workspace model directly. While a keybind submap is active
 // a little "[R]" superscript trails the last index (resize is the only
 // submap today).
 
@@ -38,30 +38,7 @@ BarModule {
   implicitWidth: row.implicitWidth
     + (root.submapActive ? WSM.numberGap() + submapText.implicitWidth + Bar.slotInset : 0)
 
-  // The ids the strip renders, synced off compositor events rather than
-  // a timer. A create, destroy or focus change schedules a sync, so a
-  // new workspace never lags the switch and a dead one clears on the
-  // destroy event instead of lingering as a ghost. The sync is deferred
-  // past current event processing (callLater, not a wall-clock wait) so
-  // the workspace model has applied the same event batch before it is
-  // read; the join-guard keeps no-op syncs from rebuilding the strip.
-  property var shown: []
-
-  function syncIds() {
-    if (root.shown.join(",") !== root.ids.join(",")) root.shown = root.ids
-  }
-
-  // The strip follows the live ids on every change, not only at startup. A
-  // workspace the model drops while the socket reports nothing further about
-  // it would otherwise stay rendered as a slot whose workspaceFor() answer is
-  // null - a number that swallows the click on it, at the end of the strip
-  // where workspaces are created and destroyed.
-  onIdsChanged: root.syncIds()
-
-  Component.onCompleted: {
-    root.syncIds()
-    Hyprland.rawEvent.connect(root.onRawEvent)
-  }
+  Component.onCompleted: Hyprland.rawEvent.connect(root.onRawEvent)
   Component.onDestruction: Hyprland.rawEvent.disconnect(root.onRawEvent)
 
   // Live submap from the hyprland event socket; empty string = default.
@@ -69,11 +46,7 @@ BarModule {
   readonly property bool submapActive: root.submap === "resize"
 
   function onRawEvent(event) {
-    if (event.name === "submap") {
-      root.submap = String(event.data ?? "").trim()
-      return
-    }
-    if (event.name === "createworkspace" || event.name === "destroyworkspace" || event.name === "workspacev2" || event.name === "focusedmon") Qt.callLater(root.syncIds)
+    if (event.name === "submap") root.submap = String(event.data ?? "").trim()
   }
 
   readonly property int cellPad: WSM.numberPad(root.textScale)
@@ -97,7 +70,9 @@ BarModule {
     spacing: WSM.numberGap()
 
     Repeater {
-      model: root.shown
+      // One live derivation: ids already tracks Hyprland.workspaces.values,
+      // so the strip follows every create/destroy/focus batch directly.
+      model: root.ids
 
       delegate: Item {
         id: slot
@@ -111,7 +86,6 @@ BarModule {
 
         width: root.cellWidth
         height: Bar.height
-        onUrgentChanged: if (!slot.urgent) label.opacity = 1
 
         Title {
           id: label
@@ -121,9 +95,25 @@ BarModule {
           anchors.verticalCenterOffset: slot.focused ? 0 : Math.round(Ui.fontS * 0.08)
           font.pixelSize: slot.focused ? Math.round(Ui.fontS / 1.2) : Ui.fontS
           text: slot.focused ? "\uDB85\uDCFB" : String(slot.wsId)
-          color: slot.urgent ? Ui.solid("red") : Ui.solid("foreground_0")
+          color: Ui.solid("foreground_0")
+          opacity: 1
+          visible: !slot.urgent
+        }
 
-          // The only animation in this module: urgents flash.
+        // Urgency flashes on its own layer so the animation owns this opacity,
+        // not the label's. Ending urgency only hides the wash; no handler has
+        // to correct a value the stopped animation left behind.
+        Title {
+          id: urgentWash
+
+          level: 3
+          anchors.centerIn: label
+          font.pixelSize: label.font.pixelSize
+          text: label.text
+          color: Ui.solid("red")
+          visible: slot.urgent
+          opacity: 0
+
           SequentialAnimation on opacity {
             running: slot.urgent
             loops: Animation.Infinite
@@ -156,11 +146,7 @@ BarModule {
               root.clickCommand("rightClick")
               return
             }
-            // A slot the model no longer backs is not a workspace to switch
-            // to; re-deriving the strip drops it instead of keeping a number
-            // that can never be clicked.
-            if (slot.ws === null) root.syncIds()
-            else slot.ws.activate()
+            if (slot.ws !== null) slot.ws.activate()
           }
         }
       }

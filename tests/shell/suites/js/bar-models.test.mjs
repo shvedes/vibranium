@@ -2568,6 +2568,35 @@ group('a slot is the label plus equal padding', () => {
   eq('a two-digit slot is wider than a one-digit one', WSM.numberBoxWidth(14, 2) > WSM.numberBoxWidth(8, 2), true)
 })
 
+// BAR-5 and BAR-6 live in Workspaces.qml, not in the pure Model.js, so the
+// behavioural change is pinned at the source level: the strip must render the
+// live derivation with no second copy, and the urgency flash must ride its own
+// layer with label.opacity left at a constant 1. A QML probe cannot construct
+// this module headlessly (it needs a BarModule host plus Hyprland), so the
+// structure is asserted directly from the file the shell loads.
+const WS_QML = fs.readFileSync(path.join(SHELL, 'features', 'bar', 'modules', 'Workspaces', 'Workspaces.qml'), 'utf8')
+
+section('workspaces: reactive strip and urgency layer (BAR-5, BAR-6)')
+group('BAR-5: the strip renders the live ids, with no second copy', () => {
+  match('the Repeater binds straight to root.ids', WS_QML, /model:\s*root\.ids\b/)
+  notMatch('no stored shown copy remains', WS_QML, /property\s+var\s+shown\b/)
+  notMatch('no syncIds function or calls remain', WS_QML, /\bsyncIds\s*\(/)
+  notMatch('no onIdsChanged resync handler remains', WS_QML, /onIdsChanged\s*:/)
+  notMatch('no click fallback re-sync remains', WS_QML, /root\.syncIds\(\)/)
+})
+group('BAR-6: the urgency flash is its own layer, label.opacity is left alone', () => {
+  notMatch('no handler writes label.opacity', WS_QML, /label\.opacity\s*=/)
+  notMatch('no onUrgentChanged correction remains', WS_QML, /onUrgentChanged\b/)
+  match('the label keeps a constant opacity 1', WS_QML, /id:\s*label\b[\s\S]*?opacity:\s*1\b/)
+  match('a dedicated urgentWash layer exists', WS_QML, /id:\s*urgentWash\b/)
+  match('the flash animation rides the wash, after the label', WS_QML, /id:\s*label\b[\s\S]*?id:\s*urgentWash\b[\s\S]*?SequentialAnimation on opacity/)
+  eq('there is still exactly one flash animation', (WS_QML.match(/SequentialAnimation on opacity/g) || []).length, 1)
+})
+group('the click contract survives both refactors', () => {
+  match('left click still activates the workspace', WS_QML, /slot\.ws\.activate\(\)/)
+  match('right click still fires the declarative hook', WS_QML, /root\.clickCommand\("rightClick"\)/)
+})
+
 section('now playing: synced lyrics')
 group('LRC stamps become sorted cues', () => {
   eq('two cues in order', CN.parseLrc('[00:12.50]Hello\n[00:15.00]World'),
