@@ -203,9 +203,10 @@ Item {
     }
   }
 
-  // The picker fades its veil out before it goes, so a dismiss reads as a
-  // close instead of a cut. The id defaults to 0 so destruction, which has
-  // no request left to name, still tears the view down.
+  // The picker is a modal cut, not a fade: dismiss() drops the veil and the
+  // surface in one turn, so a dismiss and the destruction below share the
+  // same tick by design. The id defaults to 0 so destruction, which has no
+  // request left to name, still tears the view down.
   function _destroyPicker(id = 0) {
     const view = root._picker
     if (view !== null && (id <= 0 || root._pickerId === id)) {

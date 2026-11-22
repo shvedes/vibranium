@@ -703,6 +703,23 @@ LayerSurface {
     board.requestPaint()
   }
 
+  // One reset point for the load backstop. The probe's ready edge and a
+  // canvas resize both restart the same bounded poll, so the attempt count
+  // has a single writer here instead of one at each caller.
+  function _restartLoadSettle() {
+    if (editor._closing) return
+    settleTimer.attempts = 0
+    settleTimer.restart()
+  }
+
+  // One writer for the plate retry count. Every retryable failure goes
+  // through here, so the bound is raised in one place.
+  function _retryBlurPlate() {
+    if (editor._closing || editor._blurPlateTries >= 20) return
+    editor._blurPlateTries++
+    blurPlateTimer.restart()
+  }
+
   // The one place the editor becomes ready. Idempotent, and it repaints: a
   // Canvas never repaints on its own once its image arrives, so without the
   // repaint the board reveals an empty black sheet.
@@ -1341,8 +1358,7 @@ LayerSurface {
          // size gate in _markBoardReady this timer is also the only path to
          // readiness while the window is still unconfigured, so it has to be
          // the one that stops.
-         settleTimer.attempts = 0
-         settleTimer.restart()
+         editor._restartLoadSettle()
          // Readiness is this check, not a signal and not a poll. The board
          // shares the probe's image cache (deliberately, see above), so
          // loadImage() completes against a cache hit and isImageLoaded()
@@ -1368,10 +1384,10 @@ LayerSurface {
       }
     }
 
-    // The failure bound, and a fallback promotion for a frame big enough
-    // that its decode is still running when loadImage() returns. In the
-    // common case this timer never promotes anything: readiness is settled
-    // synchronously in the probe's onStatusChanged.
+    // The one labelled load backstop. Readiness is the live isImageLoaded()
+    // check on the probe's onStatusChanged edge; this poll only catches a
+    // decode still running at that edge or a window not configured yet, and
+    // bounds both at 120 ticks. _restartLoadSettle is its only reset.
     Timer {
       id: settleTimer
 
@@ -1452,9 +1468,10 @@ LayerSurface {
       //
       // It is hidden again the moment the grab lands, so the blur shader is not
       // paid for on every frame the editor redraws while it is open.
-      // One deferred pass owns the export plate: it runs when the picture or
-      // the plate size lands, and retries a bounded number of times while the
-      // source is still decoding at the old size.
+      // The live source-size edge re-arms this clock; blurPlateTimer is the
+      // one labelled backstop that carries the render delay for a reveal still
+      // in progress or a plate size that never publishes, bounded at 20
+      // retries by _retryBlurPlate.
       Timer {
         id: blurPlateTimer
 
@@ -1484,9 +1501,13 @@ LayerSurface {
           smooth: true
           visible: false
 
-          // Grabbing straight from status is a frame early: the effect has not
-          // rendered yet, so the grab would be blank.
+          // Grabbing straight from an image signal is a frame early: the
+          // effect has not rendered yet, so the grab would be blank. The plate
+          // size landing is the live edge that re-arms the one backstop, so
+          // the grab follows the correct size instead of polling from a
+          // placeholder one; the timer still carries the render delay.
           onStatusChanged: if (status === Image.Ready) blurPlateTimer.start()
+          onSourceSizeChanged: if (status === Image.Ready) blurPlateTimer.restart()
         }
 
         MultiEffect {
@@ -1717,11 +1738,13 @@ LayerSurface {
         // backing and transform all read settled.
         paintCooldown.restart()
         if (!board.isImageLoaded(editor.fileUrl)) {
-          settleTimer.attempts = 0
-          settleTimer.restart()
+          editor._restartLoadSettle()
         }
       }
 
+      // The one bounded repaint fallback. No edge publishes "canvas backing
+      // settled" after a resize, so this single short clock lands the repaint
+      // after the geometry storm; _resized is its only external restart.
       Timer {
         id: paintCooldown
 
@@ -3471,10 +3494,7 @@ LayerSurface {
     if (blurSource.status !== Image.Ready
       || blurSource.sourceSize.width !== editor._blurPlateW
       || blurSource.sourceSize.height !== editor._blurPlateH) {
-      if (editor._blurPlateTries < 20) {
-        editor._blurPlateTries++
-        blurPlateTimer.restart()
-      }
+      editor._retryBlurPlate()
       return
     }
     const path = editor.runtimeDir + "/blur-" + editor._sessionId + ".png"
@@ -3487,10 +3507,7 @@ LayerSurface {
         || result.saveToFile(path) === false) {
         // Retryable on purpose: one failed grab must not cost every later
         // export its blur for the rest of the session.
-        if (editor._blurPlateTries < 20) {
-          editor._blurPlateTries++
-          blurPlateTimer.restart()
-        }
+        editor._retryBlurPlate()
         return
       }
       editor._blurPlatePath = path
@@ -3506,10 +3523,7 @@ LayerSurface {
     }, Qt.size(editor._blurPlateW, editor._blurPlateH))
     if (!grabbed) {
       editor._blurPlatePending = false
-      if (editor._blurPlateTries < 20) {
-        editor._blurPlateTries++
-        blurPlateTimer.restart()
-      }
+      editor._retryBlurPlate()
     }
   }
 

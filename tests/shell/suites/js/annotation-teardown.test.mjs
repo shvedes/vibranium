@@ -18,7 +18,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  suite, section, group, eq, contains, finish, SHELL_DIR,
+  suite, section, group, eq, contains, notContains, finish, SHELL_DIR,
 } from '../../lib/assert.mjs'
 
 const EDITOR_QML = fs.readFileSync(
@@ -208,6 +208,36 @@ group('every callback that can outlive the close checks the guard', () => {
   for (const name of ['_markBoardReady', '_grabBlurPlate', '_commitBoardZoom']) {
     contains(`${name} checks _closing`, extractFunction(EDITOR_QML, name), 'editor._closing')
   }
+})
+
+// ---------------------------------------------------------------------------
+section('OVL-6: the picker exit is an honest cut')
+
+const CONTROLLER_QML = fs.readFileSync(
+  path.join(SHELL_DIR, 'features', 'annotations', 'AnnotationController.qml'), 'utf8')
+const PICKER_QML = fs.readFileSync(
+  path.join(SHELL_DIR, 'features', 'annotations', 'CapturePicker.qml'), 'utf8')
+
+group('the controller does not promise a fade the picker never plays', () => {
+  notContains('no veil fade is claimed at teardown', CONTROLLER_QML, 'fades its veil out')
+  contains('dismiss drops the surface in one turn', PICKER_QML, 'picker.visible = false')
+  contains('dismiss cuts the veil', PICKER_QML, 'veil.opacity = 0')
+})
+
+// ---------------------------------------------------------------------------
+section('OVL-12: one writer per readiness counter')
+
+group('the load backstop has one reset site', () => {
+  eq('settleTimer.attempts is cleared once',
+    (EDITOR_QML.match(/settleTimer\.attempts = 0/g) || []).length, 1)
+  eq('both readiness paths share the one reset helper',
+    (EDITOR_QML.match(/editor\._restartLoadSettle\(\)/g) || []).length, 2)
+})
+
+group('the plate retry has one writer and a live source edge', () => {
+  eq('_blurPlateTries is advanced once',
+    (EDITOR_QML.match(/_blurPlateTries\+\+/g) || []).length, 1)
+  contains('the plate listens to its live source size', EDITOR_QML, 'onSourceSizeChanged')
 })
 
 finish()
