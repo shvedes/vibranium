@@ -26,6 +26,10 @@ Singleton {
   property bool _scanRunning: false
   // false = silent, true = live refresh, "open" = land the page when done.
   property var _pendingShow: null
+  // Landing generation: bumped by open()/close()/refresh() so a deferred
+  // Qt.callLater landing from a superseded open cannot push the page over
+  // newer UI (open -> close -> open before the drain).
+  property int _landingGen: 0
 
   Component.onCompleted: {
     Registry.offer("keybindings", {
@@ -73,8 +77,9 @@ Singleton {
         if (code !== 0) {
           root._pendingShow = null
           // Surface the failure instead of an empty page on first summon.
-          if (show === "open" || root._pendingShow === "open") {
-            root._pendingShow = null
+          // The captured request is the only source: _pendingShow was just
+          // cleared, so a second test on it could never be true.
+          if (show === "open") {
             root._cached = []
             root._cachedError = true
             root.open()
@@ -234,6 +239,7 @@ Singleton {
   // dynamic page onto it, then push. close() preserves injected pages, so a
   // Help-entry click survives its own navigation.
   function open() {
+    root._landingGen++
     if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) return "ok"
     if (root._cached === null) {
       // First summon: scan, then land when it completes (_pendingShow).
@@ -241,7 +247,10 @@ Singleton {
       return "ok"
     }
     root._compose()
+    const g = root._landingGen
     Qt.callLater(() => {
+      // Superseded: a close, refresh or newer open queued after this callback.
+      if (g !== root._landingGen) return
       // Re-entrancy guard: a double summon queues two landings; the
       // second must not push a duplicate frame of the same page.
       if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) return
@@ -256,6 +265,7 @@ Singleton {
   }
 
   function close() {
+    root._landingGen++
     if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) Menu.close()
     return "ok"
   }
@@ -268,6 +278,7 @@ Singleton {
   // Invalidates the cache and rescans; silent unless the page is open,
   // which recomposes live.
   function refresh() {
+    root._landingGen++
     root._cached = null
     root._cachedError = false
     root._scan(Menu.open && Menu.frame && Menu.frame.id === root.pageId)

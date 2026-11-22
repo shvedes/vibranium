@@ -26,6 +26,10 @@ Singleton {
     property string _currentTheme: "Adwaita"
     property int _currentSize: 24
     property bool _loading: false
+    // Monotone size-scan generation: each _ensureSizes start claims a new
+    // one, so an answer from a superseded run is retired even when the theme
+    // name came back around (A -> B -> A).
+    property int _scanGen: 0
 
     Component.onCompleted: {
       Registry.offer("cursorPicker", {
@@ -56,15 +60,23 @@ Singleton {
         }
         const m = _parseStateJson(stateFile.text())
         if (m) {
-            const themeChanged = m.theme !== null && m.theme !== root._currentTheme
-            if (themeChanged) root._currentTheme = m.theme
-            if (m.size !== root._currentSize) root._currentSize = m.size
-            // An external theme switch (another tool writing the state file)
-            // needs sizes for the newly selected theme; cached or scanned.
-            if (themeChanged) root._ensureSizes(root._currentTheme)
+            root.applyCurrent(m.theme, m.size)
             return
         }
         root._readGtkFallback()
+    }
+
+    // One writer of the visible theme/size. The state file (or its GTK
+    // fallback when the file is absent) is the source; set verbs delegate to
+    // vb-cursor-set and wait for this publish, so gesture, search and IPC
+    // take the same route. A new theme needs its sizes cached or scanned.
+    function applyCurrent(theme, size) {
+        const t = theme === null ? root._currentTheme : theme
+        const s = size === null ? root._currentSize : size
+        const themeChanged = t !== root._currentTheme
+        if (themeChanged) root._currentTheme = t
+        if (s !== root._currentSize) root._currentSize = s
+        if (themeChanged) root._ensureSizes(root._currentTheme)
     }
 
     function _parseStateJson(txt) {
@@ -88,9 +100,8 @@ Singleton {
         // Shared GtkSettings reader: one INI contract for every fallback.
         const txt = gtkReader.text()
         const t = GtkSettings.cursorThemeOf(txt, "")
-        if (t !== "") root._currentTheme = t
         const n = GtkSettings.cursorSizeOf(txt, -1)
-        if (n >= 0) root._currentSize = n
+        root.applyCurrent(t !== "" ? t : null, n >= 0 ? n : null)
     }
 
     FileView {
@@ -140,29 +151,21 @@ Singleton {
             if (typeof MiscSettings !== "undefined" && MiscSettings.updateThemeOptions) {
                 MiscSettings.updateThemeOptions(out)
             }
-            if (root._pendingShow) {
-                root._pendingShow = false
-            }
         }
     }
-    property bool _pendingShow: false
 
     // The theme shelf is external state: a theme installed mid-session
     // joins only through a fresh scan, so opening the picker always
     // rescans while background pushes reuse the cache.
-    function _ensureThemes(show, force) {
+    function _ensureThemes(force) {
         if (root._themes !== null && force !== true) {
             if (typeof MiscSettings !== "undefined" && MiscSettings.updateThemeOptions) {
                 MiscSettings.updateThemeOptions(root._themes)
             }
             return
         }
-        if (root._loading) {
-            root._pendingShow = show
-            return
-        }
+        if (root._loading) return
         root._loading = true
-        root._pendingShow = show
         themeScanProc.command = [Paths.vibraniumHome + "/bin/vb-cursor-list", "--pairs"]
         themeScanProc.running = true
     }
@@ -172,12 +175,17 @@ Singleton {
         stdout: StdioCollector { id: sizeOut }
         stderr: StdioCollector {}
         property string _theme: ""
+        // Process-restart race: _ensureSizes stops this shared Process to
+        // retarget --size. The killed run still emits onExited; this flag
+        // consumes that one answer so it cannot publish the new run's sizes.
         property bool _replacePending: false
+        property int _scanGen: -1
         onExited: (code, status) => {
             if (sizeScanProc._replacePending) {
                 sizeScanProc._replacePending = false
                 return
             }
+            if (sizeScanProc._scanGen !== root._scanGen) return
             const theme = sizeScanProc._theme
             if (theme === "" || String(theme) !== String(root._currentTheme)) return
             if (code !== 0) {
@@ -205,6 +213,8 @@ Singleton {
             return
         }
         const wasRunning = sizeScanProc.running
+        root._scanGen++
+        sizeScanProc._scanGen = root._scanGen
         sizeScanProc._theme = scanTheme
         sizeScanProc._replacePending = wasRunning
         if (wasRunning) sizeScanProc.running = false
@@ -224,7 +234,7 @@ Singleton {
         running: true
         repeat: false
         onTriggered: {
-            root._ensureThemes(false)
+            root._ensureThemes()
             root._ensureSizes(root._currentTheme)
         }
     }
@@ -241,7 +251,7 @@ Singleton {
     }
 
     function open() {
-        root._ensureThemes(false, true)
+        root._ensureThemes(true)
         root._ensureSizes(root._currentTheme)
         if (typeof MiscSettings !== "undefined") root._pushToMisc()
         if (Menu.open) {
@@ -260,9 +270,8 @@ Singleton {
         if (typeof MiscSettings !== "undefined" && MiscSettings.setOption) {
             return MiscSettings.setOption("misc.cursorTheme", theme) ? "ok" : "error"
         }
-        root._currentTheme = theme
         const proc = setProc.createObject(root, { command: ["vb-cursor-set", theme] })
-        proc.exited.connect(() => { root._readStateFile(); root._ensureSizes(theme); proc.destroy() })
+        proc.exited.connect(() => { root._readStateFile(); proc.destroy() })
         proc.running = true
         return "ok"
     }
@@ -272,7 +281,6 @@ Singleton {
         if (typeof MiscSettings !== "undefined" && MiscSettings.setOption) {
             return MiscSettings.setOption("misc.cursorSize", n) ? "ok" : "error"
         }
-        root._currentSize = n
         const proc = setProc.createObject(root, { command: ["vb-cursor-set", "--size", String(n)] })
         proc.exited.connect(() => { root._readStateFile(); proc.destroy() })
         proc.running = true
