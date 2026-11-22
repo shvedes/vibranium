@@ -46,10 +46,9 @@ Rectangle {
 
   radius: RoundingPolicy.radius
   color: Ui.solid("background_2")
-  border.width: tile.selected ? 2 : 1
-  border.color: tile.selected
-    ? Ui.solid("accent")
-    : Ui.tint("foreground_1", 0.10)
+  // No border, selected or otherwise: the footer names the applied wallpaper
+  // in accent, so marking the picture as well would be a second answer to the
+  // same question, and a border that only shows up mid-glide reads as a flicker.
   clip: true
   // A removal in flight fades the whole tile. A revealed disabled wallpaper is
   // dimmed by a pane over its picture instead (see `frame`), so its badge and
@@ -108,12 +107,10 @@ Rectangle {
       asynchronous: true
       cache: false
       smooth: true
+      // No decode fade: the overlay's single fade shows the card as one flat
+      // picture. A per-image fade made a tile announce itself after the rest
+      // of the deck had already arrived.
       opacity: status === Image.Ready ? 1 : 0
-
-      Behavior on opacity {
-        enabled: MotionPolicy.enabled
-        NumberAnimation { duration: Ui.normalMs; easing.type: Easing.OutCubic }
-      }
     }
 
     Icon {

@@ -59,10 +59,21 @@ Item {
   readonly property int windowRadius: 6
   // Open fade. The content is one opacity fade - no per-element and no
   // per-tile entrance - and `_settled` keeps the deck's geometry tweens off
-  // until the surface has taken the screen's size, so the first frame cannot
-  // animate a cascade out of zero-sized cards.
+  // until the surface has taken a real size, so the first frame cannot
+  // animate a cascade out of zero-sized cards. That size is a live fact, not
+  // a one-frame timer guess.
   property bool _fade: false
   property bool _settled: false
+  readonly property bool _sized: width > 0 && height > 0
+  // One fade for the WHOLE overlay, inherited by every child. Nothing inside
+  // animates its own presence. Deck glides wait until that fade has landed so
+  // the first painted frame is already at its final geometry.
+  opacity: panel._fade ? 1 : 0
+  Behavior on opacity {
+    enabled: MotionPolicy.enabled
+    Glide { duration: Ui.fastMs }
+  }
+  readonly property bool _deckLive: !MotionPolicy.enabled || opacity >= 0.99
   // The file the user is on across a row-set change (a filter keystroke, a
   // removal, a theme swap), so the deck does not jump to the top.
   property string _keepFile: ""
@@ -199,7 +210,7 @@ Item {
     if (panel._leavingFile !== "") {
       // An empty dir lets the tile fall back to the user overlay: the
       // departing picture is already gone from the listing either way.
-      want.push({ abs: -1, file: panel._leavingFile, rel: 0, dir: "", disabled: false, vanishing: false })
+      want.push({ abs: -1, file: panel._leavingFile, rel: 0, dir: "", disabled: false })
     }
     const abss = panel._windowAbss()
     for (let i = 0; i < abss.length; i++) {
@@ -208,49 +219,21 @@ Item {
         file: panel._rowFile(abss[i]),
         rel: abss[i] - panel.selIndex,
         dir: panel._rowDir(abss[i]),
-        disabled: panel._rowDisabled(abss[i]),
-        vanishing: false
+        disabled: panel._rowDisabled(abss[i])
       })
     }
     const wanted = Object.create(null)
     for (let i = 0; i < want.length; i++) wanted[want[i].file] = true
 
-    // A row that leaves the window - the hidden set being hidden again, a theme
-    // swap - fades out in place before it is dropped, so the deck reads as
-    // pictures leaving rather than a snap to the next listing. `_settled` keeps
-    // the open out of it: there the panel's own fade already covers the deck.
-    const animate = panel._settled && MotionPolicy.enabled
-    // A row that is wanted again before its fade finished turns around instead
-    // of being released under the listing that just took it back.
-    for (let i = 0; i < deck.count; i++) {
-      const row = deck.get(i)
-      if (row.vanishing === true && wanted[String(row.file)] === true) {
-        deck.setProperty(i, "vanishing", false)
-      }
-    }
+    // A row that leaves the window is removed directly. A tile never animates
+    // its own presence: the overlay's fade owns the open and close, and the
+    // deck's geometry glides own selection changes. A per-tile fade here would
+    // be a second clock on the same picture, and it made the selection border
+    // flicker for the length of the glide.
     for (let i = deck.count - 1; i >= 0; i--) {
       const row = deck.get(i)
-      if (wanted[String(row.file)] === true || row.vanishing === true) continue
-      if (animate) { deck.setProperty(i, "vanishing", true); continue }
+      if (wanted[String(row.file)] === true) continue
       deck.remove(i)
-    }
-    // Departing rows are parked past the live window, so the ascending patch
-    // below still lines up with `want`; each one releases itself when its fade
-    // ends (see _dropVanished).
-    let departing = 0
-    for (let i = 0; i < deck.count; i++) {
-      if (deck.get(i).vanishing === true) departing++
-    }
-    let at = 0
-    while (departing > 0) {
-      if (deck.get(at).vanishing === true) {
-        // move() takes a row COUNT as its third argument; without it the call
-        // throws and abandons the patch below, leaving only invisible rows.
-        deck.move(at, deck.count - 1, 1)
-        departing--
-      } else {
-        at++
-      }
     }
     for (let i = 0; i < want.length; i++) {
       const row = deck.get(i)
@@ -263,23 +246,8 @@ Item {
         deck.insert(i, want[i])
       }
     }
-    // Only live rows are trimmed here: a departing one is released by its fade.
-    while (deck.count > want.length && deck.get(deck.count - 1).vanishing !== true) {
+    while (deck.count > want.length) {
       deck.remove(deck.count - 1)
-    }
-  }
-
-  // A departing cell's fade is over: release its row. The wallpaper can come
-  // back while the fade runs (a second toggle), in which case the row has
-  // already been turned around and is left alone.
-  function _dropVanished(file) {
-    const name = String(file)
-    if (panel._indexOf(name) >= 0) return
-    for (let i = 0; i < deck.count; i++) {
-      if (String(deck.get(i).file) === name) {
-        deck.remove(i)
-        return
-      }
     }
   }
 
@@ -471,19 +439,20 @@ Item {
   function reveal() {
     panel._fade = false
     panel._settled = false
-    revealTimer.restart()
-  }
-
-  // One frame is what the surface needs to take its real size; the fade then
-  // runs over content that is already laid out.
-  Timer {
-    id: revealTimer
-    interval: 16
-    onTriggered: {
-      if (!WallpaperPicker.visible) return
+    // The panel can already be sized from a previous open, in which case no
+    // size edge will fire: re-check the live fact on the next turn. A panel
+    // that is still unsized is armed by on_SizedChanged when it lands.
+    Qt.callLater(() => {
+      if (!WallpaperPicker.visible || !panel._sized) return
       panel._settled = true
       panel._fade = true
-    }
+    })
+  }
+
+  on_SizedChanged: {
+    if (!panel._sized || !WallpaperPicker.visible || panel._fade) return
+    panel._settled = true
+    panel._fade = true
   }
 
   Connections {
@@ -493,7 +462,6 @@ Item {
       if (!WallpaperPicker.visible) {
         panel._fade = false
         panel._settled = false
-        revealTimer.stop()
         return
       }
       panel.cancelDelete()
@@ -634,12 +602,6 @@ Item {
     // while they fade out even when the last row has already left `rows`.
     visible: !panel.featureDisabled
       && (panel.rows.length > 0 || panel._leavingFile !== "" || deck.count > 0)
-    opacity: panel._fade ? 1 : 0
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.fastMs }
-    }
 
     Repeater {
       model: deck
@@ -655,9 +617,6 @@ Item {
         required property string file
         required property string dir
         required property bool disabled
-        // The row is leaving the window and is fading out before it is
-        // released.
-        required property bool vanishing
 
         // The tile a removal just took out of the listing. It keeps the slot it
         // was read in - the selection does not move on a removal - and leaves
@@ -673,62 +632,25 @@ Item {
         width: panel.tileW(cell.rel)
         height: panel.tileH(cell.rel)
         z: cell.leaving ? 200 : (cell.rel === 0 ? 100 : 50 - Math.min(Math.abs(cell.rel), 40))
-        // A tile that arrives after the deck has settled - revealing the
-        // disabled wallpapers - fades in over the deck's normal clock instead
-        // of popping into its slot. Tiles placed during the open are already
-        // covered by the panel's own fade, so they start at full opacity.
-        property real appear: 1
-        // The fade a departing row takes on its way out of the window.
-        property real vanish: 1
-        opacity: (cell.leaving ? 1 - panel._leaveProgress : 1) * cell.appear * cell.vanish
-        onVanishingChanged: {
-          vanishAnim.stop()
-          vanishAnim.to = cell.vanishing ? 0 : 1
-          vanishAnim.restart()
-        }
-        Component.onCompleted: {
-          if (!panel._settled || !MotionPolicy.enabled) return
-          cell.appear = 0
-          appearAnim.start()
-        }
-
-        NumberAnimation {
-          id: appearAnim
-
-          target: cell
-          property: "appear"
-          to: 1
-          duration: Ui.normalMs
-          easing.type: Easing.OutCubic
-        }
-
-        NumberAnimation {
-          id: vanishAnim
-
-          target: cell
-          property: "vanish"
-          duration: Ui.normalMs
-          easing.type: Easing.OutCubic
-          onFinished: {
-            const leaving = String(cell.file)
-            if (cell.vanishing) Qt.callLater(() => panel._dropVanished(leaving))
-          }
-        }
+        // A tile is still about its own presence: the overlay's fade owns the
+        // open and close, and the only per-tile opacity here is the delete
+        // exit, which the controller drives through _leaveProgress.
+        opacity: cell.leaving ? 1 - panel._leaveProgress : 1
 
         Behavior on x {
-          enabled: MotionPolicy.enabled && panel._settled
+          enabled: panel._deckLive
           Glide { duration: Ui.slowMs }
         }
         Behavior on y {
-          enabled: MotionPolicy.enabled && panel._settled
+          enabled: panel._deckLive
           Glide { duration: Ui.slowMs }
         }
         Behavior on width {
-          enabled: MotionPolicy.enabled && panel._settled
+          enabled: panel._deckLive
           Glide { duration: Ui.slowMs }
         }
         Behavior on height {
-          enabled: MotionPolicy.enabled && panel._settled
+          enabled: panel._deckLive
           Glide { duration: Ui.slowMs }
         }
 
@@ -792,12 +714,6 @@ Item {
     // No name to show until a listing offers one; an empty island would be a
     // lone pill under the deck.
     visible: stage.visible && !panel.featureDisabled && panel._currentFile() !== ""
-    opacity: panel._fade ? 1 : 0
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.fastMs }
-    }
 
     // The selected file gets the footer's island: it sits over the same dimmed
     // backdrop, so a palette foreground on it is unreadable on a light theme.
@@ -841,7 +757,6 @@ Item {
     anchors.centerIn: parent
     width: Math.max(0, panel.width - 64)
     visible: !panel.featureDisabled && panel.rows.length === 0 && deck.count === 0
-    opacity: panel._fade ? 1 : 0
     text: "No wallpapers"
     iconName: "image"
     iconColorKey: "foreground_1"
@@ -855,7 +770,6 @@ Item {
     anchors.verticalCenterOffset: -20
     width: Math.max(0, panel.width - 64)
     visible: panel.featureDisabled
-    opacity: panel._fade ? 1 : 0
     text: "Wallpapers are disabled"
     iconName: "eye-closed"
     iconColorKey: "foreground_1"
@@ -923,15 +837,9 @@ Item {
     border.width: 1
     border.color: Qt.rgba(1, 1, 1, 0.18)
     visible: !panel.featureDisabled
-    opacity: panel._fade ? 1 : 0
 
     Accessible.role: Accessible.StaticText
     Accessible.name: panel._legendPlain()
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      Glide { duration: Ui.fastMs }
-    }
 
     Text {
       id: footerText
