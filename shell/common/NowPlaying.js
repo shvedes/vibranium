@@ -265,32 +265,90 @@ function adjustedVolume(volume, direction, step) {
   return normalizeVolume(current + Math.sign(d) * s)
 }
 
-var _unmutedPlayerVolumes = {}
+// --- one-slot intents -----------------------------------------------------
+//
+// Several helpers below keep exactly one pending fact: an unmuted level to
+// restore, a mute-resume request, the current track's optimistic like, a
+// transport direction. Each slot carries the generation it was minted with
+// and the object that issued it, so a newer intent retires the older one and
+// a recycled dbus name cannot pick up another player's pending fact. Nothing
+// here decays with the wall clock: a slot lives until it is consumed,
+// superseded, or torn down with its player.
+var _intentSeq = 0
+
+function _mintIntent(ref, value, key) {
+  _intentSeq += 1
+  return { seq: _intentSeq, ref: ref || null, key: key === undefined ? "" : key, value: value }
+}
+
+// A stored slot answers only to the object that minted it. Neither a bare
+// dbus name nor MprisPlayer.uniqueId is identity here: the name is reused when
+// a client restarts, and uniqueId is a per-track counter (two players can
+// both report 1). A caller that needs to cross an object recreation must
+// capture the generation from the write and pass it to consume.
+function _intentOwnedBy(slot, player) {
+  return !!slot && !!player && slot.ref === player
+}
+
+function _isLivePlayer(slot, live) {
+  for (let i = 0; i < live.length; i++) {
+    if (_intentOwnedBy(slot, live[i])) return true
+  }
+  return false
+}
+
+// The key is the fast path, but ownership is authoritative: the slot may sit
+// under a different key because the player's dbus name changed. Scan only for
+// the same object, never for a name or a track id.
+function _findSlot(slots, player, key) {
+  if (!player) return null
+  const preferred = key === "" ? null : slots[key]
+  if (_intentOwnedBy(preferred, player)) return { key: key, slot: preferred }
+  const keys = Object.keys(slots)
+  for (let i = 0; i < keys.length; i++) {
+    if (_intentOwnedBy(slots[keys[i]], player)) {
+      return { key: keys[i], slot: slots[keys[i]] }
+    }
+  }
+  return null
+}
 
 function playerVolumeKey(player) {
   if (!player) return ""
   return String(player.dbusName || player.identity || playerKey(player))
 }
 
+var _unmutedPlayerVolumes = {}
 var _muteResumePlayers = {}
 
 function setMuteResumePending(player, pending) {
   const key = playerVolumeKey(player)
-  if (key === "") return
-  if (pending) _muteResumePlayers[key] = true
-  else delete _muteResumePlayers[key]
+  if (key === "") return undefined
+  const found = _findSlot(_muteResumePlayers, player, key)
+  if (!pending) {
+    if (found) delete _muteResumePlayers[found.key]
+    return undefined
+  }
+  // A newer mute retires the older slot for the same player, even if the
+  // player arrived under a different key.
+  if (found) delete _muteResumePlayers[found.key]
+  const intent = _mintIntent(player, true, key)
+  _muteResumePlayers[key] = intent
+  return intent.seq
 }
 
-function consumeMuteResume(player) {
-  const key = playerVolumeKey(player)
-  if (key === "" || _muteResumePlayers[key] !== true) return false
-  delete _muteResumePlayers[key]
+function consumeMuteResume(player, expectedSeq) {
+  const found = _findSlot(_muteResumePlayers, player, playerVolumeKey(player))
+  if (!found) return false
+  if (expectedSeq !== undefined && expectedSeq !== null
+    && Number(expectedSeq) !== found.slot.seq) return false
+  delete _muteResumePlayers[found.key]
   return true
 }
 
 function restorePlayerVolume(player, fallback) {
-  const key = playerVolumeKey(player)
-  const saved = normalizeVolume(key === "" ? 0 : _unmutedPlayerVolumes[key])
+  const found = _findSlot(_unmutedPlayerVolumes, player, playerVolumeKey(player))
+  const saved = normalizeVolume(found ? found.slot.value : 0)
   if (saved > 0) return saved
   const safeFallback = normalizeVolume(fallback)
   return safeFallback > 0 ? safeFallback : 0.5
@@ -300,33 +358,76 @@ function togglePlayerVolume(player, fallback) {
   const current = normalizeVolume(player ? player.volume : 0)
   const key = playerVolumeKey(player)
   if (current > 0) {
-    if (key !== "") _unmutedPlayerVolumes[key] = current
+    if (key !== "") {
+      const found = _findSlot(_unmutedPlayerVolumes, player, key)
+      if (found) delete _unmutedPlayerVolumes[found.key]
+      _unmutedPlayerVolumes[key] = _mintIntent(player, current, key)
+    }
     return 0
   }
   return restorePlayerVolume(player, fallback)
 }
 
-var _manualAt = 0
-var _manualKind = ""
-
-// Shell-initiated transport intent. Library scripts (.pragma library)
-// share one instance per QML engine, so the island (writer) and the
-// bar pill (reader) see the same stamp. Never persist, never bind.
-function noteManual(kind) {
-  _manualKind = String(kind || "")
-  _manualAt = Date.now()
+// Called by MediaState when the MPRIS set changes. A player that left cannot
+// come back and claim a slot a live player never issued.
+function dropPlayerIntents(livePlayers) {
+  const live = Array.isArray(livePlayers) ? livePlayers : []
+  const keys = Object.keys(_muteResumePlayers)
+  for (let i = 0; i < keys.length; i++) {
+    if (!_isLivePlayer(_muteResumePlayers[keys[i]], live)) delete _muteResumePlayers[keys[i]]
+  }
+  const volumes = Object.keys(_unmutedPlayerVolumes)
+  for (let i = 0; i < volumes.length; i++) {
+    if (!_isLivePlayer(_unmutedPlayerVolumes[volumes[i]], live)) delete _unmutedPlayerVolumes[volumes[i]]
+  }
+  if (_likeIntent !== null && !_isLivePlayer(_likeIntent, live)) _likeIntent = null
 }
 
-function manualFresh(maxAgeMs) {
-  if (!(_manualAt > 0)) return false
-  return Date.now() - _manualAt <= (maxAgeMs > 0 ? maxAgeMs : 3000)
-}
+// --- shell-initiated transport intent ------------------------------------
+//
+// Library scripts (.pragma library) share one instance per QML engine, so
+// the writer (island pad or lyrics overlay) and the reader (the island's
+// title handler) see the same slot. The id is captured at command time and
+// retired by the title edge, never by a clock: a later unrelated title
+// change cannot inherit a direction, and two quick presses leave only the
+// newest intent for the one edge they produce.
+var _manualIntent = null
 
-function manualDir() {
-  if (!manualFresh(3000)) return 0
-  if (_manualKind === "previous") return -1
-  if (_manualKind === "next") return 1
+function _manualDirOf(kind) {
+  if (kind === "previous") return -1
+  if (kind === "next") return 1
   return 0
+}
+
+function noteManual(kind) {
+  _manualIntent = _mintIntent(null, String(kind || ""))
+  return _manualIntent.seq
+}
+
+function peekManual() {
+  if (_manualIntent === null) return null
+  return {
+    seq: _manualIntent.seq,
+    kind: _manualIntent.value,
+    dir: _manualDirOf(_manualIntent.value)
+  }
+}
+
+// Consume the intent only if it is still the one the caller observed. A
+// stale id leaves the newer intent in place for its own title edge.
+function consumeManual(expectedSeq) {
+  if (_manualIntent === null) return null
+  if (expectedSeq !== undefined && expectedSeq !== null
+    && Number(expectedSeq) !== _manualIntent.seq) return null
+  const out = peekManual()
+  _manualIntent = null
+  return out
+}
+
+// Deprecated derived read: the direction of the unconsumed intent, or 0.
+// Kept for existing readers; new code consumes on the title edge instead.
+function manualDir() {
+  return _manualIntent === null ? 0 : _manualDirOf(_manualIntent.value)
 }
 
 function playerKey(p) {
@@ -354,10 +455,11 @@ function playerKey(p) {
 // Spotify does not publish whether the current track is already liked, so the
 // shell keeps one optimistic answer for the track on screen. It is keyed by
 // playerKey, which moves with the track, so the next track starts from
-// unliked instead of inheriting the previous verdict. A client that does
-// publish a rating seeds the answer through `playerRating`.
-var _likeKey = ""
-var _likeValue = false
+// unliked instead of inheriting the previous verdict. The slot is also owned
+// by the player object, so a later client reusing the same bus and track
+// cannot inherit the answer. A client that does publish a rating seeds the
+// answer through `playerRating`.
+var _likeIntent = null
 
 function canLikePlayer(p) {
   if (!p) return false
@@ -388,17 +490,15 @@ function playerRating(p) {
 function playerLiked(p) {
   if (!p) return false
   const key = playerKey(p)
-  if (key !== "" && key === _likeKey) return _likeValue
+  if (key !== "" && _likeIntent !== null && _likeIntent.key === key
+    && _intentOwnedBy(_likeIntent, p)) return _likeIntent.value
   return playerRating(p) > 0
 }
 
 function toggleLiked(p) {
   const next = !playerLiked(p)
   const key = playerKey(p)
-  if (key !== "") {
-    _likeKey = key
-    _likeValue = next
-  }
+  if (key !== "") _likeIntent = _mintIntent(p, next, key)
   return next
 }
 

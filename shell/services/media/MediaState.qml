@@ -36,6 +36,13 @@ Singleton {
       : (Mpris.players ? Mpris.players.values ?? [] : []),
     p => p.playbackState === MprisPlaybackState.Playing)
   readonly property var activePlayer: root.players.length > 0 ? root.players[0] ?? null : null
+
+  // Player-owned intents (mute resume, saved volume, optimistic like) live in
+  // the shared JS library. Retire them when the media set changes so a recycled
+  // bus name cannot pick up a slot the departed player left behind. The set is
+  // the live source, so no second subscription or copied list is needed.
+  onPlayersChanged: NP.dropPlayerIntents(root.players)
+
   // The cover the warmer holds for a player nobody is displaying yet: the
   // head of the media set is the player every now-playing surface shows.
   readonly property string activeArtUrl: root.activePlayer !== null

@@ -90,6 +90,11 @@ Item {
   readonly property bool playing: root.player !== null && root.player.playbackState === MprisPlaybackState.Playing
   onTitleChanged: {
     root.refreshTrackUrl()
+    // The first title notification after a command is the edge that consumes
+    // its intent, once, with the id just observed. A newer intent minted in
+    // between stays pending for its own edge.
+    const manual = NP.peekManual()
+    if (manual !== null) NP.consumeManual(manual.seq)
     const key = root.title + "|" + root.artist + "|" + root.album
     if (root._lastMetaKey === "") {
       root._lastMetaKey = key
@@ -97,9 +102,8 @@ Item {
     }
     if (key === root._lastMetaKey) return
     root._lastMetaKey = key
-    const dir = NP.manualDir()
-    if (dir === 0) return
-    root._swapDir = dir
+    if (manual === null || manual.dir === 0) return
+    root._swapDir = manual.dir
     metaText.kickMeta()
   }
   onLinkCopiedChanged: titleMarquee.reset()

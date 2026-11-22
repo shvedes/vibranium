@@ -21,7 +21,7 @@
 import vm from 'node:vm'
 import fs from 'node:fs'
 import path from 'node:path'
-import { loadLib, libSource } from '../../lib/qmlloader.mjs'
+import { loadLib } from '../../lib/qmlloader.mjs'
 import {
   suite, section, group, eq, ne, is, match, notMatch, contains, notContains,
   throws, noThrow, approx, skip, deepEqual, finish, SHELL_DIR,
@@ -44,32 +44,38 @@ const WSM = loadLib(path.join(BAR, 'modules', 'Workspaces', 'Model.js'))
 const PP = loadLib(path.join(BAR, 'modules', 'ColorPicker', 'PreviewPlacement.js'))
 const CN = loadLib(path.join(SHELL, 'common', 'NowPlaying.js'))
 
-// --- a clock we control -------------------------------------------------
+// --- a fresh library instance per group ---------------------------------
 //
-// noteManual/manualFresh/manualDir are gated on Date.now(), and a .pragma
-// library gets its own vm context per file, so the host's Date is not the
-// context's Date and monkey-patching it here would prove nothing. clocked()
-// re-evaluates the same source in a context whose Date is a stub, which is
-// what makes the freshness threshold testable on both sides without a sleep
-// and lets both NowPlaying copies be compared at the *same* timestamp.
+// A .pragma library shares one instance per QML engine, and the intent
+// helpers below keep their generation counter and player slots in module
+// state. To assert exact ids and one-shot consumption without groups leaking
+// into each other, freshLib() re-evaluates the same source in a new vm
+// context with the same .import bindings loadLib gives it.
 //
 // It is a second loader, not a replacement: loadLib above is still what every
-// non-time-gated assertion runs against, and the first group below asserts
-// that clocked() publishes the same function set.
+// assertion that does not mint an intent runs against, and the first group
+// below asserts that freshLib() publishes the same function set.
 const DECL = /^(?:function\s+([A-Za-z_$][\w$]*)|(?:var|let|const)\s+([A-Za-z_$][\w$]*))/gm
-function clocked(file, t = 1000) {
-  const clock = { t }
-  const src = libSource(file)
-  const holder = { console, Date: { now: () => clock.t } }
+const IMPORT_RE = /^[ \t]*\.import\s+["']([^"']+)["']\s+as\s+([A-Za-z_$][\w$]*)\s*;?\s*$/gm
+function freshLib(file) {
+  const abs = path.resolve(file)
+  let src = fs.readFileSync(abs, 'utf8')
+  src = src.replace(/^[ \t]*\.pragma\s+library\s*;?\s*$/gm, '')
+  const holder = { console }
+  src = src.replace(IMPORT_RE, (_m, spec, alias) => {
+    holder[alias] = loadLib(path.resolve(path.dirname(abs), spec))
+    return ''
+  })
   const ctx = vm.createContext(holder)
-  vm.runInContext(src, ctx, { filename: file })
-  const out = { _clock: clock }
+  vm.runInContext(src, ctx, { filename: abs })
+  const out = {}
   for (const m of src.matchAll(DECL)) {
     const name = m[1] || m[2]
     if (name in ctx) out[name] = ctx[name]
   }
   return out
 }
+const freshNp = () => freshLib(path.join(SHELL, 'common', 'NowPlaying.js'))
 
 const ZONES = ['left', 'center', 'right']
 // Registry facts Bar.qml injects into normalizeLayout/renderLayout.
@@ -1788,68 +1794,53 @@ group('clampRatio is the seek thumb, guarded on a positive width', () => {
   approx('a tiny thumb', CN.clampRatio(0.001, 100), 0.00001, 1e-12)
 })
 
-section('common/NowPlaying.js - the time-gated transport stamp')
-group('an unstamped library reports no manual intent at all', () => {
-  const fresh = clocked(path.join(SHELL, 'common', 'NowPlaying.js'))
-  eq('the loader built the same function set', Object.keys(fresh).filter((k) => k !== '_clock').sort().join(), Object.keys(CN).sort().join())
-  eq('manualFresh is false for any budget', fresh.manualFresh(3000), false)
-  eq('for the default budget', fresh.manualFresh(0), false)
-  eq('for a huge budget', fresh.manualFresh(1e9), false)
-  eq('for a negative budget', fresh.manualFresh(-1), false)
-  eq('manualDir is 0', fresh.manualDir(), 0)
+section('common/NowPlaying.js - the manual transport intent')
+group('a fresh library publishes the same surface, with no intent pending', () => {
+  const np = freshNp()
+  eq('the loader built the same function set', Object.keys(np).sort().join(), Object.keys(CN).sort().join())
+  eq('no intent to peek', np.peekManual(), null)
+  eq('nothing to consume', np.consumeManual(), null)
+  eq('and no direction', np.manualDir(), 0)
 })
-group('a fresh stamp is inside the budget, on both sides of the threshold', () => {
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'), 1000)
-  np._clock.t = 5000
-  np.noteManual('next')
-  eq('at the instant of the stamp, the default budget is fresh', np.manualFresh(3000), true)
-  eq('a 1ms budget at age 0', np.manualFresh(1), true)
-  np._clock.t = 5001
-  eq('age 1 with a 1ms budget is still fresh (the test is <=)', np.manualFresh(1), true)
-  np._clock.t = 5002
-  eq('age 2 with a 1ms budget is stale', np.manualFresh(1), false)
-  np._clock.t = 8000
-  eq('age exactly 3000 with the default budget is fresh', np.manualFresh(3000), true)
-  np._clock.t = 8001
-  eq('age 3001 with the default budget is stale', np.manualFresh(3000), false)
-  eq('but a longer budget still holds it', np.manualFresh(60000), true)
+group('noteManual mints a monotonic id and peek/consume retire on the edge', () => {
+  const np = freshNp()
+  eq('the first id is 1', np.noteManual('next'), 1)
+  eq('the second id is 2', np.noteManual('previous'), 2)
+  eq('peek is non-mutating', np.peekManual().seq, 2)
+  eq('peek is still non-mutating', np.peekManual().seq, 2)
+  const seen = np.peekManual()
+  eq('peek carries the kind', seen.kind, 'previous')
+  eq('peek carries the direction', seen.dir, -1)
+  eq('consume with the peeked id succeeds', np.consumeManual(seen.seq).seq, 2)
+  eq('the token is gone after one consume', np.consumeManual(seen.seq), null)
+  eq('and peek sees nothing', np.peekManual(), null)
+  eq('the deprecated read is derived from the same token', np.manualDir(), 0)
 })
-group('a non-positive budget folds to the 3000ms default', () => {
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'), 1000)
-  np._clock.t = 5000
-  np.noteManual('next')
-  eq('zero', np.manualFresh(0), true)
-  eq('a negative budget', np.manualFresh(-5000), true)
-  eq('undefined', np.manualFresh(undefined), true)
-  eq('NaN is not > 0, so it folds too', np.manualFresh(NaN), true)
-  np._clock.t = 5000 + 3001
-  eq('and the fold is a real 3000ms window', np.manualFresh(0), false)
-  eq('as is a negative one', np.manualFresh(-1), false)
-  eq('but a longer explicit budget still reads fresh', np.manualFresh(3002), true)
+group('a stale id cannot consume a newer intent', () => {
+  const np = freshNp()
+  const first = np.noteManual('next')
+  const second = np.noteManual('previous')
+  eq('the new intent is current', np.peekManual().seq, second)
+  eq('the old id cannot consume it', np.consumeManual(first), null)
+  eq('so the new intent is still pending', np.peekManual().seq, second)
+  eq('the current id consumes it', np.consumeManual(second).dir, -1)
+  eq('nothing left', np.peekManual(), null)
 })
-group('manualDir maps the kind to a direction, and expires with the stamp', () => {
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'), 1000)
-  np._clock.t = 5000
+group('an unrecognised kind is a real token that still gets consumed', () => {
+  const np = freshNp()
+  np.noteManual('stop')
+  eq('peek reports no direction', np.peekManual().dir, 0)
+  eq('consume still retires it', np.consumeManual().dir, 0)
+  eq('and it cannot be read twice', np.peekManual(), null)
+})
+group('manualDir is a deprecated derived read of the unconsumed token', () => {
+  const np = freshNp()
   np.noteManual('previous')
   eq('previous is -1', np.manualDir(), -1)
   np.noteManual('next')
   eq('next is 1', np.manualDir(), 1)
-  np.noteManual('stop')
-  eq('anything else is 0', np.manualDir(), 0)
-  np.noteManual('')
-  eq('an empty kind is 0', np.manualDir(), 0)
-  np.noteManual(null)
-  eq('a null kind is 0', np.manualDir(), 0)
-  np.noteManual(undefined)
-  eq('an undefined kind is 0', np.manualDir(), 0)
-  np.noteManual(0)
-  eq('a falsy kind is 0', np.manualDir(), 0)
-  np.noteManual('PREVIOUS')
-  eq('the kind is case-sensitive', np.manualDir(), 0)
-  np._clock.t = 5000 + 3001
-  eq('an expired stamp reports no direction', np.manualDir(), 0)
-  eq('even though the kind is still remembered', np.noteManual('next') === undefined, true)
-  eq('re-stamping restores it', np.manualDir(), 1)
+  eq('consume returns the consumed record', np.consumeManual().kind, 'next')
+  eq('after the edge the derived read is 0', np.manualDir(), 0)
 })
 
 section('common/NowPlaying.js - the media surface every consumer shares')
@@ -1859,8 +1850,8 @@ group('the whole published surface is here, and it is the only copy', () => {
   // a second implementation. With one library that distinction is gone, so
   // the assertion is the full surface: every documented helper publishes, and
   // the set is exactly these - which still catches a helper being dropped.
-  const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualFresh', 'manualDir']
-  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'reanchorPosition', 'scrubPosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked', 'parseLrc', 'lyricIndexAt', 'parsePlainLyrics', 'lyricsFromSearch', 'lyricsCacheKey', 'lyricsCacheGet', 'lyricsCachePut', 'lyricsCacheSize', 'lyricsCacheClear']
+  const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualDir', 'peekManual', 'consumeManual']
+  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'dropPlayerIntents', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'reanchorPosition', 'scrubPosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked', 'parseLrc', 'lyricIndexAt', 'parsePlainLyrics', 'lyricsFromSearch', 'lyricsCacheKey', 'lyricsCacheGet', 'lyricsCachePut', 'lyricsCacheSize', 'lyricsCacheClear']
   for (const k of shared) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   for (const k of unique) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   is('BROWSER_TOKENS publishes the client table', CN.BROWSER_TOKENS, (v) => Array.isArray(v) && v.every((t) => t === String(t).toLowerCase()), 'lowercase tokens')
@@ -2445,47 +2436,117 @@ group('setMuteResumePending and consumeMuteResume are a one-shot latch', () => {
   CN.setMuteResumePending(p, true)
   CN.setMuteResumePending(p, false)
   eq('a pending false clears the latch', CN.consumeMuteResume(p), false)
-  eq('setMuteResumePending returns nothing', CN.setMuteResumePending(p, true), undefined)
   eq('a player with no key is never armed', CN.setMuteResumePending(null, true) === undefined && CN.consumeMuteResume(null), false)
   eq('a keyless player cannot be consumed', CN.consumeMuteResume({ volume: 0 }), false)
-  // The latch is per player, so arming one does not arm another.
-  CN.setMuteResumePending({ dbusName: 'latch.a' }, true)
-  eq('another player is unaffected', CN.consumeMuteResume({ dbusName: 'latch.b' }), false)
-  eq('and the armed one still fires', CN.consumeMuteResume({ dbusName: 'latch.a' }), true)
+  // The latch is per player object, so arming one does not arm another.
+  const a = { dbusName: 'latch.a' }
+  const b = { dbusName: 'latch.b' }
+  CN.setMuteResumePending(a, true)
+  eq('another player is unaffected', CN.consumeMuteResume(b), false)
+  eq('and the armed one still fires', CN.consumeMuteResume(a), true)
 })
 group('togglePlayerVolume mutes to zero and restores what it saved', () => {
-  eq('a player at 42% mutes', CN.togglePlayerVolume({ dbusName: 'v.a', volume: 0.42 }, 0.3), 0)
-  eq('and comes back to 42%', CN.togglePlayerVolume({ dbusName: 'v.a', volume: 0 }, 0.3), 0.42)
-  eq('a player at 70% mutes', CN.togglePlayerVolume({ dbusName: 'v.b', volume: 0.7 }, 0.3), 0)
-  eq('and comes back to 70%', CN.togglePlayerVolume({ dbusName: 'v.b', volume: 0 }, 0.3), 0.7)
-  eq('a player at 100% mutes', CN.togglePlayerVolume({ dbusName: 'v.c', volume: 1 }, 0.3), 0)
-  eq('and comes back to 100%', CN.togglePlayerVolume({ dbusName: 'v.c', volume: 0 }, 0.3), 1)
-  eq('an unmuted player is never lowered by a restore', CN.togglePlayerVolume({ dbusName: 'v.d', volume: 0.2 }, 0.9), 0)
+  for (const [name, level] of [['v.a', 0.42], ['v.b', 0.7], ['v.c', 1], ['v.d', 0.2]]) {
+    const p = { dbusName: name, volume: level }
+    eq(`a player at ${level} mutes`, CN.togglePlayerVolume(p, 0.3), 0)
+    p.volume = 0
+    eq(`and the same player comes back to ${level}`, CN.togglePlayerVolume(p, 0.3), level)
+  }
+  eq('an unmuted player is never lowered by a restore', CN.togglePlayerVolume({ dbusName: 'v.d2', volume: 0.2 }, 0.9), 0)
 })
 group('a player that was never muted comes up to the fallback', () => {
-  eq('with a usable fallback', CN.togglePlayerVolume({ dbusName: 'v.e', volume: 0 }, 0.2), 0.2)
-  eq('and the fallback does not become the saved value', CN.togglePlayerVolume({ dbusName: 'v.e', volume: 0 }, 0.2), 0.2)
-  eq('a fallback of zero gets the 0.5 default', CN.togglePlayerVolume({ dbusName: 'v.f', volume: 0 }, 0), 0.5)
-  eq('an out-of-range fallback is normalized first', CN.togglePlayerVolume({ dbusName: 'v.g', volume: 0 }, 2), 1)
-  eq('a negative fallback is the 0.5 default', CN.togglePlayerVolume({ dbusName: 'v.h', volume: 0 }, -1), 0.5)
-  eq('a NaN fallback is the 0.5 default', CN.togglePlayerVolume({ dbusName: 'v.i', volume: 0 }, NaN), 0.5)
-  eq('a saved value beats the fallback', CN.restorePlayerVolume({ dbusName: 'v.a', volume: 0 }, 0.25), 0.42)
-  eq('an unknown player takes the fallback', CN.restorePlayerVolume({ dbusName: 'v.unknown', volume: 0 }, 0.25), 0.25)
-  eq('an unknown player with no fallback gets the default', CN.restorePlayerVolume({ dbusName: 'v.unknown', volume: 0 }, 0), 0.5)
+  const e = { dbusName: 'v.e', volume: 0 }
+  eq('with a usable fallback', CN.togglePlayerVolume(e, 0.2), 0.2)
+  eq('and the fallback does not become the saved value', CN.togglePlayerVolume(e, 0.2), 0.2)
+  const f = { dbusName: 'v.f', volume: 0 }
+  eq('a fallback of zero gets the 0.5 default', CN.togglePlayerVolume(f, 0), 0.5)
+  const g = { dbusName: 'v.g', volume: 0 }
+  eq('an out-of-range fallback is normalized first', CN.togglePlayerVolume(g, 2), 1)
+  const h = { dbusName: 'v.h', volume: 0 }
+  eq('a negative fallback is the 0.5 default', CN.togglePlayerVolume(h, -1), 0.5)
+  const i = { dbusName: 'v.i', volume: 0 }
+  eq('a NaN fallback is the 0.5 default', CN.togglePlayerVolume(i, NaN), 0.5)
+  const saved = { dbusName: 'v.saved', volume: 0.65 }
+  CN.togglePlayerVolume(saved, 0.3)
+  eq('a saved value beats the fallback', CN.restorePlayerVolume(saved, 0.25), 0.65)
+  const unknown = { dbusName: 'v.unknown', volume: 0 }
+  eq('an unknown player takes the fallback', CN.restorePlayerVolume(unknown, 0.25), 0.25)
+  eq('an unknown player with no fallback gets the default', CN.restorePlayerVolume(unknown, 0), 0.5)
 })
 group('the keyless player case is a real identity, not a shared slot', () => {
-  eq('a player with no name at all mutes', CN.togglePlayerVolume({ volume: 0.6 }, 0.3), 0)
-  eq('and comes back to 60%', CN.togglePlayerVolume({ volume: 0 }, 0.3), 0.6)
-  eq('an identity-keyed player mutes', CN.togglePlayerVolume({ identity: 'v.name', volume: 0.6 }, 0.3), 0)
-  eq('and comes back', CN.togglePlayerVolume({ identity: 'v.name', volume: 0 }, 0.3), 0.6)
-  eq('a player-keyed player mutes', CN.togglePlayerVolume({ trackTitle: 'v.title', volume: 0.6 }, 0.3), 0)
-  eq('and comes back', CN.togglePlayerVolume({ trackTitle: 'v.title', volume: 0 }, 0.3), 0.6)
+  const none = { volume: 0.6 }
+  eq('a player with no name at all mutes', CN.togglePlayerVolume(none, 0.3), 0)
+  none.volume = 0
+  eq('and comes back to 60%', CN.togglePlayerVolume(none, 0.3), 0.6)
+  const named = { identity: 'v.name', volume: 0.6 }
+  eq('an identity-keyed player mutes', CN.togglePlayerVolume(named, 0.3), 0)
+  named.volume = 0
+  eq('and comes back', CN.togglePlayerVolume(named, 0.3), 0.6)
+  const keyed = { trackTitle: 'v.title', volume: 0.6 }
+  eq('a player-keyed player mutes', CN.togglePlayerVolume(keyed, 0.3), 0)
+  keyed.volume = 0
+  eq('and comes back', CN.togglePlayerVolume(keyed, 0.3), 0.6)
   eq('a null player takes the fallback', CN.togglePlayerVolume(null, 0.4), 0.4)
   eq('a null player with no fallback gets the default', CN.togglePlayerVolume(null, 0), 0.5)
   eq('an out-of-range volume is normalized before the test', CN.togglePlayerVolume({ dbusName: 'v.j', volume: 2 }, 0.3), 0)
   eq('and a negative volume is silent, so it comes up', CN.togglePlayerVolume({ dbusName: 'v.k', volume: -1 }, 0.3), 0.3)
   eq('a missing volume field is silent', CN.togglePlayerVolume({ dbusName: 'v.l' }, 0.3), 0.3)
   eq('a NaN volume is silent', CN.togglePlayerVolume({ dbusName: 'v.m', volume: NaN }, 0.3), 0.3)
+})
+group('mute-resume carries a generation and answers only to its owner', () => {
+  const np = freshNp()
+  const p = { dbusName: 'bus.shared' }
+  eq('arming mints generation 1', np.setMuteResumePending(p, true), 1)
+  eq('a wrong generation cannot consume', np.consumeMuteResume(p, 2), false)
+  eq('and the flag is still armed', np.consumeMuteResume(p, 1), true)
+  eq('a second arm mints a newer generation', np.setMuteResumePending(p, true), 2)
+  eq('the older generation is now stale', np.consumeMuteResume(p, 1), false)
+  eq('the newer one fires', np.consumeMuteResume(p, 2), true)
+})
+group('a recycled bus name cannot pick up another player slot', () => {
+  const np = freshNp()
+  const original = { dbusName: 'bus.reused', volume: 0.6 }
+  eq('mute saves the original level', np.togglePlayerVolume(original, 0.3), 0)
+  const recycled = { dbusName: 'bus.reused', volume: 0 }
+  eq('a different object on the same bus cannot restore it', np.restorePlayerVolume(recycled, 0.25), 0.25)
+  np.setMuteResumePending(original, true)
+  eq('and cannot consume its resume flag', np.consumeMuteResume(recycled), false)
+  eq('while the original still can', np.consumeMuteResume(original), true)
+  const a = { dbusName: 'bus.latest', volume: 0.4 }
+  np.togglePlayerVolume(a, 0.3)
+  const b = { dbusName: 'bus.latest', volume: 0.7 }
+  np.togglePlayerVolume(b, 0.3)
+  eq('the later mute owns the saved level', np.restorePlayerVolume(b, 0.2), 0.7)
+  eq('the earlier player cannot read it', np.restorePlayerVolume(a, 0.2), 0.2)
+})
+group('a generation narrows a slot but never replaces ownership', () => {
+  const np = freshNp()
+  // MprisPlayer.uniqueId is a per-track counter, not a player id: two
+  // different players can both report 1, so neither name nor that number
+  // may stand in for the object that minted the slot.
+  const first = { dbusName: 'bus.same', uniqueId: 1 }
+  const second = { dbusName: 'bus.same', uniqueId: 1 }
+  const gen = np.setMuteResumePending(first, true)
+  eq('a different object cannot claim it by generation', np.consumeMuteResume(second, gen), false)
+  eq('the owner still can', np.consumeMuteResume(first, gen), true)
+  np.setMuteResumePending(first, true)
+  eq('nor by a matching track counter alone', np.consumeMuteResume(second), false)
+  eq('the owner still can, without a generation', np.consumeMuteResume(first), true)
+})
+group('player removal drops the one-slot intents', () => {
+  const np = freshNp()
+  const gone = { dbusName: 'bus.gone', uniqueId: 'gone', volume: 0.6 }
+  np.setMuteResumePending(gone, true)
+  np.togglePlayerVolume(gone, 0.3)
+  np.noteManual('next')
+  np.dropPlayerIntents([{ dbusName: 'bus.live', uniqueId: 'live' }])
+  eq('the removed player cannot consume its flag', np.consumeMuteResume(gone), false)
+  eq('its saved volume is gone too', np.restorePlayerVolume(gone, 0.2), 0.2)
+  eq('the transport intent has no player and survives', np.peekManual().dir, 1)
+  const live = { dbusName: 'bus.live', uniqueId: 'live' }
+  np.setMuteResumePending(live, true)
+  np.dropPlayerIntents([live])
+  eq('a live player keeps its slot', np.consumeMuteResume(live), true)
 })
 
 
@@ -2534,14 +2595,35 @@ group('a published rating seeds the answer until the first toggle', () => {
   eq('a negative rating reads unliked', CN.playerLiked(spotifyTrack('negative', { 'xesam:userRating': -1 })), false)
   eq('a missing rating reads unliked', CN.playerLiked(spotifyTrack('missing')), false)
   eq('a non-numeric rating reads unliked', CN.playerLiked(spotifyTrack('bad', { 'xesam:userRating': 'yes' })), false)
-  eq('a toggle overrides the seed', CN.toggleLiked(spotifyTrack('rated2', { 'xesam:userRating': 1 })), false)
-  eq('and the override is what the next read reports', CN.playerLiked(spotifyTrack('rated2', { 'xesam:userRating': 1 })), false)
+  const rated2 = spotifyTrack('rated2', { 'xesam:userRating': 1 })
+  eq('a toggle overrides the seed', CN.toggleLiked(rated2), false)
+  eq('and the override is what the next read reports', CN.playerLiked(rated2), false)
 })
 group('degenerate players read unliked rather than throwing', () => {
   eq('null', CN.playerLiked(null), false)
   eq('undefined', CN.playerLiked(undefined), false)
   eq('no metadata', CN.playerLiked({ dbusName: 'org.mpris.MediaPlayer2.spotify' }), false)
   eq('metadata that is not an object', CN.playerLiked({ dbusName: 'org.mpris.MediaPlayer2.spotify', metadata: 7 }), false)
+})
+group('the optimistic like verdict is owned by its player object', () => {
+  const np = freshNp()
+  const md = { 'mpris:trackid': '/track/shared' }
+  const a = { dbusName: 'org.mpris.MediaPlayer2.spotify', metadata: md }
+  const b = { dbusName: 'org.mpris.MediaPlayer2.spotify', metadata: md }
+  eq('a fresh track reads unliked', np.playerLiked(a), false)
+  eq('the first toggle likes it', np.toggleLiked(a), true)
+  eq('the same object keeps the verdict', np.playerLiked(a), true)
+  eq('a different object with the same key does not inherit it', np.playerLiked(b), false)
+  eq('and toggling that object starts from unliked', np.toggleLiked(b), true)
+  eq('the first object lost the slot', np.playerLiked(a), false)
+})
+group('player removal drops the optimistic like verdict too', () => {
+  const np = freshNp()
+  const p = spotifyTrack('leaving')
+  np.toggleLiked(p)
+  eq('liked before removal', np.playerLiked(p), true)
+  np.dropPlayerIntents([spotifyTrack('staying')])
+  eq('unliked after removal', np.playerLiked(p), false)
 })
 
 section('workspaces: the number strip geometry')
