@@ -70,7 +70,6 @@ PanelCard {
   sizeMotionDuringGate: AppLauncher.entry !== ""
   property real _latchedListH: -1
   property bool _fitPending: false
-  property int _fitAttempts: 0
   exactListH: panel._latchedListH
   fitPending: panel._fitPending
   rows: AppLauncher.results
@@ -363,19 +362,127 @@ PanelCard {
     }
   }
 
+  // LNC-1: one settled-edge waiter replaces the fit poll. queueFit arms a
+  // single {fn, guard} waiter; _fitReady is one derivation of the four live
+  // signals the fit actually depends on (swap window, slot motion, count,
+  // content polish) and its change handler drains the waiter. An attempt
+  // counter can no longer be spent by a settle wait before a fit gets its
+  // turn: there is no shared budget for the four waits.
+  property var _fitWaiters: []
+  property int _fitFallbackAttempts: 0
+
+  // The measured fit, read live: fitHeight re-checks the row count, the
+  // per-row measured heights and contentHeight, so the derivation tracks all
+  // of those edges without a snapshot or a retry.
+  function _fitCandidate() { return list.fitHeight(panel.availListH, panel.slotLimit) }
+
+  // 1 = a slot is open or folding (wait for its motion-finished edge),
+  // 2 = a slot is open but resting (give up: the region falls back to the
+  //     card's resting buffer), 0 = no slot claims the region.
+  // Reading each delegate's live motion/heights makes this derivation follow
+  // the same edges the old 16 ms poll only sampled.
+  function _fitSlotVerdict() {
+    const kids = list.contentItem.children
+    let resting = false
+    for (let i = 0; i < kids.length; i++) {
+      const d = kids[i]
+      if (!(d instanceof LauncherEntry)) continue
+      if (d.slotMotionMs > 0) return 1
+      if (d.descSlotH > 0 || d.deleteSlotH > 0) resting = true
+    }
+    return resting ? 2 : 0
+  }
+
+  readonly property bool _fitReady: panel._fitReadyEval()
+  function _fitReadyEval() {
+    const ws = panel._fitWaiters
+    if (ws.length === 0) return false
+    const rows = panel.rows || []
+    if (rows.length === 0) return true
+    if (!ws[0].guard || !ws[0].guard()) return false
+    if (list._inSwap) return false
+    const verdict = panel._fitSlotVerdict()
+    if (verdict === 1) return false
+    if (verdict === 2) return true
+    if (list.count !== rows.length) return false
+    return panel._fitCandidate() >= 0
+  }
+
+  on_FitReadyChanged: if (panel._fitReady) panel._drainFit()
+  function _drainFit() {
+    while (panel._fitWaiters.length > 0 && panel._fitReady) {
+      const w = panel._fitWaiters[0]
+      // A newer row set retires this fit even if no queueFit landed yet.
+      if (w.guard && !w.guard()) {
+        panel._fitWaiters = []
+        panel._fitPending = false
+        return
+      }
+      // Drop before the callback (MenuPanel._drainSettled shape): a waiter
+      // queued by a waiter drains in the same call, before the binding has
+      // re-evaluated its guard against the row set the callback installed.
+      panel._fitWaiters = panel._fitWaiters.slice(1)
+      panel._fitPending = false
+      fitFallback.stop()
+      w.fn()
+    }
+  }
+
+  function whenFit(fn, guard) {
+    // One waiter, latest rows win: a fit armed for a row set that has since
+    // changed is retired here instead of latching a stale height.
+    panel._fitWaiters = [{ fn: fn, guard: guard }]
+    panel._fitPending = true
+    panel._fitFallbackAttempts = 0
+    fitFallback.restart()
+    // One deferral: install and polish in the same turn, then read the edges.
+    // Not a retry - from here the waiter is released by real signals.
+    Qt.callLater(panel._drainFit)
+  }
+
+  function _fitGiveUp() {
+    panel._fitWaiters = []
+    panel._fitPending = false
+    panel._latchedListH = -1
+  }
+
+  function _fitCommit() {
+    const rows = panel.rows || []
+    if (rows.length === 0) {
+      panel._fitGiveUp()
+      return
+    }
+    // Re-read on the release frame: a waiter queued by a waiter can drain
+    // before the binding re-evaluated its guard against the installed rows.
+    if (panel._fitSlotVerdict() === 2) {
+      panel._fitGiveUp()
+      return
+    }
+    const fit = panel._fitCandidate()
+    if (fit < 0) {
+      panel._fitGiveUp()
+      return
+    }
+    panel._latchedListH = fit
+    panel._fitPending = false
+    // Settled relatch for the card's resting buffer: this point is reached
+    // with no slot in motion, no resting slot heights and the count matched,
+    // so the live contentHeight is resting content for the current row set.
+    panel._latchRestingBuffer()
+  }
+
   function queueFit() {
     const rows = panel.rows || []
     if (rows.length === 0) {
-      panel._latchedListH = -1
-      panel._fitPending = false
+      panel._fitGiveUp()
+      fitFallback.stop()
       return
     }
     // Size from the model NOW, in the same turn as the rows, and let the
     // measured fit correct it when it lands.
     //
     // Without this the card is painted at the PREVIOUS row set's height for
-    // as long as the measurement is in flight - at least two event-loop turns
-    // and up to 24 frame-paced retries - because PanelCard.restingListH holds
+    // as long as the measurement is in flight: PanelCard.restingListH holds
     // the last committed fit across a pending one on purpose, to keep the card
     // still across a keystroke. Those two together are the staged shift a
     // filter tick shows: the rows arrive at their new count, the card stays
@@ -389,11 +496,6 @@ PanelCard {
     // vanishes at an integral scale factor and shows at a fractional one, so
     // the correction is bounded by that and not by the row set.
     //
-    // Ahead of the pending check on purpose: keystrokes arrive faster than the
-    // fit settles and the row set has already changed again by then, so the
-    // model is re-read there too - otherwise the card would track the second
-    // keystroke's rows at the first one's height.
-    //
     // The guard is not defensive noise: with no resolved ceiling snappedListH
     // answers 0, and PanelCard._latchRestingFit accepts 0 as a measurement
     // (it only refuses a negative one), so an unguarded write pins
@@ -401,114 +503,29 @@ PanelCard {
     // region's height - which is a collapse, not a stale value.
     const model = panel.snappedListH(panel.availListH)
     if (model > 0) panel._latchedListH = model
-    if (panel._fitPending) {
-      panel._fitAttempts = 0
-      if (fitRetryTimer.fitCallback !== null) fitRetryTimer.restart()
-      return
-    }
-    panel._fitPending = true
-    panel._fitAttempts = 0
-    const fail = () => {
-      panel._latchedListH = -1
-      panel._fitPending = false
-    }
-    // Two waits, two budgets: geometry in motion outlives a few frames,
-    // while a count that has not caught up resolves in one. Function
-    // declarations, not arrows: they hoist, and a `const` above its first
-    // use reports qt.qml.usedbeforedeclared.
-    function retrySettle() {
-      if (panel._fitAttempts < 24) {
-        panel._fitAttempts++
-        fitRetryTimer.fitCallback = tryFit
-        fitRetryTimer.restart()
-        return
-      }
-      fail()
-    }
-    function retryFit() {
-      if (panel._fitAttempts < 8) {
-        panel._fitAttempts++
-        fitRetryTimer.fitCallback = tryFit
-        fitRetryTimer.restart()
-        return
-      }
-      fail()
-    }
-    function tryFit() {
-      if (!panel._fitPending) return
-      fitRetryTimer.stop()
-      fitRetryTimer.fitCallback = null
-      const rows = panel.rows || []
-      if (rows.length === 0) {
-        panel._latchedListH = -1
-        panel._fitPending = false
-        return
-      }
-      // Motion and a swap in flight defer the measurement - the row is
-      // about to be a different height, and the next frame reads it right.
-      // An open but RESTING description or delete confirm does not: nothing
-      // about it is about to change, so the fit gives up instead of spending
-      // its budget on it, and the region falls back to the card's resting
-      // buffer, which re-latches from the live content.
-      let movingSlot = false
-      let restingSlot = false
-      const kids = list.contentItem.children
-      for (let i = 0; i < kids.length; i++) {
-        const d = kids[i]
-        if (!(d instanceof LauncherEntry)) continue
-        if (d.slotMotionMs > 0) { movingSlot = true; break }
-        if (d.descSlotH > 0 || d.deleteSlotH > 0) restingSlot = true
-      }
-      if (list._inSwap || movingSlot) {
-        retrySettle()
-        return
-      }
-      if (restingSlot) {
-        fail()
-        return
-      }
-      if (list.count !== rows.length) {
-        retryFit()
-        return
-      }
-      const fit = list.fitHeight(panel.availListH, panel.slotLimit)
-      if (fit < 0 && rows.length > 0) {
-        retryFit()
-        return
-      }
-      panel._latchedListH = fit
-      panel._fitPending = false
-      // Settled relatch for the card's resting buffer: this point is only
-      // reached with no slot in motion, no resting slot heights and the
-      // count matched, so the live contentHeight is resting content for the
-      // current row set. A row set that changed while a slot was open
-      // skipped the count-driven latch (gated by slotOpen), and the slot
-      // edge itself must not latch (mid-collapse) - this is the one place
-      // that reads settled content for the new set.
-      panel._latchRestingBuffer()
-    }
-    Qt.callLater(() => {
-      if (!panel._fitPending) return
-      Qt.callLater(tryFit)
-    })
+    whenFit(panel._fitCommit, () => (panel.rows || []) === rows)
   }
 
-  // Frame-paced fit retries. Re-posting through Qt.callLater instead paced
-  // the wait on event-loop turns, which is both unbounded (the wait above
-  // never reached its own give-up) and busy: it rescanned every live
-  // delegate per turn for as long as the condition held, competing with the
-  // polish it was waiting on. A timer paces the retry; the attempt budget
-  // bounds it.
+  // The only bounded fallback, and it covers one genuinely edgeless case: a
+  // row whose delegate is never instantiated, so fitHeight stays negative and
+  // no content signal follows to wake the waiter. Every other wait is
+  // released by a live edge through _fitReady; this only stops a permanent
+  // park when no edge can arrive.
   Timer {
-    id: fitRetryTimer
+    id: fitFallback
 
-    property var fitCallback: null
     interval: 16
     repeat: false
     onTriggered: {
-      const retry = fitRetryTimer.fitCallback
-      fitRetryTimer.fitCallback = null
-      if (typeof retry === "function") retry()
+      if (panel._fitWaiters.length === 0) return
+      panel._drainFit()
+      if (panel._fitWaiters.length === 0) return
+      if (panel._fitFallbackAttempts < 24) {
+        panel._fitFallbackAttempts++
+        fitFallback.restart()
+        return
+      }
+      panel._fitGiveUp()
     }
   }
 
