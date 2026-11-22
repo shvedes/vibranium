@@ -94,6 +94,12 @@ BarModule {
   readonly property bool outputSilent: root.sink && root.sink.audio
     ? Core.Audio.silentFor(root.outputVolume, root.outputMuted) : false
 
+  // Output percentage readout (shell.statusbar.volumePercent, default off):
+  // the current output's level printed next to the bar icon, the battery
+  // module's convention. The pill stays one slot wide while it is off.
+  readonly property bool showPercentage: Settings.value("shell.statusbar.volumePercent") === true
+    && !!root.sink && !!root.sink.audio
+
   // Preferred device label for the tooltip.
   readonly property string sinkLabel: Model.nodeLabel(root.sink)
 
@@ -327,22 +333,56 @@ BarModule {
       }
     }
 
-    // Volume icon box - always visible
+    // Volume icon box - always visible. Grows by the readout's width when the
+    // percentage option is on; the glyph stays at the slot's leading edge so
+    // the number reads as an extension of it rather than moving it.
     Item {
       id: volumeBox
-      implicitWidth: root.slotWidth
+
+      // The slide drives both the number's opacity and the added width, so
+      // the row measures the pill frame by frame and reserves exactly the
+      // space the text needs. Boot settle keeps a persisted option from
+      // sliding in on the first layout pass.
+      property real pctSlide: root.showPercentage ? 1 : 0
+      Behavior on pctSlide {
+        enabled: root.bootSettled
+        Glide { duration: Ui.slowMs }
+      }
+      readonly property int pctWidth: pctText.implicitWidth + 4
+
+      implicitWidth: root.slotWidth + Math.round(pctSlide * pctWidth)
       implicitHeight: Bar.height
       width: implicitWidth
       height: implicitHeight
 
       CrossfadeIcon {
-        anchors.centerIn: parent
+        // Hold the one-slot box at the leading edge and center the glyph in
+        // it: growing the pill must not move the icon or recenter it over the
+        // number. Icon's implicit width is the whole slot, so an explicit
+        // slot width here reproduces the original centered placement.
+        anchors.left: parent.left
+        width: root.slotWidth
+        anchors.verticalCenter: parent.verticalCenter
         name: root.volumeIconName
         colorKey: root.volumeIconColor
         // Silent (muted or at zero): only the X goes red
         // (class="indicator" in volume-off).
         accentKey: root.outputSilent ? "red" : ""
         dimTiers: root.volumeDimTiers
+      }
+
+      Title {
+        id: pctText
+
+        anchors.left: parent.left
+        anchors.leftMargin: root.slotWidth + 2
+        anchors.verticalCenter: parent.verticalCenter
+        opacity: volumeBox.pctSlide
+        visible: opacity > 0
+        level: 3
+        font.pixelSize: Bar.pillFontSize
+        color: Ui.solid(root.volumeIconColor)
+        text: Format.percent(root.outputVolume)
       }
 
       MouseArea {

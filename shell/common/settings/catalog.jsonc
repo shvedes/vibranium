@@ -828,6 +828,14 @@
                 "sub": "Always show mic pill"
             },
             {
+                "key": "shell.statusbar.volumePercent",
+                "type": "bool",
+                "default": false,
+                "label": "Percentage",
+                "sub": "Show output volume level",
+                "desc": "Show the current output's volume percentage next to the bar icon."
+            },
+            {
                 "key": "shell.statusbar.volumeRightClick",
                 "type": "string",
                 "default": "vb-shell app audioMixer",
@@ -1068,6 +1076,7 @@
                             "icon": "",
                             "children": [
                                 "shell.statusbar.volumeShowMic",
+                                "shell.statusbar.volumePercent",
                                 "shell.statusbar.volumeRightClick",
                                 "shell.statusbar.volumeMiddleClick",
                                 "shell.statusbar.volumeMicRightClick",
