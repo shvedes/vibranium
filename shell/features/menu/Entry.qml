@@ -364,7 +364,17 @@ Item {
   Component.onCompleted: {
     const p = Menu.panel || Menu.probeSource
     row._projectionRev = p ? p.projectionRev : 0
-    syncExpanded()
+    // A mode restore recreates this delegate with its stored slot already
+    // expanded. Born open, the slot has no from-rest transition: its height
+    // appears at full size on the first frame and the card, which follows
+    // live slot height, jumps with it. Hold the slot closed for the spawn
+    // tick, then open it through the same path a key uses.
+    const stNow = Menu.stateOf(itm)
+    if (p && p._restoreSeatPending && stNow.expanded === true && !searchResult) {
+      row._restoreUnfold = true
+      syncExpanded()
+      Qt.callLater(() => { row._restoreUnfold = false })
+    } else syncExpanded()
   }
 
   function syncExpanded() {
@@ -377,6 +387,10 @@ Item {
   // For editors; info-only rows expand into the body view. Selects
   // expand into their inline dropdown.
   property bool expanded: false
+  // One spawn tick for a slot restored by a mode clear: the slot stays
+  // closed while the delegate is created, then opens from rest on the next
+  // turn. Owned here, read only by this row's own slot bindings.
+  property bool _restoreUnfold: false
   // Generic staged confirmation (replaces per-service timerStage etc.)
   property int confirmStage: 0
   readonly property var confirm: Menu.confirmFor(itm)
@@ -2358,7 +2372,7 @@ Item {
     // the remaining top padding inside the slot.
     anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
     topGap: nested ? row.nestedSlotTopGap : 0
-    open: row.expanded
+    open: row.expanded && !row._restoreUnfold
     // Only while the group is OPEN. A live nested child's geometry is the
     // motion an open group rides; once the group itself folds, THIS slot's
     // close is the motion. Following a child's closing tail there switched

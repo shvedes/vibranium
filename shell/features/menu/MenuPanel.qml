@@ -89,8 +89,11 @@ Rectangle {
 
   readonly property string currentPageId: Menu.frame ? Menu.frame.id : ""
   readonly property bool searching: Menu.searching
-  // "/" quick-filter: trims the current page's rows (not cross-page search).
-  readonly property bool scopedSearching: Menu.scopedActive
+  // "/" quick-filter: the service publishes the arm (scopedActive) and the
+  // live view state (scopedSearching = armed AND a query exists). Derive the
+  // view from the query-aware state: arming the field alone changes no rows
+  // and no geometry. Field routing and filter chrome read the arm instead.
+  readonly property bool scopedSearching: Menu.scopedSearching
 
   // Sliding-highlight motion gate: the selection bar glides for pure
   // focus shifts between resting rows, including while a query is
@@ -1813,18 +1816,40 @@ Rectangle {
       panel.recomputeRows("reveal")
     }
 
+    // The arm itself only owns the field and the key route. Leaving it clears
+    // the bar and hands focus back; geometry follows the query-aware state in
+    // onScopedSearchingChanged below. Deferred outside the activation event
+    // so an Enter that pushes a page cannot re-fire on the new page's row.
     function onScopedActiveChanged() {
+      if (Menu.scopedActive || !Menu.open) return
+      Qt.callLater(() => {
+        if (!Menu.scopedActive && Menu.open) {
+          if (searchField.text !== "") searchField.text = ""
+          if (panel.mode === "filter") focusCtrl.grabList()
+        }
+      })
+    }
+
+    // Arming the field changes the filter chrome and the key route, not the
+    // row set. The projection follows the query-aware state, so this handler
+    // runs only when the view actually enters or leaves a filtered set.
+    function onScopedSearchingChanged() {
       panel.projectionRev++
-      // The "/" filter trims the page it was armed on, so the launch that
-      // wanted the head of the untrimmed page is over - same reason as the
-      // query above.
       panel._summonSeat = false
-      const leaving = !Menu.scopedActive
+      const leaving = !panel.scopedSearching
       if (!leaving) {
         // The filter re-projects the page, so a slot claim from the page that
         // is being filtered names no row in this projection and must not keep
-        // the card grown to the outgoing dropdown's size.
+        // the card grown to the outgoing dropdown's size. Clearing the region
+        // here would take the card from the dropdown's height to rest in one
+        // frame. Hand that shrink to the one height tween first, then let the
+        // fit for the filtered rows retarget the same tween.
+        const from = panel._currentListH()
+        const base = panel._restingFallbackH()
         panel._releaseSlotRegion()
+        if (from > base + 0.5 && !panel._heightAnimating
+          && !panel._transitionActive && panel.shown && MotionPolicy.enabled)
+          panel._startHeightTransition(base, -1, from)
         // Arming: remember where on the page the user stood. A nested hit is
         // rendered at the top register while the filter is up and the group
         // row underneath it is unmounted, so this is the only copy of the seat
@@ -1840,25 +1865,19 @@ Rectangle {
         panel._scopedReturnChild = rowItem && rowItem.isGroup
           ? rowItem.childIndex : -1
       }
-      // QoL: picking a filtered entry clears the filter bar and returns focus to the list.
-      // Defer outside the activation event for the same reason as onSearchingChanged:
-      // grabbing list focus synchronously while the Enter that triggered the
-      // submenu push is still in flight would deliver that same Enter to the
-      // new page (Settings push -> General).
-      if (leaving && Menu.open) {
-        Qt.callLater(() => {
-          if (!Menu.scopedActive && Menu.open) {
-            if (searchField.text !== "") searchField.text = ""
-            if (panel.mode === "filter") focusCtrl.grabList()
-          }
-        })
-      }
       // Arming or clearing the "/" filter trims and restores the CURRENT
       // page's rows: rows leave and come back in place, so this is a
       // reveal like any other. Clearing also restores the full page box in
       // this turn, so the restored rows have to land in it this turn too.
       panel.recomputeRows("reveal", leaving)
       if (!leaving) return
+      // The restored rows are installed now. Arm the reveal on this edge,
+      // before the slot's first unfold frame: waiting for a settled waiter
+      // let the row grow halfway and made the region publish a height the
+      // card had never shown. The row's live height then drives the card.
+      const returnRow = panel.rowsModel[panel._scopedReturnIdx]
+      if (panel._scopedReturnIdx >= 0 && returnRow && Menu.isExpanded(returnRow))
+        list.autoRevealIndex = panel._scopedReturnIdx
       // Seat the captured row back after the page's rows are installed. The
       // uid names the row, not the number it had in the trim; the scroll goes
       // back with it so an expanded group's slot is still inside the viewport.
@@ -1937,13 +1956,12 @@ Rectangle {
           panel._followSlotRow()
           if (hadClaim) panel._latchClaim()
           if (panel._fadeRestoreOwed) panel._startModeFadeIn()
-          Qt.callLater(function() {
-            if (Menu.scopedActive || list.autoRevealIndex >= 0) return
-            // The projection cleared the claim along with the filter rows.
-            // Restore it now that the card and scroll are final, so an open
-            // group keeps its bar/background without re-seating the page.
+          // The projection cleared the claim with the filter rows. Re-arm it
+          // on THIS edge, not a turn later: deferring let the restored slot
+          // unfold halfway before the claim appeared, so the region was
+          // published from a height the card had never shown and jumped.
+          if (!Menu.scopedActive && list.autoRevealIndex < 0)
             list.autoRevealIndex = at
-          })
         })
       }, 2)
     }
@@ -2764,7 +2782,17 @@ Rectangle {
     // released, following the closing row's live height here would latch a
     // region sized to the OUTGOING fit - a height no row in the new projection
     // owns. Only an armed claim may grow the card through the region.
-    if (!claimed || panel._claimListH <= 0) {
+    // A slot that will need growth must start following the row's live
+    // height on the FIRST unfold frame. Waiting for the claim to latch reads
+    // a snapshot taken after the row has already grown, which lands the card
+    // at that snapshot in one frame. growForSlot is the same verdict the
+    // claim uses, read here without waiting for the claim's edge.
+    // A live slot height already above the row's rest height is the verdict:
+    // the region below floors out at the resting base when a slot fits, so
+    // following it costs nothing, and it starts on the first unfold frame
+    // instead of waiting for growForSlot's settled geometry.
+    const needsGrowth = live > 0 && !Menu.slotClosing
+    if ((!claimed || panel._claimListH <= 0) && !needsGrowth) {
       const from = panel._slotRegionH
       const base = panel._restingFallbackH()
       panel._slotRegionH = -1
@@ -2853,6 +2881,20 @@ Rectangle {
   // fit and resting state: those keep their own machinery (_animatedListH,
   // heightAnim) and fall through to the base.
   property real _slotRegionH: -1
+
+  // A live slot owns the card's size from its first frame. A fit tween still
+  // in flight keeps its own destination and hands over at its end, jumping
+  // from that destination to the region. Yield at the moment the region is
+  // published, while both still agree, so the one derived chain follows the
+  // row's live geometry. Called by both region writers.
+  function _yieldFitToRegion() {
+    if (panel._slotRegionH <= 0 || !panel._heightAnimating
+      || panel._transitionActive || Menu.slotClosing) return
+    panel._heightAnimating = false
+    panel._animatedListH = -1
+    panel._heightTargetH = -1
+    heightAnim.stop()
+  }
   // The region the claim asks for, LATCHED. A plain property, written
   // imperatively by _latchClaim. It is the scroll/region SPLIT decision for
   // the list and the gate for a card growth; the card's actual height is the
@@ -2979,6 +3021,7 @@ Rectangle {
         panel._slotRegionH = Math.max(base, Math.min(liveH, panel.screenMaxListH))
       else if (panel._slotRegionH < 0)
         panel._slotRegionH = base
+      panel._yieldFitToRegion()
     }
     panel._claimListH = grown
     list.growthH = grown
@@ -3573,7 +3616,9 @@ Rectangle {
   // land one turn later.
   function onFieldEdited(text) {
     const publish = () => {
-      if (panel.scopedSearching) {
+      // The arm owns the route, not the view: the first character reaches
+      // the scoped query even though the projection is still the plain page.
+      if (Menu.scopedActive) {
         // An empty query leaves the filter armed by design only when it was
         // armed with no query at all. Erasing a real query is a cancel: the
         // scope must go, or its arm-time seat is never handed back.
@@ -3581,7 +3626,7 @@ Rectangle {
         else Menu.setScopedQuery(text)
       } else Menu.setQuery(text)
     }
-    const query = panel.scopedSearching ? Menu.scopedQuery : Menu.query
+    const query = Menu.scopedActive ? Menu.scopedQuery : Menu.query
     // Only the first character of a mode and its erase are edges. Re-ranking
     // a live query installs its rows immediately, as before.
     if ((text === "") !== (query === "")) {
@@ -4522,6 +4567,13 @@ Rectangle {
     const frow = panel.focusedRow()
     if (frow && frow.isFlow && frow.flowIndex > 0
       && typeof frow.backFlow === "function" && frow.backFlow()) return
+    // Armed but no character typed: the view never changed, so there is no
+    // trim to clear and no seat to hand back. Leave the filter mode itself.
+    if (Menu.scopedActive && !panel.scopedSearching) {
+      panel.onFieldEdited("")
+      focusCtrl.grabList()
+      return
+    }
     // "/" trigger armed: Esc while typing only de-focuses the box - the
     // query text and the trim both stay, so arrow-key browsing keeps the
     // filtered page. A second Esc (list mode) drops the trim and restores
@@ -4624,6 +4676,11 @@ Rectangle {
   // by construction; the scoped trim is still armed (empty query shows the
   // full page), which is exactly what has to go.
   function backspaceEmptyChain() {
+    if (Menu.scopedActive && !panel.scopedSearching) {
+      panel.onFieldEdited("")
+      focusCtrl.grabList()
+      return
+    }
     if (panel.scopedSearching) {
       panel.onFieldEdited("")
       if (searchField.text !== "") searchField.text = ""
@@ -5256,7 +5313,7 @@ Rectangle {
     anchors.right: parent.right
     anchors.margins: Ui.outerPad
     height: Ui.filterH
-    scoped: panel.scopedSearching
+    scoped: Menu.scopedActive
     // The result handoff and the mode fade are two readings of one field
     // contract: the border and ghost leave with whichever transition is
     // running, and the query text fades with the view it belongs to.
