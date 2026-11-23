@@ -142,6 +142,78 @@ t_eq "input with grace off does not release" "0" "${R[offReleased]}"
 
 t_note "The deadline is wall-clock, not a QML timer: monotonic timers freeze during suspend, so the old timer-based window survived sleep and the wake input unlocked the session. Date.now() advances across suspend, so a window armed before sleep is expired on wake."
 
+# --- every pre-sleep lock uses the suspend reason ---------------------------
+# Grace is keyed on the lock reason, so a lock taken just before logind sleeps
+# must carry the same reason as one Session.suspend() takes. The lid-switch
+# bind used the plain lockscreen verb, which armed grace: a wake inside the
+# window released the session without a password. A dedicated sleep-lock verb
+# gives both paths one authority that does not request the sleep itself.
+
+BINDS="$VIBRANIUM_DIR/default/hypr/binds.lua"
+SESSION="$SHELL_DIR/services/session/Session.qml"
+t_file "the lid-switch bind lives in the hypr binds" "$BINDS"
+t_file "the sleep-lock verb lives in the session service" "$SESSION"
+
+LID_BIND="$(grep -F 'switch:on:Lid Switch' "$BINDS" || true)"
+t_contains "the lid bind locks through the session service" \
+  "vb-shell session lockForSleep" "$LID_BIND"
+t_not_contains "the lid bind does not use the plain lock verb" \
+  "vb-shell lockscreen lock" "$LID_BIND"
+
+SLEEP_LOCK="$(SESSION="$SESSION" node - <<'NODE'
+const fs = require("fs")
+const src = fs.readFileSync(process.env.SESSION, "utf8")
+
+// A function by name, balanced to its closing brace, read from the real
+// source so a change to the verb is what this suite measures.
+function lift(name) {
+  const m = new RegExp("function\\s+" + name + "\\s*\\([^)]*\\)\\s*\\{").exec(src)
+  if (!m) throw new Error("no function " + name + " in Session.qml")
+  let depth = 0
+  let end = m.index + m[0].length - 1
+  for (; end < src.length; end++) {
+    const c = src[end]
+    if (c === "{") depth++
+    else if (c === "}") { depth--; if (depth === 0) { end++; break } }
+  }
+  return src.slice(m.index, end)
+}
+
+const calls = []
+const root = {
+  _via(via) { return "via:" + via },
+  lock(reason, via) { calls.push("lock:" + reason + ":" + via); return "ok" },
+  lockForSleep(via) { calls.push("sleepLock:" + root._via(via)); return "ok" },
+  _suspendViaSystemctl() { calls.push("systemctl"); return "ok" }
+}
+const sleepFn = new Function("root", lift("lockForSleep") + "\nreturn lockForSleep")(root)
+const suspendFn = new Function("root", lift("suspend") + "\nreturn suspend")(root)
+
+const verdict = sleepFn("surface")
+const sleepCalls = calls.join(",")
+calls.length = 0
+const suspendVerdict = suspendFn("surface")
+
+process.stdout.write("verdict=" + verdict + "\n")
+process.stdout.write("sleepCalls=" + sleepCalls + "\n")
+process.stdout.write("suspendCalls=" + calls.join(",") + "\n")
+process.stdout.write("suspendVerdict=" + suspendVerdict + "\n")
+NODE
+)" || { t_block "node could not evaluate the sleep-lock verb"; }
+
+declare -A S
+while IFS='=' read -r key value; do
+  [[ -n $key ]] && S["$key"]="$value"
+done <<<"$SLEEP_LOCK"
+
+t_section "the pre-sleep lock carries the suspend reason"
+t_eq "the sleep-lock verb reports the lock verdict" "ok" "${S[verdict]}"
+t_eq "the sleep-lock verb locks with the suspend reason, without sleeping" \
+  "lock:suspend:via:surface" "${S[sleepCalls]}"
+t_eq "suspend shares the sleep-lock verb rather than locking again" \
+  "sleepLock:via:surface,systemctl" "${S[suspendCalls]}"
+t_eq "suspend still reports the sleep handoff" "ok" "${S[suspendVerdict]}"
+
 # --- LCK-5: a policy flip mid-tween must stop the tween and snap its driver ---
 # appearAnim, fitAnim and progressAppearAnim each sample the animation gate once
 # when they start. A global switch flipped off mid-reveal left the tween running

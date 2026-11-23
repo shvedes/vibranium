@@ -65,6 +65,7 @@ Singleton {
       description: "session power actions",
       verbNames: [
         "lock",
+        "lockForSleep",
         "logout",
         "poweroff",
         "reboot",
@@ -181,6 +182,14 @@ Singleton {
     return "confirmation_required"
   }
 
+  // Lock for a sleep transition without requesting the sleep itself. logind
+  // owns some sleeps - the lid switch is one - so those callers still have to
+  // engage a lock that carries this reason: it is what withholds grace on
+  // wake. The verdict is the lock call's own report; no sleep child starts.
+  function lockForSleep(via) {
+    return root.lock("suspend", root._via(via))
+  }
+
   // Lock first so wake always lands on the lockscreen, then hand the suspend to
   // logind as an owned child. The verdict is the whole synchronous report: the
   // child's outcome is asynchronous, so a refusal is published instead.
@@ -188,9 +197,9 @@ Singleton {
   //   "busy"     a suspend child is already in flight
   //   "failed"   no child could be started
   //
-  // The lock it takes keeps this suspend's own origin, so a request raised
-  // here is recognisable downstream as part of the suspend rather than as a
-  // second unrelated one.
+  // The lock goes through lockForSleep, so a request raised here is
+  // recognisable downstream as part of the suspend rather than as a second
+  // unrelated one, whether this call or logind performs the sleep.
   //
   // No inhibitor bypass here: caffeine holds an idle-only lock, which never
   // blocks an explicit sleep, so a manual suspend needs no -i. That flag
@@ -199,7 +208,7 @@ Singleton {
   // consults the registries before calling with via idle, so the automatic
   // path stays guarded without it.
   function suspend(via) {
-    root.lock("suspend", root._via(via))
+    root.lockForSleep(via)
     return root._suspendViaSystemctl()
   }
 
@@ -361,6 +370,7 @@ Singleton {
     function help(command: string): string {
       return UnitIpc.help("session", "Session", "session power actions", [
         { name: "lock", help: "lock the session" },
+        { name: "lockForSleep", help: "lock for a sleep transition without requesting sleep" },
         { name: "logout", help: "end the session" },
         { name: "poweroff", help: "power off" },
         { name: "reboot", help: "reboot" },
@@ -384,6 +394,10 @@ Singleton {
     // no verb gained a parameter, so a caller that knew nothing about this
     // keeps working and reads the same return strings.
     function lock(): string { return root.lock(undefined, "ipc") }
+    // The lock half of suspend, for sleeps logind starts on its own - a lid
+    // switch. It carries the suspend reason so wake input cannot ride a grace
+    // window armed by the lock, and leaves the sleep itself to logind.
+    function lockForSleep(): string { return root.lockForSleep("ipc") }
     // The destructive verbs answer confirmation_required without reaching
     // requestDestructive; the body is the member so the two layers cannot
     // drift. The names and signatures match the manifest rows.

@@ -392,7 +392,7 @@ hl.bind(
 hl.bind(mainMod .. " + Return", hl.dsp.exec_raw("vb-launch-terminal"), { description = "Open terminal" })
 
 hl.bind("CTRL + ALT + L", hl.dsp.exec_raw("vb-shell lockscreen lock"), { description = "Lock session" })
-hl.bind("switch:on:Lid Switch", hl.dsp.exec_raw("vb-shell lockscreen lock"), { description = "Lock session on lid close" })
+hl.bind("switch:on:Lid Switch", hl.dsp.exec_raw("vb-shell session lockForSleep"), { description = "Lock session on lid close" })
 
 hl.bind("CTRL + ALT + C", hl.dsp.exec_raw("vb-shell colorPicker pick"), { description = "Color picker" })
 hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
