@@ -16,8 +16,8 @@ import "../../common/math/Range.js" as Range
 // Order follows a simple rule: owned indicators hug the inside edge (away
 // from the screen corners), so on the right zone they come before the
 // layout slots and on the left/center after. Keeping both populations in
-// one ordered model means the static anchor of a right-anchored group
-// (e.g. logout) always lands at the corner.
+// one ordered model means the row's last right-zone slot sits at the corner
+// until the user drags it elsewhere.
 //
 // Drag reorder: grab and drag a module (or a whole group) - the gesture is
 // a DragHandler, so a plain click still reaches the module while a move
@@ -924,9 +924,9 @@ Item {
     id: slot
 
     required property var modelData
-    // Layout slots are draggable unless fixed: pinned slots (e.g. the
-    // session group) and non-draggable owned modules stay put while
-    // remaining fully toggleable upstream (static case).
+    // Layout slots are draggable unless fixed: pinned slots and
+    // non-draggable owned modules stay put while remaining fully toggleable
+    // upstream (static case). No layout slot is pinned today.
     readonly property bool draggable: !Bar.isFixedSlot(slot.modelData.id)
     // The dragged slot is "lifted": it rides the cursor wearing the held
     // wrap below, and the freed gap is wherever its geometry isn't

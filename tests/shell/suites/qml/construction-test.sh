@@ -249,7 +249,6 @@ qs.features.bar.modules.ArchUpdates.ArchUpdates
 qs.features.bar.modules.ColorPicker.ColorPicker
 qs.features.bar.modules.ColorPicker.ColorPickerOverlay
 qs.features.bar.modules.KeyboardLayout.KeyboardLayout
-qs.features.bar.modules.Logout.Logout
 qs.features.bar.modules.Network.Network
 qs.features.bar.modules.Network.NetworkIsland
 qs.features.bar.modules.Network.NetworkQrOverlay
@@ -260,6 +259,7 @@ qs.features.bar.modules.PowerProfile.PowerProfile
 qs.features.bar.modules.Printers.Printers
 qs.features.bar.modules.Printers.PrintersIsland
 qs.features.bar.modules.Privacy.Privacy
+qs.features.bar.modules.Session.Session
 qs.features.bar.modules.Tray.Tray
 qs.features.bar.modules.Tray.TrayMenu
 qs.features.bar.modules.Volume.Volume

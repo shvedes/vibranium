@@ -10,7 +10,7 @@ import qs.services as Core
 import qs.features.bar
 import qs.features.bar.modules.Clock
 import qs.features.bar.modules.KeyboardLayout
-import qs.features.bar.modules.Logout
+import qs.features.bar.modules.Session
 import qs.features.bar.modules.Bluetooth
 import qs.features.bar.modules.Battery
 import qs.features.bar.modules.Network
@@ -293,9 +293,9 @@ Singleton {
   // are never placed or enabled individually, which is what makes a group
   // a single, indivisible draggable unit (nothing to pull out from inside).
   property var _groups: ({})
-  // Slot id -> anchor slot id it must precede when enabled (e.g. the
-  // weather module always slots in directly before the session group).
-  // General enablement ordering without per-module special cases.
+  // Slot id -> anchor slot id it must precede when enabled (e.g. the tray
+  // slots in directly before the session button). General enablement
+  // ordering without per-module special cases.
   property var _placeBefore: ({})
   // Always-on slots: no settings toggle, kept in their zone at boot. Empty
   // today - a slot listed here is force-enabled even when the user's file
@@ -314,10 +314,9 @@ Singleton {
   // renamed from VideoDownloader to Downloader; the layout key is the only
   // thing that still carries the old name in a user's file.
   readonly property var _renamedSlotIds: ({ videoDownloader: "downloader" })
-  // Pinned slots: map of slot id -> zone it is pinned to. Pinned slots are
-  // non-rearrangeable (a drag never moves them) and always resolve to the
-  // end of their pinned zone, so e.g. the session group stays parked on the
-  // far right corner. They remain fully toggle-able like any other module.
+  // Pinned slots: map of slot id -> zone it is pinned to. A pinned slot is
+  // non-rearrangeable and always resolves to the end of its pinned zone.
+  // Empty today: session and tray are ordinary draggable slots.
   property var _pinned: ({})
 
   function isGroup(id) {
@@ -862,10 +861,8 @@ Singleton {
     onFinished: root.entranceSlideDone = true
   }
 
-  // Is `kind` on the bar, either as a slot of its own or as a member of a
-  // group that is? Both, and the second half is load-bearing: a group member
-  // holds no slot, so `tray` and `logout` are reached through the `session`
-  // key. Without that, every group member would sit unplaced forever.
+  // Is `kind` on the bar? The group walk remains so a group reintroduced by
+  // a caller resolves its members through the key that holds the slot.
   function _inLayout(layout, kind) {
     for (const zone in layout) {
       const list = layout[zone]
@@ -1007,34 +1004,32 @@ Singleton {
     })
     Registry.register(root.tag, root)
     Registry.register("lyrics", root)
-    // Modules render group members through memberComponent; the layout only
-    // ever holds standalone slots + group keys.
-    root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, archUpdates: archUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, logout: logoutComp, tray: trayComp, downloader: downloaderComp }
-    // Session = tray + logout. Logout is the static anchor on the bar's far
-    // corner; the tray sits directly to its left and slides out leftward off
-    // it without ever moving logout.
-    root._groups = { session: ["tray", "logout"] }
-    root._zones = { workspaces: "left", privacy: "right", clock: "center", weather: "right", keyboardLayout: "right", bluetooth: "right", battery: "right", network: "right", printers: "right", powerProfile: "right", archUpdates: "right", colorPicker: "right", nightLight: "right", nowPlaying: "right", volume: "right", session: "right", downloader: "right" }
+    // Every registered id is a standalone layout slot; there are no group
+    // members to expand, so the layout holds exactly the ids below.
+    root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, archUpdates: archUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, session: sessionComp, tray: trayComp, downloader: downloaderComp }
+    // Tray and session are independent slots. The tray owns its chevron
+    // trigger and slides leftward from wherever the user puts it; the power
+    // button is a plain module with no coupling to it.
+    root._groups = ({})
+    root._zones = { workspaces: "left", privacy: "right", clock: "center", weather: "right", keyboardLayout: "right", bluetooth: "right", battery: "right", network: "right", printers: "right", powerProfile: "right", archUpdates: "right", colorPicker: "right", nightLight: "right", nowPlaying: "right", volume: "right", session: "right", tray: "right", downloader: "right" }
     // Right-zone default order: the keyboard layout indicator, bluetooth,
     // battery and the network module join the zone ahead of the session
-    // group, in toggle order - bluetooth and battery slot in directly before
-    // the network module. Privacy is a right-zone launcher because the dots
-    // live on the overlay, and anchors on `battery` to sit where the shipped
-    // default layout puts it: after battery, clear of the pinned session
-    // group on the far corner.
-    root._placeBefore = { privacy: "battery", weather: "session", keyboardLayout: "session", bluetooth: "network", battery: "network", network: "volume", printers: "session", downloader: "powerProfile", powerProfile: "session", archUpdates: "session", colorPicker: "session", nightLight: "session", nowPlaying: "session", volume: "session" }
+    // button, in toggle order - bluetooth and battery slot in directly before
+    // the network module. The tray heals in at the head of the right zone so
+    // the shipped layout keeps it at the far left of the group. Privacy
+    // is a right-zone launcher because the dots live on the overlay, and
+    // anchors on `battery` to sit where the default layout puts it.
+    root._placeBefore = { tray: "keyboardLayout", privacy: "battery", weather: "session", keyboardLayout: "session", bluetooth: "network", battery: "network", network: "volume", printers: "session", downloader: "powerProfile", powerProfile: "session", archUpdates: "session", colorPicker: "session", nightLight: "session", nowPlaying: "session", volume: "session" }
     // Empty: every static slot is toggleable today. The map stays because
     // BarLib.normalizeLayout takes it as an input, and it is where a future
     // always-on slot (one the user may not switch off) is declared.
     root._permanent = ({})
-    // The session group (tray + power) is pinned to the right edge: it
-    // cannot be dragged elsewhere and always sits at the end of the right
-    // zone, while remaining toggleable through its menu row.
-    root._pinned = { session: "right" }
-    // `found` for the static catalog. One call per slot rather than one per
-    // Component, because a group is entered by its KEY and its members are
-    // reported individually by Group.qml as they construct - a `found` for
-    // `tray` here and another in Group would be the same module twice.
+    // No reserved corners: every layout slot, session and tray included, is
+    // draggable and may be dropped in any zone. The map stays because the
+    // layout library takes it as an input; nothing is pinned today.
+    root._pinned = ({})
+    // `found` for the static catalog. One call per slot, which is also one
+    // call per rendered module now that every id owns its own slot.
     //
     // The stamp is taken here, after the registry is populated and before
     // updateLayout, so `found` genuinely precedes every `booting`.
@@ -1212,8 +1207,8 @@ Singleton {
   }
 
   Component {
-    id: logoutComp
-    Logout {}
+    id: sessionComp
+    Session {}
   }
   Component {
     id: trayComp

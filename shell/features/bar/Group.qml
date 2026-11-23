@@ -56,9 +56,8 @@ Item {
         //
         // The construction clock lives here rather than in Zone, and that is
         // the whole reason a group is recorded as its members and never as
-        // one entry of its own: the user sees `tray` and `logout` sitting
-        // there. The container this file is (a Row of Loaders) is not a
-        // module and is never timed.
+        // one entry of its own: the user sees the members, not the container
+        // this file is (a Row of Loaders), which is never timed.
         //
         // Open and close bracket the construction exactly as in Zone's slot
         // loader: the stamp goes into the expression that hands the

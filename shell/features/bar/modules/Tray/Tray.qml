@@ -2,51 +2,40 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell.Services.SystemTray
+import qs.common
 import qs.features.bar
 
-// Tray module. Hosts the StatusNotifier items, collapsed to zero width.
-// The logout icon is its expansion trigger: hovering it slides the tray
-// out to the left - because this module is the last one in the right
-// zone's right-anchored row, growing it pushes every module ahead of it
-// left in the same motion. It stays expanded while the mouse sits on the
-// logout icon, on the tray itself, or on one of the tray's menus.
+// Tray module. Hosts the StatusNotifier items in a collapsible slot with its
+// own disclosure affordance: a left-pointing chevron pinned to the slot's
+// right edge. Hovering the chevron slides the icons out to the left - the row
+// is right-anchored inside the clipped slot, so the clip reveals the icons
+// nearest the chevron first and extends the rest leftward. The chevron
+// cross-fades to accent while the tray is open.
 //
-// Each item: left-click activates, right-click opens its DBusMenu (see
-// Quickshell.DBusMenu), the wheel scrolls it.
+// The hover latch holds the tray open across the chevron -> item handoff and
+// while one of its menus is up. Each item: left-click activates, right-click
+// opens its DBusMenu, middle-click secondary-activates, wheel scrolls.
 CollapsibleSlot {
   id: root
 
-  // Tray icons read the bar's scaled slot/canvas themselves (see TrayItem), so
-  // this row does not restate them: a token copied here is a value the icons
-  // do not read, and they would follow the real one only by coincidence.
-  // Spacing/padding are 0 like Zone/Group (slots abut with 0 gap, canvas
-  // centering provides the visual padding).
-  readonly property int sidePad: 0
+  // The disclosure affordance stays visible at every slide value, so a
+  // collapsed tray is still a chevron-sized target the user can hover. Only
+  // the icons beyond it are animated by the slide.
+  readonly property int chevronSlot: Ui.chevronW
   readonly property int spacing: 0
 
-  // Open while the logout trigger (the shared per-window hover state),
-  // this module itself, or one of this module's menus keeps it up.
-  // `=== true` so a mid-reload undefined read (window being torn down)
-  // coerces instead of warning. With the logout module disabled there is
-  // no trigger - the tray then stays expanded at all times.
+  // The chevron is the trigger. It lives in this module, so the tray neither
+  // borrows an adjacent module's hover nor asks the bar whether a group
+  // partner is present. `=== true` keeps a torn-down frame quiet.
   function triggerActive() {
-    // Reading properties on a module/window being torn down during reload
-    // throws; treat that frame as not-triggered. Whole body in the try so
-    // even the barWindow read on a half-destroyed root is covered.
     try {
-      const w = root.barWindow
-      if (!w) return false
-      return w.trayTriggerHovered === true
+      return chevronArea.containsMouse === true
     } catch (e) { return false }
   }
-  // While a slot-reorder drag is live on this bar window the session group
-  // stays fully static: hovering it must not even latch the tray, or it
-  // would pop open the instant the drag ends (the drag suppressed the slide
-  // but the hover machinery kept running and armed the latch). Gate the
-  // hover reads themselves so nothing accumulates during a drag.
-  // Inert while a slot-reorder drag runs AND for a short grace after it,
-  // so a rearrange that leaves the cursor over the session doesn't slide
-  // the tray open on release; a deliberate fresh hover reopens it.
+  // A slot-reorder drag suppresses the slide entirely: reopening under a
+  // moving cursor would shift the row the drag is measuring. The window's
+  // grace flag keeps that true briefly after the drag, so a rearrange that
+  // leaves the pointer on the chevron needs a fresh hover to expand it.
   function windowFlag(name): bool {
     try {
       const w = root.barWindow
@@ -55,7 +44,13 @@ CollapsibleSlot {
     } catch (e) { return false }
   }
   readonly property bool dragMode: root.windowFlag("recentDragActive")
-  readonly property bool triggerHovered: !root.dragMode && root.triggerActive()
+  // A drag invalidates a hover that was already on the chevron: the pointer
+  // can stay parked there through the whole grace, and re-arming on the flag's
+  // falling edge would pop the tray open with no fresh gesture. Only a new
+  // chevron enter after the freeze lifts clears the invalidation.
+  property bool hoverInvalidated: false
+  readonly property bool triggerHovered: !root.dragMode
+    && !root.hoverInvalidated && root.triggerActive()
   // Whole-module hover is the fill AND any item: sibling MouseAreas do not
   // share hover (moving onto the top one exits the one below), so the fill
   // alone goes false over the icons while the icons themselves go true.
@@ -66,19 +61,30 @@ CollapsibleSlot {
   property int _itemHoverCount: 0
   readonly property bool selfHovered: !root.dragMode && (root.hovered || root._itemHoverCount > 0)
   readonly property bool hasItems: SystemTray.items.values.length > 0
-  // The expansion trigger (logout) is a group member alongside the tray,
-  // so whenever this module is rendered the trigger is present too. Ask the
-  // group (not the raw layout) so the tray stays robust to composition
-  // changes.
-  readonly property bool logoutPresent: Bar.isModuleVisible("logout")
+  // An empty tray shrinks out of the row instead of snapping in one frame.
+  // Width rides Ui.slowMs and the fade Ui.fastMs, the same pair the zone uses
+  // when a module enters or leaves, so the neighbor slots glide with it.
+  property real presence: root.hasItems ? 1 : 0
+  Behavior on presence {
+    enabled: MotionPolicy.enabled
+    NumberAnimation { duration: Ui.slowMs; easing.type: Easing.OutCubic }
+  }
+  property real presenceFade: root.hasItems ? 1 : 0
+  Behavior on presenceFade {
+    enabled: MotionPolicy.enabled
+    NumberAnimation { duration: Ui.fastMs }
+  }
+  // Hidden only once the shrink finishes, so the outgoing frames still paint.
+  visible: root.presence > 0
+  opacity: root.presenceFade
 
   // Hover latch. Briefly holds `open` after the last hover loss so the
-  // handoff between trigger -> fill -> item (and between adjacent items,
+  // handoff between chevron -> fill -> item (and between adjacent items,
   // where the leave fires just before the next enter) never flickers the
-  // slide. Hover here is seamless (the logout edge is static, fill covers
-  // gaps and items cover icons via the OR in selfHovered), so the grace
-  // only needs to bridge that ms-level handoff - 50ms closes fast once the
-  // cursor truly leaves, instead of lingering open.
+  // slide. The handoff is seamless - the chevron is static, the fill covers
+  // gaps and items cover icons via the OR in selfHovered - so the grace only
+  // needs to bridge that ms-level handoff: 50ms closes fast once the cursor
+  // truly leaves, instead of lingering open.
   property bool hoverLatch: false
   property int graceMs: 50
 
@@ -107,10 +113,11 @@ CollapsibleSlot {
     graceTimer.stop()
     root.hoverLatch = false
     root._itemHoverCount = 0
+    root.hoverInvalidated = true
   }
 
   readonly property bool open: !root.dragMode
-    && (!root.logoutPresent || root.hoverLatch || trayMenu.open)
+    && (root.hoverLatch || trayMenu.open)
 
   // A collapsing tray must not leave its tooltip behind: the collapse can
   // run without a leave (anchor destroyed, or the clip swallows the exit),
@@ -124,14 +131,19 @@ CollapsibleSlot {
     } catch (e) {}
   }
 
-  // Collapsible slot (see CollapsibleSlot.qml, collapseInOut for the
-  // easing rationale): 1 expanded, 0 collapsed. Zero width with no items.
+  // Collapsible slot (see CollapsibleSlot.qml, collapseInOut for the easing
+  // rationale): 1 expanded, 0 collapsed. The chevron is outside the slide and
+  // occupies chevronSlot while there are icons to reveal; with none, the whole
+  // slot - chevron included - measures zero.
   collapseShown: root.open
-  collapseFull: root.hasItems ? root.contentWidth : 0
+  collapseFull: root.contentWidth
   collapseInOut: true
   collapseAnimated: true
 
-  readonly property real contentWidth: trayRow.implicitWidth + root.sidePad * 2
+  implicitWidth: Math.round(root.presence
+    * (root.chevronSlot + Math.round(root.slide * root.collapseFull)))
+
+  readonly property real contentWidth: trayRow.implicitWidth
 
   Row {
     id: trayRow
@@ -140,12 +152,11 @@ CollapsibleSlot {
     // hover/clicks for tooltips and menus; the fill below still covers the
     // gaps. See selfHovered: fill XOR items would each go false alone.
     z: 2
-    // Hug the right (logout) side so the tray 'expands from the left': a
-    // leftward-growing tray pinned on its logout edge reveals the icon
-    // nearest logout first and extends the rest to the left - the clip
-    // shows the rightmost icons, then progressively more as it widens.
+    // Hugging the chevron's left edge makes the slide reveal icons from the
+    // right inward: the icon nearest the chevron appears first, and the rest
+    // extend to the left as the clipped slot widens.
     anchors.right: parent.right
-    anchors.rightMargin: root.sidePad
+    anchors.rightMargin: root.chevronSlot
     anchors.verticalCenter: parent.verticalCenter
     spacing: root.spacing
 
@@ -193,6 +204,66 @@ CollapsibleSlot {
     }
   }
 
+  // Disclosure affordance and trigger in one. The chevron points at the
+  // icons the slide reveals, stays visible while collapsed, and cross-fades
+  // to accent once the tray is open. It is raised above the icon row so its
+  // hover is never stolen by an icon.
+  MouseArea {
+    id: chevronArea
+
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: root.chevronSlot
+    height: parent.height
+    z: 3
+    hoverEnabled: true
+    cursorShape: Qt.PointingHandCursor
+    // Right-click belongs to the item DBusMenus, or to the configured
+    // command on the fill below; the chevron consumes hover and left-click.
+    acceptedButtons: Qt.LeftButton
+    // A hover arriving while the window is frozen is not a fresh gesture.
+    // Wait for a rising edge after the freeze to clear the drag invalidation.
+    onContainsMouseChanged: {
+      if (containsMouse && !root.dragMode) root.hoverInvalidated = false
+    }
+
+    // A themed SVG from the shipped set, so the affordance carries the same
+    // stroke, weight and DPR treatment as every other bar icon. Two stacked
+    // full-strength copies cross-fade rather than swapping a recolor URL: the
+    // move to accent is one continuous fade, gated by the shared motion
+    // policy. The resting copy uses the same tone as the neighboring icons.
+    Icon {
+      anchors.centerIn: parent
+      size: root.chevronSlot
+      name: "chevron"
+      // The shipped glyph points right; the tray opens leftward.
+      rotation: 180
+      colorKey: "foreground_0"
+      opacity: root.open ? 0 : 1
+      visible: opacity > 0
+
+      Behavior on opacity {
+        enabled: MotionPolicy.enabled
+        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+      }
+    }
+
+    Icon {
+      anchors.centerIn: parent
+      size: root.chevronSlot
+      name: "chevron"
+      rotation: 180
+      colorKey: "accent"
+      opacity: root.open ? 1 : 0
+      visible: opacity > 0
+
+      Behavior on opacity {
+        enabled: MotionPolicy.enabled
+        NumberAnimation { duration: Ui.fastMs; easing.type: Easing.OutCubic }
+      }
+    }
+  }
+
   // Whole-module hover keeps the tray expanded while crossing it. The row
   // sits above the built-in fill (z), so the per-item MouseAreas receive
   // hover/clicks first and the fill below still covers the gaps: accepting
@@ -233,10 +304,3 @@ CollapsibleSlot {
     }
   }
 }
-
-
-
-
-
-
-

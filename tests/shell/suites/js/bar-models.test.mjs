@@ -278,7 +278,7 @@ group('plain slots pass through in first-seen order', () => {
   eq('a zone value that is not an array is skipped', B.entranceExpectedIds({ left: 'clock', right: ['volume'] }, {}), ['volume'])
 })
 group('a group key expands to its members, never itself', () => {
-  // The bar's session group: one layout slot, two modules on screen.
+  // A two-member group: one layout slot, two modules on screen.
   const groups = { session: ['tray', 'logout'] }
   eq('the key becomes its members', B.entranceExpectedIds({ right: ['volume', 'session'] }, groups), ['volume', 'tray', 'logout'])
   eq('member order is the group order', B.entranceExpectedIds({ right: ['session'] }, groups), ['tray', 'logout'])

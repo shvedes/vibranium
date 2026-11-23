@@ -81,39 +81,26 @@ LayerSurface {
     ? (rightZone.width <= 0 || rightZone.height <= 0
       ? 0 : Math.ceil(rightZone.height)) : 0
 
-  // The logout trigger publishes its raw hover here. Logout.qml produces the
-  // hover value; arming a drag invalidates it. Lives on the window so each
-  // monitor's bar keeps its own state.
-  property bool logoutHovered: false
-
   // Count of zones on this window with a slot-reorder drag running. While a
-  // drag is live the session group must be inert: hovering it (the logout
-  // trigger) must not expand the tray, which would otherwise shift the row
-  // under the cursor mid-drag. Counted per window so a drag on one monitor
-  // never freezes another's session hover.
+  // drag is live the tray must be inert: hovering its chevron must not expand
+  // it, which would otherwise shift the row under the cursor mid-drag.
+  // Counted per window so a drag on one monitor never freezes another's bar.
   property int _slotDragCount: 0
   readonly property bool slotDragActive: win._slotDragCount > 0
 
-  // True during a drag and for a short grace after it ends. The session
-  // keys off this (not slotDragActive) so releasing a module that leaves
-  // the cursor parked over the session doesn't pop the tray open right
-  // after a rearrange; it only expands again on a deliberate fresh hover.
+  // True during a drag and for a short grace after it ends. The tray keys
+  // off this (not slotDragActive) so releasing a module that leaves the
+  // cursor parked on the chevron doesn't pop the tray open right after a
+  // rearrange; it only expands again on a deliberate fresh hover.
   property bool recentDragActive: false
   property int dragGraceMs: 450
-
-  // Shared hover state between the logout trigger and the tray module: the
-  // tray stays expanded while the logout icon (or the tray itself) is
-  // hovered. One derivation over the two source events, with the drag term
-  // winning, so a hover that arrived during a rearrange cannot re-arm the
-  // tray when the grace expires under a parked cursor.
-  readonly property bool trayTriggerHovered: !win.recentDragActive && win.logoutHovered
 
   function enterSlotDrag() {
     win._slotDragCount++
     win._armRecentDrag()
-    // Trace: the per-window drag count is the contract the session group
-    // reads to freeze itself, so a frozen tray is explained by the window
-    // that reported the drag rather than by a guess.
+    // The per-window drag count is the contract the tray reads to freeze
+    // itself, so a frozen tray is explained by the window that reported the
+    // drag rather than by a guess.
   }
   function leaveSlotDrag() {
     if (win._slotDragCount > 0) win._slotDragCount--
@@ -121,17 +108,16 @@ LayerSurface {
   }
   function _armRecentDrag() {
     win.recentDragActive = true
-    // A hover latched before the drag would survive the grace and pop the tray
-    // open when the freeze lifts, with no fresh hover to justify it. Discard it
-    // at the arm edge; only a new hover after the freeze may publish it again.
-    win.logoutHovered = false
+    // The tray drops its own hover latch when it sees this flag flip, so a
+    // hover swept over the chevron during a rearrange cannot survive the
+    // grace and reopen it with no fresh gesture to justify it.
     dragGraceTimer.restart()
   }
 
-  // Hold recentDragActive (and thus the session's inertness) for dragGraceMs
-  // after the last drag ends, then let the session react to hover again.
-  // Guarded so a timer firing during a still-running long drag doesn't lift
-  // the inertness; the next enter/leave re-arms it anyway.
+  // Hold recentDragActive (and thus the tray's inertness) for dragGraceMs
+  // after the last drag ends, then let it react to hover again. Guarded so a
+  // timer firing during a still-running long drag doesn't lift the
+  // inertness; the next enter/leave re-arms it anyway.
   Timer {
     id: dragGraceTimer
 

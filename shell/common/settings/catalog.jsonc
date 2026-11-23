@@ -661,6 +661,7 @@
                         "clock"
                     ],
                     "right": [
+                        "tray",
                         "keyboardLayout",
                         "caffeine",
                         "timer",
@@ -745,7 +746,7 @@
                 "visibility": "hidden"
             },
             {
-                "key": "shell.statusbar.logoutRightClick",
+                "key": "shell.statusbar.sessionRightClick",
                 "type": "string",
                 "default": "",
                 "label": "Right-click action",
@@ -1153,7 +1154,12 @@
                         {
                             "id": "bar-session",
                             "type": "toggle",
-                            "label": "Power & Tray"
+                            "label": "Session"
+                        },
+                        {
+                            "id": "bar-tray",
+                            "type": "toggle",
+                            "label": "Tray"
                         },
                         {
                             "id": "bar-nightLight",
