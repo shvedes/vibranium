@@ -440,32 +440,23 @@ t_eq "a seven-day step lands on 7 March" "2023-03-07" "$(qp_get sel.dayWeek)"
 # stepMonth
 # ---------------------------------------------------------------------------
 
-t_section "stepMonth coalesces inputs received during an active slide"
-t_eq "the slide duration is the 120ms token" "120" "$(qp_get st.slideMs)"
+t_section "stepMonth lands every step immediately"
 t_eq "a fresh calendar is on September 2024" "2024/8" "$(qp_get st.a.before)"
-t_eq "one stepMonth(1) moves to October immediately" "2024/9" "$(qp_get st.a.after1)"
-t_eq "and puts the component into the sliding state" "true" "$(qp_get st.a.sliding)"
-t_eq "queued deltas wait until the current transition settles" "2024/9" "$(qp_get st.a.afterSecondCall)"
-t_eq "the third step is queued too" "2024/9" "$(qp_get st.a.afterThirdCall)"
-t_eq "the backward year jump is accumulated, not applied mid-slide" "2024/9" "$(qp_get st.a.afterYearJump)"
-t_eq "zero is ignored without changing the queued delta" "2024/9" "$(qp_get st.a.afterZeroDelta)"
-t_eq "the net queued delta is -10 months" "-10" "$(qp_get st.a.pendingDelta)"
-t_eq "the queued delta is applied when the slide settles" "2023/11" "$(qp_get st.a.afterQueued)"
-t_eq "the pending delta is cleared after it is applied" "0" "$(qp_get st.a.pendingAfter)"
-t_eq "rapid three forward steps coalesce into two additional months" "2024/11" "$(qp_get st.rapid.afterCoalesced)"
-t_eq "the rapid calendar clears its pending delta" "0" "$(qp_get st.rapid.pendingAfter)"
-# A separate calendar that has no queued delta can step again after settling.
-t_eq "after the slide finishes the guard is released" "false" "$(qp_get st.b.sliding)"
-t_eq "so stepMonth(-1) lands, back to August" "2024/7" "$(qp_get st.b.afterMinus1)"
-t_eq "and re-arms the slide for the next one" "true" "$(qp_get st.b.slidingDuring)"
-t_eq "so a settled calendar really does step" "true" "$(qp_get st.b.worked)"
+t_eq "one stepMonth(1) moves to October" "2024/9" "$(qp_get st.a.after1)"
+t_eq "a second step lands on November at once" "2024/10" "$(qp_get st.a.afterSecondCall)"
+t_eq "and a third on December" "2024/11" "$(qp_get st.a.afterThirdCall)"
+t_eq "a backward year jump is applied immediately" "2023/11" "$(qp_get st.a.afterYearJump)"
+t_eq "zero is ignored" "2023/11" "$(qp_get st.a.afterZeroDelta)"
+t_eq "three rapid steps land three months on" "11" "$(qp_get st.rapid.immediateMonth)"
+t_eq "and the later reading agrees" "2024/11" "$(qp_get st.rapid.afterSteps)"
+t_eq "a separate calendar steps back to August" "2024/7" "$(qp_get st.b.afterMinus1)"
+t_eq "so a later step really does land" "true" "$(qp_get st.b.worked)"
 
 t_section "stepping across a year boundary rolls the year"
 # This is the path the library is actually asked for: stepMonth() calls
 # CalendarLib.stepMonth, which builds new Date(year, month + delta, 1) and so
 # handles the rollover the way the direct viewMonth assignment does not.
 t_eq "the calendar starts on December 2024" "2024/11" "$(qp_get st.c.before)"
-t_eq "with no slide in flight" "false" "$(qp_get st.c.sliding)"
 t_eq "one step forward gives January 2025" "2025/0" "$(qp_get st.c.after)"
 t_eq "month AND year both rolled" "true" "$(qp_get st.c.rolledToNextYear)"
 t_eq "the new grid is a full January" "31" "$(qp_get st.c.januaryLength)"
@@ -804,8 +795,7 @@ t_skip "the wheel handler" \
   "onWheel is a mouse event; the onWheel -> stepMonth(+/-1) mapping and its direction (negative angleDelta.y steps forward) are unverified"
 t_skip "Keys.onLeftPressed / RightPressed / UpPressed / DownPressed" \
   "synthetic key events are not delivered to an item without a window; the plain-arrow day/week and Ctrl+arrow month mappings are only covered through stepDay()/stepMonth() directly, not through the key handlers themselves"
-t_skip "the slide animation's in-flight position" \
-  "gridHost.x and gridHost.opacity are file-private ids, so only the _sliding flag is observable - the probe can see that a slide started and that it finished, not where the grid was at 40ms"
+t_note "month changes swap the grid in place: there is no slide, fade or queue left to sample, so stepMonth is asserted through the resulting viewYear/viewMonth instead"
 t_skip "the month title text" \
   "monthTitle is a file-private id, so Qt.formatDate(new Date(viewYear, viewMonth, 1), 'MMMM yyyy') cannot be read back; the grid is asserted instead, and it is derived from the same two properties"
 t_skip "rendered pixels of the plot" \

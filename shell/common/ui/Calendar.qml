@@ -12,8 +12,8 @@ import "CalendarLib.js" as CalendarLib
 // - Clicking a day selects it: the year progress bar (share of the year
 //   behind that day) updates live. Right-clicking slides back to today.
 // - The month is scrollable: the mouse wheel, the header chevrons, and the
-//   arrow keys (when focused) step it, animated as a simple horizontal
-//   slide.
+//   arrow keys (when focused) step it. Month changes are immediate: the
+//   grid swaps in place with no slide or fade.
 // - Today is marked with an accent underline (accent fill when selected).
 Item {
   id: root
@@ -42,6 +42,9 @@ Item {
   readonly property int viewYearRolled: root.viewYear + Math.floor(root.viewMonth / 12)
 
   signal daySelected(date date)
+  // The month title is the view switch: hosts wire this to their month/year
+  // transition, so the title stays the single affordance for changing scale.
+  signal viewToggleRequested()
 
   // ---- geometry -----------------------------------------------------------
   // Painted from the CalendarLib layout constants - the single source of
@@ -114,28 +117,20 @@ Item {
 
   // ---- behavior -----------------------------------------------------------
 
-  // Slide-fade state; deltas arriving mid-slide are coalesced into the next
-  // transition rather than discarded.
-  property bool _sliding: false
-  property int _pendingMonthDelta: 0
+  // The animated flag is for explicit chevron navigation: the grid slides
+  // in from the travel side while fading up. Wheel and keys stay instant.
+  property real monthShiftY: 0
 
-  function stepMonth(delta) {
+  function stepMonth(delta, animated) {
     if (!isFinite(delta) || delta === 0) return
-    if (root._sliding) {
-      root._pendingMonthDelta += delta
-      return
-    }
-    root._sliding = true
-    const dir = delta > 0 ? 1 : -1
     const next = CalendarLib.stepMonth(root.viewYearRolled, root.viewMonthIndex, delta)
     root.viewYear = next.year
     root.viewMonth = next.month
-    // Slide-fade in, just like settings-menu navigation: begin from a
-    // short offset on the travel side (next from the right, prev from the
-    // left), faded out, then ease both to rest.
-    gridHost.x = dir * 48
-    gridHost.opacity = 0
-    monthSlide.start()
+    if (animated === true) {
+      monthShiftY = delta > 0 ? 36 : -36
+      gridHost.opacity = 0
+      monthSlide.restart()
+    }
   }
 
   function selectDay(year, month, day) {
@@ -193,10 +188,20 @@ Item {
 
       anchors.centerIn: parent
       text: Qt.formatDate(new Date(root.viewYearRolled, root.viewMonthIndex, 1), "MMMM yyyy")
-      color: Ui.solid("foreground_0")
+      color: monthTitleHover.containsMouse
+        ? Ui.solid("accent") : Ui.solid("foreground_0")
       font.pixelSize: Ui.fontM
       font.family: Ui.fontFamily
       font.bold: true
+
+      MouseArea {
+        id: monthTitleHover
+
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: root.viewToggleRequested()
+      }
     }
 
     Text {
@@ -217,7 +222,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.stepMonth(-1)
+        onClicked: root.stepMonth(-1, true)
       }
     }
 
@@ -239,7 +244,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.stepMonth(1)
+        onClicked: root.stepMonth(1, true)
       }
     }
   }
@@ -319,7 +324,7 @@ Item {
   Item {
     id: gridHost
 
-    y: root.gridY
+    y: root.gridY + root.monthShiftY
     width: root.gridW
     height: root.gridH
 
@@ -389,15 +394,12 @@ Item {
     }
   }
 
-  // Slide-fade for month switching (same feel as settings-menu navigation):
-  // the new month starts a short offset away and faded out, then slides and
-  // fades in to rest. The old month simply swaps out underneath.
   ParallelAnimation {
     id: monthSlide
 
     NumberAnimation {
-      target: gridHost
-      property: "x"
+      target: root
+      property: "monthShiftY"
       to: 0
       duration: Ui.fastMs
       easing.type: Easing.OutCubic
@@ -407,13 +409,6 @@ Item {
       property: "opacity"
       to: 1
       duration: Ui.fastMs
-    }
-
-    onFinished: {
-      root._sliding = false
-      const delta = root._pendingMonthDelta
-      root._pendingMonthDelta = 0
-      if (delta !== 0) root.stepMonth(delta)
     }
   }
 }

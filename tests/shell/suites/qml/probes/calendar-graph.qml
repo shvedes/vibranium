@@ -932,15 +932,13 @@ Item {
     return parts[parts.length - 1]
   }
 
-  // ---- phase 14: the month-slide queue ---------------------------------
-  // Deltas that arrive during a slide accumulate and start after it settles.
+  // ---- phase 14: month stepping is immediate ----------------------------
+  // No animation and no queue: every call lands on the next month at once.
 
   function p14StepGuard() {
-    kv("st.slideMs", Ui.fastMs)
     kv("st.a.before", stA.viewYear + "/" + stA.viewMonth)
     stA.stepMonth(1)
     kv("st.a.after1", stA.viewYear + "/" + stA.viewMonth)
-    kv("st.a.sliding", stA._sliding)
     stA.stepMonth(1)
     kv("st.a.afterSecondCall", stA.viewYear + "/" + stA.viewMonth)
     stA.stepMonth(1)
@@ -949,12 +947,10 @@ Item {
     kv("st.a.afterYearJump", stA.viewYear + "/" + stA.viewMonth)
     stA.stepMonth(0)
     kv("st.a.afterZeroDelta", stA.viewYear + "/" + stA.viewMonth)
-    kv("st.a.pendingDelta", stA._pendingMonthDelta)
     stRapid.stepMonth(1)
     stRapid.stepMonth(1)
     stRapid.stepMonth(1)
     kv("st.rapid.immediateMonth", stRapid.viewMonth)
-    kv("st.rapid.pending", stRapid._pendingMonthDelta)
   }
 
   // ---- phase 15: FunctionGraph defaults and a well-formed sample --------
@@ -1122,18 +1118,13 @@ Item {
     kv("lib.gridlines.infiniteXStep", gDef._xStep(Infinity, 268))
   }
 
-  // ---- phase 18: stepMonth again, once the slide has finished -----------
+  // ---- phase 18: later steps on the same calendars -----------------------
 
   function p19StepAfterSettle() {
-    kv("st.a.afterQueued", stA.viewYear + "/" + stA.viewMonth)
-    kv("st.a.pendingAfter", stA._pendingMonthDelta)
-    kv("st.rapid.afterCoalesced", stRapid.viewYear + "/" + stRapid.viewMonth)
-    kv("st.rapid.pendingAfter", stRapid._pendingMonthDelta)
-    kv("st.b.sliding", stB._sliding)
+    kv("st.rapid.afterSteps", stRapid.viewYear + "/" + stRapid.viewMonth)
     kv("st.b.before", stB.viewYear + "/" + stB.viewMonth)
     stB.stepMonth(-1)
     kv("st.b.afterMinus1", stB.viewYear + "/" + stB.viewMonth)
-    kv("st.b.slidingDuring", stB._sliding)
     kv("st.b.worked", stB.viewMonth === 7)
   }
 
@@ -1226,7 +1217,6 @@ Item {
 
   function p23StepYearForward() {
     kv("st.c.before", stC.viewYear + "/" + stC.viewMonth)
-    kv("st.c.sliding", stC._sliding)
     stC.stepMonth(1)
     kv("st.c.after", stC.viewYear + "/" + stC.viewMonth)
     kv("st.c.rolledToNextYear", stC.viewYear === 2025 && stC.viewMonth === 0)
@@ -1239,7 +1229,6 @@ Item {
 
   function p27StepYearBack() {
     kv("st.d.before", stD.viewYear + "/" + stD.viewMonth)
-    kv("st.d.sliding", stD._sliding)
     stD.stepMonth(-1)
     kv("st.d.after", stD.viewYear + "/" + stD.viewMonth)
     kv("st.d.rolledToPrevYear", stD.viewYear === 2023 && stD.viewMonth === 11)
