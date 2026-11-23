@@ -1446,10 +1446,13 @@ function keyRoute(ctx) {
   // walk the same stages as Enter/click. Rows with neither fall through
   // to the filter behavior of Delete below. Editors are skipped so
   // Delete keeps deleting text inside an open input.
-  if (ctx.grid !== true && list && ctx.editor !== true
+  if (ctx.grid !== true && list && ctx.editor !== true && ctx.field !== true
     && (k === "deleteKey" || (ctrl && k === "keyD"))) {
     if (ctx.del === true) return { name: "delete", arg: null }
     if (ctx.confirm === true) return { name: "confirm", arg: null }
+    // Delete is the row verb, not the filter opener. A row without a
+    // delCommand simply swallows it, the way Ctrl+D does.
+    return { name: "delete", arg: null }
   }
 
   switch (k) {

@@ -446,12 +446,14 @@ Item {
   // child paints at fontM behind the icon column it declares and left of its
   // toggle, so each of those is reserved from the same tokens GroupRow draws
   // with.
-  function _groupNeedW(itm) {
+  function _groupNeedW(itm, depth) {
     const kids = root._groupChildrenOf(itm)
     if (kids.length === 0) return 0
+    const level = Number(depth) || 0
     let maxLabel = 0
     let maxSub = 0
     let maxValue = 0
+    let nestedNeed = 0
     let hasIcon = false
     let hasToggle = false
     const valueW = (text, key) => {
@@ -497,10 +499,30 @@ Item {
         maxValue = Math.max(maxValue,
           Math.max(valueW(kid.placeholder, "ph"), valueW(kid.value, "val"))
             + Ui.childIconW + Ui.toggleW)
-      } else if (Array.isArray(kid.options)) {
+      } else if (Array.isArray(kid.options) && kid.options.length > 0) {
         for (let o = 0; o < kid.options.length; o++) {
           const opt = kid.options[o] ?? {}
           maxValue = Math.max(maxValue, valueW(opt.label ?? opt.value, "opt" + o))
+        }
+      } else if (Array.isArray(kid.flow)) {
+        // A staged flow draws its own option rows and editor field inside the
+        // child's dropdown. The card has to be as wide as the widest stage or
+        // every option label and placeholder elides when the stage opens.
+        for (let s = 0; s < kid.flow.length; s++) {
+          const stage = kid.flow[s] ?? {}
+          if (Array.isArray(stage.options)) {
+            for (let o = 0; o < stage.options.length; o++) {
+              const opt = stage.options[o] ?? {}
+              maxValue = Math.max(maxValue,
+                valueW(opt.label ?? opt.value, "flow" + s + "o" + o))
+            }
+          }
+          if (stage.kind === "text" || stage.kind === "number"
+            || stage.kind === "range") {
+            maxValue = Math.max(maxValue,
+              Math.max(valueW(stage.placeholder, "flowph" + s),
+                valueW(stage.subAccent, "flowsub" + s)))
+          }
         }
       } else if (kid.type === "number" || kid.type === "range") {
         // The readout includes the unit suffix, and its widest possible
@@ -513,12 +535,20 @@ Item {
         && (kid.var !== undefined || kid.value !== undefined)) {
         maxValue = Math.max(maxValue, valueW(kid.value, "val"))
       }
+      // A group inside a group paints its own dropdown one register deeper.
+      // Measure it too, or the inner row's label and placeholders elide on a
+      // card sized only for the outer children.
+      if (level < 3 && kid.type === "group"
+        && Array.isArray(kid.children) && kid.children.length > 0) {
+        nestedNeed = Math.max(nestedNeed, root._groupNeedW(kid, level + 1))
+      }
     }
     if (maxLabel === 0 && maxSub === 0 && maxValue === 0) return 0
-    return root.rowChromeW() + 2 * Ui.m
+    const own = root.rowChromeW() + 2 * Ui.m
       + (hasIcon ? Ui.childIconW + Ui.s : 0)
       + Ui.s + (hasToggle ? Ui.toggleW : 0) + Math.max(maxLabel, maxSub)
       + (maxValue > 0 ? Ui.s + maxValue : 0)
+    return Math.max(own, nestedNeed + Ui.s * (level + 1))
   }
 
   // Width the open group dropdown needs, or 0 when none is open - the same

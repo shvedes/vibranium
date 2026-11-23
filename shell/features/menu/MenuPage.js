@@ -36,6 +36,10 @@ function defaultsFor(type) {
     label: "",
     sub: "",
     icon: "",
+    // Optional theme colour key for the row's icon. Empty keeps the shared
+    // foreground colour; a destructive row can ask for "red" without a
+    // provider accent hook (which only recolours indicator-class glyphs).
+    iconColor: "",
     // Short display text painted in the row's icon slot (the emoji picker
     // carries one emoji here); rendered by Entry.qml when icon is empty.
     glyph: "",
@@ -460,6 +464,9 @@ function buildPage(id, title, width, rawItems, opts) {
     // has nothing to span. The panel arms the scoped filter on the first
     // keystroke when the current page declares it.
     filterDefault: opts.filterDefault === true,
+    // A dynamic page that wants typed text to run a global cross-page search
+    // instead of the default scoped filter.
+    searchGlobal: opts.searchGlobal === true,
     items: items,
     // Raw sources kept for later extension merges; merging happens on raw
     // objects so every final page can be re-normalized with fresh uids.

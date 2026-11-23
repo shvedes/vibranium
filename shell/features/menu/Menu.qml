@@ -239,6 +239,10 @@ Singleton {
     root.stack = []
     root.resetSearch()
     root._states = ({})
+    // Flow stages are session state: a wizard left half-filled must not stay
+    // parked on its later stage when the same menu is summoned again.
+    root._flow = ({})
+    root._slotCloses = ({})
     root.rev++
     SurfaceClaim.release(root._claimToken)
     root._claimToken = null
@@ -743,9 +747,12 @@ Singleton {
     // its expanded dropdown with no region or background.
     root._pendingQueryGen++
     if (root.frame && root.hasDynamicPage(root.frame.id)) {
-      if (!root.scopedActive) root.beginScoped()
-      root.setScopedQuery(q)
-      return
+      const pg = root.pageById(root.frame.id)
+      if (!pg || pg.searchGlobal !== true) {
+        if (!root.scopedActive) root.beginScoped()
+        root.setScopedQuery(q)
+        return
+      }
     }
     root._applyQuery(String(q ?? ""))
   }
@@ -957,6 +964,16 @@ Singleton {
       && typeof ProviderHost.providerFor === "function") {
       try {
         const p = ProviderHost.providerFor(id)
+        if (p) return p
+      } catch (e) {}
+    }
+    // One page-level resolver can serve hundreds of rows without claiming a
+    // provider id for each one. ProviderHost copies its frozen table on every
+    // claim, which made a store change cost seconds on the UI thread.
+    const api = root.frame ? root._dynamicApis[root.frame.id] : null
+    if (api && typeof api.provider === "function") {
+      try {
+        const p = api.provider(id)
         if (p) return p
       } catch (e) {}
     }
@@ -1739,7 +1756,10 @@ Singleton {
       }
       return null
     }
-    return findIn(items, 4)
+    // A vault can nest far deeper than four groups. Resolve by uid through
+    // the whole live tree so a deep row's provider, guard and landing waiter
+    // can find it; the walk is bounded only to stop a malformed cycle.
+    return findIn(items, 12)
   }
 
   function hasPage(id) {
@@ -2125,6 +2145,22 @@ Singleton {
     root.rev++
     if (value === true && item && item.uid && root._slotCloses[item.uid] !== undefined)
       root._setSlotClose(item.uid, false)
+  }
+
+  // Open a whole ancestor chain with one rev bump. A deep landing used to
+  // write each group separately, and every write re-ran row projection and
+  // width measurement over the whole vault on the UI thread.
+  function setExpandedBatch(items, value) {
+    const list = Array.isArray(items) ? items : []
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i]
+      if (!it || !it.uid) continue
+      if (value !== true) root._setSlotClose(it.uid, true)
+      root._rawState(it).expanded = value === true
+      if (value === true && root._slotCloses[it.uid] !== undefined)
+        root._setSlotClose(it.uid, false)
+    }
+    if (list.length > 0) root.rev++
   }
 
   function setInfo(item, value) {

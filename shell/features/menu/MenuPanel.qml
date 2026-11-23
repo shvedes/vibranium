@@ -144,9 +144,6 @@ Rectangle {
   readonly property int gridCols: panel.gridGeometry.cols
   readonly property real gridSide: panel.gridGeometry.side
 
-  readonly property int gridRows: Math.ceil(panel.rowsModel.length / panel.gridCols)
-  readonly property real gridContentH: panel.gridRows * panel.gridSide
-
   // Frozen chrome slots so the row diff treats spacers as unchanged
   // between recompositions (identity, not value, is compared).
   property var _gridPool: MenuLayout.createPool()
@@ -681,7 +678,6 @@ Rectangle {
     // leaves, so anything pruned here has no delegate left to report.
     Menu.pruneSlotCloses(candidate)
     panel.queueFit()
-    metrics.recalcWidth()
   }
 
   // Whether this install can be sized from the MODEL: nothing open, closing,
@@ -2149,8 +2145,10 @@ Rectangle {
       ? Math.round(pg.maxHeight) : 0
   }
 
+  // A page may declare its own ceiling, including one taller than the panel's
+  // default. The default still applies to pages that name none.
   readonly property real effMaxHeight: panel.pageMaxHeight > 0
-    ? Math.min(panel.pageMaxHeight, panel.maxHeight) : panel.maxHeight
+    ? Math.min(panel.pageMaxHeight, panel.hardMaxHeight) : panel.maxHeight
 
   readonly property real regionChromeH: Ui.chromeHeight(Ui.outerPad, Ui.filterH, Ui.listTopGap)
 
@@ -2329,7 +2327,8 @@ Rectangle {
       return {
         sub: "",
         widest: "",
-        restH: RowGeometry.restSeparatorFor(lbl !== "", lineH)
+        restH: Number(it.sepHeight) > 0 ? Number(it.sepHeight)
+          : RowGeometry.restSeparatorFor(lbl !== "", lineH)
       }
     }
     // One provider resolution for both facts (see Menu.rowFactsFor): the
@@ -3531,8 +3530,31 @@ Rectangle {
     } else Qt.callLater(publish)
   }
 
+  function focusFilter(mode) {
+    focusCtrl.openMode = mode === "list" ? "list" : "filter"
+    focusCtrl.reassert()
+    if (focusCtrl.openMode === "filter") focusCtrl.grabFilter()
+  }
+
   function currentRow() {
     return panel.gridMode ? grid.currentItem : list.currentItem
+  }
+
+  // The deepest open child under the page cursor. Delete/Ctrl+D and other
+  // row verbs must act on the row the user is actually looking at, not on
+  // its outer group (a nested folder would otherwise turn its parent into a
+  // deletion confirmation).
+  function focusedRow() {
+    let row = panel.currentRow()
+    for (let depth = 0; depth < 4 && row && row.isGroup
+      && typeof row._focusedChildRow === "function"; depth++) {
+      if (row.childIndex < 0) break
+      const kid = row._focusedChildRow()
+      if (!kid || !kid.itm || typeof kid.itm.delCommand !== "string"
+        || kid.itm.delCommand === "") break
+      row = kid
+    }
+    return row
   }
 
   // Grid motion lives in GridList (common/ui/GridList.qml); these stay
@@ -4433,6 +4455,11 @@ Rectangle {
   }
 
   function escapeChain() {
+    // A staged flow owns Escape ahead of the field and the filter: step back
+    // one stage, keeping the values already typed in earlier stages.
+    const frow = panel.focusedRow()
+    if (frow && frow.isFlow && frow.flowIndex > 0
+      && typeof frow.backFlow === "function" && frow.backFlow()) return
     // "/" trigger armed: Esc while typing only de-focuses the box - the
     // query text and the trim both stay, so arrow-key browsing keeps the
     // filtered page. A second Esc (list mode) drops the trim and restores
@@ -4506,10 +4533,7 @@ Rectangle {
     // stage has no field to swallow the key, so without this step Esc folds
     // the whole wizard instead of returning to the previous stage (e.g.
     // from "generate / enter" back to the filename input).
-    if (deep && deep !== row && deep.isFlow && deep.flowIndex > 0
-      && typeof deep.backFlow === "function" && deep.backFlow()) return
-    if (row && row.isFlow && row.flowIndex > 0
-      && typeof row.backFlow === "function" && row.backFlow()) return
+
     if (row && row.expanded) {
       row.collapse()
       return
@@ -4689,7 +4713,7 @@ Rectangle {
         return !!c && c.editorOpen === true
       },
       get del() {
-        const r = cur()
+        const r = panel.focusedRow()
         return !!r && !!r.itm && typeof r.itm.delCommand === "string"
           && r.itm.delCommand !== ""
       },
@@ -4754,7 +4778,7 @@ Rectangle {
       case "swallow":
         break
       case "delete": {
-        const drow = panel.currentRow()
+        const drow = panel.focusedRow()
         if (drow) drow.requestDelete()
         break
       }

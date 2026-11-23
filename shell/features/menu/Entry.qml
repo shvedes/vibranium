@@ -388,9 +388,9 @@ Item {
   readonly property var deleteConfirm: itm && typeof itm.delCommand === "string" && itm.delCommand !== ""
     ? {
         stages: 2,
-        hint: "Press Delete again to remove this timer",
+        hint: "Press Delete again to remove " + String(itm?.label ?? "this item"),
         armed: "<b><u>Press Delete again to confirm removal</u></b>",
-        label: "Remove timer"
+        label: "Remove " + String(itm?.label ?? "item")
       } : null
   readonly property var activeConfirm: row.deleteArmed ? row.deleteConfirm : row.confirm
 
@@ -1667,7 +1667,7 @@ Item {
       // The glyph stays in the ordinary foreground so the swatch strip below
       // - painted in the theme's real colors - is the only place color is
       // sampled.
-      colorKey: "foreground_0"
+      colorKey: itm && String(itm.iconColor ?? "") !== "" ? String(itm.iconColor) : "foreground_0"
       accentKey: row.iconAccentKey
     }
 
@@ -2125,7 +2125,7 @@ Item {
 
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      visible: row.isSelect && !row.isActionSelect
+      visible: row.isSelect && !row.isActionSelect && !(itm && itm.hideValue)
       // Width probe (house pattern, see valueMetrics): sizing off the
       // item's own implicitWidth loops the binding and freezes the box
       // stale after picking a longer option. A select value never joins
@@ -3675,9 +3675,14 @@ Item {
       // next stage and close the row. Only the front layer owns the row's
       // commit and escape verbs.
       function ownsRow() {
+        // A ghost from an earlier stage must not consume Enter/Escape after
+        // the flow has advanced. The stage index captured at creation is the
+        // simplest proof that this field still belongs to the live stage.
+        if (row.isFlow && _stageIndex !== row.flowIndex) return false
         const host = expLoader.item && expLoader.item.debugEditorHost
         return !host || (host.frontItem && host.frontItem.viewItem === stageEditor)
       }
+      property int _stageIndex: row.flowIndex
       onCommit: text => { if (stageEditor.ownsRow()) row.commitEditor(text) }
       onInvalid: msg => row.showEditorError(msg)
       onRecovered: row.clearEditorError()
