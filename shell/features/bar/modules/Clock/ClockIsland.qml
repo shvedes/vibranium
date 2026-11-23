@@ -5,12 +5,12 @@ import qs.common
 import "../../../../common/text/Clock.js" as ClockFmt
 import "../../../../common/ui/CalendarLib.js" as CalendarLib
 import "../../../../common/ui/MoonPhaseLib.js" as MoonLib
+import "../../../../common/ui/SunLib.js" as SunLib
 
-// The clock's island content, split the way GNOME splits its calendar popup:
-// a month grid on the left, a hairline divider, and the selected day's moon
-// phase on the right. The right side shows that day plus the five after it,
-// so clicking any date moves all six entries with the selection. Today stays
-// honest across midnight through the module's SystemClock, which ticks
+// The clock's island content, laid out as Month | Sun | Moon: a month grid
+// on the left, a hairline divider, then the selected day's sun and moon on
+// the right. Clicking a date moves both right-hand sections with it. Today
+// stays honest across midnight through the module's SystemClock, which ticks
 // forever in Clock.qml so every fresh calendar is born on the right date.
 //
 // Sizing: Calendar and the pane constants are fixed, so the card derives its
@@ -22,8 +22,8 @@ Item {
   // The module's live date, handed down rather than read out of Clock.qml:
   // an island has no business resolving an id from its module's file scope.
   property date today: new Date()
-  // The day whose moon the right pane describes. goToToday() emits
-  // daySelected on open, so the selection and the pane agree from frame one.
+  // The day whose sun and moon the right pane describes. goToToday() emits
+  // daySelected on open, so both sections agree with the grid from frame one.
   property date selectedDate: new Date()
 
   readonly property bool moonEnabled: Settings.value("shell.statusbar.clockMoonPhase") === true
@@ -39,24 +39,46 @@ Item {
   readonly property int paneGap: 10
   readonly property int separatorW: 1
   readonly property int moonPaneW: 196
-  readonly property int heroDisc: 46
-  readonly property int rowDisc: 24
-  readonly property int rowGap: 8
   readonly property int titleH: CalendarLib.titleH
-  readonly property int heroY: root.titleH + Ui.s
-  readonly property int heroH: 60
-  readonly property int nextY: root.heroY + root.heroH + Ui.s
-  readonly property int rowY: root.nextY + 16 + 6
-  readonly property int rowH: 28
+  readonly property int heroDisc: 44
+  readonly property int rowDisc: 22
+  readonly property int rowGap: 8
+  readonly property int heroY: 100
+  readonly property int rowsY: 152
+  readonly property int rowH: 24
   readonly property int rowTextX: root.rowDisc + root.rowGap
+  readonly property int rowPhaseX: root.rowTextX + 32
 
   readonly property var forecast: MoonLib.forecast(root.selectedDate, 6)
   readonly property var hero: root.forecast.length > 0 ? root.forecast[0] : null
   readonly property var nextEvent: MoonLib.nextPrincipal(root.selectedDate, 14)
-  // The event instant is formatted through the shared clock label so the
-  // 12/24-hour setting applies here exactly as it does to the bar and lock.
+  // The event instant uses the shared clock label so the 12/24-hour setting
+  // applies here exactly as it does to the bar and lock.
   readonly property string eventTime: root.nextEvent
     ? ClockFmt.clockLabel(root.nextEvent.at.getTime(), TimeFormat.use12h) : ""
+
+  function clock(at) {
+    return at ? ClockFmt.clockLabel(at.getTime(), TimeFormat.use12h) : ""
+  }
+
+  // The weather service persists its configured location into shell state;
+  // reading that section here avoids importing the whole services module
+  // (whose singletons need a window backend) into an island. No coordinates
+  // means no made-up times: the pane says so instead.
+  readonly property var weatherSection: ShellState.section("weather") || ({})
+  readonly property var sunLocation: SunLib.validPair(
+    weatherSection.latitude, weatherSection.longitude)
+  readonly property var sun: root.sunLocation
+    ? SunLib.forDate(root.selectedDate, root.sunLocation.latitude,
+      root.sunLocation.longitude) : null
+  readonly property string riseText: root.sun && root.sun.sunrise
+    ? root.clock(root.sun.sunrise) : "\u2014"
+  readonly property string setText: root.sun && root.sun.sunset
+    ? root.clock(root.sun.sunset) : "\u2014"
+  readonly property string sunLength: !root.sun ? "Set a location in Weather"
+    : root.sun.polar === "day" ? "24h of daylight"
+    : root.sun.polar === "night" ? "No daylight"
+    : SunLib.span(root.sun.dayLengthMinutes) + " of daylight"
 
   Row {
     anchors.fill: parent
@@ -94,10 +116,79 @@ Item {
       visible: root.moonEnabled
       clip: true
 
+      // ---- Sun: the selected day's light ---------------------------------
+
       Title {
         level: 2
-        anchors.left: parent.left
-        anchors.top: parent.top
+        y: 0
+        text: "DAYLIGHT"
+      }
+
+      Icon {
+        x: 0
+        y: 24
+        width: 16
+        height: 16
+        name: "sunrise"
+        colorKey: "foreground_0"
+        accentKey: "#ffb454"
+      }
+
+      Text {
+        x: 22
+        y: 24
+        text: root.riseText
+        color: Ui.solid("foreground_0")
+        font.pixelSize: Ui.fontS
+        font.family: Ui.fontFamily
+        font.bold: true
+      }
+
+      Icon {
+        x: 98
+        y: 24
+        width: 16
+        height: 16
+        name: "sunset"
+        colorKey: "foreground_0"
+        accentKey: "#ff6b5a"
+      }
+
+      Text {
+        x: 120
+        y: 24
+        text: root.setText
+        color: Ui.solid("foreground_0")
+        font.pixelSize: Ui.fontS
+        font.family: Ui.fontFamily
+        font.bold: true
+      }
+
+      Icon {
+        x: 0
+        y: 44
+        width: 14
+        height: 14
+        name: "weather-clear-day"
+        colorKey: "#ffd34d"
+      }
+
+      Text {
+        x: 20
+        y: 44
+        width: root.moonPaneW - 20
+        elide: Text.ElideRight
+        text: root.sunLength
+        color: Ui.solid("foreground_0")
+        font.pixelSize: Ui.fontXs
+        font.family: Ui.fontFamily
+      }
+
+      // ---- Moon: the selected day and the five after it ------------------
+
+      Title {
+        level: 2
+        y: 76
         text: "MOON PHASE"
       }
 
@@ -113,7 +204,7 @@ Item {
         x: root.heroDisc + root.rowGap
         y: root.heroY
         width: root.moonPaneW - root.heroDisc - root.rowGap
-        spacing: 2
+        spacing: 1
 
         Text {
           width: parent.width
@@ -150,13 +241,6 @@ Item {
         }
       }
 
-      Title {
-        level: 2
-        anchors.left: parent.left
-        y: root.nextY
-        text: "NEXT 5 DAYS"
-      }
-
       Repeater {
         model: root.forecast.slice(1)
 
@@ -165,7 +249,7 @@ Item {
           required property var modelData
 
           x: 0
-          y: root.rowY + index * root.rowH
+          y: root.rowsY + index * root.rowH
           width: root.moonPaneW
           height: root.rowH
 
@@ -179,17 +263,17 @@ Item {
 
           Text {
             x: root.rowTextX
-            y: 1
+            anchors.verticalCenter: parent.verticalCenter
             text: Qt.formatDate(parent.modelData.date, "ddd")
             color: Ui.solid("foreground_0")
-            font.pixelSize: Ui.fontS
+            font.pixelSize: Ui.fontXs
             font.family: Ui.fontFamily
             font.bold: true
           }
 
           Text {
-            x: root.rowTextX
-            y: 15
+            x: root.rowPhaseX
+            anchors.verticalCenter: parent.verticalCenter
             text: parent.modelData.short + " \u00b7 " + parent.modelData.percent + "%"
             color: parent.modelData.principal
               ? Ui.solid("accent") : Ui.tint("foreground_0", 0.6)

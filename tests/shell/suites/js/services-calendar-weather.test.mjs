@@ -405,19 +405,23 @@ group('the derived sizes agree with their own definitions', () => {
   is('a cell is wider than it is tall', CAL.cellW > CAL.cellH, (v) => v === true, 'landscape cell')
 })
 
-group('the vertical stack is header blocks then the grid, and nothing else', () => {
-  eq('gridY is the three header blocks with the 8px token between and after', CAL.gridY,
-    CAL.titleH + CAL.SP + CAL.yearBlockH + CAL.SP + CAL.weekdayRowH + CAL.SP)
-  eq('contentHeight is the grid offset plus the grid', CAL.contentHeight, CAL.gridY + CAL.gridH)
-  approx('contentHeight - gridY is exactly the grid height', CAL.contentHeight - CAL.gridY, CAL.gridH)
-  is('the header stack is shorter than the grid', CAL.gridY < CAL.gridH, (v) => v === true, 'gridY < gridH')
-  is('the painted height is the header plus the grid', CAL.contentHeight > CAL.gridY, (v) => v === true, 'contentHeight > gridY')
+group('the vertical stack is title, weekdays, grid, then year progress', () => {
+  eq('the weekday row follows the title', CAL.weekdayRowY, CAL.titleH + CAL.SP)
+  eq('gridY is the title, weekday row and one spacing token', CAL.gridY,
+    CAL.titleH + CAL.SP + CAL.weekdayRowH + CAL.SP)
+  eq('the year block follows the grid', CAL.yearBlockY, CAL.gridY + CAL.gridH + CAL.SP)
+  eq('contentHeight is the year block offset plus its height', CAL.contentHeight,
+    CAL.yearBlockY + CAL.yearBlockH)
+  approx('contentHeight - yearBlockY is exactly the year block',
+    CAL.contentHeight - CAL.yearBlockY, CAL.yearBlockH)
+  is('the header is shorter than the grid', CAL.gridY < CAL.gridH, (v) => v === true, 'gridY < gridH')
+  is('the year block sits below the grid', CAL.yearBlockY > CAL.gridY, (v) => v === true, 'year block after grid')
   // The spacing token is duplicated from Ui.s because a .js file cannot
   // import the QML singleton, so its value is pinned here instead.
   eq('the spacing token is Ui.s', CAL.SP, 8)
-  eq('the header blocks are title, year and weekday', [CAL.titleH, CAL.yearBlockH, CAL.weekdayRowH], [24, 32, 16])
-  eq('the published numbers', { cellW: CAL.cellW, cellH: CAL.cellH, cellGap: CAL.cellGap, gridW: CAL.gridW, gridH: CAL.gridH, gridY: CAL.gridY, contentHeight: CAL.contentHeight },
-    { cellW: 42, cellH: 28, cellGap: 2, gridW: 306, gridH: 178, gridY: 96, contentHeight: 274 })
+  eq('the blocks are title, weekday and year', [CAL.titleH, CAL.weekdayRowH, CAL.yearBlockH], [24, 16, 32])
+  eq('the published numbers', { cellW: CAL.cellW, cellH: CAL.cellH, cellGap: CAL.cellGap, gridW: CAL.gridW, gridH: CAL.gridH, gridY: CAL.gridY, yearBlockY: CAL.yearBlockY, contentHeight: CAL.contentHeight },
+    { cellW: 42, cellH: 28, cellGap: 2, gridW: 306, gridH: 178, gridY: 56, yearBlockY: 242, contentHeight: 274 })
   eq('MS_PER_DAY is the day maths constant', CAL.MS_PER_DAY, 24 * 60 * 60 * 1000)
 })
 

@@ -61,9 +61,9 @@ Item {
   // evaluated) width/height - hosts size their surfaces from these so the
   // card is never derived from a not-yet-evaluated binding.
   readonly property int desiredWidth: gridW
-  readonly property int desiredHeight: gridY + gridH
-  readonly property int yearBlockY: titleH + Ui.s
-  readonly property int weekdayRowY: yearBlockY + yearBlockH + Ui.s
+  readonly property int desiredHeight: CalendarLib.contentHeight
+  readonly property int yearBlockY: CalendarLib.yearBlockY
+  readonly property int weekdayRowY: CalendarLib.weekdayRowY
   readonly property int gridY: CalendarLib.gridY
 
   width: root.desiredWidth
@@ -152,13 +152,34 @@ Item {
     root.daySelected(root.selectedDate)
   }
 
+  // Arrows walk the selection by day and by week. selectDay keeps the view
+  // on the new date, so crossing a month boundary navigates as expected.
+  function stepDay(delta) {
+    if (!isFinite(delta) || delta === 0) return
+    const d = root.selectedDate
+    const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta)
+    root.selectDay(next.getFullYear(), next.getMonth(), next.getDate())
+  }
+
   // First render must match selectedDate even if a host assigned it after
   // construction; the binding already covers that, this keeps both paths.
   focus: true
-  Keys.onLeftPressed: root.stepMonth(-1)
-  Keys.onRightPressed: root.stepMonth(1)
-  Keys.onUpPressed: root.stepMonth(-12)
-  Keys.onDownPressed: root.stepMonth(12)
+  Keys.onLeftPressed: (event) => {
+    if (event.modifiers & Qt.ControlModifier) root.stepMonth(-1)
+    else root.stepDay(-1)
+  }
+  Keys.onRightPressed: (event) => {
+    if (event.modifiers & Qt.ControlModifier) root.stepMonth(1)
+    else root.stepDay(1)
+  }
+  Keys.onUpPressed: (event) => {
+    if (event.modifiers & Qt.ControlModifier) root.stepMonth(-12)
+    else root.stepDay(-7)
+  }
+  Keys.onDownPressed: (event) => {
+    if (event.modifiers & Qt.ControlModifier) root.stepMonth(12)
+    else root.stepDay(7)
+  }
 
   // ---- month title (with prev/next chevrons) ------------------------------
 
@@ -284,7 +305,8 @@ Item {
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         text: Qt.locale().dayName(weekday, Locale.ShortFormat).toUpperCase()
-        color: Ui.tint("foreground_0", 0.5)
+        color: weekday === 0 || weekday === 6
+          ? Ui.tint("red", 0.7) : Ui.tint("foreground_0", 0.5)
         font.pixelSize: Ui.fontXs
       font.family: Ui.fontFamily
         font.letterSpacing: 0.5
@@ -344,8 +366,8 @@ Item {
           color: parent.selected ? Ui.solid("background_0")
             : parent.cell.today ? (parent.cell.inMonth ? Ui.solid("accent") : Ui.tint("accent", 0.5))
             : parent.cell.inMonth
-              ? (parent.cell.weekend ? Ui.tint("foreground_0", 0.6) : Ui.solid("foreground_0"))
-              : Ui.tint("foreground_0", 0.3)
+              ? (parent.cell.weekend ? Ui.tint("red", 0.85) : Ui.solid("foreground_0"))
+              : (parent.cell.weekend ? Ui.tint("red", 0.4) : Ui.tint("foreground_0", 0.3))
           font.pixelSize: Ui.fontM
       font.family: Ui.fontFamily
           font.bold: parent.selected || parent.cell.today

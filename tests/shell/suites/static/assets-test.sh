@@ -35,7 +35,7 @@ WEATHER_MODEL="$SHELL_DIR/services/weather/Model.js"
 
 # Recorded inventories. These move when a glyph is added, which is a real
 # change and should show up in a diff rather than be absorbed.
-RECORDED_SVG_COUNT=190
+RECORDED_SVG_COUNT=192
 RECORDED_SUBDIRS="battery file hypr player weather"
 RECORDED_SYMLINKS=4
 RECORDED_BATTERY="battery-0

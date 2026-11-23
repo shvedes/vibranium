@@ -562,9 +562,9 @@ Item {
     kv("id.gridW", c.gridW === 7 * c.cellW + 6 * c.cellGap)
     kv("id.gridH", c.gridH === 6 * c.cellH + 5 * c.cellGap)
     kv("id.desiredWidth", c.desiredWidth === c.gridW)
-    kv("id.desiredHeight", c.desiredHeight === c.gridY + c.gridH)
-    kv("id.yearBlockY", c.yearBlockY === c.titleH + Ui.s)
-    kv("id.weekdayRowY", c.weekdayRowY === c.yearBlockY + c.yearBlockH + Ui.s)
+    kv("id.desiredHeight", c.desiredHeight === c.yearBlockY + c.yearBlockH)
+    kv("id.yearBlockY", c.yearBlockY === c.gridY + c.gridH + Ui.s)
+    kv("id.weekdayRowY", c.weekdayRowY === c.titleH + Ui.s)
     // gridY comes from the JS library, which duplicates Ui.s as a literal (SP
     // = 8, CalendarLib.js:136) because a .js file cannot import a singleton.
     // The QML block chain above uses Ui.s instead, so the two only agree while
@@ -1273,6 +1273,16 @@ Item {
     kv("sel.todayDoy", gotoCal.dayOfYear)
     kv("sel.todayInGrid", selectedCount(gotoCal))
     kv("sel.noClockRead", sel.selectedKey !== "" && gotoCal.selectedKey === "2024-09-11")
+    // stepDay(): the arrow-key path, with the view following the selection
+    // across a month boundary. sel is on 2023-03-01 after the overflow case.
+    sel.stepDay(1)
+    kv("sel.dayNext", sel.selectedKey)
+    kv("sel.dayNextView", sel.viewYear + "/" + sel.viewMonth)
+    sel.stepDay(-2)
+    kv("sel.dayBack", sel.selectedKey)
+    kv("sel.dayBackView", sel.viewYear + "/" + sel.viewMonth)
+    sel.stepDay(7)
+    kv("sel.dayWeek", sel.selectedKey)
   }
 
   // ---- phase 24: nothing in either component's geometry is NaN ---------

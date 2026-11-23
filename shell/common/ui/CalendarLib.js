@@ -140,10 +140,13 @@ var SP = 8
 var gridW = 7 * cellW + 6 * cellGap
 // Height of the 6-week grid.
 var gridH = 6 * cellH + 5 * cellGap
-// Vertical offset where the day grid starts (title + year + weekday rows).
-var gridY = titleH + SP + yearBlockH + SP + weekdayRowH + SP
+// Vertical offsets. The weekday row and grid sit directly under the title;
+// the year progress bar closes the card, below the grid it summarises.
+var weekdayRowY = titleH + SP
+var gridY = weekdayRowY + weekdayRowH + SP
+var yearBlockY = gridY + gridH + SP
 // Full painted height of the calendar widget.
-var contentHeight = gridY + gridH
+var contentHeight = yearBlockY + yearBlockH
 
 if (typeof module !== "undefined") {
   module.exports = {

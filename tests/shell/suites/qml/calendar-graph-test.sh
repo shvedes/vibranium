@@ -103,9 +103,9 @@ t_eq "the grid height" "178" "$(qp_get cal.gridH)"
 t_eq "the title height" "24" "$(qp_get cal.titleH)"
 t_eq "the year-block height" "32" "$(qp_get cal.yearBlockH)"
 t_eq "the weekday-row height" "16" "$(qp_get cal.weekdayRowH)"
-t_eq "the grid's vertical offset" "96" "$(qp_get cal.gridY)"
-t_eq "the year block's offset" "32" "$(qp_get cal.yearBlockY)"
-t_eq "the weekday row's offset" "72" "$(qp_get cal.weekdayRowY)"
+t_eq "the grid's vertical offset" "56" "$(qp_get cal.gridY)"
+t_eq "the year block's offset" "242" "$(qp_get cal.yearBlockY)"
+t_eq "the weekday row's offset" "32" "$(qp_get cal.weekdayRowY)"
 t_eq "the width a host should size to" "306" "$(qp_get cal.desiredWidth)"
 t_eq "the height a host should size to" "274" "$(qp_get cal.desiredHeight)"
 t_eq "the item took that width" "306" "$(qp_get cal.width)"
@@ -122,20 +122,19 @@ t_section "the geometry is internally consistent, not just correct"
 t_eq "gridW is 7 cells and 6 gaps" "true" "$(qp_get id.gridW)"
 t_eq "gridH is 6 rows and 5 gaps" "true" "$(qp_get id.gridH)"
 t_eq "the desired width is the grid width" "true" "$(qp_get id.desiredWidth)"
-t_eq "the desired height is the grid offset plus the grid" "true" "$(qp_get id.desiredHeight)"
-t_eq "the year block sits one spacing unit under the title" "true" "$(qp_get id.yearBlockY)"
-t_eq "the weekday row sits one unit under the year block" "true" "$(qp_get id.weekdayRowY)"
-t_eq "the grid offset is the end of the whole QML block chain" "true" "$(qp_get id.gridYFromQmlChain)"
+t_eq "the desired height is the year block offset plus its height" "true" "$(qp_get id.desiredHeight)"
+t_eq "the year block sits one spacing unit under the grid" "true" "$(qp_get id.yearBlockY)"
+t_eq "the weekday row sits one unit under the title" "true" "$(qp_get id.weekdayRowY)"
+t_eq "the grid offset follows the weekday row" "true" "$(qp_get id.gridYFromQmlChain)"
 t_eq "the Repeater's last column lands exactly on the grid edge" "true" "$(qp_get id.lastColumnFits)"
 t_eq "the Repeater's last row lands exactly on the grid edge" "true" "$(qp_get id.lastRowFits)"
 t_eq "the item's size is its desired size" "true" "$(qp_get id.itemSizeIsDesired)"
 t_eq "and so is its implicit size" "true" "$(qp_get id.implicitIsDesired)"
 # CalendarLib.js cannot import the Ui singleton, so it duplicates Ui.s as a
-# literal SP = 8 (CalendarLib.js:136) while the QML block chain uses Ui.s.
-# gridY comes from the JS side and yearBlockY/weekdayRowY from the QML side,
-# so this identity is the only thing keeping the duplication honest - change
-# Ui.s and the two halves of the layout drift apart silently.
-t_note "gridY is computed in CalendarLib.js from a duplicated SP = 8 (CalendarLib.js:136) while Calendar.qml computes yearBlockY/weekdayRowY from Ui.s (Calendar.qml:55-56); the two agree only because Ui.s is still 8, and id.gridYFromQmlChain is the assertion that notices the day it stops"
+# literal SP = 8. Calendar.qml now reads every vertical offset from the
+# library, so the duplication only lives between SP and the Ui.s used in the
+# probe's own identities below; id.gridYFromQmlChain notices a drift.
+t_note "all vertical offsets now come from CalendarLib.js, which duplicates Ui.s as SP = 8 because a .js file cannot import the singleton; the probe's Ui.s identities stay honest only while SP is still 8"
 t_eq "selectedKey is the library's key for the selection" "true" "$(qp_get lib.selectedKey)"
 t_eq "and it is the documented yyyy-MM-dd form" "true" "$(qp_get id.selectedKeyFormat)"
 
@@ -429,6 +428,13 @@ t_eq "today is day 255 of 2024" "255" "$(qp_get sel.todayDoy)"
 t_eq "and is visible in the grid" "1" "$(qp_get sel.todayInGrid)"
 t_eq "no assertion anywhere read the real clock" "true" "$(qp_get sel.noClockRead)"
 t_eq "the signal count matches the number of log entries" "true" "$(qp_get recap.selCountMatches)"
+
+t_section "stepDay moves the selection by a day, a week, and across months"
+t_eq "one forward step from 1 March is 2 March" "2023-03-02" "$(qp_get sel.dayNext)"
+t_eq "and the view stays in March" "2023/2" "$(qp_get sel.dayNextView)"
+t_eq "two steps back cross into February" "2023-02-28" "$(qp_get sel.dayBack)"
+t_eq "and the view follows into February" "2023/1" "$(qp_get sel.dayBackView)"
+t_eq "a seven-day step lands on 7 March" "2023-03-07" "$(qp_get sel.dayWeek)"
 
 # ---------------------------------------------------------------------------
 # stepMonth
@@ -797,7 +803,7 @@ t_skip "the header chevron MouseAreas and the grid-background right-click" \
 t_skip "the wheel handler" \
   "onWheel is a mouse event; the onWheel -> stepMonth(+/-1) mapping and its direction (negative angleDelta.y steps forward) are unverified"
 t_skip "Keys.onLeftPressed / RightPressed / UpPressed / DownPressed" \
-  "synthetic key events are not delivered to an item without a window; the +/-1 and +/-12 month mapping is only covered through stepMonth() directly, not through the key handlers"
+  "synthetic key events are not delivered to an item without a window; the plain-arrow day/week and Ctrl+arrow month mappings are only covered through stepDay()/stepMonth() directly, not through the key handlers themselves"
 t_skip "the slide animation's in-flight position" \
   "gridHost.x and gridHost.opacity are file-private ids, so only the _sliding flag is observable - the probe can see that a slide started and that it finished, not where the grid was at 40ms"
 t_skip "the month title text" \

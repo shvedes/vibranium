@@ -225,7 +225,7 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 4, features 183, services 27, common 161.
+# The table: composition 1, boot 4, features 183, services 27, common 162.
 # common/ gained SortHeader (the clickable column header) and TableSort (the
 # header-click convention and natural compare) when the tables became
 # sortable, then IconWarmer (the decoded-raster warmer) for the menu's
@@ -234,7 +234,8 @@ t_section "the four layers exist, and the README's file counts still hold"
 # moved onto the shared context menu the three menus now use; features/ then
 # gained MenuIndex and MenuSpawnProbe when the menu's index and spawn-probe
 # rules moved out of Menu.qml and MenuPanel. common/ gained MoonPhaseLib and
-# features/ gained MoonDisc when the clock's calendar island grew a moon pane.
+# SunLib, features/ gained MoonDisc, when the clock's calendar island grew a
+# sky pane.
 # layer_files counts .qml and .js together, which is the set the README's "Files"
 # column counts and the set the resolver below reads, so a count here says the
 # direction rules are being applied to the tree the README describes. A count that
@@ -245,7 +246,7 @@ done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
 t_count "features/ holds the tree's 183 .qml and .js files" "183" "$(layer_files features)"
 t_count "services/ holds the 27 files the README publishes" "27" "$(layer_files services)"
-t_count "common/ holds the 161 files the README publishes" "161" "$(layer_files common)"
+t_count "common/ holds the 162 files the README publishes" "162" "$(layer_files common)"
 t_count "boot/ holds the 4 files the README publishes" "4" "$(layer_files boot)"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
 
