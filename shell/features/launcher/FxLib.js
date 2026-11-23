@@ -1,13 +1,15 @@
 .pragma library
 // Currency engine for AppLauncher: natural-language
-// "<value><currency> [in|to|as|-> = <currency>]" plus bare
-// "<value><currency>" with a per-currency default target. Pure-JS, no Qt
+// "<value> [scale] <currency> [in|to|as|-> = <currency>] [year]", where a bare
+// "<value><currency>" gets a per-currency default target. A scale is a word or
+// its short form ("100 million usd", "100m usd"); a year asks for inflation.
+// Pure-JS, no Qt
 // imports, and no network either: the rate table is an argument, so every
 // function here is drivable offline against a fixture.
 //
 // Usage: FxLib.isPotentialFx(query) -> bool (cheap gate)
-//        FxLib.tryConvert(query, snapshot) -> null | result
-//        FxLib.tryAll(query, snapshot, history) -> null | result[]
+//        FxLib.tryConvert(query, snapshot, cpi) -> null | result
+//        FxLib.tryAll(query, snapshot, history, cpi) -> null | result[]
 //   snapshot: { base, rates, updated } from parseRates(), or null/undefined
 //             while the fetch has not landed. Absent is a pending row, not
 //             a failure - the two states are not the same and must not read
@@ -15,6 +17,9 @@
 //   history:  { CODE: count } of currencies the user has picked before, or
 //             null/undefined when there is none. It reorders the bare list
 //             and never filters it; absent is the documented default order.
+//   cpi:      { years, latestYear, latestValue, updated } from parseCpi(), or
+//             null/undefined while that fetch has not landed. Only a query
+//             naming a year reads it.
 //   ok:   { ok: true, pending: false, value, from, to, out, rate,
 //           formatted, copy, phrase, desc, label, inputText, updated }
 //   wait: { ok: true, pending: true, value, from, to, label, inputText,
@@ -42,6 +47,15 @@
 // cross-rates come from dividing two entries of the same table rather than
 // from a second request per source currency.
 //
+// INFLATION
+//
+// A year suffix on an otherwise ordinary query ("$100 in 2000", "100 usd
+// 2000 year") asks what that amount is worth TODAY rather than in another
+// currency. Annual consumer-price data comes from one keyless World Bank
+// document, so the answer is a ratio of two entries of the same series. No
+// exchange rate is involved: the amount stays in the currency it was written
+// in and only its purchasing power changes.
+//
 // The code list is NOT spelled out here. A currency the table below does not
 // name is still reachable by its three-letter ISO code, and the rate table
 // decides whether it is real. So the set of currencies this engine answers
@@ -54,6 +68,18 @@
 // cross-rate base together; the arithmetic in tryConvert is base-agnostic.
 var RATE_BASE = "USD"
 var RATE_URL = "https://open.er-api.com/v6/latest/" + RATE_BASE
+
+// Annual consumer price index, from the World Bank's keyless FP.CPI.TOTL
+// series. One document covers every year the series publishes, so inflation
+// is a quotient of two entries of the same table. The index's own base year
+// cancels in that quotient; only the two readings matter.
+var CPI_URL = "https://api.worldbank.org/v2/country/USA/indicator/FP.CPI.TOTL?format=json&per_page=200"
+
+// The years a year suffix accepts. Four digits outside a plausible calendar
+// range are a bad target, not an inflation question. The index itself starts
+// in 1960; a year it cannot quote is answered as missing rather than guessed.
+var MIN_YEAR = 1900
+var MAX_YEAR = 2100
 
 // Symbols the table answers to, longest spelling first so "R$" is read
 // before "$". Every one of them is ambiguous in the wild - "$" is a dozen
@@ -347,6 +373,59 @@ function splitExplicit(body) {
   return null;
 }
 
+// Scale words and their one-letter forms. A short scale may be followed by a
+// glued symbol ("100m$"), so the boundary test rejects only another letter - a
+// currency code never starts with a bare single letter, and "100 mdl" must
+// still read as Moldovan lei rather than as a million of something.
+var SCALE_WORDS = {
+  thousand: 1e3, thousands: 1e3, k: 1e3,
+  million: 1e6, millions: 1e6, m: 1e6,
+  billion: 1e9, billions: 1e9, b: 1e9,
+  trillion: 1e12, trillions: 1e12, t: 1e12
+};
+
+function splitScale(s) {
+  let t = String(s === undefined || s === null ? "" : s).trim();
+  let words = ["trillions", "trillion", "billions", "billion",
+    "millions", "million", "thousands", "thousand"];
+  for (let i = 0; i < words.length; i++) {
+    let w = words[i];
+    if (t.toLowerCase().indexOf(w) === 0) {
+      return { spec: t.substring(w.length).trim(), factor: SCALE_WORDS[w], token: w };
+    }
+  }
+  let short = t.match(/^([kmbt])(?=$|[^a-z])/i);
+  if (short !== null) {
+    let key = short[1].toLowerCase();
+    // The label spells the short form out: "100 million USD" reads as money
+    // where "100 m USD" would read as a length.
+    let word = key === "k" ? "thousand" : key === "m" ? "million"
+      : key === "b" ? "billion" : "trillion";
+    return { spec: t.substring(short[1].length).trim(),
+      factor: SCALE_WORDS[key], token: word };
+  }
+  return { spec: t, factor: 1, token: "" };
+}
+
+// A trailing year on an otherwise ordinary currency query. The typed forms
+// are "in 2000", "2000 year" and "in 2000 year"; a bare four-digit run is not
+// enough, because "100 usd 2000" is an unfinished pair until a keyword says
+// the number is a year. parseQuery passes the rest with a leading space so a
+// symbol-led query ("$100 in 2000") still has a separator to match on.
+function splitYear(s) {
+  let t = " " + String(s === undefined || s === null ? "" : s).trim();
+  let m = t.match(/^(.*)\s+years?\s*$/i);
+  let yearWord = m !== null;
+  if (yearWord) t = m[1];
+  m = t.match(/^(.*)\s+in\s+(\d{4})\s*$/i);
+  if (m !== null) return { head: m[1].trim(), year: Number(m[2]) };
+  m = t.match(/^(.*)\s+(\d{4})\s*$/);
+  if (m !== null && (yearWord || m[1].trim() === "")) {
+    return { head: m[1].trim(), year: Number(m[2]) };
+  }
+  return null;
+}
+
 // Where a bare "<value><currency>" goes. The table's base is the answer for
 // everything else, because "how much is this worth" is asked in dollars far
 // more often than in any other single unit; the base itself has to name
@@ -481,8 +560,45 @@ function parseQuery(query, snapshot) {
   // in front of it does: "100$ in eur" and "100 in $" are both real typing.
   // It is read off the REST, not off the whole remainder, so it cannot eat
   // the target ("100$ in eur" takes the "$" and leaves "in eur" alone).
-  let glued = leadingSymbol(rest);
-  if (glued !== "") rest = rest.substring(glued.length).trim();
+  // The scale is part of the quantity, not of the currency, and may sit on
+  // either side of a symbol glued to the amount ("100m$" and "$100m" are the
+  // same hundred million). Strip both until neither moves; a target symbol
+  // sits after a keyword and never leads the rest.
+  let glued = "";
+  let factor = 1;
+  let scaleTokens = [];
+  for (let pass = 0; pass < 3; pass++) {
+    let s = leadingSymbol(rest);
+    if (s !== "") {
+      if (glued === "") glued = s;
+      rest = rest.substring(s.length).trim();
+    }
+    let sc = splitScale(rest);
+    if (sc.factor !== 1) {
+      rest = sc.spec;
+      factor *= sc.factor;
+      scaleTokens.push(sc.token);
+    }
+  }
+  value *= factor;
+  // `written` is the amount as typed, scale included, grouping commas and all.
+  // The label echoes it and the row's sub line does too, and keeping it beside
+  // `value` is what lets the sentence say "100 million US Dollars" rather than
+  // running the money formatter over a number the user had already written.
+  let written = am[0] + (scaleTokens.length === 0 ? "" : " " + scaleTokens.join(" "));
+  // The year is read before the currency separator. "100 usd in 2000" would
+  // otherwise split at "in" into an unknown target and lose the question.
+  // Only a named source may claim a year query: there is no target currency
+  // here to authorize a bare three-letter run that the engine merely guesses.
+  let yearSplit = splitYear(" " + rest);
+  if (yearSplit !== null && yearSplit.year >= MIN_YEAR && yearSplit.year <= MAX_YEAR) {
+    let yearSym = lead !== "" ? lead : glued;
+    let yearFrom = yearSym !== "" ? resolveCode(symbolCode(yearSym)) : resolveCode(yearSplit.head);
+    if (yearFrom === null || yearFrom.named !== true) return null;
+    let yearInput = written + " " + yearFrom.code + " in " + yearSplit.year;
+    return { value: value, written: written, from: yearFrom, year: yearSplit.year,
+      bare: false, incomplete: false, inputText: yearInput };
+  }
   // The rest is split with a space in front of it: a symbol-led query leaves
   // "in eur" with nothing before the keyword, and the separator pattern wants
   // whitespace on its left, so "$100 in eur" would read as a bare amount and
@@ -516,12 +632,7 @@ function parseQuery(query, snapshot) {
   // (the pending row is what starts the fetch); two unnamed sides wait for a
   // table that something else has to request.
   let sourceUnclaimed = from.named !== true && !unnamedClaimable(from, toSpec, snapshot);
-  let inputText = am[0] + " " + from.code;
-  // `written` is the amount as typed, grouping commas and all. The label
-  // echoes it and the row's sub line does too, and keeping it beside `value`
-  // is what lets the sentence say "1,234.56 US dollars" rather than running
-  // the money formatter over a number the user had already written down.
-  let written = am[0];
+  let inputText = written + " " + from.code;
   if (sourceUnclaimed) return null;
   if (toSpec === null) {
     return { value: value, written: written, from: from, to: null, bare: true,
@@ -590,6 +701,23 @@ function formatAmount(v) {
   if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
   if (s === "-0") s = "0";
   return s;
+}
+
+// A figure wider than a launcher row reads better as a magnitude: "1.86B USD"
+// fits where "1,855,126,306.22 USD" middle-elides into an unreadable fragment.
+// Only the label and the sentence use this; the copy payload and the detail
+// line keep the exact amount. Below a million nothing is gained by rounding,
+// so the ordinary money formatter stays in charge.
+function formatCompact(v) {
+  if (typeof v !== "number" || !isFinite(v)) return formatAmount(v);
+  let abs = Math.abs(v);
+  if (abs < 1e6 || abs >= 1e15) return formatAmount(v);
+  let at = abs >= 1e12 ? 1e12 : abs >= 1e9 ? 1e9 : 1e6;
+  let suffix = at === 1e12 ? "T" : at === 1e9 ? "B" : "M";
+  let s = (v / at).toPrecision(3);
+  if (s.indexOf("e") >= 0 || s.indexOf("E") >= 0) s = String(Number(s));
+  if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+  return s + suffix;
 }
 
 // A rate for the detail line: six significant digits, never the 16 a raw float
@@ -715,9 +843,10 @@ function currencyWord(code, value) {
 // already typed would give "100.00 US dollars is 87.84 Euros" - two decimals
 // on a whole number that was never a decimal. The target keeps formatAmount,
 // because that number nobody wrote down.
-function phrase(written, fromCode, out, toCode, value) {
+function phrase(written, fromCode, out, toCode, value, shown) {
   return String(written) + " " + currencyWord(fromCode, value)
-    + " is " + formatAmount(out) + " " + currencyWord(toCode, out);
+    + " is " + (shown === undefined ? formatAmount(out) : shown)
+    + " " + currencyWord(toCode, out);
 }
 
 // The provider's answer, or null when it is not one. A body that does not
@@ -743,6 +872,109 @@ function parseRates(text) {
     rates: parsed.rates,
     updated: String(parsed.time_last_update_utc || "")
   };
+}
+
+// The World Bank document is [metadata, observations]. A null value is the
+// usual shape for a year the series has not published yet, so it is skipped
+// rather than read as a zero that would divide to an invented answer.
+function parseCpi(text) {
+  let raw = String(text === undefined || text === null ? "" : text).trim();
+  if (raw === "") return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+  if (!Array.isArray(parsed) || parsed.length < 2 || !Array.isArray(parsed[1])) return null;
+  let rows = parsed[1];
+  let years = {};
+  let count = 0;
+  for (let i = 0; i < rows.length; i++) {
+    let row = rows[i];
+    if (!row || typeof row !== "object") continue;
+    let y = String(row.date === undefined || row.date === null ? "" : row.date).trim();
+    if (!/^\d{4}$/.test(y)) continue;
+    let v = num(row.value);
+    if (v === null || v <= 0) continue;
+    years[y] = v;
+    count++;
+  }
+  if (count === 0) return null;
+  let latestYear = 0;
+  for (let k in years) {
+    if (Object.prototype.hasOwnProperty.call(years, k) && Number(k) > latestYear) {
+      latestYear = Number(k);
+    }
+  }
+  let meta = parsed[0] !== null && typeof parsed[0] === "object" ? parsed[0] : {};
+  return { years: years, latestYear: latestYear,
+    latestValue: years[String(latestYear)],
+    updated: String(meta.lastupdated === undefined || meta.lastupdated === null
+      ? "" : meta.lastupdated) };
+}
+
+// The same three states as the rate table, for the same reason: a CPI
+// document that has not landed is a pending row, an empty one is a settled
+// failure, and only a parsed one may put a number on the screen.
+function cpiState(cpi) {
+  if (cpi === null || cpi === undefined || !cpi.years) return "none";
+  for (let k in cpi.years) {
+    if (Object.prototype.hasOwnProperty.call(cpi.years, k)) return "ok";
+  }
+  return "empty";
+}
+
+// A year query is one answer, never a list. No exchange rate is read: the
+// amount stays in the currency it was written in and only its purchasing
+// power changes, so the two index readings divide into each other directly.
+function convertInflation(q, cpi, state) {
+  if (state === undefined) state = cpiState(cpi);
+  let inputText = q.inputText;
+  let target = q.from.code;
+  if (state === "none") {
+    return { ok: true, pending: true, value: q.value, from: target, year: q.year,
+      uid: "fx:infl", label: inputText, inputText: inputText,
+      sub: "Fetching inflation data" };
+  }
+  if (state === "empty") {
+    return { ok: false, error: "unavailable", expr: inputText, uid: "fx:infl",
+      label: inputText, sub: "Inflation data unavailable - type to retry" };
+  }
+  let thenCpi = cpi.years[String(q.year)];
+  let haveThen = num(thenCpi) !== null && thenCpi > 0;
+  let haveNow = num(cpi.latestValue) !== null && cpi.latestValue > 0;
+  if (!haveThen || !haveNow || q.year > cpi.latestYear) {
+    let first = Infinity;
+    for (let k in cpi.years) {
+      if (Object.prototype.hasOwnProperty.call(cpi.years, k) && Number(k) < first) {
+        first = Number(k);
+      }
+    }
+    return { ok: false, error: "no-data", expr: inputText, uid: "fx:infl",
+      label: "No inflation data for " + q.year,
+      sub: isFinite(first) ? "Earliest year available: " + first : "No inflation data available" };
+  }
+  let factor = cpi.latestValue / thenCpi;
+  let out = q.value * factor;
+  if (!isFinite(out) || isNaN(out) || factor <= 0) {
+    return { ok: false, error: "out-of-range", expr: inputText, uid: "fx:infl",
+      label: "Result out of range", sub: "e.g. 100 usd in 2000" };
+  }
+  let formatted = formatAmount(out);
+  let copy = formatted + " " + target;
+  let display = formatCompact(out);
+  return { ok: true, pending: false, value: q.value, from: target, to: target,
+    year: q.year, out: out, factor: factor, formatted: formatted, copy: copy,
+    uid: "fx:infl",
+    phrase: String(q.written) + " " + currencyWord(target, q.value) + " in " + q.year
+      + " is " + display + " " + currencyWord(target, out) + " today",
+    desc: "CPI " + formatRate(thenCpi) + " (" + q.year + ") -> "
+      + formatRate(cpi.latestValue) + " (" + cpi.latestYear + "), x" + formatRate(factor)
+      + (display === formatted ? "" : "\nExact: " + copy)
+      + (cpi.updated === "" ? "" : "\nInflation data updated " + cpi.updated),
+    label: inputText + " = " + display + " " + target + " today",
+    inputText: inputText, updated: cpi.updated };
 }
 
 // One parsed query against one target currency, with every verdict a
@@ -807,32 +1039,36 @@ function convertParsed(q, snapshot, to, state) {
   }
   let formatted = formatAmount(out);
   let copy = formatted + " " + to.code;
+  let display = formatCompact(out);
   // Coerced once: a caller that assembled its own snapshot object can leave
   // this absent, and "Rates updated undefined" is worse than no second line.
   let updated = String(snapshot.updated === undefined || snapshot.updated === null
     ? "" : snapshot.updated);
   return { ok: true, pending: false, value: q.value, from: from.code,
     to: to.code, out: out, rate: rate, formatted: formatted, copy: copy,
-    phrase: phrase(q.written, from.code, out, to.code, q.value),
+    phrase: phrase(q.written, from.code, out, to.code, q.value, display),
     desc: "1 " + from.code + " = " + formatRate(rate) + " " + to.code
+      + (display === formatted ? "" : "\nExact: " + copy)
       + (updated === "" ? "" : "\nRates updated " + updated),
-    label: q.inputText + " = " + copy, inputText: q.inputText,
+    label: q.inputText + " = " + display + " " + to.code, inputText: q.inputText,
     updated: updated };
 }
 
 // Main entry, see header for the return contract. Never throws: an
 // unparseable query is null (the caller falls through to app search) and a
 // missing rate table is a pending row (the caller has a fetch in flight).
-function tryConvert(query, snapshot) {
+function tryConvert(query, snapshot, cpi) {
   let q = parseQuery(query, snapshot);
   if (q === null) return null;
+  if (q.year !== undefined) return convertInflation(q, cpi);
   return convertParsed(q, snapshot, q.bare ? resolveCode(defaultTarget(q.from.code)) : q.to);
 }
 
 // The multi-answer half: a bare amount answers with the default and then the
 // rest of SUGGEST, ordered by what the user has picked before; an explicit
 // pair still answers with exactly the one conversion it asked for, and is not
-// reordered by anything.
+// reordered by anything. A query naming a year answers with one inflation
+// reading instead and never reads the rate table or the pick history.
 //
 // Only a failure about the DOCUMENT collapses the list. No table yet and an
 // empty one mean every row would say the same thing, so those are one row.
@@ -853,9 +1089,10 @@ function tryConvert(query, snapshot) {
 // `history` may also be a function returning the map: it is called only when
 // the query is a bare amount, because that is the one shape that ranks, and a
 // caller whose history lives behind a cache read should not pay it per keystroke.
-function tryAll(query, snapshot, history) {
+function tryAll(query, snapshot, history, cpi) {
   let q = parseQuery(query, snapshot);
   if (q === null) return null;
+  if (q.year !== undefined) return [convertInflation(q, cpi)];
   let state = tableState(snapshot);
   if (q.bare !== true) return [convertParsed(q, snapshot, q.to, state)];
   let def = resolveCode(defaultTarget(q.from.code));

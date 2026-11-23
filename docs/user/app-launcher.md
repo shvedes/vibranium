@@ -273,6 +273,17 @@ $100 in eur
 100 zloty in usd
 ```
 
+Large amounts take a scale word, or its one-letter form, before the currency.
+It composes with every form above:
+
+```text
+100 million usd          100 m usd
+2.5 billion eur in usd   2.5 b eur in usd
+1 trillion jpy           1 t jpy
+500 thousand usd         500 k usd
+$100 million in eur      100m$ in eur
+```
+
 Use `in`, `to`, `as`, `->` or `=` between the currencies, exactly as the unit
 converter does. Naming a pair gives exactly one row. A bare amount answers
 with a list of up to ten currencies - the default list below - and ++enter++
@@ -298,6 +309,21 @@ BRL MXN SEK NOK ZAR TRY`, minus the currency you typed, and it does not depend
 on the amount: `100 usd` and `0.1 usd` show the same currencies in the same
 order. A currency the rate provider does not quote has no row.
 
+**Inflation.** Appending a year asks what an amount is worth **today** instead
+of in another currency. Write `in <year>` or put `year` after the query:
+
+```text
+$100 in 2000             100 usd in 2000
+100 usd 2000 year        100 million usd in 1990
+```
+
+The amount stays in the currency it was written in; only its purchasing power
+changes. The answer divides two readings of the World Bank's annual US consumer
+price index and names both readings, the years and the factor between them.
+A year the index does not quote gets a "no data" row rather than a guess, and
+the fetch failing gets its own row rather than an invented number. Inflation
+needs no exchange rate, so it opens no rate request.
+
 **The currencies you use move up.** Every conversion you copy with ++enter++
 counts, and the next bare query offers the most-counted currencies first - so
 the list settles into the currencies you actually convert to. The counts live
@@ -322,10 +348,11 @@ and if the fetch fails, you get a single row that says so rather than ten
 copies of the same message.
 
 !!! note "This plugin uses the network"
-    `fx` is the only launcher plugin that does. It fetches one rate document
-    from a free, key-less endpoint and caches it for ten minutes, so a whole
-    session of conversions costs one request. If the fetch fails the row says
-    so rather than showing a stale or invented number. Disable it from the
+    `fx` is the only launcher plugin that does. It fetches a rate document and,
+    only when a year is asked for, a consumer-price document; both come from
+    free, key-less endpoints and are cached for ten minutes, so a whole session
+    of conversions costs one request of each. If a fetch fails the row says so
+    rather than showing a stale or invented number. Disable it from the
     **Enabled plugins** row in Menu -> Settings -> App launcher.
 
 ## Color

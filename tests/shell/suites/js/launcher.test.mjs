@@ -5165,6 +5165,21 @@ const fxImpl = (opts) => {
 }
 const withRates = (rates) => ({ net: { [FX_URL]: fxBody(rates) } })
 
+// The World Bank CPI document every inflation assertion runs against, in the
+// provider's [metadata, observations] shape. The two readings are real ones
+// from the series, so the quotient in the assertions is checkable rather than
+// chosen to make a rounding rule look right.
+const CPI_URL = FXL.CPI_URL
+const CPI_ROWS = [[2000, 78.9707207568715], [2024, 143.857336014607]]
+const cpiBody = (rows, updated) => JSON.stringify([
+  { lastupdated: updated || '2026-11-11' },
+  rows.map(([date, value]) => ({ date: String(date), value })),
+])
+const withCpi = (rows, updated) => ({ net: { [CPI_URL]: cpiBody(rows, updated) } })
+const withBoth = (rates, rows) => ({
+  net: Object.assign({}, withRates(rates).net, withCpi(rows).net),
+})
+
 group('fx: a settled rate table is one copy row carrying the rate and its date', () => {
   const { impl, rec } = fxImpl(withRates(FX_RATES))
   eq('a full pair', impl.items('100 usd in eur'), [{
@@ -5394,6 +5409,90 @@ group('fx: currency spelling, symbols and the codes the table supplies', () => {
   // A code that IS named converts bare, because the bare-query path is what
   // the named table exists for.
   eq('a bare named code', impl.items('100 kwd')[0].label, '100 KWD = 308.26 USD')
+})
+
+group('fx: scale words and year suffixes extend every currency form', () => {
+  const both = fxImpl(withBoth(FX_RATES, CPI_ROWS))
+  // A scale is a quantity, not a currency: it multiplies the amount before
+  // any conversion and every existing form still accepts it.
+  eq('a scale word', both.impl.items('100 million usd in eur')[0].label,
+    '100 million USD = 87.8M EUR')
+  eq('the short letter spells the same row', both.impl.items('100m usd in eur')[0].label,
+    '100 million USD = 87.8M EUR')
+  eq('a decimal amount with a scale', both.impl.items('1.5 b usd in eur')[0].label,
+    '1.5 billion USD = 1.32B EUR')
+  eq('a symbol before the scale', both.impl.items('$100 million in eur')[0].label,
+    '100 million USD = 87.8M EUR')
+  eq('a symbol after the scale', both.impl.items('100 million$ in eur')[0].label,
+    '100 million USD = 87.8M EUR')
+  eq('a scale on a bare amount', both.impl.items('100k usd')[0].label,
+    '100 thousand USD = 87,835.60 EUR')
+  eq('and the payload is money, not a ratio', both.impl.items('100 million usd in eur')[0].item.copyValue,
+    '87,835,600.00 EUR')
+  eq('the compact label does not cost the exact figure',
+    both.impl.items('100 million usd in eur')[0].desc,
+    '1 USD = 0.878356 EUR\nExact: 87,835,600.00 EUR\n'
+    + 'Rates updated Mon, 28 Sep 2026 00:02:31 +0000')
+  eq('a short letter before a currency code is not a scale', both.impl.items('100 mdl in usd')[0].label,
+    'No rate for MDL')
+  eq('a lone short letter still falls through to the unit engine', both.impl.items('100m'), [])
+  // Inflation, in all three typed spellings and on both source forms.
+  for (const q of ['$100 in 2000', '100 usd in 2000', '100 usd 2000 year',
+    '100 usd in 2000 year']) {
+    eq(`${JSON.stringify(q)} is one inflated row`, both.impl.items(q)[0].label,
+      '100 USD in 2000 = 182.17 USD today')
+  }
+  eq('the detail line names both readings and the factor',
+    both.impl.items('100 usd in 2000')[0].desc,
+    'CPI 78.9707 (2000) -> 143.857 (2024), x1.82165\nInflation data updated 2026-11-11')
+  eq('and the sub line says the same thing as a sentence',
+    both.impl.items('100 usd in 2000')[0].sub,
+    '100 US Dollars in 2000 is 182.17 US Dollars today')
+  eq('the scale composes with the year', both.impl.items('100 million usd in 2000')[0].label,
+    '100 million USD in 2000 = 182M USD today')
+  eq('and the clipboard still carries the unrounded amount',
+    both.impl.items('100 million usd in 2000')[0].item.copyValue, '182,165,408.44 USD')
+  eq('the row has its own identity', both.impl.items('100 usd in 2000')[0].uid, 'fx:infl')
+  // Two documents, each asked for only by the query that reads it.
+  const asked = fxImpl(withBoth(FX_RATES, CPI_ROWS))
+  asked.impl.items('100 usd in 2000')
+  eq('an inflation query asks only for the CPI document',
+    asked.rec.calls.map((c) => c[1]), [CPI_URL])
+  eq('with the controller timeout', asked.rec.calls[0][2], 8000)
+  const plain = fxImpl(withBoth(FX_RATES, CPI_ROWS))
+  plain.impl.items('100 usd in eur')
+  eq('an ordinary conversion still asks only for the rate document',
+    plain.rec.calls.map((c) => c[1]), [FX_URL])
+  // An inflation answer is not a currency pick, so it cannot promote a
+  // currency in the bare conversion list.
+  const cache = { 'fx-usage': { JPY: 2 } }
+  const picked = fxImpl({ ...withBoth(FX_RATES, CPI_ROWS), cache })
+  picked.impl.activate(picked.impl.items('100 usd in 2000')[0].item)
+  eq('activating it copies the inflated figure',
+    picked.rec.calls.filter((c) => c[0] === 'execDetached').length, 1)
+  eq('and leaves the pick counts alone', cache['fx-usage'], { JPY: 2 })
+  // The two fetch states stay distinct, as on the rate side.
+  const pending = fxImpl(withRates(FX_RATES))
+  eq('no CPI body yet is a pending row, not a number', pending.impl.items('100 usd in 2000'), [{
+    kind: 'fx', uid: 'fx:infl', label: '100 USD in 2000',
+    sub: 'Fetching inflation data', desc: '', icon: 'accessories-calculator',
+    fxValue: '', fxExpr: '100 USD in 2000', incomplete: true, pending: true,
+    item: { copyValue: '' },
+  }])
+  eq('and only the CPI document was asked for', pending.rec.calls.map((c) => c[1]), [CPI_URL])
+  const failed = fxImpl({ net: { [CPI_URL]: '' } })
+  eq('a settled empty CPI body is not a pending row',
+    failed.impl.items('100 usd in 2000')[0].sub,
+    'Inflation data unavailable - type to retry')
+  eq('and it still names the question', failed.impl.items('100 usd in 2000')[0].label,
+    '100 USD in 2000')
+  const thin = fxImpl(withCpi(CPI_ROWS))
+  eq('a year the series does not quote says so',
+    thin.impl.items('100 usd in 1960')[0].label, 'No inflation data for 1960')
+  eq('and names the first year it does quote', thin.impl.items('100 usd in 1960')[0].sub,
+    'Earliest year available: 2000')
+  eq('four digits outside a calendar range are not a year at all',
+    thin.impl.items('100 usd in 1234'), [])
 })
 
 group('fx: a bare amount answers with the default order, or your own', () => {
@@ -6445,6 +6544,24 @@ group('formatAmount is a money formatter, and the rounding says so', () => {
   eq('null is NaN too', FXL.formatAmount(null), 'NaN')
 })
 
+group('formatCompact keeps a wide figure readable without losing the exact one', () => {
+  // The launcher middle-elides a long equation. A magnitude fits where the
+  // full money figure does not; the unrounded amount stays in the payload.
+  eq('below a million nothing is gained by rounding', FXL.formatCompact(1234.5), '1,234.50')
+  eq('exactly a million is one digit', FXL.formatCompact(1e6), '1M')
+  eq('millions keep three significant digits', FXL.formatCompact(87.8356e6), '87.8M')
+  eq('billions switch suffix', FXL.formatCompact(1.317534e9), '1.32B')
+  eq('trillions switch again', FXL.formatCompact(2.4e12), '2.4T')
+  eq('a negative keeps its sign', FXL.formatCompact(-1.86e9), '-1.86B')
+  eq('the exponential extreme is left alone', FXL.formatCompact(1e15), '1e+15')
+  eq('NaN is still NaN', FXL.formatCompact(NaN), 'NaN')
+  eq('the exact figure is untouched', FXL.formatAmount(87.8356e6), '87,835,600.00')
+  eq('and a label uses the compact form while its copy does not', (() => {
+    const r = FXL.tryConvert('100 million usd in eur', LIB_RATES, null)
+    return [r.label, r.copy]
+  })(), ['100 million USD = 87.8M EUR', '87,835,600.00 EUR'])
+})
+
 group('parseRates accepts the provider document and refuses everything else', () => {
   const ok = FXL.parseRates(JSON.stringify({ result: 'success', base_code: 'USD', rates: { USD: 1, EUR: 0.8 }, time_last_update_utc: 'then' }))
   eq('a good document parses', ok, { base: 'USD', rates: { USD: 1, EUR: 0.8 }, updated: 'then' })
@@ -6624,6 +6741,63 @@ group('the facade binds the projection, and the controller stores the record', (
   contains('and the user root still names nothing', facade, 'readonly property var _userGrants: []')
 })
 
+group('scale and inflation are parsed and answered in the library itself', () => {
+  const cpi = FXL.parseCpi(cpiBody(CPI_ROWS))
+  // splitScale is the quantity half: words, plurals and short letters all
+  // multiply, and a code that merely starts with one is left alone.
+  deepEqual('a scale word', FXL.splitScale('million usd'),
+    { spec: 'usd', factor: 1e6, token: 'million' })
+  deepEqual('a plural', FXL.splitScale('billions eur'),
+    { spec: 'eur', factor: 1e9, token: 'billions' })
+  deepEqual('a short letter', FXL.splitScale('m usd'),
+    { spec: 'usd', factor: 1e6, token: 'million' })
+  deepEqual('a short letter before a symbol', FXL.splitScale('m$ in eur'),
+    { spec: '$ in eur', factor: 1e6, token: 'million' })
+  deepEqual('no scale is still one', FXL.splitScale('usd in eur'),
+    { spec: 'usd in eur', factor: 1, token: '' })
+  deepEqual('a code starting with a short letter is not scaled', FXL.splitScale('mdl in usd'),
+    { spec: 'mdl in usd', factor: 1, token: '' })
+  deepEqual('a nullish spec is empty', FXL.splitScale(null),
+    { spec: '', factor: 1, token: '' })
+  // splitYear is the keyword half, read before the currency separator.
+  deepEqual('in a year', FXL.splitYear('usd in 2000'), { head: 'usd', year: 2000 })
+  deepEqual('a year followed by the word', FXL.splitYear('usd 2000 year'), { head: 'usd', year: 2000 })
+  deepEqual('a symbol-led year has an empty head', FXL.splitYear('in 2000'), { head: '', year: 2000 })
+  eq('a currency target is not a year', FXL.splitYear('usd in eur'), null)
+  eq('a bare four-digit run needs a keyword', FXL.splitYear('usd 2000'), null)
+  // parseCpi reads the provider's [metadata, observations] shape and skips
+  // unpublished years rather than turning them into zeroes.
+  eq('the latest quoted year wins', cpi.latestYear, 2024)
+  eq('a null observation is skipped', cpi.years['2025'], undefined)
+  eq('the metadata date is carried', cpi.updated, '2026-11-11')
+  eq('an unparseable body is nothing', FXL.parseCpi('<html>429</html>'), null)
+  eq('an object is not the provider shape', FXL.parseCpi('{}'), null)
+  eq('a document with no quoted year is nothing', FXL.parseCpi(cpiBody([[2025, null]])), null)
+  // cpiState is the same tri-state the rate table uses.
+  eq('no document', FXL.cpiState(null), 'none')
+  eq('a settled failure', FXL.cpiState({ years: {} }), 'empty')
+  eq('a parsed document', FXL.cpiState(cpi), 'ok')
+  // convertInflation is the single verdict behind every year row.
+  const q = FXL.parseQuery('100 usd in 2000', null)
+  eq('parseQuery carries the year', q.year, 2000)
+  eq('a pending document says so', FXL.convertInflation(q, null).pending, true)
+  eq('an empty document is unavailable', FXL.convertInflation(q, { years: {} }).error, 'unavailable')
+  eq('a quoted year has no error', FXL.convertInflation(q, cpi).error, undefined)
+  eq('the quotient is the factor', FXL.convertInflation(q, cpi).factor,
+    cpi.latestValue / cpi.years['2000'])
+  approx('the answer is the inflated amount', FXL.convertInflation(q, cpi).out,
+    100 * cpi.latestValue / cpi.years['2000'])
+  eq('the amount stays in its own currency', FXL.convertInflation(q, cpi).copy, '182.17 USD')
+  const scaled = FXL.parseQuery('100m usd in 2000', null)
+  eq('the scale survives into the year input', scaled.inputText, '100 million USD in 2000')
+  approx('and multiplies the answer', FXL.convertInflation(scaled, cpi).out,
+    100e6 * cpi.latestValue / cpi.years['2000'])
+  // Both entry points route a year query to the same verdict.
+  eq('tryConvert returns the verdict directly',
+    FXL.tryConvert('100 usd in 2000', LIB_RATES, cpi).out,
+    FXL.tryAll('100 usd in 2000', LIB_RATES, null, cpi)[0].out)
+})
+
 // =========================================================================
 section('Plugin/library parity - structure')
 // =========================================================================
@@ -6777,7 +6951,7 @@ group('the shared function names are the same set on both sides', () => {
   eq('color shares thirty-seven functions', TWINNED.find((p) => p.name === 'color').sharedFns.length, 37)
   eq('unit shares thirty-nine', TWINNED.find((p) => p.name === 'unit').sharedFns.length, 39)
   eq('time shares nine', TWINNED.find((p) => p.name === 'time').sharedFns.length, 9)
-  eq('fx shares twenty-four', TWINNED.find((p) => p.name === 'fx').sharedFns.length, 24)
+  eq('fx shares thirty', TWINNED.find((p) => p.name === 'fx').sharedFns.length, 30)
 })
 
 group('every shared function body is byte-identical', () => {
@@ -7205,6 +7379,17 @@ const PARITY_CORPUS = {
     ['splitExplicit', ['usd as eur']], ['splitExplicit', ['usd -> eur']], ['splitExplicit', ['usd = eur']],
     ['splitExplicit', ['usd in']], ['splitExplicit', ['usd']], ['splitExplicit', [null]],
     ['splitExplicit', ['usd IN eur']], ['splitExplicit', ['try in usd']], ['splitExplicit', ['leu in eur']],
+    // Scales and years are part of the same grammar; both copies must agree.
+    ['splitScale', [null]], ['splitScale', ['']], ['splitScale', ['million usd']],
+    ['splitScale', ['100m']], ['splitScale', ['m$ in eur']], ['splitScale', ['mdl']],
+    ['splitYear', [null]], ['splitYear', ['']], ['splitYear', ['in 2000']],
+    ['splitYear', ['usd 2000 year']], ['splitYear', ['usd in eur']],
+    ['parseCpi', [null]], ['parseCpi', ['']], ['parseCpi', ['not json']],
+    ['parseCpi', ['[]']], ['parseCpi', ['[{},[]]']],
+    ['cpiState', [null]], ['cpiState', [{ years: {} }]], ['cpiState', [{ years: { 2000: 80 } }]],
+    ['convertInflation', (ns) => [ns.parseQuery('100 usd in 2000', null), null]],
+    ['convertInflation', (ns) => [ns.parseQuery('100 usd in 2000', null), { years: {} }]],
+    ['tryConvert', ['100 usd in 2000', null, null]],
     // Formatting: money, not ratios.
     ['formatAmount', [0]], ['formatAmount', [1]], ['formatAmount', [1.5]], ['formatAmount', [0.5]],
     ['formatAmount', [157489.371]], ['formatAmount', [1234567.891]], ['formatAmount', [1234.5]],
@@ -7212,6 +7397,9 @@ const PARITY_CORPUS = {
     ['formatAmount', [0.0001]], ['formatAmount', [0.00001]], ['formatAmount', [1e12]],
     ['formatAmount', [NaN]], ['formatAmount', [Infinity]], ['formatAmount', [-Infinity]],
     ['formatAmount', [-0]], ['formatAmount', ['x']], ['formatAmount', [null]],
+    ['formatCompact', [0]], ['formatCompact', [1234.5]], ['formatCompact', [1e6]],
+    ['formatCompact', [87.8356e6]], ['formatCompact', [1.317534e9]],
+    ['formatCompact', [-1.86e9]], ['formatCompact', [NaN]], ['formatCompact', ['x']],
     // The provider document.
     ['parseRates', [null]], ['parseRates', [undefined]], ['parseRates', ['']], ['parseRates', ['   ']],
     ['parseRates', ['not json']], ['parseRates', ['<html>429</html>']], ['parseRates', ['null']],
@@ -7380,7 +7568,7 @@ group('every exported function in the four libraries was exercised by this run',
   // The counts, so a library growing or losing a function is a visible diff.
   eq('PluginPolicy exports twelve functions', EXPORTED.PluginPolicy.length, 12)
   eq('TimeLib exports nine functions', EXPORTED.TimeLib.length, 9)
-  eq('FxLib exports twenty-four functions', EXPORTED.FxLib.length, 24)
+  eq('FxLib exports thirty functions', EXPORTED.FxLib.length, 30)
   is('LauncherLib exports at least thirty functions', EXPORTED.LauncherLib,
     (v) => v.length >= 30, 'thirty or more')
 })

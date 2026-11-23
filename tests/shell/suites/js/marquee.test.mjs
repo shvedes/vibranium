@@ -8,7 +8,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { loadLib } from '../../lib/qmlloader.mjs'
-import { suite, section, group, eq, is, notContains, finish } from '../../lib/assert.mjs'
+import { suite, section, group, eq, is, contains, notContains, finish } from '../../lib/assert.mjs'
 
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const M = loadLib(path.join(SHELL, 'common', 'motion', 'Marquee.js'))
@@ -16,6 +16,8 @@ const DI = fs.readFileSync(path.join(SHELL, 'features', 'bar', 'modules',
   'Downloader', 'DownloaderIsland.qml'), 'utf8')
 const NI = fs.readFileSync(path.join(SHELL, 'features', 'bar', 'modules',
   'NowPlaying', 'NowPlayingIsland.qml'), 'utf8')
+const LE = fs.readFileSync(path.join(SHELL, 'features', 'launcher',
+  'LauncherEntry.qml'), 'utf8')
 
 suite('marquee', 'the shared text-scroll overflow gate')
 
@@ -66,6 +68,26 @@ group('the leg curve and overflow gate stay where they were', () => {
   eq('three Downloader overflow gates', (DI.match(/Marquee\.scrollable\(overflow\)/g) || []).length, 3)
   eq('three Downloader scroll resets', (DI.match(/onStopped: \w+\.x = 0/g) || []).length, 3)
   eq('three NowPlaying scroll resets', (NI.match(/onStopped: \w+Text\.x = 0/g) || []).length, 3)
+})
+
+section('the launcher sub line scrolls only where it is focused')
+group('current row marquees, the rest read from the left', () => {
+  contains('the launcher imports the shared timing library', LE,
+    'import "../../common/motion/Marquee.js" as Marquee')
+  contains('only the current row may scroll', LE,
+    'readonly property bool scrollable: current && Marquee.scrollable(overflow)')
+  contains('currentness is the view cursor, not a row flag', LE,
+    'row.ListView.view.currentIndex === row.index')
+  contains('the endpoint dwell comes from the library', LE,
+    'readonly property int endpointPauseMs: Marquee.endpointPauseMs()')
+  contains('the leg duration comes from the library', LE,
+    'duration: subMarquee.legMs')
+  contains('the stopped animation parks the text at the head', LE,
+    'onStopped: subText.x = 0')
+  contains('an unfocused row elides on the right, keeping its left edge', LE,
+    'elide: Text.ElideRight')
+  eq('only the title still middle-elides, never the sub',
+    (LE.match(/Text\.ElideMiddle/g) || []).length, 1)
 })
 
 finish()

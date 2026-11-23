@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.menu
+import "../../common/motion/Marquee.js" as Marquee
 import "LauncherLib.js" as LauncherLib
 
 // One launcher result row. Visual twin of menu/Entry's plain-action look -
@@ -412,36 +413,110 @@ Item {
         clip: true
       }
 
-      SlideSwap {
+      // Subtitle ownership lives in the row data: the service decides what
+      // (if anything) the sub line shows - an app description in inline mode,
+      // its placeholder for apps without one, or nothing at all when
+      // descriptions are off. The notice takes it over while descriptions are
+      // on. Rows with no sub collapse to a single title line; positioners skip
+      // invisible children, so the height folds.
+      //
+      // An overflowing sub on the current row scrolls instead of eliding, the
+      // same marquee the clipboard uses for long paths: a pause, an eased leg
+      // to the end, a pause, and back. Every other row shows the LEFT of its
+      // line with a trailing ellipsis, so an unfocused list still reads as a
+      // column of heads rather than a row of moving text.
+      Item {
+        id: subMarquee
+
         width: parent.width
-        // Subtitle ownership lives in the row data: the service decides
-        // what (if anything) the sub line shows - an app description in
-        // inline mode, its placeholder for apps without one, or nothing
-        // at all when descriptions are off. The notice takes it over while
-        // descriptions are on. Rows with no sub collapse to a single title
-        // line; positioners skip invisible children, so the height folds.
-        visible: row.subSwapText !== ""
-        text: row.subSwapText
-        // Alert rows (an offline fx row) and the refused-delete notice
-        // paint the sub red. The resolver keys off each layer's string so
-        // neither one leaks its color onto the other mid-fade; markup stays
-        // out of the copy, so a description cannot inject its own styling.
-        colorFor: row.subColorFor
-        fontSize: Ui.fontXs
-        fontFamily: Ui.fontFamily
-        // Same ligature freeze as the title: `->` in a row must read as
-        // two characters, never as the font's arrow substitute.
-        fontFeatures: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
-        // Calc sub is "Copy <large> to clipboard", fx and unit sub are the
-        // conversion as a sentence ("100 US Dollars is 2,543,000.00 Vietnamese
-        // Dong") - middle-elide keeps the source and the tail of a very long
-        // amount on screen, which are the two ends a reader needs.
-        // Clipboard suggestions elide right, and truncation stays
-        // right-anchored on one line and ends in the font ellipsis.
-        elide: ((row.modelData && (row.modelData.kind === "calc" || row.modelData.kind === "unit" || row.modelData.kind === "constants" || row.modelData.kind === "fx") && !row.modelData.incomplete) ? Text.ElideMiddle : Text.ElideRight)
-        wrapMode: Text.NoWrap
-        duration: row.noticeMotion ? Ui.normalMs : 0
+        height: subText.implicitHeight
         clip: true
+        visible: row.subSwapText !== ""
+
+        readonly property bool current: row.ListView.view !== null
+          && row.ListView.view.currentIndex === row.index
+        readonly property real overflow: Math.max(0, subText.implicitWidth - width)
+        readonly property bool scrollable: current && Marquee.scrollable(overflow)
+        readonly property int legMs: Marquee.legMs(overflow)
+        readonly property int startPauseMs: 1200
+        readonly property int endpointPauseMs: Marquee.endpointPauseMs()
+
+        function reset() {
+          subText.x = 0
+          if (subMarquee.scrollable) subMarqueeAnimation.restart()
+          else subMarqueeAnimation.stop()
+        }
+
+        onWidthChanged: subMarquee.reset()
+
+        SequentialAnimation {
+          id: subMarqueeAnimation
+
+          running: subMarquee.scrollable
+          loops: Animation.Infinite
+          PauseAnimation { duration: subMarquee.startPauseMs }
+          NumberAnimation {
+            target: subText
+            property: "x"
+            from: 0
+            to: -subMarquee.overflow
+            duration: subMarquee.legMs
+            easing.type: Easing.InOutSine
+          }
+          PauseAnimation { duration: subMarquee.endpointPauseMs }
+          NumberAnimation {
+            target: subText
+            property: "x"
+            from: -subMarquee.overflow
+            to: 0
+            duration: subMarquee.legMs
+            easing.type: Easing.InOutSine
+          }
+          PauseAnimation { duration: subMarquee.endpointPauseMs }
+          onStopped: subText.x = 0
+        }
+
+        // At rest the swap keeps its color transition when a red notice
+        // replaces the copy. Right elision shows the head of the line.
+        SlideSwap {
+          id: subSwap
+
+          visible: !subMarquee.scrollable
+          anchors.fill: parent
+          text: row.subSwapText
+          // Alert rows (an offline fx row) and the refused-delete notice
+          // paint the sub red. The resolver keys off each layer's string so
+          // neither one leaks its color onto the other mid-fade; markup stays
+          // out of the copy, so a description cannot inject its own styling.
+          colorFor: row.subColorFor
+          fontSize: Ui.fontXs
+          fontFamily: Ui.fontFamily
+          // Same ligature freeze as the title: `->` in a row must read as
+          // two characters, never as the font's arrow substitute.
+          fontFeatures: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
+          elide: Text.ElideRight
+          wrapMode: Text.NoWrap
+          duration: row.noticeMotion ? Ui.normalMs : 0
+        }
+
+        // The moving copy: full width so nothing is elided, clipped by the
+        // wrapper above. It carries the same string, font and color as the
+        // swap, so handing over between the two is a position change only.
+        Text {
+          id: subText
+
+          visible: subMarquee.scrollable
+          width: subMarquee.scrollable ? implicitWidth : subMarquee.width
+          text: row.subSwapText
+          color: row.subColorFor(row.subSwapText)
+          font.pixelSize: Ui.fontXs
+          font.family: Ui.fontFamily
+          font.features: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
+          textFormat: Text.PlainText
+          elide: Text.ElideNone
+          wrapMode: Text.NoWrap
+          onTextChanged: subMarquee.reset()
+        }
       }
     }
   }
