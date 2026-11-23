@@ -422,23 +422,10 @@ Item {
       width: parent.width
       spacing: 2
 
-      Row {
+      SectionLabel {
         anchors.left: parent.left
-        spacing: Ui.s
-
-        Icon {
-          anchors.verticalCenter: parent.verticalCenter
-          name: "package"
-          colorKey: "foreground_1"
-          size: 14
-          opacity: 0.7
-        }
-
-        Title {
-          level: 2
-          anchors.verticalCenter: parent.verticalCenter
-          text: "PACKAGE UPDATES"
-        }
+        icon: "package"
+        text: "PACKAGE UPDATES"
       }
 
       // Single subtitle line: totals plus the refresh cadence, or the
@@ -451,30 +438,19 @@ Item {
         // No dead gap while the spinner is hidden.
         spacing: statusIcon.visible ? root._gap : 0
 
-        Icon {
+        BusySpinner {
           id: statusIcon
 
           visible: root.skeleton
           width: root._iconW
           height: root._iconW
           anchors.verticalCenter: parent.verticalCenter
-          name: "update"
           colorKey: "foreground_1"
           size: root._iconW
           opacity: 0.5
-          transformOrigin: Item.Center
-
-          // The spinner is the busy state, not decoration: it keeps turning
-          // even when global animations are off. A stopped glyph still says
-          // "busy" less clearly than the motion that names a running check.
-          RotationAnimation on rotation {
-            from: 0
-            to: 360
-            duration: 1000
-            loops: Animation.Infinite
-            running: root.skeleton
-            onRunningChanged: if (!running) statusIcon.rotation = 0
-          }
+          // Busy state, not decoration: no MotionPolicy gate here - the
+          // exemption stays at this call site.
+          running: root.skeleton
         }
 
         Title {

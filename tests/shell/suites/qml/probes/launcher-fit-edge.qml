@@ -335,6 +335,18 @@ Item {
       '    function requestDelete(rec) {}',
       '    function confirmDelete() {}',
       '  }',
+      // The extracted toggleDeleteCurrent/activateCurrent read the shared
+      // ConfirmStage instance. Only its API crosses the component boundary;
+      // the cursor contract is about which record is named, so a closed stage
+      // stub is enough and keeps activation on the normal path.
+      '  property QtObject confirmStage: QtObject {',
+      '    property bool open: false',
+      '    property int stage: 0',
+      '    function isArmed(i) { return false }',
+      '    function advance(i) { return false }',
+      '    function arm(i) {}',
+      '    function close() {}',
+      '  }',
       '  function closeDelete() { m._deleteIndex = -1; m._deleteStage = 0 }',
       '  function acceptDelete() {}',
       '  function flashNotDeletable(idx) {}',

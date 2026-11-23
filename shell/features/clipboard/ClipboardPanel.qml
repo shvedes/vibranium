@@ -227,7 +227,7 @@ PanelCard {
   function moveSelection(dir) {
     if (!list.move(dir)) return
     // Leaving the armed row closes its confirm dropdown.
-    if (panel._deleteIndex >= 0 && panel._deleteIndex !== list.currentIndex) panel.closeDelete()
+    if (confirmStage.open && !confirmStage.isArmed(list.currentIndex)) panel.closeDelete()
   }
 
   function scrollBy(factor) { list.pageBy(factor) }
@@ -237,8 +237,8 @@ PanelCard {
     // Open confirm takes precedence over activation, like the launcher.
     // Only the armed row itself confirms; landing on another row (click)
     // just closes the dropdown.
-    if (panel._deleteIndex >= 0) {
-      if (list.currentIndex === panel._deleteIndex) { panel.acceptDelete(); return }
+    if (confirmStage.open) {
+      if (confirmStage.isArmed(list.currentIndex)) { panel.acceptDelete(); return }
       panel.closeDelete()
     }
     let idx = list.currentIndex
@@ -269,8 +269,9 @@ PanelCard {
   property int _pendingRepairGen: -1
   property int _pendingRepairTarget: -1
   // Three-step confirm state for pinned rows: hint -> armed -> confirm.
-  property int _deleteIndex: -1
-  property int _deleteStage: 0
+  // The state is shared; this panel owns the row-index key, the reveal
+  // claim and the service calls.
+  ConfirmStage { id: confirmStage }
   // Model-swap generation: re-arms restore the glide only for the
   // latest swap (see syncRows).
   property int _swapGen: 0
@@ -382,8 +383,7 @@ PanelCard {
   }
 
   function closeDelete() {
-    _deleteIndex = -1
-    _deleteStage = 0
+    confirmStage.close()
     list.autoRevealIndex = -1
   }
   // Post-delete reflow: rows below the removed one slide up into the
@@ -554,21 +554,20 @@ PanelCard {
   // on pinned rows, and Enter on rows already flagged missing. Same
   // hint -> armed -> confirm either way.
   function stageDeleteAt(idx) {
-    if (panel._deleteIndex === idx) {
-      if (panel._deleteStage >= 2) {
+    if (confirmStage.isArmed(idx)) {
+      if (confirmStage.advance(idx)) {
         panel.acceptDelete()
         return
       }
-      panel._deleteStage++
       list.autoRevealIndex = idx
       return
     }
-    panel._deleteIndex = idx
-    panel._deleteStage = 1
+    confirmStage.arm(idx)
     list.autoRevealIndex = idx
   }
   function acceptDelete() {
-    const idx = panel._deleteIndex
+    // The closed key is null; keep the old -1 shape for the index guards.
+    const idx = confirmStage.open ? confirmStage.key : -1
     const row = idx >= 0 && idx < panel.rows.length ? panel.rows[idx] : null
     if (row) panel._armSlide(idx)
     if (row) panel._armSettle(idx)
@@ -640,7 +639,7 @@ PanelCard {
   // panel.
   function escapeChain() {
     // The open confirm is modal: Escape cancels it before anything else.
-    if (panel._deleteIndex >= 0) {
+    if (confirmStage.open) {
       panel.closeDelete()
       return
     }
@@ -664,7 +663,6 @@ PanelCard {
     const k = event.key
     const ctrl = event.modifiers & Qt.ControlModifier
     const shift = event.modifiers & Qt.ShiftModifier
-    const meta = event.modifiers & Qt.MetaModifier
     const alt = event.modifiers & Qt.AltModifier
 
     // Ctrl-J/K scroll only the preview pane text; the list cursor never
@@ -678,7 +676,7 @@ PanelCard {
     // Ctrl-V pastes the clipboard into the query from the list, launcher
     // parity: the paste lands through the field's pipeline and then takes the
     // caret, so the next keystroke extends it instead of starting over.
-    if (k === Qt.Key_V && ctrl && !meta && focusCtrl.mode === "list"
+    if (PanelKeys.pasteRoute(k, event.modifiers, Qt) && focusCtrl.mode === "list"
         && !searchField.focused) {
       if (!panel.filterDead && searchField.pasteText(Clipboard.history)) {
         focusCtrl.grabFilter()
@@ -710,7 +708,7 @@ PanelCard {
         break
     }
 
-    if (!ctrl && !meta && !alt && event.text.length === 1 && event.text.charCodeAt(0) >= 32) {
+    if (!alt && PanelKeys.printable(event.text, event.modifiers, Qt)) {
       if (focusCtrl.mode === "list") {
         const pref = ["@"]
         for (let i = 0; i < pref.length; i++) {
@@ -791,15 +789,13 @@ PanelCard {
       anchors.topMargin: Ui.rowPadV
       height: titleSlot.height + 1 + subSlot.height
 
-      Rectangle {
+      SkeletonBar {
         id: iconSlot
 
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         width: 20
         height: 20
-        radius: RoundingPolicy.radius
-        color: Ui.tint("foreground_1", 0.14)
       }
 
       Column {
@@ -816,12 +812,10 @@ PanelCard {
           width: parent.width
           height: titleProbe.implicitHeight
 
-          Rectangle {
+          SkeletonBar {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width * skel.titleFrac
             height: 8
-            radius: RoundingPolicy.radius
-            color: Ui.tint("foreground_1", 0.14)
           }
         }
 
@@ -831,24 +825,20 @@ PanelCard {
           width: parent.width
           height: subProbe.implicitHeight
 
-          Rectangle {
+          SkeletonBar {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             width: Math.max(0, parent.width - timeSlot.width - Ui.s)
             height: 6
-            radius: RoundingPolicy.radius
-            color: Ui.tint("foreground_1", 0.14)
           }
 
-          Rectangle {
+          SkeletonBar {
             id: timeSlot
 
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             width: subProbe.implicitWidth
             height: 6
-            radius: RoundingPolicy.radius
-            color: Ui.tint("foreground_1", 0.14)
           }
         }
       }
@@ -957,7 +947,7 @@ PanelCard {
           // stages its confirm (tracks it 1:1); an armed row left behind
           // must not freeze the bar mid-move. The card takes no growth
           // claim (fixed 6-row window), so gate on the slot state.
-          highlightMotion: MotionPolicy.enabled && panel._deleteIndex !== list.currentIndex
+          highlightMotion: MotionPolicy.enabled && !confirmStage.isArmed(list.currentIndex)
           // Fixed 3-row margin (vim-style scrolloff): with the panel's
           // 6-row window the view starts moving when the cursor reaches
           // the 4th row; the glide follows the same gate as the focus.
@@ -965,7 +955,7 @@ PanelCard {
           smoothScroll: MotionPolicy.enabled
           // Never learn while a pinned-row delete confirm is open (see
           // LauncherPanel): slot-inflated heights poison the table.
-          measureGuard: idx => panel._deleteIndex < 0
+          measureGuard: idx => !confirmStage.open
           // Height table keyed by row identity: history writes reorder
           // rows and async thumbnail loads grow them in place - index
           // keys would describe the wrong row after the first mutation.
@@ -988,8 +978,8 @@ PanelCard {
           autoRevealEnabled: true
           delegate: ClipboardEntry {
             restHeight: panel.rowH
-            deleteOpen: panel._deleteIndex === index
-            deleteStage: panel._deleteIndex === index ? panel._deleteStage : 0
+            deleteOpen: confirmStage.isArmed(index)
+            deleteStage: confirmStage.isArmed(index) ? confirmStage.stage : 0
           }
         }
 

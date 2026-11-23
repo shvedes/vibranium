@@ -396,12 +396,9 @@ LayerSurface {
     // Dismissal net: any click outside the card closes the host. Inside the
     // router and declared before the card, so the card paints above it and
     // content clicks never fall through to it.
-    MouseArea {
-
-      anchors.fill: parent
-      enabled: root.open
-      acceptedButtons: Qt.AllButtons
-      onPressed: root.close()
+    DismissNet {
+      gate: root.open
+      onDismissed: root.close()
     }
 
     // The card's elevation halo, on the same surface as the card so it keeps

@@ -80,11 +80,9 @@ LayerSurface {
   }
 
   // Dismissal net: any click outside the card closes the menu.
-  MouseArea {
-    anchors.fill: parent
-    enabled: root.open
-    acceptedButtons: Qt.AllButtons
-    onPressed: root.close()
+  DismissNet {
+    gate: root.open
+    onDismissed: root.close()
   }
 
   QsMenuOpener {

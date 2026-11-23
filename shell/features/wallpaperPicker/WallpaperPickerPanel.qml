@@ -8,6 +8,7 @@ import qs.common
 import qs.features.wallpaper
 import qs.features.wallpaperPicker
 import "../../common/text/StringUtils.js" as SU
+import "../../common/ui/KeyHint.js" as KeyHint
 import "../../common/ui/PanelKeys.js" as PanelKeys
 
 // Wallpaper picker overlay: a horizontal cascade of wallpaper previews.
@@ -789,38 +790,21 @@ Item {
     // The selected file gets the footer's island: it sits over the same dimmed
     // backdrop, so a palette foreground on it is unreadable on a light theme.
     // White is the fallback text; the applied wallpaper still reads in accent.
-    Rectangle {
+    GlassPill {
       id: nameIsland
 
       x: Math.round((parent.width - width) / 2)
-      implicitWidth: nameText.implicitWidth + Ui.l * 2
-      implicitHeight: nameText.implicitHeight + Ui.s * 2
-      width: Math.min(implicitWidth, parent.width)
-      height: implicitHeight
-      radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
-      color: Qt.rgba(0, 0, 0, 0.62)
-      border.width: 1
-      border.color: Qt.rgba(1, 1, 1, 0.18)
-
-      Accessible.role: Accessible.StaticText
-      Accessible.name: panel._currentFile()
-
-      Text {
-        id: nameText
-
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, nameIsland.width - Ui.l * 2)
-        horizontalAlignment: Text.AlignHCenter
-        text: panel._currentFile()
-        color: panel._isApplied(panel._currentFile())
-          ? Ui.solid("accent")
-          : "#ffffff"
-        font.pixelSize: Ui.fontCardTitle
-        font.family: Ui.fontFamily
-        font.bold: true
-        elide: Text.ElideMiddle
-        textFormat: Text.PlainText
-      }
+      maxWidth: parent.width
+      text: panel._currentFile()
+      textColor: panel._isApplied(panel._currentFile())
+        ? Ui.solid("accent")
+        : "#ffffff"
+      accessibleName: panel._currentFile()
+      fontPixelSize: Ui.fontCardTitle
+      fontFamily: Ui.fontFamily
+      bold: true
+      elide: Text.ElideMiddle
+      textFormat: Text.PlainText
     }
   }
 
@@ -852,37 +836,27 @@ Item {
   // The footer legend: navigation and acceptance in the accent, the removal
   // key in the palette's red, and the file chooser in yellow - the one key
   // that leaves the theme's own set. Styled text because the keys are colored
-  // per key rather than the whole line.
-  function _key(name, color) {
-    return "<font color=\"" + color + "\">" + name + "</font>"
-  }
-  function _escText(text) {
-    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-  }
+  // per key rather than the whole line; the markup and plain-text recipes
+  // live in KeyHint.js, shared with the theme picker.
   function _legend() {
     const accent = Ui.solid("accent")
     if (panel._confirmOpen) {
-      return "Remove " + panel._escText(panel._confirmFile) + "?  "
-        + panel._key("Delete", Ui.solid("red")) + " again to remove · "
-        + panel._key("Esc", accent) + " cancels"
+      return "Remove " + KeyHint.escape(panel._confirmFile) + "?  "
+        + KeyHint.key("Delete", Ui.solid("red")) + " again to remove · "
+        + KeyHint.key("Esc", accent) + " cancels"
     }
     // The reveal verb is only advertised while the theme has something to
     // reveal: a Ctrl+H that would do nothing is a dead key in the legend.
     const hidden = WallpaperPicker.hiddenCount > 0
-      ? panel._key("Ctrl+H", Ui.solid("purple"))
+      ? KeyHint.key("Ctrl+H", Ui.solid("purple"))
         + (WallpaperPicker.showHidden ? " hide hidden · " : " show hidden · ")
       : ""
-    return panel._key("←/→", accent) + " · " + panel._key("A/D", accent)
-      + " · " + panel._key("J/K", accent) + " browse · "
-      + panel._key("Enter", accent) + " / " + panel._key("Space", accent) + " apply · "
+    return KeyHint.key("←/→", accent) + " · " + KeyHint.key("A/D", accent)
+      + " · " + KeyHint.key("J/K", accent) + " browse · "
+      + KeyHint.key("Enter", accent) + " / " + KeyHint.key("Space", accent) + " apply · "
       + hidden
-      + panel._key("Ctrl+O", Ui.solid("yellow")) + " open · "
-      + panel._key("Delete", Ui.solid("red")) + " remove · Esc close"
-  }
-  // The legend without its per-key markup, for the island's accessible name:
-  // a screen reader should read the keys, not the color tags.
-  function _legendPlain() {
-    return panel._legend().replace(/<[^>]*>/g, "")
+      + KeyHint.key("Ctrl+O", Ui.solid("yellow")) + " open · "
+      + KeyHint.key("Delete", Ui.solid("red")) + " remove · Esc close"
   }
 
   // The footer sits on its own dark island rather than straight on the backdrop.
@@ -893,38 +867,20 @@ Item {
   // is why the words are white instead of a palette leaf; the key hints keep
   // their palette colors, and the border and rounding make the island read as
   // a surface of its own rather than a floating line of text.
-  Rectangle {
+  GlassPill {
     id: footer
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
     anchors.bottomMargin: Ui.outerPad * 2
-    implicitWidth: footerText.implicitWidth + Ui.l * 2
-    implicitHeight: footerText.implicitHeight + Ui.s * 2
-    width: Math.min(implicitWidth, Math.max(0, panel.width - 2 * Ui.outerPad))
-    height: implicitHeight
-    radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
-    color: Qt.rgba(0, 0, 0, 0.62)
-    border.width: 1
-    border.color: Qt.rgba(1, 1, 1, 0.18)
+    maxWidth: Math.max(0, panel.width - 2 * Ui.outerPad)
     visible: !panel.featureDisabled
-
-    Accessible.role: Accessible.StaticText
-    Accessible.name: panel._legendPlain()
-
-    Text {
-      id: footerText
-
-      anchors.centerIn: parent
-      width: Math.min(implicitWidth, footer.width - Ui.l * 2)
-      horizontalAlignment: Text.AlignHCenter
-      text: panel._legend()
-      color: "#ffffff"
-      font.pixelSize: Ui.fontL
-      font.family: Ui.fontFamily
-      elide: Text.ElideRight
-      textFormat: Text.StyledText
-    }
+    accessibleName: KeyHint.plain(panel._legend())
+    text: panel._legend()
+    fontPixelSize: Ui.fontL
+    fontFamily: Ui.fontFamily
+    elide: Text.ElideRight
+    textFormat: Text.StyledText
   }
 
   PointerGuard {}

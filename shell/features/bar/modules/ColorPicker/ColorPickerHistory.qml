@@ -153,25 +153,21 @@ Item {
   clip: true
 
   // Empty state: dimmed theme glyph + hint, dead center. Fixed height
-  // keeps the island static when this shows.
-  Column {
+  // keeps the island static when this shows. The old Column faded glyph
+  // and copy together, so the 0.5 stays on the whole instance and the
+  // shared glyph keeps full opacity.
+  EmptyState {
     anchors.centerIn: parent
+    width: parent.width
     visible: root.records.length === 0
     spacing: Ui.s
     opacity: 0.5
-
-    Icon {
-      anchors.horizontalCenter: parent.horizontalCenter
-      name: "theme"
-      colorKey: "foreground_1"
-      size: 32
-    }
-
-    Title {
-      anchors.horizontalCenter: parent.horizontalCenter
-      level: 5
-      text: "Recent picks will appear here"
-    }
+    iconName: "theme"
+    iconSize: 32
+    iconOpacity: 1
+    italic: false
+    textColor: Ui.tint("foreground_1", 0.5)
+    text: "Recent picks will appear here"
   }
 
   List {

@@ -7,6 +7,7 @@ import qs.common
 import qs.services as Core
 import "MixerModel.js" as Model
 import "../../../common/audio/LevelBand.js" as LevelBand
+import "../../../common/ui/PickerChipKeys.js" as PickerChipKeys
 
 // One device row, in two modes against one header:
 //
@@ -1112,13 +1113,9 @@ Item {
         activeFocusOnTab: row.profilesReadable
         Keys.onPressed: function(event) {
           if (!row.profilesReadable) return
-          const down = event.key === Qt.Key_Down
-          const up = event.key === Qt.Key_Up
-          if (!down && !up && event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter
-            && event.key !== Qt.Key_Space) return
-          event.accepted = true
-          row.openPicker()
-          if (down || up) row.stepPicker(down ? 1 : -1)
+          PickerChipKeys.handle(event, Qt,
+            function() { row.openPicker() },
+            function(delta) { row.stepPicker(delta) })
         }
 
         Accessible.role: Accessible.ComboBox

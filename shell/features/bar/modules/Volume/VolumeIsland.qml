@@ -7,7 +7,6 @@ import Quickshell.Widgets
 import Quickshell.Services.Pipewire
 import qs.common
 import qs.services as Core
-import qs.features.bar
 import "Model.js" as Model
 import "../../../../common/text/Format.js" as Format
 import "../../../../common/math/Range.js" as Range

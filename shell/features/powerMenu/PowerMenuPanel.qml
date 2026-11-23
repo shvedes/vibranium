@@ -5,6 +5,7 @@ import Quickshell
 import qs.common
 import qs.features.clipboard
 import qs.features.powerMenu
+import "../../common/ui/PanelKeys.js" as PanelKeys
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
 
 // Power menu card - declarative via PanelCard + PanelFocus.
@@ -58,15 +59,14 @@ PanelCard {
 
   // The staged confirm under one destructive row. One action at a time, and
   // the ACTION is the service's (PowerMenu.confirmationAction - the only thing
-  // confirmPending will run), while the row and the stage are the panel's,
-  // exactly as they are for the clipboard, launcher, pass and wallpaper-picker
-  // rows. So the question opens under the action that asked for it and the
-  // list grows for it; the card reserves nothing below the list.
-  property int _confirmIndex: -1
-  property int _confirmStage: 0
-  readonly property bool armed: panel._confirmIndex >= 0
+  // confirmPending will run), while the row and the stage live in the shared
+  // state machine, exactly as they do for the clipboard and launcher rows.
+  // So the question opens under the action that asked for it and the list
+  // grows for it; the card reserves nothing below the list.
+  ConfirmStage { id: confirmStage }
+  readonly property bool armed: confirmStage.armed
   // Open OR still folding shut. The two are not the same span on purpose:
-  // `_confirmIndex` ends at the cancel, the list claim ends when the slot is
+  // the state's key ends at the cancel, the list claim ends when the slot is
   // flat (see closeConfirm), and anything that must not read a slot-inflated
   // geometry - the height table's guard, the highlight bar - spans both.
   readonly property bool slotInFlight: panel.armed || list.autoRevealIndex >= 0
@@ -247,25 +247,22 @@ PanelCard {
   function moveSelection(dir) {
     if (!list.move(dir)) return
     // Leaving the armed row closes its dropdown.
-    if (panel.armed && panel._confirmIndex !== list.currentIndex) panel.closeConfirm()
+    if (panel.armed && !confirmStage.isArmed(list.currentIndex)) panel.closeConfirm()
   }
   // Open the staged confirm under `idx`. Arming is what the activation did:
   // the service holds the action name, this holds the row it went with.
   function armConfirm(idx) {
-    panel._confirmIndex = idx
-    panel._confirmStage = 1
+    confirmStage.arm(idx)
     list.autoRevealIndex = idx
   }
   // One stage per activation: each Enter on the row advances it, so the hint
   // and the armed state cannot be reached by two different rules.
   function advanceConfirm() {
-    if (panel._confirmStage >= 2) { PowerMenu.confirmPending(); return }
-    panel._confirmStage++
+    if (confirmStage.advance(list.currentIndex)) { PowerMenu.confirmPending(); return }
   }
   function closeConfirm() {
-    if (panel._confirmIndex < 0 && !PowerMenu.confirmationArmed) return
-    panel._confirmIndex = -1
-    panel._confirmStage = 0
+    if (!confirmStage.open && !PowerMenu.confirmationArmed) return
+    confirmStage.close()
     PowerMenu.cancelPending()
     // The list's claim is NOT released here, and that is the whole of the
     // "collapsing the dropdown grows the window and leaves a gap under the
@@ -306,7 +303,7 @@ PanelCard {
     // An armed dropdown is modal for its own row: the next activation on it
     // arms the second stage, the one after that confirms. Any other row
     // answers nothing - its own activation routes instead.
-    if (panel.armed && panel._confirmIndex === idx) { panel.advanceConfirm(); return }
+    if (panel.armed && confirmStage.isArmed(idx)) { panel.advanceConfirm(); return }
     panel.closeConfirm()
     const it = panel._rows[idx]
     // A destructive row hit through the filter leaves the filter behind first,
@@ -423,43 +420,40 @@ PanelCard {
   function handleKey(event) {
     const k = event.key
     const ctrl = event.modifiers & Qt.ControlModifier
-    const meta = event.modifiers & Qt.MetaModifier
     // Ctrl-V pastes the clipboard into the filter from the list and takes the
     // caret, so the next keystroke extends the pasted query.
-    if (k === Qt.Key_V && ctrl && !meta) {
+    if (PanelKeys.pasteRoute(k, event.modifiers, Qt)) {
       if (searchField.pasteText(Clipboard.history)) focusCtrl.grabFilter()
       event.accepted = true
       return
     }
     if (k === Qt.Key_F && ctrl) { focusCtrl.grabFilter(); event.accepted = true; return }
-    switch (k) {
-      case Qt.Key_Down:
-      case Qt.Key_Tab: panel.moveSelection(1); event.accepted = true; return
-      case Qt.Key_Up:
-      case Qt.Key_Backtab: panel.moveSelection(-1); event.accepted = true; return
-      case Qt.Key_PageUp: panel.scrollBy(-0.8); event.accepted = true; return
-      case Qt.Key_PageDown: panel.scrollBy(0.8); event.accepted = true; return
-      case Qt.Key_Home: panel.jumpEnd(false); event.accepted = true; return
-      case Qt.Key_End: panel.jumpEnd(true); event.accepted = true; return
-      case Qt.Key_Escape: panel.escapeChain(); event.accepted = true; return
-      case Qt.Key_Return:
-      case Qt.Key_Enter: panel.activateCurrent(); event.accepted = true; return
-      case Qt.Key_Backspace:
-      case Qt.Key_Delete:
+    // Delete shares Backspace's "back" meaning here, but it is not in the
+    // shared table (other panels spend it on staging a delete), so it stays
+    // a local key with the same list-focus guard.
+    if (k === Qt.Key_Delete && focusCtrl.mode === "list") {
+      focusCtrl.grabFilter(); event.accepted = true; return
+    }
+    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused)) {
+      case "next": panel.moveSelection(1); event.accepted = true; return
+      case "prev": panel.moveSelection(-1); event.accepted = true; return
+      case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
+      case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
+      case "first": panel.jumpEnd(false); event.accepted = true; return
+      case "last": panel.jumpEnd(true); event.accepted = true; return
+      case "escape": panel.escapeChain(); event.accepted = true; return
+      case "activate": panel.activateCurrent(); event.accepted = true; return
+      case "back":
         if (focusCtrl.mode === "list") { focusCtrl.grabFilter(); event.accepted = true; return }
         break
-      case Qt.Key_Space:
-        if (focusCtrl.mode === "list" && !searchField.focused) { panel.activateCurrent(); event.accepted = true; return }
-        break
     }
-    if (!ctrl && !meta && event.text.length === 1 && event.text.charCodeAt(0) >= 32) {
+    if (PanelKeys.printable(event.text, event.modifiers, Qt)) {
       if (focusCtrl.mode === "list") {
         PowerMenu.submit(event.text)
         focusCtrl.grabFilter()
         event.accepted = true
       }
     }
-
   }
   Keys.onPressed: event => panel.handleKey(event)
 
@@ -520,7 +514,7 @@ PanelCard {
       // - same gate as MenuPanel, narrowed to the cursor-row rule every panel
       // with in-flow slots keeps: the bar snaps while the focused row carries
       // an unfolding confirm, because it rides that row's height.
-      highlightMotion: MotionPolicy.enabled && panel._confirmIndex !== list.currentIndex
+      highlightMotion: MotionPolicy.enabled && !confirmStage.isArmed(list.currentIndex)
       // Never learn while a slot is open OR still folding shut (see
       // LauncherPanel): the slot is in-flow under the row, so an inflated
       // height would poison the table's average and the fit would resolve
@@ -693,9 +687,9 @@ PanelCard {
           anchors.left: parent.left
           anchors.right: parent.right
           anchors.top: mainLine.bottom
-          open: panel._confirmIndex === row.index
+          open: confirmStage.isArmed(row.index)
             && PowerMenu.isDestructive(row.modelData ? row.modelData.action : "")
-          stage: panel._confirmIndex === row.index ? panel._confirmStage : 0
+          stage: confirmStage.isArmed(row.index) ? confirmStage.stage : 0
           confirmText: row.actionLabel === "" ? "Confirm" : "Confirm " + row.actionLabel
           hintText: row.actionLabel === "" ? "Press Enter to confirm" : "Press Enter to confirm " + row.actionLabel
           armedText: "<b><u>Press Enter again to confirm " + (row.actionLabel === "" ? "this action" : row.actionLabel) + "</u></b>"

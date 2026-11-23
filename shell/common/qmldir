@@ -75,6 +75,7 @@ InputField 1.0 ui/InputField.qml
 List 1.0 ui/List.qml
 GridList 1.0 ui/GridList.qml
 Card 1.0 ui/Card.qml
+GlassPill 1.0 ui/GlassPill.qml
 ContextMenu 1.0 ui/ContextMenu.qml
 Notice 1.0 ui/Notice.qml
 SoftShadow 1.0 ui/SoftShadow.qml
@@ -85,6 +86,9 @@ CheckBox 1.0 ui/CheckBox.qml
 Toggle 1.0 ui/Toggle.qml
 PanelCard 1.0 ui/PanelCard.qml
 PointerGuard 1.0 ui/PointerGuard.qml
+DismissNet 1.0 ui/DismissNet.qml
+BusySpinner 1.0 ui/BusySpinner.qml
+ConfirmStage 1.0 ui/ConfirmStage.qml
 TwoPaneMetrics 1.0 ui/TwoPaneMetrics.qml
 ScreenCeiling 1.0 ui/ScreenCeiling.qml
 OverlayWindow 1.0 ui/OverlayWindow.qml
@@ -95,6 +99,8 @@ FunctionGraph 1.0 ui/FunctionGraph.qml
 IslandHost 1.0 ui/IslandHost.qml
 IslandNav 1.0 ui/IslandNav.qml
 Title 1.0 ui/Title.qml
+SectionLabel 1.0 ui/SectionLabel.qml
+ScrollLabel 1.0 ui/ScrollLabel.qml
 SlideSwap 1.0 ui/SlideSwap.qml
 ZebraRow 1.0 ui/ZebraRow.qml
 IconWarmer 1.0 ui/IconWarmer.qml

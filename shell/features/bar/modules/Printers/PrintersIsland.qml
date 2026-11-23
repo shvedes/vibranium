@@ -4,7 +4,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.services as Svc
-import qs.features.bar
 import "../../../../services/system/PrintersLib.js" as Model
 
 // Printers island. Header: the section-cap style (lib Title level 2,
@@ -168,24 +167,10 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
 
-            Row {
+            SectionLabel {
               width: parent.width
-              spacing: Ui.s
-
-              Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "printer"
-                colorKey: "foreground_1"
-                size: 14
-                opacity: 0.7
-              }
-
-              Title {
-                level: 2
-                width: parent.width - Ui.s - 14
-                anchors.verticalCenter: parent.verticalCenter
-                text: "PRINTERS"
-              }
+              icon: "printer"
+              text: "PRINTERS"
             }
 
             // Subtitle row: the muted line with the reload spinner ahead
@@ -197,27 +182,17 @@ Item {
               spacing: Ui.s
               visible: Svc.Printers.state === "loading" || contentRoot.subtitleText !== ""
 
-              Icon {
+              BusySpinner {
                 id: reloadSpin
 
                 visible: Svc.Printers.state === "loading"
                 anchors.verticalCenter: parent.verticalCenter
-                name: "update"
                 colorKey: "foreground_1"
                 size: 12
                 opacity: 0.7
-                transformOrigin: Item.Center
-
                 // Activity feedback, not decoration: the spinner runs while a
                 // reload is in flight regardless of the motion policy.
-                RotationAnimation on rotation {
-                  from: 0
-                  to: 360
-                  duration: 1000
-                  loops: Animation.Infinite
-                  running: Svc.Printers.state === "loading"
-                  onRunningChanged: if (!running) reloadSpin.rotation = 0
-                }
+                running: Svc.Printers.state === "loading"
               }
 
               Title {
@@ -343,22 +318,9 @@ Item {
           width: parent.width
           spacing: Ui.s
 
-          Row {
-            spacing: Ui.s
-
-            Icon {
-              anchors.verticalCenter: parent.verticalCenter
-              name: "printer"
-              colorKey: "foreground_1"
-              size: 14
-              opacity: 0.7
-            }
-
-            Title {
-              level: 2
-              anchors.verticalCenter: parent.verticalCenter
-              text: "KNOWN PRINTERS - " + contentRoot.printers.length
-            }
+          SectionLabel {
+            icon: "printer"
+            text: "KNOWN PRINTERS - " + contentRoot.printers.length
           }
 
           List {
@@ -543,7 +505,7 @@ Item {
               width: parent.width
               spacing: Ui.s
 
-              Icon {
+              BusySpinner {
                 id: statusIcon
 
                 visible: jobRow.done || jobRow.failed || jobRow.processing
@@ -551,16 +513,7 @@ Item {
                 name: jobRow.processing ? "update" : (jobRow.done ? "check" : "xmark")
                 colorKey: jobRow.processing ? "yellow" : (jobRow.done ? "green" : "red")
                 size: 12
-                transformOrigin: Item.Center
-
-                RotationAnimation on rotation {
-                  from: 0
-                  to: 360
-                  duration: 1000
-                  loops: Animation.Infinite
-                  running: jobRow.processing
-                  onRunningChanged: if (!running) statusIcon.rotation = 0
-                }
+                running: jobRow.processing
               }
 
               Title {
@@ -594,25 +547,15 @@ Item {
             // Scheduled (pending) jobs spin the shared update glyph -
             // the network island's scan indicator, same asset, same
             // one-second loop.
-            Icon {
+            BusySpinner {
               id: pendingSpin
 
               visible: jobRow.pending
               anchors.verticalCenter: parent.verticalCenter
-              name: "update"
               colorKey: "foreground_1"
               size: 14
               opacity: 0.7
-              transformOrigin: Item.Center
-
-              RotationAnimation on rotation {
-                from: 0
-                to: 360
-                duration: 1000
-                loops: Animation.Infinite
-                running: jobRow.pending
-                onRunningChanged: if (!running) pendingSpin.rotation = 0
-              }
+              running: jobRow.pending
             }
 
             // In-flight state, except processing (the title spinner says

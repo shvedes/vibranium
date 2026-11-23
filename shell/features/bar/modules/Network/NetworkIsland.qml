@@ -1159,22 +1159,9 @@ Item {
         Glide { duration: Ui.resizeMs }
       }
 
-        Row {
-          spacing: Ui.s
-
-          Icon {
-            anchors.verticalCenter: parent.verticalCenter
-            name: "chart"
-            colorKey: "foreground_1"
-            size: 14
-            opacity: 0.7
-          }
-
-          Title {
-            level: 2
-            anchors.verticalCenter: parent.verticalCenter
-            text: "METRICS"
-          }
+        SectionLabel {
+          icon: "chart"
+          text: "METRICS"
         }
 
         GridLayout {
@@ -1233,20 +1220,14 @@ Item {
         // the first poll, when the section still shows without a link.
         opacity: root.hasLink ? 1 : 0.45
 
-        Row {
+        SectionLabel {
           id: speedTitleRow
 
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          spacing: Ui.s
-
-          Icon {
-            anchors.verticalCenter: parent.verticalCenter
-            name: "gauge"
-            colorKey: "foreground_1"
-            size: 14
-            opacity: 0.7
-          }
+          icon: "gauge"
+          text: "SPEED TEST"
+          hasTrailing: true
 
           // Hover crossfade: the caps title swaps for the underlined
           // Start/Stop action, fading one out as the other fades in.
@@ -1765,24 +1746,18 @@ Item {
             opacity: row.connecting ? 0 : (row.outOfReach ? 0.5 : 1)
             Behavior on opacity { enabled: MotionPolicy.enabled; NumberAnimation { duration: Ui.fastMs } }
           }
-          Icon {
+          BusySpinner {
             id: connectSpinner
             anchors.centerIn: parent
-            name: "update"
             colorKey: "foreground_1"
             size: 20
             opacity: row.connecting ? 0.9 : 0
             visible: opacity > 0.01
-            transformOrigin: Item.Center
             Behavior on opacity { enabled: MotionPolicy.enabled; NumberAnimation { duration: Ui.fastMs } }
-            RotationAnimation on rotation {
-              from: 0
-              to: 360
-              duration: 1000
-              loops: Animation.Infinite
-              running: row.connecting
-              onRunningChanged: if (!running) connectSpinner.rotation = 0
-            }
+            // Connecting is a busy state, so this one keeps spinning with
+            // the motion policy off; the exemption lives here, not in the
+            // shared spinner.
+            running: row.connecting
           }
         }
 

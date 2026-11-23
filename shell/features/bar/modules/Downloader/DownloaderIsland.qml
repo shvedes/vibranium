@@ -5,7 +5,6 @@ import QtQuick
 import Quickshell
 import qs.common
 import "DownloadsLib.js" as DL
-import "../../../../common/motion/Marquee.js" as Marquee
 import "../../../../common/collections/TableSort.js" as TableSort
 
 // Downloader island: preview, URL field and the format table. The table is
@@ -1316,71 +1315,21 @@ Item {
           // The title scrolls when it does not fit, the same marquee the
           // clipboard and now-playing islands use: a pause at each end and
           // one eased leg between them.
-          Item {
+          ScrollLabel {
             id: previewTitleMarquee
 
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.margins: 8
-            height: previewTitleText.implicitHeight
-            clip: true
-
-            readonly property real overflow: Math.max(0,
-              previewTitleText.implicitWidth - width)
-            readonly property bool scrollable: Marquee.scrollable(overflow)
-            readonly property int legMs: Marquee.legMs(overflow)
-            readonly property int endpointPauseMs: Marquee.endpointPauseMs()
-
-            function reset() {
-              previewTitleText.x = 0
-              if (previewTitleMarquee.scrollable && previewPaneInput.overTitle)
-                previewTitleAnimation.restart()
-              else previewTitleAnimation.stop()
-            }
-
-            onWidthChanged: previewTitleMarquee.reset()
-
-            SequentialAnimation {
-              id: previewTitleAnimation
-
-              running: previewTitleMarquee.scrollable && previewPaneInput.overTitle
-              loops: Animation.Infinite
-              NumberAnimation {
-                target: previewTitleText
-                property: "x"
-                from: 0
-                to: -previewTitleMarquee.overflow
-                duration: previewTitleMarquee.legMs
-                easing.type: Easing.InOutSine
-              }
-              PauseAnimation { duration: previewTitleMarquee.endpointPauseMs }
-              NumberAnimation {
-                target: previewTitleText
-                property: "x"
-                from: -previewTitleMarquee.overflow
-                to: 0
-                duration: previewTitleMarquee.legMs
-                easing.type: Easing.InOutSine
-              }
-              PauseAnimation { duration: previewTitleMarquee.endpointPauseMs }
-              onStopped: previewTitleText.x = 0
-            }
-
-            Title {
-              id: previewTitleText
-
-              // The width never depends on `scrollable`: that pair of bindings
-              // settles on the constrained width, which left the ellipsis on
-              // the very title the marquee was scrolling. The text rides its
-              // own width and the marquee's clip trims what is off-screen.
-              width: implicitWidth
-              anchors.verticalCenter: parent.verticalCenter
-              level: 3
-              text: root.previewText
-              elide: Text.ElideNone
-              onTextChanged: previewTitleMarquee.reset()
-            }
+            height: implicitHeight
+            scrolling: previewPaneInput.overTitle
+            // The old Title never ellipsised: an overlong, unhovered title was
+            // clipped by the wrapper, not shortened.
+            idleElide: Text.ElideNone
+            level: 3
+            text: root.previewText
+            opticalCenter: false
           }
         }
 
@@ -1630,22 +1579,12 @@ Item {
         // The update card's busy spinner, reused as-is: the reload glyph
         // turning once a second while the job runs. Like the bar sweep, this
         // is a busy indicator, so it ignores the global motion switch.
-        Icon {
+        BusySpinner {
           id: downloadGlyph
           anchors.verticalCenter: parent.verticalCenter
-          name: "update"
           colorKey: "accent"
           size: 12
-          transformOrigin: Item.Center
-
-          RotationAnimation on rotation {
-            from: 0
-            to: 360
-            duration: 1000
-            loops: Animation.Infinite
-            running: root.downloading
-            onRunningChanged: if (!running) downloadGlyph.rotation = 0
-          }
+          running: root.downloading
         }
 
         Title {
@@ -2679,76 +2618,27 @@ Item {
         // A title longer than its column scrolls like the recent rows: a pause
         // at each end and one eased leg between them, but only while the
         // pointer is over the title.
-          Item {
-            id: plTitleBox
+        ScrollLabel {
+          id: plTitleBox
 
-            width: parent.width - 14 - 22 - root.plDurationW - 3 * root._gap
-            height: parent.height
-            clip: true
+          width: parent.width - 14 - 22 - root.plDurationW - 3 * root._gap
+          height: parent.height
+          scrolling: plTitleHover.hovered
+          idleElide: Text.ElideNone
+          level: 5
+          fontSize: Ui.fontXs
+          text: String(plCell.modelData.title || "-")
+          // A held entry keeps its name in the accent - it is a copy, not
+          // an option - while the rest of its row steps back.
+          color: plCell.have ? Ui.solid("accent")
+            : plCell.ticked ? Ui.solid("foreground_0")
+            : Ui.tint("foreground_1", 0.6)
+          opticalCenter: false
 
-            readonly property real overflow: Math.max(0,
-              plTitleText.implicitWidth - width)
-            readonly property bool scrollable: Marquee.scrollable(overflow)
-            readonly property int legMs: Marquee.legMs(overflow)
-            readonly property int endpointPauseMs: Marquee.endpointPauseMs()
-
-            HoverHandler {
-              id: plTitleHover
-              cursorShape: plCell.liveRow && !plCell.have
-                ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-            }
-
-            function reset() {
-              plTitleText.x = 0
-              if (plTitleBox.scrollable && plTitleHover.hovered)
-                plTitleAnimation.restart()
-              else plTitleAnimation.stop()
-            }
-
-            onWidthChanged: plTitleBox.reset()
-            onOverflowChanged: plTitleBox.reset()
-
-            SequentialAnimation {
-              id: plTitleAnimation
-
-              running: plTitleBox.scrollable && plTitleHover.hovered
-              loops: Animation.Infinite
-            NumberAnimation {
-              target: plTitleText
-              property: "x"
-              from: 0
-              to: -plTitleBox.overflow
-              duration: plTitleBox.legMs
-              easing.type: Easing.InOutSine
-            }
-            PauseAnimation { duration: plTitleBox.endpointPauseMs }
-            NumberAnimation {
-              target: plTitleText
-              property: "x"
-              from: -plTitleBox.overflow
-              to: 0
-              duration: plTitleBox.legMs
-              easing.type: Easing.InOutSine
-            }
-            PauseAnimation { duration: plTitleBox.endpointPauseMs }
-            onStopped: plTitleText.x = 0
-          }
-
-          Title {
-            id: plTitleText
-
-            width: implicitWidth
-            anchors.verticalCenter: parent.verticalCenter
-            level: 5
-            text: String(plCell.modelData.title || "-")
-            elide: Text.ElideNone
-            font.pixelSize: Ui.fontXs
-            // A held entry keeps its name in the accent - it is a copy, not
-            // an option - while the rest of its row steps back.
-            color: plCell.have ? Ui.solid("accent")
-              : plCell.ticked ? Ui.solid("foreground_0")
-              : Ui.tint("foreground_1", 0.6)
-            onTextChanged: plTitleBox.reset()
+          HoverHandler {
+            id: plTitleHover
+            cursorShape: plCell.liveRow && !plCell.have
+              ? Qt.PointingHandCursor : Qt.ForbiddenCursor
           }
         }
 
@@ -2843,74 +2733,25 @@ Item {
         // A title longer than its column scrolls like the preview title: a
         // pause at each end and one eased leg between them, but only while the
         // pointer is over the title. Short titles are still and elide nothing.
-        Item {
+        ScrollLabel {
           id: histTitleBox
 
           width: root.histTitleW
           height: parent.height
-          clip: true
-
-          readonly property real overflow: Math.max(0,
-            histTitleText.implicitWidth - width)
-          readonly property bool scrollable: Marquee.scrollable(overflow)
-          readonly property int legMs: Marquee.legMs(overflow)
-          readonly property int endpointPauseMs: Marquee.endpointPauseMs()
+          scrolling: histTitleHover.hovered
+          idleElide: Text.ElideNone
+          level: 5
+          fontSize: Ui.fontXs
+          fontStrikeout: histCell.gone
+          text: histCell.titleText
+          color: histCell.gone ? Ui.tint("foreground_1", 0.55)
+            : Ui.solid("foreground_0")
+          opticalCenter: false
 
           HoverHandler {
             id: histTitleHover
             cursorShape: histCell.liveRow && !root.downloading
               ? Qt.PointingHandCursor : Qt.ArrowCursor
-          }
-
-          function reset() {
-            histTitleText.x = 0
-            if (histTitleBox.scrollable && histTitleHover.hovered)
-              histTitleAnimation.restart()
-            else histTitleAnimation.stop()
-          }
-
-          onWidthChanged: histTitleBox.reset()
-          onOverflowChanged: histTitleBox.reset()
-
-          SequentialAnimation {
-            id: histTitleAnimation
-
-            running: histTitleBox.scrollable && histTitleHover.hovered
-            loops: Animation.Infinite
-            NumberAnimation {
-              target: histTitleText
-              property: "x"
-              from: 0
-              to: -histTitleBox.overflow
-              duration: histTitleBox.legMs
-              easing.type: Easing.InOutSine
-            }
-            PauseAnimation { duration: histTitleBox.endpointPauseMs }
-            NumberAnimation {
-              target: histTitleText
-              property: "x"
-              from: -histTitleBox.overflow
-              to: 0
-              duration: histTitleBox.legMs
-              easing.type: Easing.InOutSine
-            }
-            PauseAnimation { duration: histTitleBox.endpointPauseMs }
-            onStopped: histTitleText.x = 0
-          }
-
-          Title {
-            id: histTitleText
-
-            width: implicitWidth
-            anchors.verticalCenter: parent.verticalCenter
-            level: 5
-            text: histCell.titleText
-            elide: Text.ElideNone
-            color: histCell.gone ? Ui.tint("foreground_1", 0.55)
-              : Ui.solid("foreground_0")
-            font.pixelSize: Ui.fontXs
-            font.strikeout: histCell.gone
-            onTextChanged: histTitleBox.reset()
           }
         }
 

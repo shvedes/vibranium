@@ -12,6 +12,7 @@ import "MenuRows.js" as MenuRows
 import "MenuQuiesce.js" as MenuQuiesce
 import "MenuSpawnProbe.js" as MenuSpawnProbe
 import "../../common/math/Range.js" as Range
+import "../../common/ui/PanelKeys.js" as PanelKeys
 import "../../common/ui/RowMetrics.js" as RowMetrics
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
 
@@ -4804,8 +4805,7 @@ Rectangle {
     // no caret there, so the native paste never sees the key; pasting lands
     // through the field's own pipeline and then takes the caret, so the next
     // keystroke extends the pasted query instead of replacing it.
-    if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)
-        && !(event.modifiers & Qt.MetaModifier)) {
+    if (PanelKeys.pasteRoute(event.key, event.modifiers, Qt)) {
       // An open editor owns the key even when its own paste declined it (a
       // validator refused the paste): routing it into the query would pull
       // the filter's focus off the editor mid-edit - the same rule that makes

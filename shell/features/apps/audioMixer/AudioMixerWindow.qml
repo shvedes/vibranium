@@ -489,43 +489,6 @@ QtObject {
   readonly property string statusNote: mixer.routingNote !== ""
     ? mixer.routingNote : mixer.configNote
 
-  // The empty state, per tab: a centred dim glyph over one line of generic
-  // text. One component, four copies, because the copy is the only thing that
-  // differs and four hand-written blocks would be four chances to forget one.
-  component EmptyState: Item {
-    id: empty
-
-    property string iconName: "music"
-    property string text: ""
-
-    Column {
-      width: empty.width - 2 * Ui.xl
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.horizontalCenter: parent.horizontalCenter
-      spacing: Ui.m
-
-      Icon {
-        anchors.horizontalCenter: parent.horizontalCenter
-        name: empty.iconName
-        colorKey: "foreground_1"
-        // Dimmed rather than tinted: the glyph is the shell's own, so its
-        // palette entry is the foreground and the emptiness is expressed with
-        // opacity - the same idiom the disabled rows use.
-        opacity: 0.22
-        size: 32
-      }
-
-      Title {
-        width: parent.width
-        horizontalAlignment: Text.AlignHCenter
-        wrapMode: Text.WordWrap
-        level: 5
-        text: empty.text
-        color: Ui.tint("foreground_1", 0.45)
-      }
-    }
-  }
-
   // The one dropdown list, drawn as an item of THIS window rather than as a
   // surface of its own. See the layer it is declared in for why that matters.
   //
@@ -1454,6 +1417,11 @@ QtObject {
     // centres its glyph in the window rather than at the top of a column. They
     // are laid out over the body but paint nothing and accept no input when the
     // tab has rows, so a click reaches the rows underneath.
+    //
+    // The shared qs.common.EmptyState carries the old local look through
+    // per-instance overrides: tighter gap, smaller and dimmer glyph, a
+    // non-italic Title-tinted line, and centred content inside the stretched
+    // body area (the old component was an Item hosting a centred Column).
     EmptyState {
       anchors.left: parent.left
       anchors.right: parent.right
@@ -1463,6 +1431,13 @@ QtObject {
       visible: mixer.tab === "apps" && mixer.playbackStreams.length === 0
       iconName: "music"
       text: "Nothing is playing"
+      spacing: Ui.m
+      iconSize: 32
+      iconOpacity: 0.22
+      italic: false
+      textColor: Ui.tint("foreground_1", 0.45)
+      centerContent: true
+      maxTextWidth: width - 2 * Ui.xl
     }
 
     EmptyState {
@@ -1475,6 +1450,13 @@ QtObject {
         && mixer.outputDevices.length === 0 && mixer.inputDevices.length === 0
       iconName: "speaker"
       text: "No audio devices on this graph"
+      spacing: Ui.m
+      iconSize: 32
+      iconOpacity: 0.22
+      italic: false
+      textColor: Ui.tint("foreground_1", 0.45)
+      centerContent: true
+      maxTextWidth: width - 2 * Ui.xl
     }
 
     EmptyState {
@@ -1486,6 +1468,13 @@ QtObject {
       visible: mixer.tab === "recording" && mixer.recordingStreams.length === 0
       iconName: "recording"
       text: "Nothing is recording"
+      spacing: Ui.m
+      iconSize: 32
+      iconOpacity: 0.22
+      italic: false
+      textColor: Ui.tint("foreground_1", 0.45)
+      centerContent: true
+      maxTextWidth: width - 2 * Ui.xl
     }
 
     EmptyState {
@@ -1498,6 +1487,13 @@ QtObject {
         && mixer.outputDevices.length === 0 && mixer.inputDevices.length === 0
       iconName: "settings-general"
       text: "No devices to configure"
+      spacing: Ui.m
+      iconSize: 32
+      iconOpacity: 0.22
+      italic: false
+      textColor: Ui.tint("foreground_1", 0.45)
+      centerContent: true
+      maxTextWidth: width - 2 * Ui.xl
     }
 
     EmptyState {
@@ -1509,6 +1505,13 @@ QtObject {
       visible: mixer.tab === "graph" && mixer.graphNodes.length === 0
       iconName: "link"
       text: "No audio nodes on this graph"
+      spacing: Ui.m
+      iconSize: 32
+      iconOpacity: 0.22
+      italic: false
+      textColor: Ui.tint("foreground_1", 0.45)
+      centerContent: true
+      maxTextWidth: width - 2 * Ui.xl
     }
 
     // --- the popover layer ---

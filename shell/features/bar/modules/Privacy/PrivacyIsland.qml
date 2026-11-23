@@ -54,24 +54,11 @@ Item {
       width: parent.width
       height: root.headH
 
-      Row {
+      SectionLabel {
         id: headRow
 
-        spacing: Ui.s
-
-        Icon {
-          anchors.verticalCenter: parent.verticalCenter
-          name: "incognito"
-          colorKey: "foreground_1"
-          size: 14
-          opacity: 0.7
-        }
-
-        Title {
-          level: 2
-          anchors.verticalCenter: parent.verticalCenter
-          text: "PRIVACY"
-        }
+        icon: "incognito"
+        text: "PRIVACY"
       }
 
       Title {
@@ -230,28 +217,20 @@ Item {
     // so it keeps the level's own muted color. The asset tags only its
     // shield outline class="indicator", so the accent greens the shield and
     // leaves the lock in body tone.
-    Column {
+    EmptyState {
       id: empty
 
       width: parent.width
       visible: root.rows.length === 0
       spacing: Ui.s
-
-      Icon {
-        anchors.horizontalCenter: parent.horizontalCenter
-        name: "shield-lock"
-        colorKey: "foreground_1"
-        accentKey: "green"
-        size: 48
-        opacity: 0.5
-      }
-
-      Title {
-        level: 5
-        width: parent.width
-        horizontalAlignment: Text.AlignHCenter
-        text: "No apps using your devices"
-      }
+      iconName: "shield-lock"
+      iconColorKey: "foreground_1"
+      iconAccentKey: "green"
+      iconSize: 48
+      iconOpacity: 0.5
+      italic: false
+      textColor: Ui.tint("foreground_1", 0.5)
+      text: "No apps using your devices"
     }
   }
 }

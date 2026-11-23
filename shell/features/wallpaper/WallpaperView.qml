@@ -633,11 +633,9 @@ LayerSurface {
       onCleared: win.closeMenu()
     }
 
-    MouseArea {
-      anchors.fill: parent
-      enabled: win.menuOpen
-      acceptedButtons: Qt.AllButtons
-      onPressed: win.closeMenu()
+    DismissNet {
+      gate: win.menuOpen
+      onDismissed: win.closeMenu()
     }
 
     // The card, its rows and their rhythm are the shared ContextMenu; what

@@ -6,7 +6,6 @@ import QtQml.Models
 import Quickshell
 import Quickshell.Bluetooth
 import qs.common
-import qs.features.bar
 import "Model.js" as Model
 
 // The bluetooth island: a header with the adapter status + on/off toggle,
@@ -804,15 +803,13 @@ Item {
               NumberAnimation { duration: Ui.fastMs }
             }
           }
-          Icon {
+          BusySpinner {
             id: connectSpinner
             anchors.centerIn: parent
-            name: "update"
             colorKey: "foreground_1"
             size: 16
             opacity: row.spinning ? 0.9 : 0
             visible: opacity > 0.01
-            transformOrigin: Item.Center
             Behavior on opacity {
               enabled: MotionPolicy.enabled
               NumberAnimation { duration: Ui.fastMs }
@@ -820,14 +817,7 @@ Item {
             // The spinner is motion whether or not it is a Behavior, so
             // the gate is on `running` as well as the reveal tween: with
             // the policy off the glyph holds its static angle.
-            RotationAnimation on rotation {
-              from: 0
-              to: 360
-              duration: 1000
-              loops: Animation.Infinite
-              running: row.spinning && MotionPolicy.enabled
-              onRunningChanged: if (!running) connectSpinner.rotation = 0
-            }
+            running: row.spinning && MotionPolicy.enabled
           }
         }
 

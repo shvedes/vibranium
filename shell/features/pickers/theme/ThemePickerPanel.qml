@@ -5,6 +5,8 @@ import QtQuick
 import qs.common
 import qs.features.clipboard
 import qs.features.pickers.theme
+import "../../../common/ui/KeyHint.js" as KeyHint
+import "../../../common/ui/PanelKeys.js" as PanelKeys
 
 // Theme picker overlay. A horizontal deck of theme cards, each card an
 // imaginary desktop screenshot drawn as a skeleton in that theme's own
@@ -538,7 +540,7 @@ Item {
     // caret is not live until a keystroke starts the query, so the native
     // paste never sees the key. The paste takes the caret afterwards, so the
     // next keystroke extends it instead of replacing it.
-    if (k === Qt.Key_V && ctrl && (event.modifiers & Qt.MetaModifier) === 0) {
+    if (PanelKeys.pasteRoute(k, event.modifiers, Qt)) {
       if (themeSearch.pasteText(Clipboard.history)) focusCtrl.grabFilter()
       event.accepted = true
       return
@@ -548,62 +550,67 @@ Item {
       event.accepted = true
       return
     }
-    if (k === Qt.Key_Escape) {
-      if (panel.query !== "") {
-        themeSearch.clear()
+    // The deck keeps the navigation keys while the field owns the caret
+    // (InputField.forwardNavigation), so the shared table is asked in list
+    // terms and Space keeps activating a card here. The table also names
+    // Down/Up and PageUp/PageDown, which this deck has never handled, so the
+    // next/prev cases below check the key and every other route stays absent.
+    switch (PanelKeys.route(k, Qt, true, false)) {
+      case "escape":
+        if (panel.query !== "") {
+          themeSearch.clear()
+          event.accepted = true
+          return
+        }
+        if (open) panel.collapseVariants()
+        else ThemePicker.close()
         event.accepted = true
         return
-      }
-      if (open) panel.collapseVariants()
-      else ThemePicker.close()
-      event.accepted = true
-      return
-    }
-    if (k === Qt.Key_Backspace && panel.query !== "" && !themeSearch.focused) {
-      themeSearch.text = panel.query.slice(0, -1)
-      event.accepted = true
-      return
-    }
-    if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space) {
-      panel.activateCurrent()
-      event.accepted = true
-      return
-    }
-    if (k === Qt.Key_Home) {
-      if (open) {
-        panel.variantIndex = 0
-        panel._keepFolder = panel._folderOf(panel.variants[0])
-      } else {
-        panel.selectRow(0)
-      }
-      event.accepted = true
-      return
-    }
-    if (k === Qt.Key_End) {
-      if (open) {
-        panel.variantIndex = Math.max(0, panel.variants.length - 1)
-        panel._keepFolder = panel._folderOf(panel.variants[panel.variantIndex])
-      } else {
-        panel.selectRow(panel.filteredRows.length - 1)
-      }
-      event.accepted = true
-      return
-    }
-    // Tab and Shift+Tab mean "next/previous card", exactly as in the
-    // wallpaper picker. In the main deck that is the next theme; in an open
-    // family row it is the next variant, because that row is the deck being
-    // browsed.
-    if (k === Qt.Key_Tab && !ctrl) {
-      if (open) panel.moveVariant(1)
-      else panel.moveRow(1)
-      event.accepted = true
-      return
-    }
-    if (k === Qt.Key_Backtab) {
-      if (open) panel.moveVariant(-1)
-      else panel.moveRow(-1)
-      event.accepted = true
-      return
+      case "back":
+        if (panel.query !== "" && !themeSearch.focused) {
+          themeSearch.text = panel.query.slice(0, -1)
+          event.accepted = true
+          return
+        }
+        break
+      case "activate":
+        panel.activateCurrent()
+        event.accepted = true
+        return
+      case "first":
+        if (open) {
+          panel.variantIndex = 0
+          panel._keepFolder = panel._folderOf(panel.variants[0])
+        } else {
+          panel.selectRow(0)
+        }
+        event.accepted = true
+        return
+      case "last":
+        if (open) {
+          panel.variantIndex = Math.max(0, panel.variants.length - 1)
+          panel._keepFolder = panel._folderOf(panel.variants[panel.variantIndex])
+        } else {
+          panel.selectRow(panel.filteredRows.length - 1)
+        }
+        event.accepted = true
+        return
+      // Tab and Shift+Tab mean "next/previous card", exactly as in the
+      // wallpaper picker. In the main deck that is the next theme; in an open
+      // family row it is the next variant, because that row is the deck being
+      // browsed.
+      case "next":
+        if (k !== Qt.Key_Tab || ctrl) break
+        if (open) panel.moveVariant(1)
+        else panel.moveRow(1)
+        event.accepted = true
+        return
+      case "prev":
+        if (k !== Qt.Key_Backtab) break
+        if (open) panel.moveVariant(-1)
+        else panel.moveRow(-1)
+        event.accepted = true
+        return
     }
     if (!ctrl) {
       if (k === Qt.Key_Left) {
@@ -623,8 +630,8 @@ Item {
     // on one-letter navigation. The deck keeps the keyboard while this runs,
     // so arrows and Tab continue to walk the filtered cards; Ctrl+F hands
     // the field the caret for full editing.
-    if (!ctrl && !alt && !themeSearch.focused && event.text.length === 1
-        && event.text !== " " && event.text.charCodeAt(0) >= 32) {
+    if (!alt && !themeSearch.focused && event.text !== " "
+        && PanelKeys.printable(event.text, event.modifiers, Qt)) {
       themeSearch.type(panel.query + event.text)
       // The first printable key starts the query and hands the caret to the
       // field. Subsequent keys type natively; Up/Down/Tab still reach the deck
@@ -876,89 +883,39 @@ Item {
     // are separate labels, each on the footer's island. The deck sits on a
     // dimmed desktop, so a palette foreground is unreadable there on a light
     // theme; white is the fallback text and the applied theme still reads in
-    // accent.
-    //
-    // Both are sized from TextMetrics, never from a Text's own contentWidth: an
-    // elided Text reports the width it was given, which made the caption shrink
-    // to one letter per row on every theme switch.
-    TextMetrics {
-      id: nameMetrics
-      font: nameText.font
-      text: nameText.text
-    }
-
-    TextMetrics {
-      id: metaMetrics
-      font: metaText.font
-      text: metaText.text
-    }
-
-    Rectangle {
+    // accent. Both share GlassPill's dark-glass recipe with the footer.
+    GlassPill {
       id: namePill
 
       // Never a padding-only pill: an empty label is not a caption.
-      visible: nameText.text !== ""
+      visible: text !== ""
       x: Math.round((parent.width - width) / 2)
-      implicitWidth: nameMetrics.advanceWidth + Ui.l * 2
-      implicitHeight: nameText.implicitHeight + Ui.s * 2
-      width: Math.min(implicitWidth, parent.width)
-      height: implicitHeight
-      radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
-      color: Qt.rgba(0, 0, 0, 0.62)
-      border.width: 1
-      border.color: Qt.rgba(1, 1, 1, 0.18)
-
-      Accessible.role: Accessible.StaticText
-      Accessible.name: panel._displayLabel()
-
-      Text {
-        id: nameText
-
-        anchors.centerIn: parent
-        width: Math.max(0, namePill.width - Ui.l * 2)
-        horizontalAlignment: Text.AlignHCenter
-        text: panel._displayLabel()
-        color: panel.focusedTheme && panel._isActiveFolder(panel.focusedTheme.folder)
-          ? Ui.solid("accent")
-          : "#ffffff"
-        font.pixelSize: Ui.fontCardTitle
-        font.family: Ui.fontFamily
-        font.bold: true
-        elide: Text.ElideMiddle
-        textFormat: Text.PlainText
-      }
+      maxWidth: parent.width
+      text: panel._displayLabel()
+      textColor: panel.focusedTheme && panel._isActiveFolder(panel.focusedTheme.folder)
+        ? Ui.solid("accent")
+        : "#ffffff"
+      accessibleName: panel._displayLabel()
+      fontPixelSize: Ui.fontCardTitle
+      fontFamily: Ui.fontFamily
+      bold: true
+      elide: Text.ElideMiddle
+      textFormat: Text.PlainText
     }
 
-    Rectangle {
+    GlassPill {
       id: metaPill
 
       visible: panel._meta() !== ""
       x: Math.round((parent.width - width) / 2)
-      implicitWidth: metaMetrics.advanceWidth + Ui.l * 2
-      implicitHeight: metaText.implicitHeight + Ui.s * 2
-      width: Math.min(implicitWidth, parent.width)
-      height: implicitHeight
-      radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
-      color: Qt.rgba(0, 0, 0, 0.62)
-      border.width: 1
-      border.color: Qt.rgba(1, 1, 1, 0.18)
-
-      Accessible.role: Accessible.StaticText
-      Accessible.name: panel._meta()
-
-      Text {
-        id: metaText
-
-        anchors.centerIn: parent
-        width: Math.max(0, metaPill.width - Ui.l * 2)
-        horizontalAlignment: Text.AlignHCenter
-        text: panel._meta()
-        color: Qt.rgba(1, 1, 1, 0.85)
-        font.pixelSize: Ui.fontS
-        font.family: Ui.fontFamily
-        elide: Text.ElideRight
-        textFormat: Text.PlainText
-      }
+      maxWidth: parent.width
+      text: panel._meta()
+      textColor: Qt.rgba(1, 1, 1, 0.85)
+      accessibleName: panel._meta()
+      fontPixelSize: Ui.fontS
+      fontFamily: Ui.fontFamily
+      elide: Text.ElideRight
+      textFormat: Text.PlainText
     }
   }
 
@@ -1026,25 +983,18 @@ Item {
     // keyboard grant cannot declare filter mode here.
   }
 
-  function _key(name, color) {
-    return "<font color=\"" + color + "\">" + name + "</font>"
-  }
+  // Legend markup and its screen-reader form live in KeyHint.js, shared
+  // with the wallpaper picker; the key names and strings stay here.
   function _legend() {
     const accent = Ui.solid("accent")
     const open = panel._expanded && panel.family
-    const nav = panel._key("←/→", accent) + " · " + panel._key("Tab", accent)
+    const nav = KeyHint.key("←/→", accent) + " · " + KeyHint.key("Tab", accent)
       + (open ? " variants" : " themes")
     const decide = panel.family && !open
-      ? " · " + panel._key("Enter", accent) + " / " + panel._key("Space", accent) + " expand"
-      : " · " + panel._key("Enter", accent) + " / " + panel._key("Space", accent) + " apply"
+      ? " · " + KeyHint.key("Enter", accent) + " / " + KeyHint.key("Space", accent) + " expand"
+      : " · " + KeyHint.key("Enter", accent) + " / " + KeyHint.key("Space", accent) + " apply"
     const back = open ? " · Esc back" : " · Esc close"
     return nav + decide + back
-  }
-
-  // The legend without its per-key markup, for the island's accessible name:
-  // a screen reader should read the keys, not the color tags.
-  function _legendPlain() {
-    return panel._legend().replace(/<[^>]*>/g, "")
   }
 
   // The footer sits on its own dark island rather than straight on the backdrop.
@@ -1055,37 +1005,19 @@ Item {
   // white text - which is why the words are white instead of a palette leaf;
   // the key hints keep their palette colors, and the border and rounding make
   // the island read as a surface of its own rather than a floating line of text.
-  Rectangle {
+  GlassPill {
     id: footer
 
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
     anchors.bottomMargin: Ui.outerPad * 2
-    implicitWidth: footerText.implicitWidth + Ui.l * 2
-    implicitHeight: footerText.implicitHeight + Ui.s * 2
-    width: Math.min(implicitWidth, Math.max(0, panel.width - 2 * Ui.outerPad))
-    height: implicitHeight
-    radius: Math.min(RoundingPolicy.radius, Math.round(height / 2))
-    color: Qt.rgba(0, 0, 0, 0.62)
-    border.width: 1
-    border.color: Qt.rgba(1, 1, 1, 0.18)
-
-    Accessible.role: Accessible.StaticText
-    Accessible.name: panel._legendPlain()
-
-    Text {
-      id: footerText
-
-      anchors.centerIn: parent
-      width: Math.min(implicitWidth, footer.width - Ui.l * 2)
-      horizontalAlignment: Text.AlignHCenter
-      text: panel._legend()
-      color: "#ffffff"
-      font.pixelSize: Ui.fontL
-      font.family: Ui.fontFamily
-      elide: Text.ElideRight
-      textFormat: Text.StyledText
-    }
+    maxWidth: Math.max(0, panel.width - 2 * Ui.outerPad)
+    accessibleName: KeyHint.plain(panel._legend())
+    text: panel._legend()
+    fontPixelSize: Ui.fontL
+    fontFamily: Ui.fontFamily
+    elide: Text.ElideRight
+    textFormat: Text.StyledText
   }
 
   PointerGuard {}

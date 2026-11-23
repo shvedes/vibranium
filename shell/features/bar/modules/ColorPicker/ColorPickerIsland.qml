@@ -387,22 +387,9 @@ Item {
     // History section: five fixed rows, the rest under the scrollbar.
     // Title row mirrors the network island's section headers: small
     // foreground_1 glyph at 70% before the caps title.
-    Row {
-      spacing: Ui.s
-
-      Icon {
-        anchors.verticalCenter: parent.verticalCenter
-        name: "list"
-        colorKey: "foreground_1"
-        size: 14
-        opacity: 0.7
-      }
-
-      Title {
-        level: 2
-        anchors.verticalCenter: parent.verticalCenter
-        text: "HISTORY"
-      }
+    SectionLabel {
+      icon: "list"
+      text: "HISTORY"
     }
 
     ColorPickerHistory {
@@ -472,22 +459,9 @@ Item {
 
     // Picker section. The Column's Ui.s spacing separates the title
     // from the clear button above and the field below.
-    Row {
-      spacing: Ui.s
-
-      Icon {
-        anchors.verticalCenter: parent.verticalCenter
-        name: "pipette"
-        colorKey: "foreground_1"
-        size: 14
-        opacity: 0.7
-      }
-
-      Title {
-        level: 2
-        anchors.verticalCenter: parent.verticalCenter
-        text: "PICKER"
-      }
+    SectionLabel {
+      icon: "pipette"
+      text: "PICKER"
     }
 
     // Large saturation/value field: hue fixed, S left-to-right, V

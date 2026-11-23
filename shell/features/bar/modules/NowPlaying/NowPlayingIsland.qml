@@ -6,7 +6,6 @@ import Quickshell.Services.Mpris
 import qs.common
 import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
-import "../../../../common/motion/Marquee.js" as Marquee
 import "../../../../common/math/Range.js" as Range
 
 // Now Playing island. Lockscreen flat-box language (square corners,
@@ -19,8 +18,8 @@ import "../../../../common/math/Range.js" as Range
 //
 // SPLIT MAP (one owner each, no behavior change): Strip (transport
 // strip: art column, meta column, seek/volume lanes, pads, player
-// switching) and Marquee (title marquee: overflow measure, leg/pause
-// animation, reset on track change).
+// switching) and the shared ScrollLabel (overflow measure, leg/pause
+// animation, reset on text/width/gate change for the three meta rows).
 Item {
   id: root
 
@@ -158,7 +157,7 @@ Item {
     id: copiedCycle
 
     NumberAnimation {
-      target: titleText
+      target: titleMarquee
       property: "opacity"
       to: 0
       duration: MotionPolicy.duration(Ui.fastMs)
@@ -168,7 +167,7 @@ Item {
       script: root.linkCopied = true
     }
     NumberAnimation {
-      target: titleText
+      target: titleMarquee
       property: "opacity"
       to: 1
       duration: MotionPolicy.duration(Ui.fastMs)
@@ -178,7 +177,7 @@ Item {
       duration: 2000
     }
     NumberAnimation {
-      target: titleText
+      target: titleMarquee
       property: "opacity"
       to: 0
       duration: MotionPolicy.duration(Ui.fastMs)
@@ -188,7 +187,7 @@ Item {
       script: root.linkCopied = false
     }
     NumberAnimation {
-      target: titleText
+      target: titleMarquee
       property: "opacity"
       to: 1
       duration: MotionPolicy.duration(Ui.fastMs)
@@ -881,73 +880,25 @@ Item {
                   size: 16
                 }
 
-                Item {
+                ScrollLabel {
                   id: titleMarquee
 
                   width: parent.width - 16 - 7
-                  height: titleText.implicitHeight
-                  clip: true
-
-                  readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
-                  readonly property int legMs: Marquee.legMs(overflow)
-                  readonly property int endpointPauseMs: Marquee.endpointPauseMs()
-
-                  function reset() {
-                    titleText.x = 0
-                    if (root.marqueeEnabled && !root.linkCopied && titleMarquee.overflow > 0)
-                      titleMarqueeAnimation.restart()
-                    else
-                      titleMarqueeAnimation.stop()
-                  }
-
-                  onWidthChanged: titleMarquee.reset()
-
-                  SequentialAnimation {
-                    id: titleMarqueeAnimation
-
-                    running: root.marqueeEnabled && !root.linkCopied && titleMarquee.overflow > 0
-                    loops: Animation.Infinite
-                    NumberAnimation {
-                      target: titleText
-                      property: "x"
-                      from: 0
-                      to: -titleMarquee.overflow
-                      duration: titleMarquee.legMs
-                      easing.type: Easing.InOutSine
-                    }
-                    PauseAnimation {
-                      duration: titleMarquee.endpointPauseMs
-                    }
-                    NumberAnimation {
-                      target: titleText
-                      property: "x"
-                      from: -titleMarquee.overflow
-                      to: 0
-                      duration: titleMarquee.legMs
-                      easing.type: Easing.InOutSine
-                    }
-                    PauseAnimation {
-                      duration: titleMarquee.endpointPauseMs
-                    }
-                    onStopped: titleText.x = 0
-                  }
-
-                  Text {
-                    id: titleText
-
-                    width: root.marqueeEnabled ? implicitWidth : titleMarquee.width
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.linkCopied ? "Copied!" : (root.title !== "" ? root.title : "--")
-                    color: Ui.solid("foreground_0")
-                    font.pixelSize: Ui.fontM
-                    font.family: Ui.fontFamily
-                    font.bold: true
-                    font.underline: root.titleHover && root.hasTrackLink
-                    elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
-                    wrapMode: Text.NoWrap
-                    textFormat: Text.PlainText
-                    onTextChanged: titleMarquee.reset()
-                  }
+                  height: implicitHeight
+                  // A copied link swaps the title for "Copied!" and parks the
+                  // marquee; Escape/the click restores both.
+                  scrolling: root.marqueeEnabled && !root.linkCopied
+                  // This row used to start moving at once: only the end beats
+                  // are the shared ones.
+                  startPauseMs: 0
+                  text: root.linkCopied ? "Copied!" : (root.title !== "" ? root.title : "--")
+                  color: Ui.solid("foreground_0")
+                  fontSize: Ui.fontM
+                  fontFamily: Ui.fontFamily
+                  fontBold: true
+                  fontUnderline: root.titleHover && root.hasTrackLink
+                  textFormat: Text.PlainText
+                  opticalCenter: false
 
                   MouseArea {
                     anchors.fill: parent
@@ -974,71 +925,20 @@ Item {
                   size: 15
                 }
 
-                Item {
+                ScrollLabel {
                   id: artistMarquee
 
                   width: parent.width - 15 - 7
-                  height: artistText.implicitHeight
-                  clip: true
-
-                  readonly property real overflow: Math.max(0, artistText.implicitWidth - width)
-                  readonly property int legMs: Marquee.legMs(overflow)
-                  readonly property int endpointPauseMs: Marquee.endpointPauseMs()
-
-                  function reset() {
-                    artistText.x = 0
-                    if (root.marqueeEnabled && artistMarquee.overflow > 0)
-                      artistMarqueeAnimation.restart()
-                    else
-                      artistMarqueeAnimation.stop()
-                  }
-
-                  onWidthChanged: artistMarquee.reset()
-
-                  SequentialAnimation {
-                    id: artistMarqueeAnimation
-
-                    running: root.marqueeEnabled && artistMarquee.overflow > 0
-                    loops: Animation.Infinite
-                    NumberAnimation {
-                      target: artistText
-                      property: "x"
-                      from: 0
-                      to: -artistMarquee.overflow
-                      duration: artistMarquee.legMs
-                      easing.type: Easing.InOutSine
-                    }
-                    PauseAnimation {
-                      duration: artistMarquee.endpointPauseMs
-                    }
-                    NumberAnimation {
-                      target: artistText
-                      property: "x"
-                      from: -artistMarquee.overflow
-                      to: 0
-                      duration: artistMarquee.legMs
-                      easing.type: Easing.InOutSine
-                    }
-                    PauseAnimation {
-                      duration: artistMarquee.endpointPauseMs
-                    }
-                    onStopped: artistText.x = 0
-                  }
-
-                  Text {
-                    id: artistText
-
-                    width: root.marqueeEnabled ? implicitWidth : artistMarquee.width
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.artist !== "" ? root.artist : "--"
-                    color: Ui.tint("foreground_1", 0.7)
-                    font.pixelSize: Ui.fontS
-                    font.family: Ui.fontFamily
-                    elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
-                    wrapMode: Text.NoWrap
-                    textFormat: Text.PlainText
-                    onTextChanged: artistMarquee.reset()
-                  }
+                  height: implicitHeight
+                  scrolling: root.marqueeEnabled
+                  startPauseMs: 0
+                  text: root.artist !== "" ? root.artist : "--"
+                  color: Ui.tint("foreground_1", 0.7)
+                  fontSize: Ui.fontS
+                  fontFamily: Ui.fontFamily
+                  fontBold: false
+                  textFormat: Text.PlainText
+                  opticalCenter: false
                 }
               }
 
@@ -1053,71 +953,20 @@ Item {
                   size: 16
                 }
 
-                Item {
+                ScrollLabel {
                   id: albumMarquee
 
                   width: parent.width - 16 - 7
-                  height: albumText.implicitHeight
-                  clip: true
-
-                  readonly property real overflow: Math.max(0, albumText.implicitWidth - width)
-                  readonly property int legMs: Marquee.legMs(overflow)
-                  readonly property int endpointPauseMs: Marquee.endpointPauseMs()
-
-                  function reset() {
-                    albumText.x = 0
-                    if (root.marqueeEnabled && albumMarquee.overflow > 0)
-                      albumMarqueeAnimation.restart()
-                    else
-                      albumMarqueeAnimation.stop()
-                  }
-
-                  onWidthChanged: albumMarquee.reset()
-
-                  SequentialAnimation {
-                    id: albumMarqueeAnimation
-
-                    running: root.marqueeEnabled && albumMarquee.overflow > 0
-                    loops: Animation.Infinite
-                    NumberAnimation {
-                      target: albumText
-                      property: "x"
-                      from: 0
-                      to: -albumMarquee.overflow
-                      duration: albumMarquee.legMs
-                      easing.type: Easing.InOutSine
-                    }
-                    PauseAnimation {
-                      duration: albumMarquee.endpointPauseMs
-                    }
-                    NumberAnimation {
-                      target: albumText
-                      property: "x"
-                      from: -albumMarquee.overflow
-                      to: 0
-                      duration: albumMarquee.legMs
-                      easing.type: Easing.InOutSine
-                    }
-                    PauseAnimation {
-                      duration: albumMarquee.endpointPauseMs
-                    }
-                    onStopped: albumText.x = 0
-                  }
-
-                  Text {
-                    id: albumText
-
-                    width: root.marqueeEnabled ? implicitWidth : albumMarquee.width
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.album !== "" ? root.album : "--"
-                    color: Ui.tint("foreground_1", 0.55)
-                    font.pixelSize: Ui.fontS
-                    font.family: Ui.fontFamily
-                    elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
-                    wrapMode: Text.NoWrap
-                    textFormat: Text.PlainText
-                    onTextChanged: albumMarquee.reset()
-                  }
+                  height: implicitHeight
+                  scrolling: root.marqueeEnabled
+                  startPauseMs: 0
+                  text: root.album !== "" ? root.album : "--"
+                  color: Ui.tint("foreground_1", 0.55)
+                  fontSize: Ui.fontS
+                  fontFamily: Ui.fontFamily
+                  fontBold: false
+                  textFormat: Text.PlainText
+                  opticalCenter: false
                 }
               }
             }

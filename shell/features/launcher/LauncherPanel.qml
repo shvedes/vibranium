@@ -823,27 +823,29 @@ PanelCard {
     onTriggered: panel._noticeMotion = false
   }
 
+  // The delete confirm lives in the shared stage machine; this panel keeps
+  // the key namespace (row indices), the service calls and the reveal claim.
+  ConfirmStage { id: confirmStage }
+
   // Three-step delete: hint -> armed -> confirm.
   function toggleDeleteCurrent() {
     const idx = list.currentIndex
     // Different row: close current and open for the new one.
-    if (_deleteIndex >= 0 && _deleteIndex !== idx) closeDelete()
+    if (confirmStage.open && !confirmStage.isArmed(idx)) panel.closeDelete()
     // Same row: advance stage.
-    if (_deleteIndex === idx) {
-      if (_deleteStage >= 2) {
+    if (confirmStage.isArmed(idx)) {
+      if (confirmStage.advance(idx)) {
         panel.acceptDelete()
         return
       }
-      _deleteStage++
-      if (_deleteStage === 1) AppLauncher.requestDelete(panel.currentRecord())
+      if (confirmStage.stage === 1) AppLauncher.requestDelete(panel.currentRecord())
       list.autoRevealIndex = idx
       return
     }
     // Fresh open.
     const rec = panel.currentRecord()
     if (rec && rec.removable === true) {
-      _deleteIndex = idx
-      _deleteStage = 1
+      confirmStage.arm(idx)
       AppLauncher.requestDelete(rec)
       list.autoRevealIndex = idx
       return
@@ -853,9 +855,11 @@ PanelCard {
     // dropped keypress.
     if (rec && rec.kind === "app") panel.flashNotDeletable(idx)
   }
-  property int _deleteIndex: -1
-  property int _deleteStage: 0
-  function closeDelete() { _deleteIndex = -1; _deleteStage = 0; list.autoRevealIndex = -1; AppLauncher.pendingDelete = null }
+  function closeDelete() {
+    confirmStage.close()
+    list.autoRevealIndex = -1
+    AppLauncher.pendingDelete = null
+  }
   function closeTrailingInfo() { _infoIndex = -1; list.autoRevealIndex = -1 }
 
   // Modal accept: while the delete confirmation is open, Enter/Space (and
@@ -869,7 +873,7 @@ PanelCard {
 
   function activateCurrent() {
     // The delete confirmation takes precedence over row activation.
-    if (panel._deleteIndex >= 0) { panel.acceptDelete(); return }
+    if (confirmStage.open) { panel.acceptDelete(); return }
     const rec = panel.currentRecord()
     if (!rec) {
       const fb = panel._firstNormalIndex()
@@ -881,7 +885,7 @@ PanelCard {
   }
 
   function escapeChain() {
-    if (panel._deleteIndex >= 0) { panel.closeDelete(); return }
+    if (confirmStage.open) { panel.closeDelete(); return }
     if (panel._infoIndex >= 0) { panel.closeTrailingInfo(); return }
     if (AppLauncher.mode !== "normal") {
       // Back out to the query, not to the list: the seat is the field, and
@@ -901,7 +905,7 @@ PanelCard {
   // field (InputField.backspaceEmpty), so the field is empty here by
   // construction. Peels delete/info/mode first, mirroring escapeChain.
   function backspaceEmptyChain() {
-    if (panel._deleteIndex >= 0) { panel.closeDelete(); return }
+    if (confirmStage.open) { panel.closeDelete(); return }
     if (panel._infoIndex >= 0) { panel.closeTrailingInfo(); return }
     if (AppLauncher.mode !== "normal") {
       AppLauncher.exitMode()
@@ -935,12 +939,11 @@ PanelCard {
   function handleKey(event) {
     const k = event.key
     const ctrl = event.modifiers & Qt.ControlModifier
-    const meta = event.modifiers & Qt.MetaModifier
 
     // Ctrl-V with an inactive search box: paste the clipboard into the
     // query and take the caret. With the field focused, TextInput's native
     // paste consumes the key before it ever reaches here.
-    if (k === Qt.Key_V && ctrl && !meta && focusCtrl.mode === "list") {
+    if (PanelKeys.pasteRoute(k, event.modifiers, Qt) && focusCtrl.mode === "list") {
       panel.pasteIntoSearch()
       event.accepted = true
       return
@@ -958,13 +961,13 @@ PanelCard {
       case "next":
         // A staged delete owns Down/Tab: Tab closes it and moves, Down is
         // refused so the row under the cursor cannot slip away mid-confirm.
-        if (panel._deleteIndex >= 0) {
+        if (confirmStage.open) {
           if (k !== Qt.Key_Tab) break
           panel.closeDelete()
         }
         panel.moveSelection(1, event.isAutoRepeat === true); event.accepted = true; return
       case "prev":
-        if (panel._deleteIndex >= 0) {
+        if (confirmStage.open) {
           if (k !== Qt.Key_Backtab) break
           panel.closeDelete()
         }
@@ -976,7 +979,7 @@ PanelCard {
       case "activate": panel.activateCurrent(); event.accepted = true; return
       case "escape": panel.escapeChain(); event.accepted = true; return
       case "back":
-        if (panel._deleteIndex >= 0) { panel.closeDelete(); event.accepted = true; return }
+        if (confirmStage.open) { panel.closeDelete(); event.accepted = true; return }
         if (focusCtrl.mode === "list") {
           // An empty field in list mode has nothing left to hand back to: taking
           // the field again would only bounce to the empty-field chain and loop.
@@ -990,7 +993,7 @@ PanelCard {
         break
     }
 
-    if (!ctrl && !meta && event.text.length === 1 && event.text.charCodeAt(0) >= 32) {
+    if (PanelKeys.printable(event.text, event.modifiers, Qt)) {
       if (focusCtrl.mode === "list") {
         // feed first key to filter, like MenuPanel
         // handle prefix directly so a prefix key does not become plain text
@@ -1168,7 +1171,7 @@ PanelCard {
         // Never learn row heights while a description or delete slot is
         // open: slot-inflated rows would poison the average (short seats,
         // phantom scroll). Re-measure heals on the next visit after close.
-        measureGuard: idx => panel._deleteIndex < 0 && panel._infoIndex < 0
+        measureGuard: idx => !confirmStage.open && panel._infoIndex < 0
         // Height table keyed by row identity: results are rebuilt wholesale
         // per recompute and re-ranked on every keystroke, so index keys would
         // hand a measured height to whichever row slid into that slot. The
@@ -1197,7 +1200,7 @@ PanelCard {
         // focused row stages something (tracks its slot 1:1); a slot left
         // behind must not freeze the bar mid-move.
         highlightMotion: MotionPolicy.enabled && panel._infoIndex !== list.currentIndex
-          && panel._deleteIndex !== list.currentIndex
+          && !confirmStage.isArmed(list.currentIndex)
         // Center-lock scrolloff: keyboard steps keep the cursor riding
         // the viewport middle while scrolling is possible (menu parity
         // with MenuPanel). Steps ease while animations run,
@@ -1227,8 +1230,8 @@ PanelCard {
         pursuitAnimated: true
         delegate: LauncherEntry {
           infoOpen: panel._infoIndex >= 0 && panel._infoIndex === index
-          deleteOpen: panel._deleteIndex >= 0 && panel._deleteIndex === index
-          deleteStage: panel._deleteIndex >= 0 && panel._deleteIndex === index ? panel._deleteStage : 0
+          deleteOpen: confirmStage.isArmed(index)
+          deleteStage: confirmStage.isArmed(index) ? confirmStage.stage : 0
           showDescriptions: panel.showDescriptions
           noticeTarget: panel._noticeIndex >= 0 && panel._noticeIndex === index
           noticeOn: panel._noticeOn

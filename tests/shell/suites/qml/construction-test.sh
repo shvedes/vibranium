@@ -190,13 +190,15 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 129 of the 263 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 127 of the 269 declared types, and every one of them
 # through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
 # constructed - cannot be built at all. That is one environmental
-# fact with a long reach, not 125 separate problems, and the reason string each
-# type carries says so.
+# fact with a long reach, not 127 separate problems, and the reason string each
+# type carries says so. The two types that left this set are the feature-local
+# ScrollLabel and SectionLabel: the shared common/ui versions that replaced
+# them carry no window and build cleanly.
 EXPECTED_UNCREATABLE="qs.common.LayerSurface
 qs.features.clipboard.ClipboardView
 qs.features.launcher.AppLauncherView
@@ -226,7 +228,6 @@ qs.features.apps.audioMixer.GraphChrome
 qs.features.apps.audioMixer.GraphLegend
 qs.features.apps.audioMixer.GraphNode
 qs.features.apps.audioMixer.GraphTab
-qs.features.apps.audioMixer.ScrollLabel
 qs.features.apps.audioMixer.StreamRow
 qs.features.apps.audioMixer.VolumeSlider
 qs.features.apps.imageViewer.ImageViewer
@@ -241,7 +242,6 @@ qs.features.bar.Group
 qs.features.bar.MoveWindow
 qs.features.bar.PrivacyOverlay
 qs.features.bar.RevealFlash
-qs.features.bar.SectionLabel
 qs.features.bar.ToolTipBind
 qs.features.bar.ToolTipHost
 qs.features.bar.Zone
@@ -354,8 +354,8 @@ supplied.qs.common.MenuOverlayShadow=host: null
 supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 265 declared entries over 47 qmldir files, one of which is excluded from the
-# work list (boot/Boot.qml), so 262 cases are built. The 138 that are not built
+# 269 declared entries over 47 qmldir files, one of which is excluded from the
+# work list (boot/Boot.qml), so 268 cases are built. The 136 that are not built
 # are the needs-environment and declared-but-uncreatable sets below. A
 # singleton (RowGeometry, Paths) is not creatable either; the probe's case for
 # one names it and lets the engine build it, which is why a singleton that
@@ -364,7 +364,11 @@ supplied.qs.common.LyricsPane=player: null"
 # both clean headless builds - plain items over Icons/Texts.)
 # qs.common.BootGate is the shared milestone gate: a QtObject over a
 # Connections watch, declared through an explicit default child list.
-EXPECTED_DECLARED_COUNT=265
+# (+4 for the promoted shared UI: qs.common.ScrollLabel, qs.common.SectionLabel,
+# qs.common.BusySpinner, qs.common.DismissNet, qs.common.GlassPill and
+# qs.common.ConfirmStage replace the two feature-local declarations, all clean
+# headless builds over Text/Item/QtObject.)
+EXPECTED_DECLARED_COUNT=269
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -389,8 +393,12 @@ EXPECTED_DECLARED_COUNT=265
 # Connections watch on the already-constructed DesktopLayoutState singleton,
 # with no window or environment behind it.
 # qs.common.PointerGuard is clean too: a MouseArea with no window behind it.
-EXPECTED_CLEAN_COUNT=126
-EXPECTED_NEEDS_COUNT=129
+# The six shared common/ui types above join the clean set: ScrollLabel and
+# SectionLabel are plain Text/Item wrappers, BusySpinner an Icon over a
+# RotationAnimation, DismissNet a QtObject, GlassPill an Item over a Rectangle
+# and ConfirmStage a QtObject state machine - none reaches a window.
+EXPECTED_CLEAN_COUNT=132
+EXPECTED_NEEDS_COUNT=127
 EXPECTED_UNCREATABLE_COUNT=9
 
 # --------------------------------------------------------------------------
@@ -581,13 +589,13 @@ t_eq "every built type reported a bucket" "" "$UNREPORTED"
 t_note "buckets: $(wc -l <"$CLEAN" | tr -d ' ') clean, $(wc -l <"$NEEDS" | tr -d ' ') needs-environment, \
 $(wc -l <"$UNCREATABLE" | tr -d ' ') declared-but-uncreatable, $(wc -l <"$BROKEN" | tr -d ' ') broken"
 
-# The headline observation, because a reader who sees 116 of the 228 types "not
+# The headline observation, because a reader who sees 136 of the 268 types "not
 # built" deserves the one sentence that explains all of it: under
 # QT_QPA_PLATFORM=offscreen Quickshell loads no PanelWindow backend, so no type
 # that reaches a window can be constructed at all. The widest door is the
 # Screenshots singleton, which builds a PanelWindow while it is being
 # constructed, and everything that touches it - which is all of qs.services -
-# goes with it. One environmental fact, not 116 problems.
+# goes with it. One environmental fact, not 127 problems.
 t_note "every needs-environment type failed for one reason: the offscreen platform has no \
 PanelWindow backend, so a type that reaches a window cannot be built. That includes types that reach \
 one transitively, through the Screenshots singleton that builds a PanelWindow at construction."

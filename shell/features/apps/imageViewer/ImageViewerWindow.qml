@@ -1382,12 +1382,10 @@ QtObject {
       // menu is an item above the chrome and needs no second window to be
       // reachable. The net underneath is what dismisses it - a press anywhere
       // else closes the menu instead of reaching the picture behind it.
-      MouseArea {
-        anchors.fill: parent
+      DismissNet {
         z: 20
-        enabled: root.menuOpen
-        acceptedButtons: Qt.AllButtons
-        onPressed: root.closeMenu()
+        gate: root.menuOpen
+        onDismissed: root.closeMenu()
       }
 
       ContextMenu {

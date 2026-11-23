@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.menu
-import "../../common/motion/Marquee.js" as Marquee
 import "LauncherLib.js" as LauncherLib
 
 // One launcher result row. Visual twin of menu/Entry's plain-action look -
@@ -402,10 +401,10 @@ Item {
       // invisible children, so the height folds.
       //
       // An overflowing sub on the current row scrolls instead of eliding, the
-      // same marquee the clipboard uses for long paths: a pause, an eased leg
-      // to the end, a pause, and back. Every other row shows the LEFT of its
-      // line with a trailing ellipsis, so an unfocused list still reads as a
-      // column of heads rather than a row of moving text.
+      // same shared marquee the clipboard uses for long paths: a pause, an
+      // eased leg to the end, a pause, and back. Every other row shows the
+      // LEFT of its line with a trailing ellipsis, so an unfocused list still
+      // reads as a column of heads rather than a row of moving text.
       Item {
         id: subMarquee
 
@@ -416,53 +415,13 @@ Item {
 
         readonly property bool current: row.ListView.view !== null
           && row.ListView.view.currentIndex === row.index
-        readonly property real overflow: Math.max(0, subText.implicitWidth - width)
-        readonly property bool scrollable: current && Marquee.scrollable(overflow)
-        readonly property int legMs: Marquee.legMs(overflow)
-        readonly property int startPauseMs: 1200
-        readonly property int endpointPauseMs: Marquee.endpointPauseMs()
-
-        function reset() {
-          subText.x = 0
-          if (subMarquee.scrollable) subMarqueeAnimation.restart()
-          else subMarqueeAnimation.stop()
-        }
-
-        onWidthChanged: subMarquee.reset()
-
-        SequentialAnimation {
-          id: subMarqueeAnimation
-
-          running: subMarquee.scrollable
-          loops: Animation.Infinite
-          PauseAnimation { duration: subMarquee.startPauseMs }
-          NumberAnimation {
-            target: subText
-            property: "x"
-            from: 0
-            to: -subMarquee.overflow
-            duration: subMarquee.legMs
-            easing.type: Easing.InOutSine
-          }
-          PauseAnimation { duration: subMarquee.endpointPauseMs }
-          NumberAnimation {
-            target: subText
-            property: "x"
-            from: -subMarquee.overflow
-            to: 0
-            duration: subMarquee.legMs
-            easing.type: Easing.InOutSine
-          }
-          PauseAnimation { duration: subMarquee.endpointPauseMs }
-          onStopped: subText.x = 0
-        }
 
         // At rest the swap keeps its color transition when a red notice
         // replaces the copy. Right elision shows the head of the line.
         SlideSwap {
           id: subSwap
 
-          visible: !subMarquee.scrollable
+          visible: !subText.scrollable
           anchors.fill: parent
           text: row.subSwapText
           // Alert rows (an offline fx row) and the refused-delete notice
@@ -483,20 +442,19 @@ Item {
         // The moving copy: full width so nothing is elided, clipped by the
         // wrapper above. It carries the same string, font and color as the
         // swap, so handing over between the two is a position change only.
-        Text {
+        ScrollLabel {
           id: subText
 
-          visible: subMarquee.scrollable
-          width: subMarquee.scrollable ? implicitWidth : subMarquee.width
+          visible: subText.scrollable
+          width: parent.width
+          scrolling: subMarquee.current
           text: row.subSwapText
           color: row.subColorFor(row.subSwapText)
-          font.pixelSize: Ui.fontXs
-          font.family: Ui.fontFamily
-          font.features: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
+          fontSize: Ui.fontXs
+          fontFamily: Ui.fontFamily
+          fontFeatures: ({ "calt": 0, "liga": 0, "clig": 0, "dlig": 0, "hlig": 0 })
           textFormat: Text.PlainText
-          elide: Text.ElideNone
-          wrapMode: Text.NoWrap
-          onTextChanged: subMarquee.reset()
+          opticalCenter: false
         }
       }
     }

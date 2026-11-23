@@ -28,13 +28,17 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 266 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 270 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
-#   below always describe the same tree. The shared BootGate/qml under state/
-#   is a QtObject with an explicit default child list, so it moves the count
-#   without adding a warning or an unresolved name.
+#   below always describe the same tree. The six new common/ui shared types
+#   (ScrollLabel, SectionLabel, BusySpinner, DismissNet, GlassPill,
+#   ConfirmStage) moved the count without adding a warning or an unresolved
+#   name; the two feature-local files they replaced left it again. The shared
+#   BootGate/qml under state/ is a QtObject with an explicit default child
+#   list, so it too moves the count without adding a warning or an unresolved
+#   name.
 # RECORDED_WARNING_COUNT: 139 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
@@ -139,7 +143,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # `model` unqualified, which cost 11 `unqualified` warnings and 12 info notes.
 # The delegate now declares `required property var modelData` and reads it
 # through its own id, matching the ArchUpdates table, so both figures fell.
-RECORDED_FILE_COUNT=266
+RECORDED_FILE_COUNT=270
 RECORDED_WARNING_COUNT=112
 RECORDED_INFO_COUNT=17
 

@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Services.UPower
 import qs.common
-import qs.features.bar
 import "../../../../common/power/BatteryModel.js" as Model
 
 // The battery island: a header with the device count, then the device

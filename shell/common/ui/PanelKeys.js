@@ -36,3 +36,33 @@ function route(key, qt, listMode, fieldFocused) {
   if (key === qt.Key_Space) return listMode && !fieldFocused ? "activate" : ""
   return ""
 }
+
+// Ctrl-V from a row whose field has no caret: the native paste never sees the
+// key, so the panel has to land it through the field's own pipeline. This is
+// only the key answer - "paste" - because the guard differs per surface (an
+// open menu editor swallows it, the launcher and clipboard want list focus,
+// the clipboard also wants a live filter and an unfocused field). The action
+// and event.accepted stay in the panel that owns them.
+//
+// Meta is explicitly excluded: on those layouts Ctrl+Meta+V is a system
+// shortcut, not a query paste. The qt table is handed in, as above, so this
+// stays drivable from plain values with no Qt import.
+function pasteRoute(key, modifiers, qt) {
+  if (!qt) return ""
+  if (key !== qt.Key_V) return ""
+  if ((modifiers & qt.ControlModifier) === 0) return ""
+  if ((modifiers & qt.MetaModifier) !== 0) return ""
+  return "paste"
+}
+
+// The "one printable character starts the query" test, shared by every panel
+// that spends its letters on the filter. It is deliberately only about the
+// key: no Ctrl, no Meta, exactly one character whose code is at or above
+// space. Field focus, alt-state, a dead filter or a reserved prefix are panel
+// state, so those guards stay at the call site rather than leaking in here.
+function printable(text, modifiers, qt) {
+  if (!qt) return false
+  if ((modifiers & qt.ControlModifier) !== 0) return false
+  if ((modifiers & qt.MetaModifier) !== 0) return false
+  return typeof text === "string" && text.length === 1 && text.charCodeAt(0) >= 32
+}

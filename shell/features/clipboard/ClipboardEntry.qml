@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.clipboard
-import "../../common/motion/Marquee.js" as Marquee
 
 // Clipboard row - mirrors LauncherEntry with descriptions enabled:
 // icon 20px, title, subLeft - time, pin indicator. Looks like AppLauncher
@@ -120,84 +119,27 @@ Item {
       anchors.verticalCenter: parent.verticalCenter
       spacing: 1
 
-      // Path rows scroll instead of eliding, the same marquee the bar's
-      // Now Playing island uses for long titles: a pause at each end, then
-      // an eased leg to the other end. The clip is the row column, so the
-      // full path is readable without painting over the time or the icon.
-      // Prose keeps the ordinary elide - only a path is worth the motion.
-      Item {
+      // Path rows scroll instead of eliding, the same shared marquee the bar's
+      // Now Playing island uses for long titles: a pause at each end, then an
+      // eased leg to the other end. The clip is the row column, so the full
+      // path is readable without painting over the time or the icon. Prose
+      // keeps the ordinary elide - only a path is worth the motion.
+      ScrollLabel {
         id: titleMarquee
 
         width: parent.width
-        height: titleText.implicitHeight
-        clip: true
-
-        readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
-        readonly property bool scrollable: row.pathLike
-          && Marquee.scrollable(overflow)
-        readonly property int legMs: Marquee.legMs(overflow)
-        readonly property int startPauseMs: 1200
-        readonly property int endpointPauseMs: 400
-
-        function reset() {
-          titleText.x = 0
-          if (titleMarquee.scrollable) titleMarqueeAnimation.restart()
-          else titleMarqueeAnimation.stop()
-        }
-
-        onWidthChanged: titleMarquee.reset()
-
-        SequentialAnimation {
-          id: titleMarqueeAnimation
-
-          running: titleMarquee.scrollable
-          loops: Animation.Infinite
-          // The wait before the first leg is what lets a row read its head
-          // before it starts moving; the endpoints keep the same pause.
-          PauseAnimation {
-            duration: titleMarquee.startPauseMs
-          }
-          NumberAnimation {
-            target: titleText
-            property: "x"
-            from: 0
-            to: -titleMarquee.overflow
-            duration: titleMarquee.legMs
-            easing.type: Easing.InOutSine
-          }
-          PauseAnimation {
-            duration: titleMarquee.endpointPauseMs
-          }
-          NumberAnimation {
-            target: titleText
-            property: "x"
-            from: -titleMarquee.overflow
-            to: 0
-            duration: titleMarquee.legMs
-            easing.type: Easing.InOutSine
-          }
-          PauseAnimation {
-            duration: titleMarquee.endpointPauseMs
-          }
-          onStopped: titleText.x = 0
-        }
-
-        Text {
-          id: titleText
-
-          width: titleMarquee.scrollable ? implicitWidth : titleMarquee.width
-          text: row.titleText
-          color: Ui.tint("foreground_0", 1)
-          font.pixelSize: Ui.fontL
-          font.family: Ui.fontFamily
-          // When the path cannot scroll, keep the old left elide so the
-          // file name stays visible; prose elides on the right.
-          elide: titleMarquee.scrollable ? Text.ElideNone
-            : (row.pathLike ? Text.ElideLeft : Text.ElideRight)
-          textFormat: Text.PlainText
-          onTextChanged: titleMarquee.reset()
-          // Secret entries already generic, but ensure not selectable?
-        }
+        height: implicitHeight
+        scrolling: row.pathLike
+        // When the path cannot scroll, keep the old left elide so the file
+        // name stays visible; prose elides on the right.
+        idleElide: row.pathLike ? Text.ElideLeft : Text.ElideRight
+        text: row.titleText
+        color: Ui.tint("foreground_0", 1)
+        fontSize: Ui.fontL
+        fontFamily: Ui.fontFamily
+        fontBold: false
+        textFormat: Text.PlainText
+        opticalCenter: false
       }
 
       Item {

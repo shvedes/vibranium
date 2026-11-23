@@ -18,6 +18,19 @@ import { suite, section, group, eq, ne, is, noThrow, finish } from '../../lib/as
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const DL = loadLib(path.join(SHELL, 'features/bar/modules/Downloader/DownloadsLib.js'))
 const TS = loadLib(path.join(SHELL, 'common/collections/TableSort.js'))
+const SPINNER = fs.readFileSync(path.join(SHELL, 'common', 'ui', 'BusySpinner.qml'), 'utf8')
+
+// The rotation used to be hand-rolled in each island; it now lives in the one
+// shared BusySpinner. Read a caller's `running` expression from the instance
+// slice so the motion-policy exemption is checked where the decision is made.
+function spinnerRun(src) {
+  const m = /BusySpinner\s*\{[\s\S]*?\brunning:\s*([^\n]+)/.exec(src)
+  return m ? m[1].trim() : ''
+}
+function spinnerRotation(src) {
+  const m = /RotationAnimation on rotation\s*\{[\s\S]*?\}/.exec(src)
+  return m ? m[0] : ''
+}
 
 suite('video-downloader-integration', 'boundaries, fuzz and the cross-component round trip')
 
@@ -477,17 +490,19 @@ group('the QML wiring cannot fall back to the clipboard or the island', () => {
   is('the island demands and releases the preview warmer', island,
     s => s.includes('requestPreview(') && s.includes('releasePreview('),
     'preview demand')
-  is('the island spinner ignores the global motion switch', island,
-    s => /RotationAnimation on rotation[\s\S]*?running: root\.downloading/.test(s),
-    'spinner running')
+  is('the shared spinner owns the rotation and takes running from its caller',
+    spinnerRotation(SPINNER),
+    s => /running: root\.running/.test(s) && !s.includes('MotionPolicy'),
+    'shared spinner running')
+  eq('the island spinner ignores the global motion switch', spinnerRun(island),
+    'root.downloading')
   is('the barber pole ignores the global motion switch', island,
     s => /NumberAnimation on x[\s\S]*?running: root\.downloading/.test(s),
     'pole running')
   const arch = fs.readFileSync(path.join(SHELL,
     'features/bar/modules/ArchUpdates/ArchUpdatesIsland.qml'), 'utf8')
-  is('the ArchUpdates spinner ignores the global motion switch', arch,
-    s => /RotationAnimation on rotation[\s\S]*?running: root\.skeleton/.test(s),
-    'arch spinner running')
+  eq('the ArchUpdates spinner ignores the global motion switch', spinnerRun(arch),
+    'root.skeleton')
   is('a playlist page uses the default Best selector', playlist,
     s => s.includes('DL.qualitySelector("best")'), 'Best selector')
   is('the middle-click single-video path leaves the format to the wrapper', target,
