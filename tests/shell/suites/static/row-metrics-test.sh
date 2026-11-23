@@ -114,7 +114,6 @@ t_not_contains "MenuPanel holds no spacing literal" "total += 2" "$MENU_SRC"
 CARDS=(
   "clipboard/ClipboardPanel"
   "launcher/LauncherPanel"
-  "pass/PassPanel"
   "powerMenu/PowerMenuPanel"
 )
 BOUND=0
@@ -124,7 +123,7 @@ for c in "${CARDS[@]}"; do
   t_contains "$(basename "$c") reads the list's spacing" "rowSpacing: list.spacing" "$src"
   BOUND=$((BOUND + 1))
 done
-t_eq "and the scan cannot shrink: four cards are pinned" "4" "$BOUND"
+t_eq "and the scan cannot shrink: three cards are pinned" "3" "$BOUND"
 t_contains "and the menu reads its own" "readonly property real rowSpacing: list.spacing" "$MENU_SRC"
 
 t_section "a row the vocabulary cannot read is not measured as empty"

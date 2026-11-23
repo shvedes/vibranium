@@ -137,6 +137,10 @@ function defaultsFor(type) {
     // template the panel offers Delete/Ctrl+D on (%v -> value).
     section: "",
     delCommand: "",
+    // Optional resting height for a separator row. 0 keeps the shared token;
+    // a page that needs a stronger visual break can ask for one without
+    // changing the geometry every other menu uses.
+    sepHeight: 0,
 
     // settings binding: canonical option key managed by the settings store.
     // Non-empty rows read/write through the store instead of session state.
@@ -499,6 +503,11 @@ function buildOptionsPage(sel) {
       type: "option",
       label: labelled ? o.label : String(o.value),
       value: o.value,
+      // An option may carry its own glyph. It is the same icon vocabulary a
+      // page row uses (already in defaultsFor) - copied here because options
+      // are normalized from plain descriptors, not from a page's raw rows.
+      icon: o.icon === undefined || o.icon === null ? "" : String(o.icon),
+      glyph: o.glyph === undefined || o.glyph === null ? "" : String(o.glyph),
       onSelect: parent.onSelect,
       onCall: parent.onCall
     }, id, i)

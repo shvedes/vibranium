@@ -15,10 +15,11 @@ import "../../common/text/StringUtils.js" as SU
 
 // Demand-loaded child of the Pass facade: every piece of store work lives
 // here and nothing here survives a close. The binary probe, the store
-// resolve, the .gpg-id read, the find scan, the git checks, every
-// pass/gpg child and the panel tree itself are constructed with this
-// object and go with it, so a shell that never opens the password manager
-// never pays for any of it.
+// resolve, the .gpg-id read, the find scan, the git checks and every
+// pass/gpg/git child are constructed with this object and go with it, so a
+// shell that never opens the password manager never pays for any of it.
+// There is no window, no row renderer and no navigation here: the facade
+// derives two ordinary menu pages from the facts this object publishes.
 //
 // The facade is the only writer of this object's lifetime: it arrives
 // through a Loader, it leaves the same way. Nothing here reaches into the
@@ -33,12 +34,16 @@ import "../../common/text/StringUtils.js" as SU
 // The single exception is `pass edit` itself, which needs a terminal for
 // $EDITOR: it launches through vb-launch-tui exactly like any other TUI
 // surface.
+//
+// The page model is a derivation of entries/allDirs/gitReady/passBinary/
+// initialized. This object only writes those facts; the facade is the sole
+// publisher of the menu pages and of the provider callbacks keyed by row id.
 Item {
   id: root
 
   // Staged-delete marks are panel input, not store state: the map is
-  // created once by the facade and handed in, so PassEntry's bindings
-  // keep their target across a teardown. Required, not defaulted: a
+  // created once by the facade and handed in, so a row's pending binding
+  // keeps its target across a teardown. Required, not defaulted: a
   // controller built without the shared map would split the marks in
   // two, and the split would only show as rows stuck pending.
   required property OptimisticSet optimistic
@@ -288,13 +293,8 @@ Item {
     } else {
       // The running scan owns the one find slot, so a refresh that lands
       // while it runs cannot start a second one and the flag is the only way
-      // to have it asked for at all. Named only when a verb is parked: that
-      // is the case where the INFO line carrying that verb is printed by a
-      // LATER scan, and the gap between the two otherwise reads as a
-      // mutation that reported late for no reason.
+      // to have it asked for at all.
       root._refreshQueued = true
-      const parked = root._pendingAction
-      if (parked !== null) Log.debug(parked.verb + ": refresh queued behind the running scan")
     }
     root._checkRemote("")
   }
@@ -307,13 +307,9 @@ Item {
       root.busy = false
       if (root._refreshQueued) {
         root._refreshQueued = false
-        // This early return is the other half of the queue above: a scan that
-        // lands while a refresh is already pending does not spend the parked
-        // verb, which is why a verb's total can end up describing more than
-        // the one write that armed it. Without the line the mutation reads as
-        // reported against a scan that finished before it was even started.
-        const parked = root._pendingAction
-        if (parked !== null) Log.debug(parked.verb + ": total deferred to the queued scan")
+        // This early return is the other half of the queue above: the newer
+        // refresh gets its own scan instead of reporting against one that had
+        // already finished when the request arrived.
         Qt.callLater(() => root.refresh())
         return
       }
@@ -339,9 +335,6 @@ Item {
       if (pending !== null) {
         const total = pending.set === "dirs" ? root.allDirs.length : root.entries.length
         Log.info(pending.verb + ", total " + total)
-        // The count the INFO line is reporting is the AFTER picture; the scan
-        // shape behind it is what explains an unexpected total.
-        Log.debug("scan: " + parsed.files.length + " files, " + parsed.dirs.length + " dirs")
       }
       // Every name the scan found is tokenised, so the token map holds the whole
       // vocabulary of this store rather than only the names something asked
@@ -409,11 +402,6 @@ Item {
       // attempted for a change git cannot store. Same handoff, without the
       // side effect.
       root._pendingAction = { verb: "created folder", set: "dirs" }
-      // What the sibling mutations do not say: no push was probed. An empty
-      // folder is invisible to git, so the missing `git push` line that
-      // follows every other verb here is the contract working rather than a
-      // sync that quietly failed, and the total above is a folder count.
-      Log.debug("created folder: armed for the scan, no push probed")
       root.refresh()
     }
   }
@@ -1008,7 +996,7 @@ Item {
     }
   }
 
-  // --- git: async push after mutation, explicit pull/push for the panel ---
+  // --- git: async push after mutation, explicit pull/push for the menu ---
   //
   // A pull and a push are the only two children here that leave the
   // machine. Nothing here ever reads the remote URL: `remote get-url origin`
@@ -1022,15 +1010,6 @@ Item {
     // class of thing and neither may reach a log at any level. A name that
     // has to appear is published as an opaque per-session token instead.
     root._pendingAction = action || null
-    // The half of the handoff that is invisible at the other end. The INFO
-    // line prints at the scan, a whole child later, and nothing in between
-    // says which writer armed it, which of the two lists its total will be
-    // read from, or that a push was probed. Both fields are call-site
-    // literals, which is why nothing here is summarised: the one string this
-    // feature may not print - bounded or not - is a name.
-    if (root._pendingAction !== null)
-      Log.debug(root._pendingAction.verb + ": armed for the scan, total will count "
-        + root._pendingAction.set + ", push probed")
     root.refresh()
     root.tryPush()
   }
@@ -1096,15 +1075,6 @@ Item {
       // remote. It stays in the toast, which the user asked for, and never
       // reaches a log.
       Log.info("git push, code " + exitCode)
-      // What the code alone cannot say: whether anybody was told, and why
-      // nothing is recounted. A push is the one direction that cannot change
-      // what is on this disk, so a scan would report a model the push cannot
-      // have touched - and the toast a reader is asking about only happens
-      // for a push the panel asked for, so the two codes are not
-      // interchangeable to whoever reads them.
-      Log.debug("git push, code " + exitCode + ", "
-        + (root._gitVerbose ? "asked by the panel" : "after a mutation")
-        + ", listing not rescanned")
       if (exitCode !== 0) {
         root.lastError = "git push failed"
         if (root._gitVerbose) root._notify("Password Manager", "Push failed")
@@ -1130,12 +1100,6 @@ Item {
       // is knowable here without publishing any of it.
       Log.info("git pull, code " + exitCode)
       if (exitCode !== 0) {
-        // The success arm rescans and this one deliberately does not, and from
-        // the INFO line alone there is nothing to tell the two apart. A
-        // refused pull changed nothing on this disk, so the model a scan would
-        // rebuild is already the right one; naming the absence is what keeps a
-        // silent scan from reading as a count still in flight.
-        Log.debug("git pull, code " + exitCode + ", refused: no scan follows")
         root.lastError = "git pull failed"
         root._notify("Password Manager", "Pull failed")
         return
@@ -1146,70 +1110,6 @@ Item {
       // The scan that follows is what tells a reader whether the pull
       // brought anything.
       root.refresh()
-      // Started or queued is refresh()'s decision, not this child's, and it is
-      // the only thing separating "the pull brought nothing" from "the pull's
-      // scan has not landed yet" - the two are the same line in the log.
-      Log.debug("git pull, code " + exitCode + ", scan "
-        + (root._refreshQueued ? "queued behind a running one" : "started"))
-    }
-  }
-
-  // --- panel body: the window exists only while this controller does ---
-  // Opened and closed through the facade, because the surface claim and
-  // the close settle live there; this object only renders.
-  //
-  // The card's share of each screen is asked of ScreenCeiling, which reads
-  // the SCREEN and never this window: the window is sized from the card it
-  // hosts, so its height resolves in stages, while a screen's height is a
-  // settled number from the first frame.
-  Variants {
-    model: Ui.validScreens
-
-    OverlayWindow {
-      id: win
-
-      required property ShellScreen modelData
-      screen: modelData
-      // The card's share of THIS screen, owned by the shared ceiling so
-      // the reason lives in one place. See ScreenCeiling.
-      ScreenCeiling {
-        id: ceiling
-        screen: win.modelData
-        fraction: 0.72
-        growthFraction: 0.92
-      }
-
-      visible: Pass.visible
-      overlayOpen: Pass.visible
-      primary: modelData === Ui.primaryScreen
-      dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
-
-      wlrNamespace: "vibranium:modal"
-
-      onCloseRequested: Pass.close()
-
-      Loader {
-        anchors.fill: parent
-        active: win.primary
-        sourceComponent: passPanelComp
-      }
-
-      Component {
-        id: passPanelComp
-
-        Item {
-
-          // Halo follows the Drop shadow row, independent of the scrim.
-          MenuOverlayShadow { host: card }
-
-          PassPanel {
-            id: card
-            visible: win.primary
-            maxHeight: ceiling.maxHeight
-            hardMaxHeight: ceiling.hardMaxHeight
-          }
-        }
-      }
     }
   }
 }

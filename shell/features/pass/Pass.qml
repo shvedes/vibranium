@@ -5,136 +5,105 @@ pragma ComponentBehavior: Bound
 import QtQml
 import QtQuick
 import Quickshell
-// IpcHandler and the credential transport's Process; every store child and
-// every file read now lives with the controller that drives it.
 import Quickshell.Io
 import qs.common
+import qs.features.menu
 import "Model.js" as Model
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/security/SecretOwnership.js" as SecretOwnership
 
-// Pass password-manager service in the shell's own process. A
-// resident facade over a demand-loaded controller: the IPC target, the
-// surface claim, the credential exit path and the panel's view state are
-// here and live for the whole session, while every piece of store work
-// (the binary probe, the store resolve, the .gpg-id read, the find scan,
-// the git checks, the pass/gpg children and the panel tree) lives in
-// PassController and is built on first use.
+// Pass is an ordinary menu service. Its whole user-facing surface is two
+// dynamic pages built from the controller's five store facts; it has no
+// window, no row renderer, no key handling and no navigation state of its own.
+// The menu owns the surface, the stack and the focus; this object owns the
+// derivation, the providers keyed by row id, the verbs and the one credential
+// exit path.
 //
-// The singleton cannot be unloaded, so the split is not "hide the
-// singleton": UnitGate leases the unit, a Loader holds the controller,
-// and the facade releases both after the close animation has played.
-// A shell that never opens the password manager pays for none of the
-// construction work - which is the whole point of the unit being
-// first_use in Boot's catalog.
-//
-// Nothing here hands out the controller. The public read surface below
-// is a projection of it (empty and unknown while it is gone), so a
-// consumer can never hold a reference to the tree behind the facade.
+// "One state, many derivations": the controller writes entries, allDirs,
+// gitReady, passBinary and initialized. Everything on screen is a function of
+// those five values, recomputed on a single deferred publish edge. Publishing
+// is the only writer of the page table, the provider table and the page API,
+// and it re-supplies all three on every injection because a container load
+// drops injected pages.
 Singleton {
   id: root
 
   readonly property string tag: "pass"
   readonly property string unitId: "pass"
+  readonly property string menuPage: "pass-menu"
+  readonly property string vaultPage: "pass-vault"
 
-  // --- panel view state ---
-  // The panel's own navigation, kept here because it outlives a single
-  // open and needs no store, no process and no controller to answer.
-  property string mode: "menu" // menu | browse | action | create
-  property string currentDir: ""
-  property string selectedPath: ""
+  // --- controller lifecycle ------------------------------------------------
+  // The resident facade leases a demand-loaded controller. A shell that never
+  // summons Pass pays for no probe, no find scan and no store child.
+  readonly property string gateOwner: "pass-facade"
 
-  // Reload survival for visibility (memory-only, never disk): the
-  // binding reads through persist, imperative sets write back below.
-  PersistentProperties {
-    id: persist
-    reloadableId: "pass-visible"
-    property bool visible: false
-  }
-  property bool visible: persist.visible
-  readonly property bool open: root.visible
-  // Whether a panel has already been opened over a controller, which is
-  // what separates the open that inherits the controller it was handed from
-  // the opens that have to look at the store again.
-  property bool _panelOpened: false
-  onVisibleChanged: {
-    persist.visible = visible
-    // Either direction hands the controller's lifetime to the panel: an
-    // open cancels a release the grace had pending, and a close is already
-    // closeSettle's, so the idle timer has nothing left to decide.
-    idleRelease.stop()
-    if (!root.visible) return
-    // The first open is answered by the construction it came with; every
-    // later one re-probes, so a pass binary or a .gpg-id that appeared
-    // while the panel was closed is still picked up.
-    if (root._panelOpened) root._refreshOnOpen()
-    root._panelOpened = true
+  UnitLease {
+    id: lease
+    unitId: root.unitId
+    owner: root.gateOwner
+    controllerComponent: controllerComp
   }
 
-  // Staged-delete marks are panel input, not store state. The set is
-  // created once and handed to every controller, so PassEntry's
-  // Connections target and its pending bindings survive a teardown; a
-  // mark whose controller died unsettled is cancelled by that
-  // controller on the way out.
+  readonly property alias controllerState: lease.phase
+  readonly property alias controllerError: lease.error
+  readonly property alias constructions: lease.constructions
+  readonly property bool facadeReady: root.tag !== ""
+
+  // --- public read surface (projection, empty/unknown while controller gone)
+  readonly property string storeDir: lease.controller !== null ? lease.controller.storeDir : ""
+  readonly property bool initialized: lease.controller !== null ? lease.controller.initialized : false
+  readonly property var entries: lease.controller !== null ? lease.controller.entries : []
+  readonly property var allDirs: lease.controller !== null ? lease.controller.allDirs : []
+  readonly property bool busy: lease.controller !== null ? lease.controller.busy : false
+  readonly property string passBinary: lease.controller !== null ? lease.controller.passBinary : "unknown"
+  readonly property bool gitReady: lease.controller !== null ? lease.controller.gitReady : false
+  readonly property var keyChoices: lease.controller !== null ? lease.controller.keyChoices : []
+  readonly property string lastError: Model.statusError(
+    lease.controller === null ? "" : lease.controller.lastError, root._copyError)
+
+  // The five facts are read together. A binding on this object re-evaluates
+  // once for any of them, and its only consequence is arming one deferred
+  // publish - never a second stored copy of the page.
+  readonly property var pageFacts: ({
+    entries: root.entries,
+    allDirs: root.allDirs,
+    gitReady: root.gitReady,
+    passBinary: root.passBinary,
+    initialized: root.initialized
+  })
+
+  property bool _publishArmed: false
+  onPageFactsChanged: root._schedulePublish()
+
+  // Staged-delete marks belong to the controller work, but the shared map is
+  // created here so a row's pending binding survives a controller teardown.
   property OptimisticSet optimistic: OptimisticSet {}
   signal keysReady()
   signal deleteCommitted(string path)
 
-  // --- opaque store tokens ---
-  //
-  // The map lives here and nowhere else, and "here" is load-bearing: this is
-  // the only object in the directory that outlives a panel close, so a token
-  // minted for an entry is still that token after the controller is torn
-  // down and rebuilt, and a new shell always starts again at #1. The map is
-  // private, is never persisted, and is read by nothing but
-  // the accessors below - so the whole anonymisation of this component is
-  // this block plus the pure helpers in Model.js, and there is no second
-  // path to it.
-  //
-  // A name is passed IN and the token comes out; no caller ever holds the
-  // pairing.
+  // Opaque log tokens are minted here, on the resident facade: a token has to
+  // keep meaning the same entry across a controller rebuild. The controller
+  // passes names in and gets a counter back; no caller holds the pairing.
   readonly property var _tokens: Model.newTokenMap()
   function entryToken(path) { return Model.token(root._tokens, "entry", path) }
   function folderToken(dir) { return Model.token(root._tokens, "folder", dir) }
 
-  // --- credential transport ---
-  // The one exit path for a decrypted value, and the only child the
-  // resident facade holds. It stays here on purpose: it is the single
-  // place a credential can leave the process, and it outlives a panel
-  // close so an in-flight copy is never cut short. The wl-copy argv, the
-  // SecretStore.feed() sink and the stdin channel are all spelled here,
-  // and the suite case that would pin them
-  // (tests/shell/suites/js/modules-wallpaper.test.mjs, the transport-sink
-  // case) is recorded as an explicit skip: the case needs a PAM agent and
-  // a wl-copy binary, and this environment has neither, so the transport
-  // is unverified by the suite. It knows nothing about the store: whoever
-  // decrypted a value hands over a handle, and the handle is all that
-  // crosses.
-  //
-  // wl-copy takes flags and the mime type in argv and reads the bytes from
-  // stdin, so the value is absent from /proc/<pid>/cmdline and from every
-  // process listing. The write channel is closed right after the write
-  // because the EOF is mandatory: wl-copy buffers stdin into a temp file and
-  // claims the selection only once that read completes.
+  // --- credential transport ------------------------------------------------
+  // The one exit path for a decrypted value, and the only Process the facade
+  // holds. The controller never sees the wl-copy child and the child never
+  // sees a plaintext QML property: the value moves from SecretStore straight
+  // into its stdin. wl-copy takes flags in argv and reads bytes on stdin, so
+  // the secret is absent from /proc/<pid>/cmdline, from history and from
+  // every notification. The write channel closes on the feed edge because
+  // wl-copy claims the selection only after stdin reaches EOF.
   property var _secretHandles: []
-  // The transport's own status line entry, surfaced through the same
-  // read-only projection the controller's errors use: the panel shows
-  // whichever is live, the controller's first.
   property string _copyError: ""
+
   function copySecret(handle) {
     const key = String(handle || "")
     if (key === "" || copyProc.running) return false
-    // A copy is a fact about the vault being used, and it is the only thing
-    // here worth a line: the handle is a path (`pass:email/gmail`), which this
-    // component's own contract calls identifying, and the value never leaves
-    // the sink below. Logged on the hand-off rather than on the child's exit
-    // because `wl-copy` outliving the shell is normal and the transport
-    // succeeding is not this component's news.
-    Log.info("copied entry")
-    Log.debug("hand-off armed, transport " + (copyProc.running ? "starting" : "idle"))
     copyProc._handle = key
-    // The sink is a closure that writes straight into the child, so the
-    // value never becomes a return value any caller could hold on to.
     copyProc._sink = () => SecretStore.feed(key, v => copyProc.write(v))
     copyProc._fed = false
     copyProc.stdinEnabled = true
@@ -143,36 +112,20 @@ Singleton {
     root._copyError = ""
     copyProc.running = true
     copyTimeout.restart()
-    // A hand-off is the tail of a copy: the value is in the transport, which
-    // is the facade's to finish, and the controller is only still needed for
-    // a read that has not decrypted yet. The grace starts again from here,
-    // so a slow pinentry cannot be cut short by the deadline the demand set.
     idleRelease.restart()
-    // What the hand-off costs, which the line above does not say: the value
-    // holds a SecretStore slot until the write deadline expires, and the
-    // controller keeps its own grace rather than the one the demand armed.
-    // A copy followed by no teardown is the shape of a stuck shell, and both
-    // numbers are what tell it apart from a value still in flight.
-    Log.debug("copied entry: store slot held to the " + copyTimeout.interval
-      + "ms write deadline, controller grace re-armed")
     return true
   }
+  function copyIdle() { return !copyProc.running }
   function _untrackSecret(handle) {
     root._secretHandles = SecretOwnership.untrack(root._secretHandles, handle)
   }
-  // Whether the transport would take a value right now. A caller reads this
-  // to refuse a read it could not hand off, instead of starting one.
-  function copyIdle() {
-    return !copyProc.running
-  }
-  // A slot the child never took is released here instead of staying in the
-  // store until the session ends.
   function _forgetSecret(handle) {
     root._secretHandles = SecretOwnership.forget(SecretStore, root._secretHandles, handle)
   }
   function _releaseSecrets() {
     root._secretHandles = SecretOwnership.releaseAll(SecretStore, root._secretHandles)
   }
+  function _notify(summary, body) { Exec.notifyStatus(summary, body) }
 
   Process {
     id: copyProc
@@ -187,22 +140,17 @@ Singleton {
     onExited: {
       copyTimeout.stop()
       copyProc._sink = null
-      // Covers the child that exited before the write went out: the value it
-      // was going to receive is released here instead of staying in the store.
       root._forgetSecret(copyProc._handle)
       copyProc._handle = ""
     }
   }
-  // onStarted is the only feed edge. Process publishes it for every child
-  // that reaches exec, so no readiness timer is needed to guess when the
-  // write channel can be handed over.
+  // onStarted is the only feed edge: Process publishes it for every child
+  // that reaches exec, so there is no readiness guess here.
   Timer {
     id: copyTimeout
     interval: 5000
     repeat: false
     onTriggered: {
-      // A child that never finished reading its stdin would hold the
-      // credential in the store slot forever.
       if (copyProc.running) copyProc.running = false
       copyProc._sink = null
       root._forgetSecret(copyProc._handle)
@@ -217,316 +165,715 @@ Singleton {
     if (typeof sink !== "function") return
     copyProc._fed = true
     try { sink() } catch (ignored) { }
-    // The slot is gone by now, whatever the sink did with the value.
     root._untrackSecret(copyProc._handle)
-    // Process maps stdinEnabled=false onto QProcess::closeWriteChannel().
     copyProc.stdinEnabled = false
   }
 
-  // Token for the exclusive-surface claim this open holds, released by
-  // hidePanel() and by Component.onDestruction.
-  property var _claimToken: null
-
-  // --- controller lifecycle ---
-  // The lease, the state and the Loader are the shared UnitLease; what each
-  // facade keeps is when to give the controller back.
-  readonly property string gateOwner: "pass-facade"
-
-  UnitLease {
-    id: lease
-    unitId: root.unitId
-    owner: root.gateOwner
-    controllerComponent: controllerComp
+  // --- page publication ----------------------------------------------------
+  // One deferred edge, armed by the fact binding, by a summon and by a
+  // container drop. There is no "tries" counter and no readiness timer: a
+  // later edge simply supplies the newest derivation again.
+  function _schedulePublish() {
+    if (root._publishArmed) return
+    root._publishArmed = true
+    Qt.callLater(root._publish)
   }
 
-  readonly property alias controllerState: lease.phase
-  readonly property alias controllerError: lease.error
-  readonly property bool facadeReady: root.tag !== ""
-  readonly property alias constructions: lease.constructions
+  property var _providerIds: []
+  property var _landing: null
+  property bool _summonLanding: false
 
-  // --- public read surface (projected) ---
-  readonly property string storeDir: lease.controller !== null ? lease.controller.storeDir : ""
-  readonly property bool initialized: lease.controller !== null ? lease.controller.initialized : false
-  readonly property var entries: lease.controller !== null ? lease.controller.entries : []
-  readonly property var allDirs: lease.controller !== null ? lease.controller.allDirs : []
-  readonly property bool busy: lease.controller !== null ? lease.controller.busy : false
-  readonly property string lastError: Model.statusError(
-    lease.controller === null ? "" : lease.controller.lastError, root._copyError)
-  readonly property string passBinary: lease.controller !== null ? lease.controller.passBinary : "unknown"
-  readonly property bool gitReady: lease.controller !== null ? lease.controller.gitReady : false
-  readonly property var keyChoices: lease.controller !== null ? lease.controller.keyChoices : []
+  function _releaseProviders() {
+    const ids = root._providerIds
+    root._providerIds = []
+    for (let i = 0; i < ids.length; i++)
+      ProviderHost.unregisterProvider(ids[i], root)
+  }
 
-  Component.onCompleted: {
-    Registry.offer("pass", {
-      title: "Password manager",
-      description: "native pass frontend",
-      verbNames: [
-        "open",
-        "copy",
-        "close",
-        "toggle",
-        "status",
-        "help",
-        "ping",
-      ]
-    })
-    Registry.register("pass", root)
-    // Boot alongside the shell: build the controller (binary probe, store
-    // resolve, find scan, git check) in the background so the first open
-    // shows a warm vault in one frame instead of a cold "0 entries" +
-    // "Working..." skeleton. The demand holds its lease; idleRelease skips
-    // panel-opened controllers, so this survives until the session ends.
-    // A shell without `pass` installed still pays one cheap probe - the
-    // price of an instant first frame.
-    Idle.run(() => {
-      if (lease.controller !== null) return
-      if (root.visible) return
-      if (lease.demand() !== null) idleRelease.stop()
-    }, 0, 0, "pass-prewarm")
-    // A reload with the panel open lands here with visible already true
-    // and no claim (a claim is memory-only), so the open is replayed
-    // through showPanel() after clearing the flag: the claim and the
-    // controller come back exactly as they were before the reload.
-    if (root.visible) {
-      root.visible = false
-      root.showPanel()
+  // One surface per row id that can submit work. The id is path-derived, so
+  // the same row keeps its callback across a rescan that reorders everything.
+  function _surfaceFor(item) {
+    const id = String(item ? item.id : "")
+    if (Array.isArray(item.flow) && item.flow.length > 0)
+      return {
+        runFlow: (it, vals) => root._runFlow(it, vals),
+        forget: value => root._forgetPath(String(value || ""))
+      }
+    if (item && item.confirm)
+      return {
+        // The shared Icon recolors its indicator from this accent key; "red"
+        // is the same key the other destructive rows use.
+        iconAccent: () => "red",
+        runConfirm: it => root._deletePath(String(it.value || "")),
+        forget: value => root._forgetPath(String(value || ""))
+      }
+    if (item && item.delCommand === "@forget")
+      return { forget: value => root._forgetPath(String(value || "")) }
+    return null
+  }
+
+  function _registerProviderIds(list) {
+    const out = []
+    for (let i = 0; i < list.length; i++) {
+      const spec = list[i]
+      const surface = root._surfaceFor(spec.item)
+      if (!surface) continue
+      // A nested child reaches the menu through a normalized mirror. Claim
+      // the row id AND its uid: whichever survives into the delegate, the
+      // provider is found and the flow really commits instead of silently
+      // mirroring the typed value into the row's value slot.
+      const keys = spec.uid && spec.uid !== spec.id ? [spec.id, spec.uid] : [spec.id]
+      for (let k = 0; k < keys.length; k++) {
+        if (ProviderHost.claimProvider(keys[k], surface, root)) out.push(keys[k])
+      }
+    }
+    root._providerIds = out
+  }
+
+  function _publish() {
+    if (!root._publishArmed) return
+    root._publishArmed = false
+    if (typeof Menu === "undefined" || !Menu || !Menu.injectPage) return
+
+    const menuItems = root._menuRows()
+    const vaultItems = root._vaultRows()
+    // The page API is re-supplied on every inject: a container reload drops
+    // the dynamic API table along with the pages.
+    const api = { forget: value => root._forgetPath(String(value || "")) }
+    Menu.injectPage(Menu.buildDynamicPage(root.menuPage, "Password manager", 0, menuItems), api, false)
+    Menu.injectPage(Menu.buildDynamicPage(root.vaultPage, "Vault", 0, vaultItems), api, false)
+
+    const ids = []
+    function walk(list) {
+      for (let i = 0; i < list.length; i++) {
+        const it = list[i]
+        if (!it) continue
+        if (root._surfaceFor(it) !== null)
+          ids.push({ id: it.id, uid: it.uid, item: it })
+        if (Array.isArray(it.children)) walk(it.children)
+      }
+    }
+    // Walk the NORMALIZED pages: their rows carry both the declared id and
+    // the uid the delegate actually uses for provider lookup.
+    const pages = [Menu.pageById(root.menuPage), Menu.pageById(root.vaultPage)]
+    for (let p = 0; p < pages.length; p++) {
+      if (pages[p] && Array.isArray(pages[p].items)) walk(pages[p].items)
+    }
+    // The surfaces are generic closures keyed by id; an unchanged id set
+    // needs no claims at all. Re-claiming hundreds of ids on every fact
+    // change copies ProviderHost's frozen table one entry at a time, which
+    // is the visible lag on the first vault frame.
+    const nextIds = ids.map(s => s.id).concat(
+      ids.filter(s => s.uid && s.uid !== s.id).map(s => s.uid)).sort()
+    const oldIds = root._providerIds.slice().sort()
+    if (nextIds.length !== oldIds.length
+      || nextIds.some((v, i) => v !== oldIds[i])) {
+      root._releaseProviders()
+      root._registerProviderIds(ids)
+    }
+
+    if (root._summonLanding) {
+      root._summonLanding = false
+      Menu.jumpTo(root.menuPage, 0)
+      return
+    }
+    if (root._landing !== null) {
+      const landing = root._landing
+      root._landing = null
+      root._releaseFocusLanding(landing)
     }
   }
 
-  Component.onDestruction: {
-    idleRelease.stop()
-    // The controller goes before the lease does, so no gate observer ever
-    // sees the unit released while its child is still alive.
-    root.teardownController()
-    // A store slot and an in-flight copy child are the only things that can
-    // outlive a panel: release both, and the child goes with this singleton.
-    root._releaseSecrets()
-    if (copyProc.running) copyProc.running = false
-    copyProc._sink = null
-    copyProc._handle = ""
-    SurfaceClaim.releaseOwner(root)
-    Registry.unregister("pass")
+  // A landing is released on the page's real settled edge. The waiter's guard
+  // reads the live page, so a slow rescan holds it instead of being guessed by
+  // a timer, and a stale intent is retired by replacing _landing before it is
+  // ever published.
+  function _releaseFocusLanding(landing) {
+    const panel = Menu.panel
+    if (!panel || !panel.listView || !Array.isArray(landing.chain) || landing.chain.length === 0) return
+    if (landing.closeGroup) {
+      const group = Menu.itemByUid(landing.closeGroup)
+      // setExpanded(false) arms a slot-close latch that only lands when a
+      // slot actually folds. A group that was never opened has no such edge;
+      // writing it would hold Menu.slotClosing (and the fit) shut forever.
+      if (group && Menu.isExpanded(group)) {
+        Menu.setExpanded(group, false)
+        // The same publish swaps this group's delegate, so its fold never
+        // reports slotCloseFinished and Menu.slotClosing would stay armed
+        // forever, holding every settled waiter (including this landing)
+        // shut. Clear the latch on the next edge, after the fold has started.
+        Qt.callLater(() => Menu.slotCloseFinished(group))
+      }
+    }
+    if (landing.flowUid) {
+      const flowUid = landing.flowUid
+      const flowItem = Menu.itemByUid(flowUid)
+      // Resetting a flow clears its stage cursor but not the row's expanded
+      // state. Without this the wizard stays open and keeps the keyboard
+      // while the landing tries to focus the newly created entry.
+      if (flowItem && Menu.isExpanded(flowItem)) Menu.setExpanded(flowItem, false)
+      // The committed flow row folds as its editor closes, but this same
+      // publish replaces its delegate before that fold reports. Clear its
+      // latch on the next edge so Menu.slotClosing cannot hold the landing
+      // waiter shut forever.
+      Qt.callLater(() => Menu.slotCloseFinished({ uid: flowUid }))
+    }
+    // Only a summon needs the root-frame teleport. A mutation landing is a
+    // focus change on the page already showing; jumping here would discard the
+    // pass-menu frame below and make Back close the whole menu.
+    if (!Menu.frame || Menu.frame.id !== landing.page) Menu.jumpTo(landing.page, 0)
+    const ready = () => Menu.frame && Menu.frame.id === landing.page
+    const chain = landing.chain
+    // A created entry is published only after its child exits and the find
+    // scan lands; a deleted one is still on the page until that scan lands.
+    // The guard reads the live page instead of spending the landing on the
+    // first settled frame, so it releases on the real publish edge - no
+    // timer, no retry budget, and no stale fallback.
+    const gone = landing.waitGone || ""
+    const present = () => ready() && (gone === "" || !Menu.itemByUid(gone))
+      && !!Menu.itemByUid(chain[chain.length - 1])
+    // The first settled edge opens the ancestors. A second one re-seats the
+    // target: the publish's own model swap can echo its old index in between,
+    // and taking the seat on that edge is the only way to keep it from winning.
+    panel.whenSettled(() => {
+      if (!ready()) return
+      const idx = Menu.visibleIndexOfUid(landing.page, chain[0])
+      if (idx < 0) return
+      const list = panel.listView
+      list.seat(idx, "land")
+      let row = list.itemAtIndex(idx)
+      for (let i = 0; i + 1 < chain.length; i++) {
+        if (!row) return
+        const kids = row.groupChildren || []
+        let at = -1
+        for (let j = 0; j < kids.length; j++) {
+          if (kids[j] && kids[j].uid === chain[i + 1]) { at = j; break }
+        }
+        if (at < 0) return
+        // Expansion seeds its own child cursor at zero. Open the ancestor
+        // here; the child seat goes on the next settled edge, after that seed.
+        row.setExpanded(true) // ancestors only; the target stays closed
+        row = row._focusedChildRow ? row._focusedChildRow() : null
+      }
+      // A nested whenSettled waiter drains inside the same call and its child
+      // seat is undone by the expansion's own cursor seed. One deferred turn
+      // is an edge, not a retry budget: the expansion has landed by then.
+      Qt.callLater(() => {
+        if (!ready()) return
+        const at = Menu.visibleIndexOfUid(landing.page, chain[0])
+        if (at < 0) return
+        const list2 = panel.listView
+        let r = list2.itemAtIndex(at)
+        for (let i = 0; i + 1 < chain.length && r; i++) {
+          const kids = r.groupChildren || []
+          let found = -1
+          for (let j = 0; j < kids.length; j++) {
+            if (kids[j] && kids[j].uid === chain[i + 1]) { found = j; break }
+          }
+          if (found < 0) break
+          r.childIndex = found
+          r = r._focusedChildRow ? r._focusedChildRow() : null
+        }
+        list2.seat(at, "land")
+        list2.forceLayout()
+        // The group's slot geometry settles a frame after the child seat;
+        // re-seat once more on that edge so the highlight cannot span the
+        // rows the expansion just moved.
+        panel.whenSettled(() => {
+          if (!ready()) return
+          const at2 = Menu.visibleIndexOfUid(landing.page, chain[0])
+          if (at2 < 0) return
+          // "click" is the persistent seat cause: track() records it as user
+          // motion, so a later model swap cannot restore the pre-create row.
+          panel.listView.seat(at2, "click")
+          panel.listView.forceLayout()
+        }, ready)
+      })
+    }, present)
   }
 
-  // The transport needs it for its own timeout; every other message comes
-  // from the controller, which owns the flow that failed.
-  function _notify(summary, body) {
-    Exec.notifyStatus(summary, body)
+  // The menu keys state by uid, not by the row id a provider is claimed with.
+  // A uid is pageId + "#" + uidKey(id), and a nested child's key carries every
+  // ancestor's key as a "/" prefix (MenuPage.normalizeChildren). Building the
+  // landing chain here keeps that vocabulary in one place.
+  function _uidFor(id) {
+    const key = String(id || "").replace(/[#:]/g, "-").replace(/[\x00-\x1f\x7f]/g, "-")
+    return root.vaultPage + "#" + key
+  }
+  // A "Create here" row lives inside its folder's dropdown, so its uid
+  // carries every ancestor folder key as a "/" prefix (MenuPage normalizes
+  // children that way). Closing it by a bare uid is a no-op and leaves the
+  // group open after a create.
+  function _createGroupUid(dir) {
+    if (dir === "" || dir === "root") return root._uidFor(Model.rowId("create-group", "root"))
+    const parts = String(dir).split("/").filter(p => p !== "")
+    let prefix = ""
+    for (let i = 0; i < parts.length; i++) {
+      const key = String(Model.rowId("dir", parts.slice(0, i + 1).join("/")))
+        .replace(/[#:]/g, "-").replace(/[\x00-\x1f\x7f]/g, "-")
+      prefix = prefix ? prefix + "/" + key : key
+    }
+    const leaf = String(Model.rowId("create-group", dir))
+      .replace(/[#:]/g, "-").replace(/[\x00-\x1f\x7f]/g, "-")
+    return root.vaultPage + "#" + prefix + "/" + leaf
   }
 
-  // --- open / close ---
-  function showPanel() {
-    if (root.visible) return true
-    // Demand first: without a controller there is no window to show, so
-    // the claim must not be taken and `visible` must not be set.
-    if (lease.demand() === null) return false
-    root.navigate({ mode: "menu", dir: "", path: "" })
-    root.visible = true
-    // Claimed once the panel is up, not before: the stored closer is
-    // hidePanel, which refuses to run while `visible` is false, so a claim
-    // taken earlier would install a closer that provably does nothing and
-    // leave a claim nobody can retire if the rest of the opening throws.
-    // The store is not probed here: the controller that just arrived has
-    // already probed the binary and scanned the store, and refresh() blocks
-    // on the .gpg-id read, so a second pair here made the first open pay for
-    // two full scans. onVisibleChanged re-probes from the second open on.
-    root._claimToken = SurfaceClaim.claim("pass", root.hidePanel, root)
+  function _chainFor(path, isDir) {
+    const parts = String(path || "").split("/").filter(p => p !== "")
+    const chain = []
+    let prefix = ""
+    // For a file the last segment is the file itself, not a folder above it.
+    const dirCount = isDir ? parts.length : Math.max(0, parts.length - 1)
+    for (let i = 0; i < dirCount; i++) {
+      const key = (prefix ? prefix + "/" : "")
+        + String(Model.rowId("dir", parts.slice(0, i + 1).join("/")))
+          .replace(/[#:]/g, "-").replace(/[\x00-\x1f\x7f]/g, "-")
+      chain.push(root.vaultPage + "#" + key)
+      prefix = key
+    }
+    // A folder target is its own last ancestor: appending it twice would make
+    // the walker try to open the target inside itself and abandon the landing.
+    if (!isDir) {
+      const leaf = String(Model.rowId("file", String(path || "")))
+        .replace(/[#:]/g, "-").replace(/[\x00-\x1f\x7f]/g, "-")
+      chain.push(root.vaultPage + "#" + (prefix ? prefix + "/" : "") + leaf)
+    }
+    return chain
+  }
+  function _landOn(path, isDir, closeGroup, flowUid) {
+    root._landing = {
+      page: root.vaultPage,
+      chain: root._chainFor(path, isDir),
+      closeGroup: closeGroup || "",
+      flowUid: flowUid || ""
+    }
+    root._schedulePublish()
+  }
+
+  // --- composition: pass-menu ----------------------------------------------
+  function _warning(id, text) {
+    return {
+      type: "expandable", id: id, label: "Password manager unavailable",
+      warning: text, desc: text, infoOnly: true, enabled: false
+    }
+  }
+
+  function _menuRows() {
+    if (root.passBinary !== "present")
+      return [root._warning("pass:warning", "The pass package is not installed")]
+    const rows = [{
+      type: "submenu",
+      id: "pass:browse",
+      label: "Browse vault",
+      sub: Model.countWord(root.entries.length, "entry", "entries"),
+      icon: "file-folders",
+      page: root.vaultPage
+    }]
+    if (root.gitReady) {
+      rows.push({
+        type: "group",
+        id: "pass:git",
+        label: "Git operations",
+        sub: "origin configured",
+        icon: "git",
+        children: [
+          { type: "action", id: "pass:push", label: "Push to remote", sub: "upload commits to origin", icon: "git", call: "pass push", keepOpen: true },
+          { type: "action", id: "pass:pull", label: "Pull from remote", sub: "fetch and rebase from origin", icon: "git", call: "pass pull", keepOpen: true }
+        ]
+      })
+    }
+    return rows
+  }
+
+  // --- composition: pass-vault ---------------------------------------------
+  function _createRows(dir) {
+    const suffix = dir === "" ? "root" : dir
+    return [{
+      type: "group",
+      id: Model.rowId("create-group", suffix),
+      label: dir === "" ? "Create" : "Create here",
+      sub: "in " + (dir === "" ? "vault root" : dir),
+      icon: "file",
+      children: [
+        {
+          type: "select", id: Model.rowId("create-folder", suffix),
+          label: "Folder", sub: "new folder", icon: "file-folder",
+          marker: false, hideValue: true, keepOpen: true,
+          flow: [
+            { kind: "text", placeholder: "Folder name or path", sub: "Create here", subAccent: "Folder name..." }
+          ]
+        },
+        {
+          type: "select", id: Model.rowId("create-file", suffix),
+          label: "File", sub: "new password", icon: "file",
+          marker: false, hideValue: true, keepOpen: true,
+          flow: [
+            { kind: "text", placeholder: "Entry name or path", sub: "Create here", subAccent: "Entry name..." },
+            {
+              kind: "select", sub: "Create here", subAccent: "Password source...",
+              options: [
+                { label: "Generate a password", value: "generate", icon: "update" },
+                { label: "Enter a password", value: "enter", icon: "pencil" }
+              ]
+            },
+            {
+              kind: "text", placeholder: "Password", sub: "Create here",
+              subAccent: "Type the secret...", sensitive: true,
+              skipUnless: "enter"
+            }
+          ]
+        }
+      ]
+    }]
+  }
+
+  function _fileRows(path) {
+    return [
+      { type: "text", id: Model.rowId("rename", path), value: path, label: "Rename", sub: "change the pass name", icon: "pencil",
+        placeholder: "New name or path", flow: [
+          { kind: "text", placeholder: "New name or path", sub: "Rename", subAccent: "New name..." }
+        ] },
+      { type: "action", id: Model.rowId("copy", path), value: path, label: "Copy", sub: "copy line 1", icon: "copy",
+        call: "pass copy %v", hideValue: true, keepOpen: true },
+      { type: "select", id: Model.rowId("move", path), value: path, label: "Move", sub: "pick a destination", icon: "arrow-corner",
+        marker: false, hideValue: true, keepOpen: true,
+        flow: [
+          { kind: "select", sub: "Move", subAccent: "Destination...", options: root._moveOptions() }
+        ] },
+      { type: "action", id: Model.rowId("edit", path), value: path, label: "Edit", sub: "open in a terminal", icon: "tui",
+        call: "pass edit %v", hideValue: true },
+      { type: "action", id: Model.rowId("delete", path), value: path, label: "Delete", sub: "remove this password", icon: "remove",
+        confirm: {
+          stages: 2,
+          hint: "Press <b>Enter</b> again to delete this password",
+          armed: "<b><u>Press again to confirm delete</u></b>",
+          label: "Delete"
+        } }
+    ]
+  }
+
+  function _moveOptions() {
+    const opts = [{ label: "Vault root", value: "", icon: "file-folders" }]
+    const dirs = root.allDirs
+    for (let i = 0; i < dirs.length; i++)
+      opts.push({ label: dirs[i], value: dirs[i], icon: "file-folder" })
+    return opts
+  }
+
+  function _folderRow(dir) {
+    const ch = Model.childrenOf(root.entries, dir, root.allDirs)
+    // Create here is always the first child of a folder, with its own
+    // separator directly beneath it, before the folder's contents. Its
+    // scope is in the path-derived id, so the row carries no value copy.
+    const children = [root._createRows(dir)[0], {
+      type: "separator",
+      id: Model.rowId("sep", dir),
+      sepHeight: 22
+    }]
+    for (let i = 0; i < ch.dirs.length; i++) {
+      const sub = dir === "" ? ch.dirs[i] : dir + "/" + ch.dirs[i]
+      children.push(root._folderRow(sub))
+    }
+    for (let i = 0; i < ch.files.length; i++) {
+      const file = ch.files[i]
+      children.push({
+        type: "group",
+        id: Model.rowId("file", file.path),
+        label: file.name,
+        sub: file.dir,
+        icon: "lock",
+        delCommand: "",
+        children: root._fileRows(file.path)
+      })
+    }
+    return {
+      type: "group",
+      id: Model.rowId("dir", dir),
+      label: dir.substring(dir.lastIndexOf("/") + 1),
+      sub: Model.folderSubtitle(root.entries, root.allDirs, dir),
+      icon: "file-folder",
+      delCommand: "@forget",
+      value: dir,
+      children: children
+    }
+  }
+
+  function _vaultRows() {
+    if (root.passBinary !== "present")
+      return [root._warning("pass:vault-warning", "The pass package is not installed")]
+    const rows = root._createRows("")
+    rows.push({ type: "separator", id: "pass:sep", sepHeight: 22 })
+    const ch = Model.childrenOf(root.entries, "", root.allDirs)
+    for (let i = 0; i < ch.dirs.length; i++) rows.push(root._folderRow(ch.dirs[i]))
+    for (let i = 0; i < ch.files.length; i++) {
+      const file = ch.files[i]
+      rows.push({
+        type: "group",
+        id: Model.rowId("file", file.path),
+        label: file.name,
+        sub: file.dir,
+        icon: "lock",
+        children: root._fileRows(file.path)
+      })
+    }
+    return rows
+  }
+
+  // --- flow / confirm verbs ------------------------------------------------
+  // A committed flow must reopen at its first stage. Entry.collapse() resets
+  // the flow of the delegate it holds, but a publish can swap that delegate
+  // before the reset lands, leaving the next summon on "generate"/"enter".
+  // Clearing by the stable uid here keeps the wizard's cursor correct.
+  function _finishFlow(item, ok) {
+    if (ok && item && item.uid) Menu.resetFlow({ uid: item.uid })
+    return ok
+  }
+
+  function _runFlow(item, values) {
+    if (!item) return false
+    const id = String(item.id || "")
+    const v0 = String(values && values["0"] !== undefined ? values["0"] : "").trim()
+    const v1 = String(values && values["1"] !== undefined ? values["1"] : "")
+    const v2 = String(values && values["2"] !== undefined ? values["2"] : "")
+    // A stage swap keeps the outgoing editor alive as a ghost for its fade.
+    // When a create republishes the page, that ghost can re-fire accepted()
+    // with a seeded text of "undefined" and commit a second, bogus flow.
+    // Such a value is never a name the user typed: drop the late commit so
+    // it cannot create a stray entry or overwrite the real focus landing.
+    if (v0 === "undefined" || v0 === "null") return true
+    if (id.indexOf("pass:rename:") === 0) {
+      if (!Model.validPath(v0)) {
+        root._notify("Password Manager", "Invalid name")
+        return true
+      }
+      const from = String(item.value || "")
+      root._landOn(v0, false, "")
+      return root._finishFlow(item, root.moveEntry(from, v0))
+    }
+    if (id.indexOf("pass:move:") === 0) {
+      const from = String(item.value || "")
+      const base = from.substring(from.lastIndexOf("/") + 1)
+      // A single select stage stores its value at index 0; the destination
+      // is that folder plus the file's basename.
+      const to = v0 === "" ? base : v0 + "/" + base
+      root._landOn(to, false, "")
+      return root._finishFlow(item, root.moveEntry(from, to))
+    }
+    if (id.indexOf("pass:create-folder:") === 0) {
+      // The scope is encoded in the path-derived id, never in the row's
+      // value slot: a flow stage writes its text there while it is open,
+      // and that must not be mistaken for the destination folder.
+      const rawDir = id.substring("pass:create-folder:".length)
+      const dir = rawDir === "root" ? "" : rawDir
+      const full = dir === "" ? v0 : dir + "/" + v0
+      if (!Model.validPath(full)) {
+        root._notify("Password Manager", "Invalid folder name")
+        return true
+      }
+      const group = root._createGroupUid(dir)
+      root._landOn(full, true, group, item.uid)
+      return root._finishFlow(item, root.createFolder(full))
+    }
+    if (id.indexOf("pass:create-file:") === 0) {
+      const rawDir = id.substring("pass:create-file:".length)
+      const dir = rawDir === "root" ? "" : rawDir
+      const full = dir === "" ? v0 : dir + "/" + v0
+      if (!Model.validPath(full)) {
+        root._notify("Password Manager", "Invalid entry name")
+        return true
+      }
+      const group = root._createGroupUid(dir)
+      root._landOn(full, false, group, item.uid)
+      const ok = v1 === "enter"
+        ? root.insertEntry(full, v2, true)
+        : root.generateEntry(full, true)
+      return root._finishFlow(item, ok)
+    }
+    return false
+  }
+
+  function _deletePath(path) {
+    const p = String(path || "")
+    if (p === "") return false
+    const focus = Model.neighbourAfter(root.entries, root.allDirs, p)
+    if (!root.requestDelete(p)) return false
+    const isDir = root.allDirs.indexOf(p) !== -1
+    const waitGone = root._uidFor(Model.rowId(isDir ? "dir" : "file", p))
+    if (focus === "") {
+      root._landing = {
+        page: root.vaultPage,
+        chain: [root._uidFor(Model.rowId("create-group", "root"))],
+        closeGroup: "",
+        waitGone: waitGone
+      }
+    } else {
+      const neighbourIsDir = focus.indexOf("pass:dir:") === 0
+      const path = focus.replace(/^pass:(dir|file):/, "")
+      root._landing = {
+        page: root.vaultPage,
+        chain: root._chainFor(path, neighbourIsDir),
+        closeGroup: "",
+        waitGone: waitGone
+      }
+    }
+    root._schedulePublish()
     return true
   }
-  function hidePanel() {
-    if (!root.visible) return
-    root.visible = false
-    SurfaceClaim.release(root._claimToken)
-    root._claimToken = null
-    // The controller stays resident once a panel has been opened: tearing the
-    // tree down on every close made every open pay for a binary probe, a
-    // .gpg-id read, a find scan and a git remote check from an empty
-    // projection ("Browse Vault (0 entries)", "Working...", no git rows) -
-    // the reported staged boot. The window fade needs no teardown (the tree
-    // is hidden, not destroyed); flows still report through the live
-    // controller, and the next open inherits a warm scan and only re-probes
-    // in the background (see onVisibleChanged). Copy-only demands without a
-    // panel still release via idleRelease.
-  }
-  function open() { root.toggle(); return true }
-  function close() { root.hidePanel(); return true }
-  function toggle() { root.visible ? root.hidePanel() : root.showPanel() }
+  function _forgetPath(path) { return root._deletePath(path) }
 
-  // --- navigation (view state only, no controller required) ---
-  // The single writer of mode/currentDir/selectedPath. Every verb below and
-  // every panel transition funnels through here, so a keyboard gesture and an
-  // IPC caller sequence the same field writes and the panel's onChanged
-  // rebuilds never observe a state the facade did not produce. A key left out
-  // is left untouched: browseTo never clears the selected path, select keeps
-  // the current dir, and a peel writes only the fields its step names.
-  function navigate(args) {
-    const next = args || {}
-    if (next.dir !== undefined) root.currentDir = String(next.dir || "")
-    if (next.path !== undefined) root.selectedPath = String(next.path || "")
-    if (next.mode !== undefined) root.mode = String(next.mode)
-  }
-  function browseTo(dir) {
-    root.navigate({ mode: "browse", dir: dir })
-  }
-  function select(path) {
-    root.navigate({ mode: "action", path: path })
-  }
-  // One peel step; the panel's Esc chain drives it. The rule is the store
-  // library's, this is the facade's own state it is applied to.
-  function back() {
-    const step = Model.navigationBack(root.mode, root.currentDir)
-    root.navigate({ mode: step.mode, dir: step.dir })
-    if (step.close === true) root.hidePanel()
-  }
+  // --- command verbs: one controller, defined refusal when there is none ---
+  function _unavailableVerb() { return Model.unavailableVerb(root.controllerState, root.controllerError) }
+  function _ctrl() { return lease.demand() }
 
-  // --- demand / teardown ---
-  // Build the controller on first use and keep exactly one. Repeated
-  // callers - a held key, a second IPC verb, the panel's own close - all
-  // land here, and every path out (refused lease, failed construction,
-  // unload) drops the lease again, so a refused or failed caller leaves
-  // the next one a clean unit.
-  // Drop the controller and the lease, then state the outcome. The flag is
-  // what keeps the teardown the gate performs on the way out - it runs
-  // teardownController() from inside the release - from restating
-  // "unloaded" in the middle of a demand that is about to report why it
-  // failed, so the state sequence a consumer sees is the facade's own.
-  // Drop the controller and the lease without touching the reported state.
-  // A caller that is about to answer unavailable or failed unwinds through
-  // here, so the state it reports is the last one a consumer sees instead of
-  // flapping through "unloaded" on the way there.
-  // Idempotent and callable with nothing loaded: Boot's unit teardown
-  // hook and the close settle both land here, and the second call is a
-  // no-op rather than a double release.
-
-  // Boot's unit teardown hook calls this by name on every facade, so the
-  // shared lease teardown is republished under the name the hook owns.
-  function teardownController() {
-    return lease.teardown()
+  function copyEntry(path) {
+    const c = root._ctrl()
+    return c !== null && c.copyEntry(path) === true
   }
+  // Registry verbs named by the menu's declarative `call` specs. They are the
+  // same functions the IPC handler uses, so a row and `qs ipc call` cannot
+  // disagree about what a copy or an edit does.
+  function copy(path) { return root.copyEntry(path) }
+  function edit(path) { return root.editEntry(path) }
+  function createFolder(path) {
+    const c = root._ctrl()
+    return c !== null && c.createFolder(path) === true
+  }
+  function moveEntry(from, to) {
+    const c = root._ctrl()
+    return c !== null && c.moveEntry(from, to) === true
+  }
+  function requestDelete(path) {
+    const c = root._ctrl()
+    return c !== null && c.requestDelete(path) === true
+  }
+  function removeEntry(path) { return root.requestDelete(path) }
+  function insertEntry(path, secret, force) {
+    const c = root._ctrl()
+    return c !== null && c.insertEntry(path, secret, force) === true
+  }
+  function generateEntry(path, force) {
+    const c = root._ctrl()
+    return c !== null && c.generateEntry(path, force) === true
+  }
+  function editEntry(path) {
+    const c = root._ctrl()
+    return c !== null && c.editEntry(path) === true
+  }
+  function initStore(key) {
+    const c = root._ctrl()
+    return c !== null && c.initStore(key) === true
+  }
+  function requestKeys() {
+    const c = root._ctrl()
+    return c !== null && c.requestKeys() === true
+  }
+  function push() {
+    const c = root._ctrl()
+    return c !== null && c.push() === true
+  }
+  function pull() {
+    const c = root._ctrl()
+    return c !== null && c.pull() === true
+  }
+  function teardownController() { return lease.teardown() }
 
-  // The gate's teardown hook drops this owner's whole lease set in one
-  // call, so the ensure and the retain that came with it go together and
-  // a lost release cannot leave the record counting an owner nobody holds.
-  // --- idle release ---
-  // The close settle only runs when a panel was opened, so the one demand
-  // that opens nothing - the copy verb - had no way back to teardown: the
-  // store probe, the find, git and gpg children, the model and the panel
-  // tree all stayed resident with no claim, no window and visible false.
-  // The release is armed where the controller is built and where a value
-  // reaches the transport, so no demand site has to remember to give the
-  // controller back, and it waits for a copy to land before it does.
+  // --- summon / dismiss ----------------------------------------------------
+  // The menu is the surface. Summoning arms the root-frame landing, re-probes
+  // the binary (a package installed while Pass was closed must be picked up)
+  // and refreshes the facts; the deferred publish then lands pass-menu.
+  function open() {
+    // The CTRL-ALT-P keybind calls `pass open`. On the Pass page that is a
+    // toggle: a second press must dismiss the same surface, not re-summon it.
+    // A menu showing some other page is still a summon, not a close.
+    if (root.ownsFrame()) return root.close()
+    const c = lease.demand()
+    if (c === null) return root._unavailableVerb()
+    root._summoned = true
+    c.probeBinary()
+    c.refresh()
+    root._summonLanding = true
+    root._schedulePublish()
+    if (typeof Menu !== "undefined" && Menu && !Menu.open)
+      Menu.openFile(Paths.settingsCatalogPath + "#main")
+    return "ok"
+  }
+  function ownsFrame() {
+    return typeof Menu !== "undefined" && Menu && Menu.open && Menu.frame
+      && (Menu.frame.id === root.menuPage || Menu.frame.id === root.vaultPage)
+  }
+  function close() {
+    if (root.ownsFrame()) Menu.close()
+    return "ok"
+  }
+  function toggle() { return root.ownsFrame() ? root.close() : root.open() }
+
+  // Only a copy-only demand (no summon yet) gives its controller back after
+  // the grace: a summoned controller stays warm for the next open.
+  property bool _summoned: false
   function _releaseIfIdle() {
-    // Only a controller the facade accepted: a refused or failed demand
-    // reports its own state to the next caller, and a timer landing on it
-    // would restate that as "unloaded". A panel that is up owns its
-    // controller outright - the close settle is the path that gives it
-    // back, and a copy the panel itself asked for arms this timer too.
     if (root.controllerState !== "ready" || lease.controller === null) return false
-    if (root.visible) return false
-    // A panel that has ever been opened keeps its controller resident (see
-    // hidePanel): the next open must show a warm vault in one frame, not a
-    // cold skeleton. Only copy-only demands (no panel yet) release here.
-    if (root._panelOpened) return false
-    // A copy is in flight from here until the transport child is gone and
-    // the controller has no read left to finish. Releasing now would drop a
-    // value mid-decrypt, and the credential slot is released by the
-    // controller's own teardown - once, whether it runs from here or from
-    // the close settle.
-    if (copyProc.running || root._secretHandles.length > 0
-      || lease.controller.copyPending === true) {
+    if (root._summoned) return false
+    if (copyProc.running || root._secretHandles.length > 0 || lease.controller.copyPending === true) {
       idleRelease.restart()
       return false
     }
     return root.teardownController()
   }
-
-  // The open-time pair, from the second open on: what the first open
-  // inherited from the controller it was handed is a store scan that just
-  // ran, and repeating it there doubled the blocking .gpg-id read. What it
-  // cannot inherit is the state of the world a moment later, so a binary
-  // that got installed or a .gpg-id that appeared between two opens still
-  // reaches the panel.
-  function _refreshOnOpen() {
-    const ctrl = lease.controller
-    if (ctrl === null) return false
-    ctrl.probeBinary()
-    ctrl.refresh()
-    return true
+  Timer {
+    id: idleRelease
+    interval: 1200
+    repeat: false
+    onTriggered: root._releaseIfIdle()
   }
 
-  // Defined answer for every verb while the controller is not there, so
-  // an IPC caller learns why instead of getting a silent no-op.
-  function _unavailableVerb() {
-    return Model.unavailableVerb(root.controllerState, root.controllerError)
+  // --- boot / registry / ipc -----------------------------------------------
+  Component.onCompleted: {
+    Registry.offer("pass", {
+      title: "Password manager",
+      description: "native pass frontend",
+      verbNames: ["open", "copy", "close", "toggle", "status", "help", "ping"]
+    })
+    Registry.register("pass", root)
+    // A cheap warm probe at boot: the first summon then shows a warm vault.
+    Idle.run(() => {
+      if (lease.controller !== null) return
+      if (root._summoned) return
+      if (lease.demand() !== null) idleRelease.stop()
+    }, 0, 0, "pass-prewarm")
   }
 
-  // --- command verbs: one controller, a defined refusal when there is none ---
-  function copyEntry(path) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.copyEntry(path) === true
-  }
-  function createFolder(path) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.createFolder(path) === true
-  }
-  function moveEntry(from, to) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.moveEntry(from, to) === true
-  }
-  function removeEntry(path) {
-    return root.requestDelete(path)
-  }
-  function requestDelete(path) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.requestDelete(path) === true
-  }
-  function insertEntry(path, secret, force) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.insertEntry(path, secret, force) === true
-  }
-  function generateEntry(path, force) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.generateEntry(path, force) === true
-  }
-  function editEntry(path) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.editEntry(path) === true
-  }
-  function initStore(key) {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.initStore(key) === true
-  }
-  function requestKeys() {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.requestKeys() === true
-  }
-  function push() {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.push() === true
-  }
-  function pull() {
-    const ctrl = lease.demand()
-    return ctrl !== null && ctrl.pull() === true
+  // A container load drops every injected page and its API. Republishing is
+  // the same derivation as a fact change - no retry loop, no fresh state.
+  Connections {
+    target: PageHost
+    function onPagesDropped() { root._schedulePublish() }
   }
 
-  // --- IPC ---
+  Component.onDestruction: {
+    idleRelease.stop()
+    root._releaseProviders()
+    root.teardownController()
+    root._releaseSecrets()
+    if (copyProc.running) copyProc.running = false
+    copyProc._sink = null
+    copyProc._handle = ""
+    Registry.unregister("pass")
+  }
+
   IpcHandler {
     target: "pass"
     function help(command: string): string {
       return UnitIpc.help("pass", "Password manager", "native pass frontend", [
-        { name: "open", help: "show/hide the panel" },
-        { name: "copy", help: "(path) copy line 1" },
-        { name: "close", help: "hide the panel" },
-        { name: "toggle", help: "show/hide" },
+        { name: "open", help: "toggle the Password manager menu page" },
+        { name: "copy", help: "(path) copy line 1 to the clipboard" },
+        { name: "close", help: "close the Pass page" },
+        { name: "toggle", help: "open/close the Pass page" }
       ], command)
     }
     function ping(): string { return "pong" }
-    // open is the shell's toggle key, so both halves answer "ok"; the
-    // opening half answers the controller's state instead when the panel
-    // could not be built.
-    function open(): string { return root._toggleVerb() }
-    function close(): string { root.hidePanel(); return "ok" }
-    function toggle(): string { return root._toggleVerb() }
+    function open(): string { return root.open() }
+    function close(): string { return root.close() }
+    function toggle(): string { return root.toggle() }
     function status(): string {
       const unit = UnitGate.state(root.unitId)
       return JSON.stringify({
@@ -536,9 +883,9 @@ Singleton {
         dirs: root.allDirs.length,
         busy: root.busy,
         lastError: root.lastError,
-        visible: root.visible,
-        mode: root.mode,
+        page: root.ownsFrame() ? Menu.frame.id : "",
         git: root.gitReady,
+        pass: root.passBinary,
         controller: root.controllerState,
         controllerError: root.controllerError,
         constructions: root.constructions,
@@ -546,44 +893,19 @@ Singleton {
       })
     }
     function copy(path: string): string {
-      const ctrl = lease.demand()
-      if (ctrl === null) return root._unavailableVerb()
-      return ctrl.copyEntry(path || "") ? "ok" : "error:copy"
+      const c = lease.demand()
+      if (c === null) return root._unavailableVerb()
+      return c.copyEntry(path || "") ? "ok" : "error:copy"
     }
   }
 
-  function _toggleVerb() {
-    const wasVisible = root.visible
-    root.toggle()
-    return Model.toggleReply(wasVisible, root.controllerState, root.visible,
-      root.controllerError)
-  }
-
-  // The controller, and nothing else: a Loader with no source until the
-  // first demand, so a facade that is only an IPC target holds no store
-  // child, no file read, no window and no panel tree. The two signals the
-  // facade re-emits are wired here, at the only place the controller is
-  // named.
   Component {
     id: controllerComp
 
     PassController {
       optimistic: root.optimistic
       onKeysReady: root.keysReady()
-      onDeleteCommitted: (path) => root.deleteCommitted(path)
+      onDeleteCommitted: path => root.deleteCommitted(path)
     }
-  }
-
-  // The grace a demand that opened no panel keeps its controller for. Long
-  // enough that a copy followed by an open reuses the store scan the copy
-  // already paid for, short enough that the residue of a copy nobody
-  // followed up on is gone within a second. Bounded and one-shot: a later
-  // demand re-arms it, the panel's own open or close stops it, and a copy
-  // still in flight re-arms it rather than losing the value.
-  Timer {
-    id: idleRelease
-    interval: 1200
-    repeat: false
-    onTriggered: root._releaseIfIdle()
   }
 }

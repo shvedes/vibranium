@@ -717,10 +717,10 @@ t_eq "and the same after the stage change" "0" "$(qp_get confirm.cancelHits.stay
 t_eq "an armed slot shows the armed text on its own" "<b><u>Press again to confirm</u></b>" "$(qp_get confirm.armed.text0)"
 # FINDING: `signal cancelled()` is declared at ConfirmSlot.qml:17 and nothing
 # in the file ever emits it, and no consumer in the tree connects to it (the
-# seven ConfirmSlot users - PassPanel, PassEntry, Entry, PowerMenuPanel,
-# WallpaperEntry, ClipboardEntry, LauncherEntry - all drive the stage from
-# outside). So the type advertises a cancel notification it never sends.
-t_note "FINDING (Low, dead signal): ConfirmSlot declares signal cancelled() (ConfirmSlot.qml:17) and never emits it. Nothing in the file raises it, and none of its seven consumers in the tree connects to onCancelled - each tracks the stage itself, which the header calls 'pure view'. A consumer wiring onCancelled would therefore hang silently, with no compile error and no runtime warning. Pinned here as the observed zero; PasswordBox.qml:73 declares and does emit a same-named signal, so the name itself is not the problem."
+# five ConfirmSlot users - Entry, PowerMenuPanel, WallpaperEntry,
+# ClipboardEntry and LauncherEntry - drive the stage from outside).
+# So the type advertises a cancel notification it never sends.
+t_note "FINDING (Low, dead signal): ConfirmSlot declares signal cancelled() (ConfirmSlot.qml:17) and never emits it. Nothing in the file raises it, and none of its five consumers in the tree connects to onCancelled - each tracks the stage itself, which the header calls 'pure view'. A consumer wiring onCancelled would therefore hang silently, with no compile error and no runtime warning. Pinned here as the observed zero; PasswordBox.qml:73 declares and does emit a same-named signal, so the name itself is not the problem."
 t_skip "ConfirmSlot's cancel path raises cancelled()" "the signal is declared but never emitted by the component; there is no path from any input or state change to it, so the count is asserted as a pinned zero instead"
 
 # ---------------------------------------------------------------------

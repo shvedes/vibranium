@@ -49,6 +49,25 @@ Item {
   required property var modelData
   required property int index
 
+  // A keyed model may recycle this delegate for a different uid when a row
+  // is deleted. Transient UI state (an armed staged delete, an open editor,
+  // a dropdown cursor) belongs to the OLD row and must not reappear on the
+  // neighbour - that is what made a delete look like a laggy second confirm.
+  property string _rowUid: ""
+  onModelDataChanged: {
+    const uid = modelData && modelData.uid ? String(modelData.uid) : ""
+    if (_rowUid !== "" && uid !== _rowUid) {
+      Menu.slotCloseFinished({ uid: _rowUid })
+      expanded = false
+      confirmStage = 0
+      deleteArmed = false
+      promptOpen = false
+      optionIndex = -1
+      childIndex = -1
+    }
+    _rowUid = uid
+  }
+
   // Normalized item payload; a search index entry when searchResult.
   property var itm: null
   property bool sel: false
@@ -701,6 +720,7 @@ Item {
   // newborn delegate reports this before its own Text polishes because the
   // number is the shared line token rather than this row's laid-out text.
   readonly property real sepH: !row.isSep ? 0
+    : itm && Number(itm.sepHeight) > 0 ? Number(itm.sepHeight)
     : nested ? RowGeometry.childRestSeparator(row.sepLabel !== "")
     : RowGeometry.restSeparatorFor(row.sepLabel !== "", row.subLineH)
   readonly property string iconName: itm ? String(itm.icon ?? "") : ""
@@ -1169,8 +1189,18 @@ Item {
       row.confirmStage = 0
       row.deleteArmed = false
       row.collapse()
-      if (dc !== "")
-        Menu.runCommand(dc, itm.value !== undefined ? String(itm.value) : "")
+      if (dc !== "") {
+        const value = itm.value !== undefined ? String(itm.value) : ""
+        // "@forget" routes to the owning page's api, the same contract the
+        // grid's forgetCurrent uses. A list row reaches it through this
+        // staged path instead of a shell command template.
+        if (dc === "@forget") {
+          const api = Menu.frame ? Menu.dynamicApi(Menu.frame.id) : null
+          if (api && typeof api.forget === "function") api.forget(value)
+        } else {
+          Menu.runCommand(dc, value)
+        }
+      }
     }
   }
 
@@ -1270,6 +1300,9 @@ Item {
 
   function backFlow() {
     if (!row.isFlow || row.flowIndex <= 0) return false
+    // The previous stage is an editor; keep the row's slot open so the field
+    // is on screen immediately instead of needing a second Enter to reopen.
+    if (!Menu.isExpanded(itm)) Menu.setExpanded(itm, true)
     Menu.setFlowIndex(itm, row.flowIndex - 1)
     Qt.callLater(grabEditorFocus)
     return true
@@ -1307,8 +1340,12 @@ Item {
     try {
       if (row.isFlow && row.flowKind === "select") {
         if (row.advanceFlow(value)) { return }
-        // Last select stage: fall through to the normal commit below
-        // with the accumulated values available via Menu.flowValuesOf.
+        // Last select stage, including one skipped by skipUnless: commit the
+        // whole flow. Falling through to the plain select path would only
+        // mirror the picked value into the row's value slot (e.g. "generate")
+        // and never run the owning service's runFlow callback.
+        row.commitFlow()
+        return
       }
       // Prompt option (free text inside the dropdown): open the editor
       // in place instead of committing + closing. The daemon only hears
@@ -2574,9 +2611,9 @@ Item {
         // and made an opening editor slide in as if it were a stage swap.
         property int stageKey: !row.expanded ? -1
           : row.isFlow ? row.flowIndex
+          : row.confirmOpen ? 1003
           : row.isGroup ? 1004
           : row.dropdownOpen ? 1001
-          : row.confirmOpen ? 1003
           : (row.hasEditor || row.promptOpen) ? 1002
           : 1000
         property int _prevStageKey: -1
@@ -3598,6 +3635,10 @@ Item {
       keepFocusAccent: row.expanded || row._shellClosing
       isText: row.isFlow ? row.flowKind === "text"
         : (row.isText || row.promptOpen)
+      // A flow stage can ask for a masked field. The editor forwards one bool
+      // to the shared InputField, which owns the echo, the reveal eye and the
+      // caps animation; nothing here grows a second secret field vocabulary.
+      sensitive: row.isFlow && row.flowStep && row.flowStep.sensitive === true
       placeholder: String((row.isFlow && row.flowStep && row.flowStep.placeholder)
         || row.itm?.placeholder || "value")
       // Flow stages reseed from the stored stage value so Back never

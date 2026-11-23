@@ -554,6 +554,82 @@ function toggleReply(wasVisible, state, visible, error) {
   return unavailableVerb(state, error);
 }
 
+// --- menu page vocabulary -------------------------------------------------
+//
+// The two dynamic pages are a projection of the controller's facts, so their
+// row identities have to be facts too. An id is derived from the pass path and
+// the role it plays, never from a position in a list: a publish can insert or
+// drop rows anywhere, and uid-keyed state, provider routing and the menu's
+// model diff all depend on a row keeping the same name across that change.
+
+function rowId(kind, path) {
+  const k = String(kind === undefined || kind === null ? "" : kind);
+  const p = String(path === undefined || path === null ? "" : path);
+  return "pass:" + k + ":" + p;
+}
+
+// A pass name may be slash-separated, but every segment has to survive the
+// same validation a plain name does. Used by rename and create before a path
+// is ever handed to a process.
+function validPath(path) {
+  const raw = String(path === undefined || path === null ? "" : path);
+  if (raw === "") return false;
+  const parts = raw.split("/");
+  for (let i = 0; i < parts.length; i++) {
+    if (!isValidName(parts[i])) return false;
+  }
+  return true;
+}
+
+function countWord(n, singular, plural) {
+  const k = Number(n) || 0;
+  return k === 1 ? "1 " + singular : k + " " + plural;
+}
+
+// Folder subtext: recursive entries, immediate subfolders. A zero side is
+// omitted rather than printed as "0 folders", and the one side is singular.
+function folderSubtitle(entries, allDirs, dir) {
+  const n = countUnder(entries, dir);
+  const kids = childrenOf(entries, dir, allDirs).dirs.length;
+  const parts = [];
+  if (n > 0) parts.push(countWord(n, "entry", "entries"));
+  if (kids > 0) parts.push(countWord(kids, "folder", "folders"));
+  return parts.join(" \u2022 ");
+}
+
+// Sibling ids in display order (subfolders, then files) for the folder that
+// holds `path`. The caller uses this to pick a focus neighbour after a delete
+// or a move; the id is the stable key the page publishes too.
+function siblingIds(entries, allDirs, parent) {
+  const ch = childrenOf(entries, parent, allDirs);
+  const out = [];
+  for (let i = 0; i < ch.dirs.length; i++)
+    out.push(rowId("dir", parent === "" ? ch.dirs[i] : parent + "/" + ch.dirs[i]));
+  for (let i = 0; i < ch.files.length; i++) out.push(rowId("file", ch.files[i].path));
+  return out;
+}
+
+// Where to put the cursor when `path` is gone: the next sibling, else the
+// previous one, else the parent folder (empty id at the vault root, which the
+// caller reads as "focus Create"). Pure over the post-mutation lists.
+function neighbourAfter(entries, allDirs, path) {
+  const p = String(path === undefined || path === null ? "" : path);
+  if (p === "") return "";
+  const parent = SU.dirname(p);
+  const siblings = siblingIds(entries, allDirs, parent);
+  const gone = rowId("file", p);
+  let at = -1;
+  for (let i = 0; i < siblings.length; i++) {
+    if (siblings[i] === gone || siblings[i] === rowId("dir", p)) { at = i; break; }
+  }
+  if (at >= 0) {
+    if (at + 1 < siblings.length) return siblings[at + 1];
+    if (at > 0) return siblings[at - 1];
+  }
+  if (parent === "") return "";
+  return rowId("dir", parent);
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     versionCompare: versionCompare,
@@ -577,6 +653,12 @@ if (typeof module !== "undefined" && module.exports) {
     unavailableVerb: unavailableVerb,
     statusError: statusError,
     navigationBack: navigationBack,
-    toggleReply: toggleReply
+    toggleReply: toggleReply,
+    rowId: rowId,
+    validPath: validPath,
+    countWord: countWord,
+    folderSubtitle: folderSubtitle,
+    siblingIds: siblingIds,
+    neighbourAfter: neighbourAfter
   };
 }

@@ -1,47 +1,19 @@
 #!/bin/bash
-# Suite: pass-pin-tokens - LNC-2 delete pin and LNC-3 deferred sync tokens.
+# Suite: pass-pin-tokens - retired with the standalone Pass panel.
 #
-# PassPanel cannot be constructed offscreen, so the probe reads the real file
-# and evaluates its own syncRows / release bodies with stubbed list, frame
-# store, Pass service and deferred queue. The two overlapping intents are
-# driven frame by frame: an older pin release must not unpin a newer motion,
-# and an older sync must not reset a page slide opened by a newer intent.
+# The LNC-2 delete pin and LNC-3 deferred row-sync tokens lived entirely in
+# PassPanel.qml. That row renderer is gone: the vault is now an ordinary Menu
+# page, so row timing, delete confirmation and focus landings are owned by
+# Entry.qml, List.qml and MenuPanel.qml and covered by the menu suites. The
+# source-extraction probe asserted a file that no longer exists.
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../lib/qmlprobe.sh"
 
-t_init "pass-pin-tokens" "delete pin generations and deferred sync tokens"
-require_qs
-trap qp_teardown EXIT
+t_init "pass-pin-tokens" "retired: row timing moved into the shared menu"
 
-if ! qp_run "$TESTS_SHELL_DIR/suites/qml/probes/pass-pin-tokens.qml" 30; then
-  t_no "the probe reached ##DONE##" "$(printf 'the probe did not finish.\n%s' "$(qp_out)")"
-  t_summary
-  exit $?
-fi
-
-t_section "the slice is the real source"
-qp_assert "the probe ran without throwing" "probe.error" ""
-qp_assert "the QML source was read" "slice.sourceStatus" "true"
-qp_assert "syncRows was found" "slice.syncFound" "true"
-qp_assert "the pin release was found" "slice.releaseFound" "true"
-
-t_section "LNC-3: a deferred sync owns its own token and key"
-qp_assert "no shared pending token slots" "slice.noSharedSlots" "true"
-qp_assert "token, resume, gen, key and page gen are captured" "slice.capturesLocals" "true"
-qp_assert "the flush epoch still retires older closures" "slice.flushEpochRetained" "true"
-qp_assert "no reset from a stale token during a live slide" "sync.resetsDuringLiveSlide" "0"
-qp_assert "no token committed with another intent's key" "sync.mismatchedCommits" "0"
-qp_assert "the transition's own sync closes the window" "sync.windowClosed" "true"
-qp_assert "the committed key is the transition's view" "sync.finalKey" "pageC"
-
-t_section "LNC-2: the pin release is generation-scoped and edge-driven"
-qp_assert "no wall-clock poll in the release" "pin.noClockPoll" "true"
-qp_assert "the release rides list motion and instant edges" "pin.edgeHandlers" "true"
-qp_assert "the first release waits for a live edge" "pin.beforeNewDelete" "0"
-qp_assert "no unpin mid-new-motion" "pin.midNewMotion" "0"
-qp_assert "no unpin before the list publishes its edge" "pin.duringNewMotion" "0"
-qp_assert "the live edge releases the new pin exactly once" "pin.afterEdge" "1"
+t_note "PassPanel.qml was removed. Its two overlapping-intent token tests now belong to the shared menu's list/reveal and settled-waiter machinery; the facade only publishes facts and releases a focus landing on the panel's settled edge."
+t_skip "the PassPanel delete pin generations" "PassPanel.qml no longer exists; staged deletes use the menu's ConfirmSlot and the page api's forget route"
+t_skip "the PassPanel deferred sync token" "row installs and landings are MenuPanel.recomputeRows / whenSettled, covered by the menu suites"
 
 t_summary

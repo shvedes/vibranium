@@ -6,7 +6,7 @@ import "../math/Range.js" as Range
 
 // Library-wide empty state: big background glyph over one line of muted
 // copy. The bar-island pattern (ArchUpdatesIsland error/up-to-date
-// overlays, PassPanel package warning): centered Column, 10px gap, 56px
+// overlays, menu warning rows): centered Column, 10px gap, 56px
 // glyph, muted text below. Menus show it for filter/search with no hits;
 // the glyph names the mode (filter-x vs search-alert, two-tone with a red
 // indicator), with per-surface overrides (ThemePicker palette,

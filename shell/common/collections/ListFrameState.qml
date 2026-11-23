@@ -28,7 +28,7 @@ QtObject {
   // True between begin() and the commit or clear that closes the window.
   readonly property bool tokenLive: root._activeToken >= 0
 
-  // Retained frames per owner. PassPanel navigation touches roughly 140
+  // Retained frames per owner. Fast menu navigation touches roughly 140
   // distinct view keys across a long open session, so 32 keeps the pages
   // navigation actually returns to while bounding a pathological key
   // loop. Eviction is least recently used and skips the active key, so a

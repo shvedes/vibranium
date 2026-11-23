@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.menu
+import qs.services as Core
 import "../../common/text/Format.js" as Format
 
 // Expansion editor shell for range/number/text rows: the validating
@@ -22,6 +23,9 @@ Item {
   // bounds arrive per-stage for flow rows, per-item otherwise. This shell
   // renders whatever it is given and stays stage-agnostic.
   property bool isText: false
+  // Masked, revealable secret entry. The shared field keeps the echo and the
+  // eye; this shell only forwards the one flag a flow stage declares.
+  property bool sensitive: false
   property string placeholder: ""
   // Seed applied once at creation; later edits flow through signals.
   property string initialText: ""
@@ -83,6 +87,13 @@ Item {
     anchors.verticalCenter: parent.verticalCenter
     height: Ui.buttonHeight
     placeholder: root.placeholder
+    sensitive: root.sensitive
+    revealable: root.sensitive
+    clearable: !root.sensitive
+    // The network island's caps contract, narrowed to secret fields: the
+    // shared field animates its echo from capsOn and reports a press back.
+    capsActive: root.sensitive && Core.Keyboard.capsOn
+    onCapsToggled: if (root.sensitive) Core.Keyboard.toggleCaps()
     // Tab and the caret keys are accepted here. With navigation left to Qt,
     // Tab moves focus to the menu's search field and the editor stays open
     // but unreachable by arrow or Enter.

@@ -190,7 +190,7 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 128 of the 261 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 129 of the 263 declared types, and every one of them
 # through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
@@ -253,6 +253,7 @@ qs.features.bar.modules.Logout.Logout
 qs.features.bar.modules.Network.Network
 qs.features.bar.modules.Network.NetworkIsland
 qs.features.bar.modules.Network.NetworkQrOverlay
+qs.features.bar.modules.NowPlaying.LyricsFullscreenOverlay
 qs.features.bar.modules.NowPlaying.NowPlaying
 qs.features.bar.modules.NowPlaying.NowPlayingIsland
 qs.features.bar.modules.PowerProfile.PowerProfile
@@ -297,8 +298,6 @@ qs.features.osd.OSDCard
 qs.features.osd.OSDView
 qs.features.pass.Pass
 qs.features.pass.PassController
-qs.features.pass.PassEntry
-qs.features.pass.PassPanel
 qs.features.pickers.cursor.CursorPicker
 qs.features.pickers.font.FontPicker
 qs.features.pickers.keybindings.Keybindings
@@ -325,6 +324,8 @@ qs.services.Keyboard
 qs.services.MediaArt
 qs.services.MediaState
 qs.services.PipeWireState
+qs.services.PlayerModePad
+qs.services.PlayerVolumeRow
 qs.services.PowerPolicy
 qs.services.PowerProfile
 qs.services.Printers
@@ -348,11 +349,13 @@ EXPECTED_NEEDS_REASONS="No PanelWindow backend loaded"
 # tray menu moved onto the shared ContextMenu, whose rows take a plain record
 # rather than a required DBusMenu entry.)
 EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null
+supplied.qs.common.SoftShadow=host: null
+supplied.qs.common.MenuOverlayShadow=host: null
 supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 261 declared entries over 47 qmldir files, one of which is excluded from the
-# work list (boot/Boot.qml), so 260 cases are built. The 137 that are not built
+# 264 declared entries over 47 qmldir files, one of which is excluded from the
+# work list (boot/Boot.qml), so 262 cases are built. The 138 that are not built
 # are the needs-environment and declared-but-uncreatable sets below. A
 # singleton (RowGeometry, Paths) is not creatable either; the probe's case for
 # one names it and lets the engine build it, which is why a singleton that
@@ -361,7 +364,7 @@ supplied.qs.common.LyricsPane=player: null"
 # both clean headless builds - plain items over Icons/Texts.)
 # qs.common.BootGate is the shared milestone gate: a QtObject over a
 # Connections watch, declared through an explicit default child list.
-EXPECTED_DECLARED_COUNT=261
+EXPECTED_DECLARED_COUNT=264
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -385,8 +388,8 @@ EXPECTED_DECLARED_COUNT=261
 # qs.common.BootGate is clean: a QtObject whose only dependency is a
 # Connections watch on the already-constructed DesktopLayoutState singleton,
 # with no window or environment behind it.
-EXPECTED_CLEAN_COUNT=123
-EXPECTED_NEEDS_COUNT=128
+EXPECTED_CLEAN_COUNT=125
+EXPECTED_NEEDS_COUNT=129
 EXPECTED_UNCREATABLE_COUNT=9
 
 # --------------------------------------------------------------------------

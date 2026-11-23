@@ -46,18 +46,50 @@ Rectangle {
     anchors.leftMargin: Ui.m
     anchors.rightMargin: Ui.m
 
-    Column {
+    Item {
       id: midCol
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.rightMargin: 8
       anchors.verticalCenter: parent.verticalCenter
-      spacing: 2
+      height: Math.max(optIcon.height, optLabel.implicitHeight)
+
+      // Option icons use the same icon/glyph vocabulary a page row declares;
+      // buildOptionsPage copies the fields onto the option record. No icon is
+      // a zero-width column, so an option list without icons is unchanged.
+      readonly property string iconName: String(opt.modelData.icon ?? "")
+      readonly property string glyphText: iconName === "" ? String(opt.modelData.glyph ?? "") : ""
+      readonly property bool hasIcon: iconName !== "" || glyphText !== ""
+
+      Icon {
+        id: optIcon
+        visible: midCol.iconName !== ""
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        name: midCol.iconName
+        size: Ui.fontM + 4
+      }
+
+      Text {
+        id: optGlyph
+        visible: midCol.iconName === "" && midCol.hasIcon
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        width: optIcon.width
+        text: midCol.glyphText
+        color: opt.chosen ? Theme.color("accent") : Ui.tint("foreground_1", 0.85)
+        font.pixelSize: Ui.fontM
+        font.family: Ui.fontFamily
+        horizontalAlignment: Text.AlignHCenter
+      }
 
       Text {
         id: optLabel
 
-        width: parent.width
+        anchors.left: midCol.hasIcon
+          ? (midCol.iconName !== "" ? optIcon.right : optGlyph.right) : parent.left
+        anchors.leftMargin: midCol.hasIcon ? Ui.s : 0
+        anchors.right: parent.right
         // An option with no label still has a value to show; otherwise the
         // row disappears from the list and reads as a gap between accents.
         text: String(opt.modelData.label ?? "") !== ""

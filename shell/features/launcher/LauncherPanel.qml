@@ -1201,7 +1201,7 @@ PanelCard {
           && panel._deleteIndex !== list.currentIndex
         // Center-lock scrolloff: keyboard steps keep the cursor riding
         // the viewport middle while scrolling is possible (menu parity
-        // with MenuPanel/PassPanel). Steps ease while animations run,
+        // with MenuPanel). Steps ease while animations run,
         // jump while off.
         smoothScroll: MotionPolicy.enabled
         // Separator rows (clipboard-suggestion divider) never take the

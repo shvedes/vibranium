@@ -106,11 +106,12 @@ group('all six libraries load and publish a namespace', () => {
   // redaction functions is ever inlined away: every one of the seven takes a
   // store name and every one is covered by the clusters below.
   // 17 pass helpers, the five that carry the log anonymisation plus the two
-  // private helpers behind them, and the two store-relative path helpers the
-  // parsers below read through. The loader publishes every top-level
-  // declaration, so the private helpers are part of the namespace whether or
-  // not module.exports names them.
-  eq('pass/Model publishes twenty-seven', Object.keys(PASS).length, 27)
+  // private helpers behind them, the two store-relative path helpers the
+  // parsers read through, and the six menu-page vocabulary helpers (row ids,
+  // validation, counts and focus neighbours). The loader publishes every
+  // top-level declaration, so the private helpers are part of the namespace
+  // whether or not module.exports names them.
+  eq('pass/Model publishes thirty-three', Object.keys(PASS).length, 33)
   // 17 in module.exports plus `fracOr`, which the file never exports but the
   // loader picks up as a top-level declaration.
   eq('WallpaperTrans publishes eighteen', Object.keys(WT).length, 18)
@@ -3518,6 +3519,51 @@ group('the degenerate inputs the two callers can produce', () => {
 })
 
 // ======================================================================
+section('pass/Model - the menu page vocabulary')
+group('row ids are path-derived and stable across a republish', () => {
+  eq('a file id', PASS.rowId('file', 'mail/gmail'), 'pass:file:mail/gmail')
+  eq('a folder id', PASS.rowId('dir', 'mail'), 'pass:dir:mail')
+  eq('the same path and role give the same id', PASS.rowId('file', 'mail/gmail'), PASS.rowId('file', 'mail/gmail'))
+  eq('a different role is a different id', PASS.rowId('dir', 'mail') !== PASS.rowId('file', 'mail'), true)
+  eq('no ordinal is involved', /pass:file:0/.test(PASS.rowId('file', '0')), true)
+  eq('nulls are total', PASS.rowId('file', null), 'pass:file:')
+})
+group('a slash-separated name validates every segment', () => {
+  eq('a plain name', PASS.validPath('gmail'), true)
+  eq('slash-separated segments', PASS.validPath('mail/work/gmail'), true)
+  eq('empty', PASS.validPath(''), false)
+  eq('a leading dot', PASS.validPath('.secret'), false)
+  eq('a dot-dot segment', PASS.validPath('mail/../gmail'), false)
+  eq('an empty segment', PASS.validPath('mail//gmail'), false)
+  eq('a meta character', PASS.validPath('mail/gmail;rm'), false)
+  eq('spaces stay allowed', PASS.validPath('work mail/gmail'), true)
+})
+group('count copy omits the zero side and singularises one', () => {
+  eq('zero', PASS.countWord(0, 'entry', 'entries'), '0 entries')
+  eq('one', PASS.countWord(1, 'entry', 'entries'), '1 entry')
+  eq('many', PASS.countWord(3, 'entry', 'entries'), '3 entries')
+  eq('a folder', PASS.countWord(1, 'folder', 'folders'), '1 folder')
+})
+group('folder subtext is derived from the same entry and dir facts', () => {
+  const es = PASS.listEntries(['mail/a.gpg', 'mail/work/b.gpg', 'top.gpg'])
+  eq('recursive entries, immediate folders', PASS.folderSubtitle(es, ['mail', 'mail/work'], 'mail'), '2 entries \u2022 1 folder')
+  eq('the folder side is singular', PASS.folderSubtitle(es, [], 'mail'), '2 entries \u2022 1 folder')
+  eq('an empty folder', PASS.folderSubtitle([], ['empty'], 'empty'), '')
+  eq('nothing under it', PASS.folderSubtitle([], [], 'mail'), '')
+  eq('one entry only', PASS.folderSubtitle(PASS.listEntries(['mail/a.gpg']), [], 'mail'), '1 entry')
+  eq('one folder only', PASS.folderSubtitle([], ['mail/a'], 'mail'), '1 folder')
+})
+group('focus neighbours survive a delete or move', () => {
+  const es = PASS.listEntries(['mail/a.gpg', 'mail/b.gpg', 'top.gpg'])
+  eq('the sibling ids in display order', PASS.siblingIds(es, [], 'mail'), [PASS.rowId('file', 'mail/a'), PASS.rowId('file', 'mail/b')])
+  eq('next sibling', PASS.neighbourAfter(es, [], 'mail/a'), PASS.rowId('file', 'mail/b'))
+  eq('previous sibling at the end', PASS.neighbourAfter(es, [], 'mail/b'), PASS.rowId('file', 'mail/a'))
+  eq('the parent folder when it had no sibling', PASS.neighbourAfter(PASS.listEntries(['mail/a.gpg']), ['mail'], 'mail/a'), PASS.rowId('dir', 'mail'))
+  eq('Create at the vault root', PASS.neighbourAfter(PASS.listEntries(['top.gpg']), [], 'top'), '')
+  eq('the post-mutation list decides', PASS.neighbourAfter([], [], 'top'), '')
+})
+
+// ======================================================================
 section('WallpaperTrans - the kind and speed tables')
 group('the kind table, the pool and the directions', () => {
   eq('the six kinds', WT.transitions(), ['none', 'fade', 'slide', 'swipe', 'circle', 'random'])
@@ -4153,6 +4199,8 @@ const SURFACE = {
     // directly so the path rule has one owner. storeDirPath is the public
     // projection the controller addresses the store by.
     '_storeDir', '_storedPath', 'storeDirPath',
+    // The two dynamic menu pages are a derivation of these six pure helpers.
+    'rowId', 'validPath', 'countWord', 'folderSubtitle', 'siblingIds', 'neighbourAfter',
   ],
   'WallpaperTrans': [
     'transitions', 'randomPool', 'speeds', 'normalizeKind', 'resolveKind', 'normalizeSpeed',
@@ -4183,9 +4231,9 @@ group('the surface lists match the loaded namespaces exactly', () => {
   eq('Battery/Model: 23 exports', SURFACE['Battery/Model'].length, 23)
   eq('Bluetooth/Model: 9 exports', SURFACE['Bluetooth/Model'].length, 9)
   eq('Network/Model: 33 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 35)
-  eq('pass/Model: 27 exports', SURFACE['pass/Model'].length, 27)
+  eq('pass/Model: 33 exports', SURFACE['pass/Model'].length, 33)
   eq('WallpaperTrans: 18 exports', SURFACE['WallpaperTrans'].length, 18)
-  eq('113 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 113)
+  eq('119 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 119)
   // Six names are genuinely shared between two libraries - deviceLabel,
   // deviceIconName, formatRate, subtextFor, sectionTitleFor and listEntries -
   // and each is called through ITS OWN namespace, so the call check above

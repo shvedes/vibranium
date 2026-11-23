@@ -4502,6 +4502,14 @@ Rectangle {
       Menu.setInfo(row.itm, false)
       return
     }
+    // A staged flow's text stage handles Esc in its own field; the select
+    // stage has no field to swallow the key, so without this step Esc folds
+    // the whole wizard instead of returning to the previous stage (e.g.
+    // from "generate / enter" back to the filename input).
+    if (deep && deep !== row && deep.isFlow && deep.flowIndex > 0
+      && typeof deep.backFlow === "function" && deep.backFlow()) return
+    if (row && row.isFlow && row.flowIndex > 0
+      && typeof row.backFlow === "function" && row.backFlow()) return
     if (row && row.expanded) {
       row.collapse()
       return

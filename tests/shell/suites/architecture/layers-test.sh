@@ -225,7 +225,7 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 4, features 185, services 27, common 161.
+# The table: composition 1, boot 4, features 183, services 27, common 161.
 # common/ gained SortHeader (the clickable column header) and TableSort (the
 # header-click convention and natural compare) when the tables became
 # sortable, then IconWarmer (the decoded-raster warmer) for the menu's
@@ -243,7 +243,7 @@ for layer in boot common features services; do
   t_true "the $layer/ layer directory exists" test -d "$SHELL_DIR/$layer"
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
-t_count "features/ holds the tree's 185 .qml and .js files" "185" "$(layer_files features)"
+t_count "features/ holds the tree's 183 .qml and .js files" "183" "$(layer_files features)"
 t_count "services/ holds the 27 files the README publishes" "27" "$(layer_files services)"
 t_count "common/ holds the 161 files the README publishes" "161" "$(layer_files common)"
 t_count "boot/ holds the 4 files the README publishes" "4" "$(layer_files boot)"

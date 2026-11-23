@@ -586,7 +586,7 @@ group('defaultsFor fills every key a row renderer branches on', () => {
   // README: "normalizeItem must fill every role the row renderer reads, so
   // views never branch on a missing key." The count is the contract; a new
   // role has to show up as a diff here.
-  eq('50 roles', Object.keys(d).length, 50)
+  eq('51 roles', Object.keys(d).length, 51)
   const expected = [
     'type', 'id', 'label', 'sub', 'icon', 'glyph', 'desc', 'warning', 'enabled',
     'when', 'checked', 'disabled', 'requires', 'command', 'call', 'page',
@@ -595,7 +595,7 @@ group('defaultsFor fills every key a row renderer branches on', () => {
     'flow', 'infoOnly', 'min', 'max', 'step', 'unit', 'onChange',
     'placeholder', 'onSubmit', 'progressValue', 'body', 'section',
     'delCommand', 'var', 'showIf', 'active', 'palette',
-    'previewFontFamily', 'subAccent', 'subLead', 'confirm',
+    'previewFontFamily', 'subAccent', 'subLead', 'confirm', 'sepHeight',
   ]
   eq('and they are exactly these', Object.keys(d).sort(), expected.slice().sort())
   eq('everything is a safe falsy default', d.label, '')
@@ -885,6 +885,10 @@ group('buildOptionsPage fills the option row from label-or-value', () => {
   eq('a false value survives', build([{ label: 'L', value: false }])[0].value, false)
   eq('a non-array palette is dropped', build([{ label: 'L', value: 1, palette: 'x' }])[0].palette, [])
   eq('the option hay indexes label and value', build([{ label: 'DuckDuckGo', value: 'ddg' }])[0].hay, 'duckduckgo ddg')
+  eq('an option icon is carried for OptionRow', build([{ label: 'a', value: '1', icon: 'update' }])[0].icon, 'update')
+  eq('an option glyph is carried too', build([{ label: 'a', value: '1', glyph: 'G' }])[0].glyph, 'G')
+  eq('an absent icon is an empty string, not undefined', build([{ label: 'a', value: '1' }])[0].icon, '')
+  eq('a null icon is an empty string too', build([{ label: 'a', value: '1', icon: null }])[0].icon, '')
   eq('an empty options list yields an empty page', M.buildOptionsPage({ uid: 'u', label: 'L', options: [] }).items.length, 0)
   eq('no options key yields an empty page', M.buildOptionsPage({ uid: 'u', label: 'L' }).items.length, 0)
   eq('a page width comes from the parent item', M.buildOptionsPage({ uid: 'u', label: 'L', _pageWidth: 380, options: [] }).width, 380)

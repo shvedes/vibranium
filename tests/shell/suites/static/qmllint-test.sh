@@ -136,9 +136,9 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # `model` unqualified, which cost 11 `unqualified` warnings and 12 info notes.
 # The delegate now declares `required property var modelData` and reads it
 # through its own id, matching the ArchUpdates table, so both figures fell.
-RECORDED_FILE_COUNT=267
-RECORDED_WARNING_COUNT=103
-RECORDED_INFO_COUNT=23
+RECORDED_FILE_COUNT=265
+RECORDED_WARNING_COUNT=113
+RECORDED_INFO_COUNT=17
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -167,11 +167,13 @@ PanelWindow"
 # line. The per-surface files no longer open a PanelWindow of their own, so the
 # diagnostic moved out of them and into the one file that must reopen it. The
 # unresolved-type set is unchanged, because the type still appears there.
-RECORDED_WARNING_KINDS="confusing-expression-statement 4
+RECORDED_WARNING_KINDS="comma 1
+confusing-expression-statement 22
 eval 1
-missing-property 52
+missing-property 48
+property-override 1
 uncreatable-type 1
-unqualified 40
+unqualified 36
 unresolved-type 3"
 
 t_section "the tool under test"
