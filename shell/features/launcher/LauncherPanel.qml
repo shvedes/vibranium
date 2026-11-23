@@ -122,7 +122,6 @@ PanelCard {
 
   Component.onCompleted: { AppLauncher._attachPanel(panel); panel.syncRows(); panel.queueFit() }
   Component.onDestruction: AppLauncher._detachPanel(panel)
-  TapHandler { onTapped: panel.focusSearch() }
 
   function focusSearch() { focusCtrl.grabFilter() }
 
@@ -1234,8 +1233,6 @@ PanelCard {
           noticeTarget: panel._noticeIndex >= 0 && panel._noticeIndex === index
           noticeOn: panel._noticeOn
           noticeMotion: panel._noticeMotion
-          onActivated: () => panel.activateCurrent()
-          onDeleteConfirm: () => panel.toggleDeleteCurrent()
         }
       }
     }
@@ -1254,4 +1251,6 @@ PanelCard {
   readonly property alias input: searchField.input
 
   function probeFocus() { return focusCtrl.probe() }
+
+  PointerGuard {}
 }

@@ -166,9 +166,6 @@ Item {
     descSlot && (descSlot.open || descSlot.closing) ? descSlot.slotMs : 0,
     deleteSlot && (deleteSlot.open || deleteSlot.closing) ? deleteSlot.slotMs : 0)
 
-  signal activated()
-  signal deleteConfirm()
-
   width: ListView.view ? ListView.view.width : 240
   // The row tracks each slot's height animation 1:1 - every slot owns its
   // top padding inside its own height (DropdownSlot.topGap), so the sum is
@@ -202,22 +199,6 @@ Item {
     anchors.leftMargin: Ui.m + 2
     anchors.rightMargin: Ui.m + 2
     visible: row.isSep
-  }
-
-  MouseArea {
-
-    anchors.fill: parent
-    enabled: !row.isSep
-    acceptedButtons: Qt.LeftButton | Qt.RightButton
-    onClicked: mouse => {
-      if (mouse.button === Qt.RightButton) {
-        AppLauncher.close()
-        return
-      }
-      const view = row.ListView.view
-      if (view && view.currentIndex !== row.index) view.seat(row.index, "click")
-      row.activated()
-    }
   }
 
   Item {
@@ -553,7 +534,7 @@ Item {
 
   // Delete confirmation: three-step flow (hint -> armed -> confirm).
   // Stage 1: hint text + outlined Delete button.
-  // Stage 2: button fills red (armed), key/click confirms.
+  // Stage 2: button fills red (armed), the key confirms.
   property bool deleteOpen: false
   property int deleteStage: 0
 
@@ -571,6 +552,5 @@ Item {
     stage: row.deleteStage
     hintText: "Press Delete to remove this app"
     armedText: "<b><u>Press again to confirm deletion</u></b>"
-    onConfirmed: row.deleteConfirm()
   }
 }

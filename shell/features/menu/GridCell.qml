@@ -10,10 +10,10 @@ import qs.common
 //   header/spacer- non-selectable chrome slots woven into the model by
 //                  MenuPanel.composeGridRows (this GridView build has no
 //                  native sections); headers span the card width.
-// Selection paints instantly like list rows, and only a click moves the
-// cursor: a parked pointer must not steer keyboard navigation (same rule as
-// the list delegates). Corners follow
-// RoundingPolicy across the menu module.
+// Selection paints instantly like list rows. The grid holds no pointer
+// handlers: the panel seats and activates the cursor through the key sink,
+// the same rule the list delegates follow. Corners follow RoundingPolicy
+// across the menu module.
 Rectangle {
   id: cell
 
@@ -35,8 +35,6 @@ Rectangle {
   readonly property var view: GridView.view
 
   property bool sel: false
-
-  signal activated()
 
   // Glyph preference: the value slot carries the raw emoji (page-command
   // substitution source); the label's first code point is the fallback.
@@ -112,11 +110,5 @@ Rectangle {
     name: cell.linkIconName
     colorKey: "foreground_0"
     visible: cell.isLink && cell.linkIconName !== ""
-  }
-
-  MouseArea {
-    enabled: !cell.isHeader && !cell.isSpacer
-    anchors.fill: parent
-    onClicked: cell.activated()
   }
 }

@@ -173,7 +173,6 @@ PanelCard {
     panel.syncRows()
   }
   Component.onDestruction: PowerMenu._detachPanel(panel)
-  TapHandler { onTapped: focusCtrl.grabFilter() }
 
   Connections {
     target: PowerMenu
@@ -257,9 +256,8 @@ PanelCard {
     panel._confirmStage = 1
     list.autoRevealIndex = idx
   }
-  // One stage per activation, from either direction - Enter on the armed row
-  // or a click on its button - so the hint and the armed state cannot be
-  // reached by two different rules.
+  // One stage per activation: each Enter on the row advances it, so the hint
+  // and the armed state cannot be reached by two different rules.
   function advanceConfirm() {
     if (panel._confirmStage >= 2) { PowerMenu.confirmPending(); return }
     panel._confirmStage++
@@ -642,17 +640,6 @@ PanelCard {
         // Always transparent: the List sliding highlight bar paints the
         // selection behind the rows (see common/ui/List). Same as menu Entry.
         Rectangle { anchors.fill: parent; color: "transparent" }
-        MouseArea {
-          anchors.fill: parent
-          acceptedButtons: Qt.LeftButton | Qt.RightButton
-          onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) { PowerMenu.close(); return }
-            if (list.currentIndex !== row.index) list.seat(row.index, "click")
-            // Routed through the panel, which owns the staged confirm: a
-            // click on the armed row advances it, exactly as Enter does.
-            panel.activateCurrent()
-          }
-        }
         Item {
           id: mainLine
           anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; anchors.topMargin: Ui.rowPadV
@@ -712,7 +699,6 @@ PanelCard {
           confirmText: row.actionLabel === "" ? "Confirm" : "Confirm " + row.actionLabel
           hintText: row.actionLabel === "" ? "Press Enter to confirm" : "Press Enter to confirm " + row.actionLabel
           armedText: "<b><u>Press Enter again to confirm " + (row.actionLabel === "" ? "this action" : row.actionLabel) + "</u></b>"
-          onConfirmed: panel.advanceConfirm()
           // The claim on the list - the card's `slotOpen` - is released here,
           // at the slot's terminal edge, and not when the row stops being
           // armed. See closeConfirm for what the earlier edge cost.
@@ -752,12 +738,5 @@ PanelCard {
     message: panel.faultMessage
   }
 
-  // Same rule as the settings menu: the card refuses the pointer. Above the
-  // rows and their confirm slots, so a click inside the power menu lands on
-  // nothing - the cursor keys walk it, Enter commits, Escape dismisses.
-  MouseArea {
-    anchors.fill: parent
-    z: 10000
-    acceptedButtons: Qt.AllButtons
-  }
+  PointerGuard {}
 }

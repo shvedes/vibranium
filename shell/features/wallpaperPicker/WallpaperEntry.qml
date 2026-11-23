@@ -28,8 +28,7 @@ Rectangle {
   // Position in the deck relative to the selection: 0 is the big card,
   // negative is to its left. The panel's own binding keeps this current.
   property int rel: 0
-  // A removal is in flight for this file: the tile stays in place but takes no
-  // clicks.
+  // A removal is in flight for this file: the tile stays in place but fades.
   property bool pending: false
   // Removal armed for this file: the red pane slides up from the bottom of the
   // picture, and the next Delete removes it.
@@ -245,10 +244,4 @@ Rectangle {
     layer.samples: 4
   }
 
-  MouseArea {
-    anchors.fill: parent
-    enabled: !tile.pending
-    cursorShape: Qt.PointingHandCursor
-    onClicked: tile.chosen()
-  }
 }

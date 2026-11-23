@@ -84,6 +84,7 @@ RowHeightProbe 1.0 ui/RowHeightProbe.qml
 CheckBox 1.0 ui/CheckBox.qml
 Toggle 1.0 ui/Toggle.qml
 PanelCard 1.0 ui/PanelCard.qml
+PointerGuard 1.0 ui/PointerGuard.qml
 TwoPaneMetrics 1.0 ui/TwoPaneMetrics.qml
 ScreenCeiling 1.0 ui/ScreenCeiling.qml
 OverlayWindow 1.0 ui/OverlayWindow.qml

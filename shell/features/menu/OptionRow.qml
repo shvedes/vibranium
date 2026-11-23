@@ -10,7 +10,8 @@ import "../../common/math/Range.js" as Range
 // entry marks the active row, rather than by a bullet in a gutter of its
 // own: the gutter was a second way of saying "this one", and it charged
 // every option - chosen or not - the width to hold it. Cursor and chosen
-// flags are owned by the entry row; clicks report back through picked().
+// flags are owned by the entry row; the keyboard cursor and the row's pick()
+// are the only ways to choose an option.
 Rectangle {
   id: opt
 
@@ -30,8 +31,6 @@ Rectangle {
   property bool settling: false
   readonly property real reveal: settling && optLabel.implicitWidth > 0
     ? Range.clamp01(midCol.width / optLabel.implicitWidth) : 1
-
-  signal picked(var value)
 
   width: parent.width
   height: 28
@@ -118,11 +117,5 @@ Rectangle {
         }
       }
     }
-  }
-
-  MouseArea {
-
-    anchors.fill: parent
-    onClicked: opt.picked(opt.modelData.value)
   }
 }

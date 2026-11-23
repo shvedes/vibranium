@@ -28,7 +28,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 267 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 266 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
@@ -51,7 +51,10 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   warning total is 139. One of them left with the wallpaper picker's old
 #   two-pane panel, whose entry read `ListView.view` from outside a ListView:
 #   the cascade rewrite keeps the deck's cells in a Repeater instead, so that
-#   read is gone rather than suppressed. Eleven additional
+#   read is gone rather than suppressed. Another left with the clipboard's
+#   row click, which read `ListView.view.seat()` to seat the cursor under the
+#   pointer: every menu is walked by keys now, so no delegate reaches into
+#   the view for a click seat. Eleven additional
 #   dynamic/property-access diagnostics
 #   are retained rather than suppressed; the component probes pin those runtime
 #   contracts separately. A reader who sees the total fall with
@@ -136,8 +139,8 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # `model` unqualified, which cost 11 `unqualified` warnings and 12 info notes.
 # The delegate now declares `required property var modelData` and reads it
 # through its own id, matching the ArchUpdates table, so both figures fell.
-RECORDED_FILE_COUNT=265
-RECORDED_WARNING_COUNT=113
+RECORDED_FILE_COUNT=266
+RECORDED_WARNING_COUNT=112
 RECORDED_INFO_COUNT=17
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
@@ -170,7 +173,7 @@ PanelWindow"
 RECORDED_WARNING_KINDS="comma 1
 confusing-expression-statement 22
 eval 1
-missing-property 48
+missing-property 47
 property-override 1
 uncreatable-type 1
 unqualified 36

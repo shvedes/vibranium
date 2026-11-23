@@ -5651,8 +5651,6 @@ Rectangle {
 
         delegate: GridCell {
           sel: grid.currentIndex === index
-
-          onActivated: () => panel.activateCurrent(false)
         }
       }
     }
@@ -5680,18 +5678,7 @@ Rectangle {
     }
   }
 
-  // Full keyboard operation: the card refuses the pointer, all the way down.
-  // This net sits above every row, slot, editor and grid cell, so a click
-  // inside the menu lands on nothing. Rows are reached with the cursor keys,
-  // committed with Enter, and the menu is dismissed from the scrim or with
-  // Escape. Hover is deliberately NOT taken here - the net does not enable it,
-  // and no menu row paints a hover state - so the card keeps answering the
-  // pointer with nothing while the keyboard keeps the whole menu.
-  MouseArea {
-    anchors.fill: parent
-    z: 10000
-    acceptedButtons: Qt.AllButtons
-  }
+  PointerGuard {}
 
   // --- DIAGNOSTIC frame sync (armed only by `debugTrace on`) ---
   // One compact geometry record per display frame while a trace is on. A

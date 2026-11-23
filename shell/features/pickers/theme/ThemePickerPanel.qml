@@ -18,7 +18,7 @@ import qs.features.pickers.theme
 // move through the deck exactly as they do in the wallpaper picker.
 //
 // FAMILIES OPEN ON PURPOSE. A family is a card with its variants kept
-// closed until the user explicitly selects it with Enter, Space or a click.
+// closed until the user explicitly selects it with Enter or Space.
 // Moving through the deck never opens one. When it does open, the variants
 // slide down from behind the parent into a second, smaller copy of the same
 // deck: one selected variant in the middle and its neighbour variants as
@@ -402,7 +402,7 @@ Item {
     // If the row being browsed no longer matches the query, prefer the theme
     // that is actually applied over the first alphabetical hit. Typing a
     // filter must not quietly move the cursor to a different theme that Enter
-    // or a click can then apply.
+    // can then apply.
     if (at.row < 0) at = panel._locate(ThemePicker.activeFolder)
     panel.selIndex = at.row >= 0 ? at.row : 0
     panel.variantIndex = at.row >= 0 ? at.variant : 0
@@ -621,8 +621,8 @@ Item {
     }
     // A surface with a search box spends its printable keys on the query, not
     // on one-letter navigation. The deck keeps the keyboard while this runs,
-    // so arrows and Tab continue to walk the filtered cards; Ctrl+F or a click
-    // hands the field the caret for full editing.
+    // so arrows and Tab continue to walk the filtered cards; Ctrl+F hands
+    // the field the caret for full editing.
     if (!ctrl && !alt && !themeSearch.focused && event.text.length === 1
         && event.text !== " " && event.text.charCodeAt(0) >= 32) {
       themeSearch.type(panel.query + event.text)
@@ -636,11 +636,6 @@ Item {
   Keys.onPressed: event => panel.handleKey(event)
 
   // ---- surface -------------------------------------------------------------
-  MouseArea {
-    anchors.fill: parent
-    onClicked: ThemePicker.close()
-  }
-
   Item {
     id: stage
 
@@ -770,24 +765,6 @@ Item {
             }
           }
         }
-
-        MouseArea {
-          anchors.fill: parent
-          enabled: rowCard.matched
-          onClicked: mouse => {
-            const folder = panel._folderOf(rowCard.modelData)
-            const selected = rowCard.selected
-            const slot = rowCard.slot
-            focusCtrl.grabList()
-            // Apply the card that was clicked, not whatever the deck has
-            // re-selected by the time the focus handoff finishes. A family
-            // card has no folder of its own and still goes through the
-            // expand/apply path.
-            if (!selected) panel.selectRow(slot)
-            else if (folder !== "") ThemePicker.apply(folder)
-            else panel.activateCurrent()
-          }
-        }
       }
     }
 
@@ -874,15 +851,6 @@ Item {
               colors: variantCard.modelData.colors || ({})
               light: variantCard.modelData.light
             }
-          }
-        }
-
-        MouseArea {
-          anchors.fill: parent
-          onClicked: {
-            focusCtrl.grabList()
-            if (variantCard.selected) ThemePicker.apply(String(variantCard.modelData.folder ?? ""))
-            else panel.moveVariant(variantCard.rel)
           }
         }
       }
@@ -1119,4 +1087,6 @@ Item {
       textFormat: Text.StyledText
     }
   }
+
+  PointerGuard {}
 }

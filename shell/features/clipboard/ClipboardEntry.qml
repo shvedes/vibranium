@@ -41,9 +41,6 @@ Item {
   readonly property string timeText: modelData ? String(modelData.timeStr || "") : ""
   readonly property string iconName: modelData ? String(modelData.icon || "text") : "text"
 
-  signal activated()
-  signal deleteConfirm()
-
   // Slide-in used by the panel after a delete: rows below the removed
   // row start one row low and ease up into the vacated position. Runs on
   // a Translate so it never fights the ListView's own y layout. Follows
@@ -90,21 +87,6 @@ Item {
     height: 18
     radius: RoundingPolicy.radius
     color: Theme.color("accent")
-  }
-
-  MouseArea {
-    anchors.fill: parent
-    acceptedButtons: Qt.LeftButton | Qt.RightButton
-    enabled: !row.pending
-    onClicked: mouse => {
-      if (mouse.button === Qt.RightButton) {
-        Clipboard.close()
-        return
-      }
-      const v = row.ListView.view
-      if (v && v.currentIndex !== row.index) v.seat(row.index, "click")
-      row.activated()
-    }
   }
 
   Item {
@@ -266,7 +248,7 @@ Item {
   }
 
   // Confirm dropdown under the row: hint text + Delete button. Stage 2
-  // fills the button red; one more key/click confirms. Panel owns stage.
+  // fills the button red; one more Delete confirms. Panel owns stage.
   // Pinned rows arm it via Delete, rows flagged missing via Enter - the
   // staging is the same either way, only the hint names the reason.
   ConfirmSlot {
@@ -278,6 +260,5 @@ Item {
     open: row.deleteOpen && (row.pinned || row.missing)
     stage: row.deleteStage
     hintText: row.missing ? "Press Delete to remove this missing entry" : "Press Delete to remove this pinned entry"
-    onConfirmed: row.deleteConfirm()
   }
 }

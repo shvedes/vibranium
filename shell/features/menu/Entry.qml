@@ -22,8 +22,8 @@ import "../../common/math/Range.js" as Range
 //   OptionRow boxes - arrows drive the cursor, Enter picks. A group row
 //   unfolds the same way over whole entries (GroupRow), so a nested family
 //   of toggles is one row on the page. Numbers and
-//   ranges show just their value - +/- keys and the wheel adjust, Enter
-//   opens the numeric editor.
+//   ranges show just their value - +/- keys adjust, Enter opens the
+//   numeric editor.
 // - Selection background switches INSTANTLY; rows do not paint hover
 //   fills (a parked pointer would leave ghost tints behind keyboard
 //   navigation).
@@ -960,25 +960,14 @@ Item {
 
   // --- uniform API used by the panel ---
 
-  // Right-click: close an open dropdown, otherwise navigate back one
-  // level (pop; at root this closes the menu).
-  function rightClick() {
-    if (dropdownOpen) {
-      collapse()
-      return
-    }
-    if (!searchResult && Menu.stack.length > 1) Menu.pop()
-    else Menu.close()
-  }
-
   function activate() {
     if (!enabled_) return
-    // An open editor owns activation: Enter or a click commits its value.
-    // Falling through to the type switch would call openEditor() again and
-    // toggle the slot shut, reading as an Escape the user never pressed.
+    // An open editor owns activation: Enter commits its value. Falling
+    // through to the type switch would call openEditor() again and toggle
+    // the slot shut, reading as an Escape the user never pressed.
     if (editorOpen && commitOpenEditor()) return
-    // The host seats its cursor on the child whose row activated, so a click
-    // and Enter take the same path through the group as through the page.
+    // The host seats its cursor on the child whose row activated, so Enter
+    // takes the same path through the group as through the page.
     row.activated()
     const _wasFiltered = Menu.scopedActive
     try {
@@ -1076,9 +1065,8 @@ Item {
 
   function flip(state) {
     if (!itm) return
-    // Both routes to a toggle land here - the row's own activation and the
-    // pill's click - so this is the only place that sees either, and the
-    // only place that can report one exactly once.
+    // Every route to a toggle lands here, so this is the only place that
+    // sees a flip and the only place that can report one exactly once.
     // The same DEBUG line as a staged choice, for the same reason: a toggle
     // flip is a state change, and the state change itself is already
     // reported by whoever consumes it - a setting write prints
@@ -1621,29 +1609,9 @@ Item {
     }
   }
 
-  MouseArea {
-
-    anchors.fill: parent
-    // A muted conditional row is inert: it must not even take the cursor on a
-    // click, or the bar would sit on a row that cannot be activated.
-    enabled: !row.isSep && row.enabled_
-    acceptedButtons: Qt.LeftButton | Qt.RightButton
-    onClicked: mouse => {
-      if (mouse.button === Qt.RightButton) {
-        row.rightClick()
-        return
-      }
-      // An explicit click takes the selection with it.
-      const view = row.ListView.view
-      if (view && !row.isSep && row.itm && view.currentIndex !== row.index)
-        view.currentIndex = row.index
-      row.activate()
-    }
-  }
-
-  // No wheel on a row. The menu is keyboard-only, so a scroll over a stepper
-  // row no longer moves its value: the wheel is the one input a menu refuses,
-  // all the way down to the rows.
+  // The row takes no pointer input: the panel seats the cursor and activates
+  // through the key sink, so there is no click or right-click path here. The
+  // menu is keyboard-only all the way down to its rows - no wheel, no drag.
 
   // --- main line: icon | label | trail cluster ---
 
@@ -1940,42 +1908,6 @@ Item {
       fillColor: row.sel || row.editorOpen
         ? Theme.color("accent") : Ui.tint("accent", 0.55)
       animationsEnabled: MotionPolicy.enabled
-
-      // Range seek: drag or click snaps to step, commits once on release.
-      MouseArea {
-        anchors.fill: parent
-        anchors.topMargin: -6
-        anchors.bottomMargin: -6
-        enabled: row.isRange && row.enabled_
-        cursorShape: Qt.PointingHandCursor
-
-        property bool dirty: false
-
-        function seek(x) {
-          const frac = Range.clamp01(x / Math.max(1, width))
-          const raw = row.minimum + frac * (row.maximum - row.minimum)
-          const snapped = row.minimum
-            + Math.round((raw - row.minimum) / row.stepSize) * row.stepSize
-          const next = MenuLib.quantize(MenuLib.clamp(snapped,
-            row.minimum, row.maximum))
-          if (next === row.numericValue) return
-          dirty = true
-          Menu.setValue(row.itm, next)
-        }
-
-        onPressed: mouse => {
-          dirty = false
-          seek(mouse.x)
-        }
-        onPositionChanged: mouse => {
-          if (pressed) seek(mouse.x)
-        }
-        onReleased: {
-          if (!dirty) return
-          dirty = false
-          Menu.runCommand(row.itm.onChange, row.numericDisplay)
-        }
-      }
     }
 
     // Progress rows: percentage in the value slot, bar floating left.
@@ -2025,7 +1957,7 @@ Item {
     }
 
     // number/range: current value as quiet text; numbers adjust via
-    // +/- keys, the wheel and the editor's internal steppers.
+    // +/- keys and the editor's internal steppers.
     // Unified column: when MenuPanel detects ≥2 bars, all value boxes
     // share Menu.unifiedBarValueW so little bars form a perfect vertical
     // line. Right-hand values never elide – label truncates instead.
@@ -3587,7 +3519,6 @@ Item {
             settling: row.cardSettling
             cursor: row.optionIndex === index
             chosen: index === row.chosenIndex
-            onPicked: value => row.pick(value)
           }
         }
       }
@@ -3766,19 +3697,6 @@ Item {
       // For single-stage confirms (recording) armed is empty, show hint.
       armedText: cf ? (cf.armed !== "" ? cf.armed : cf.hint) : ""
       confirmText: cf ? cf.label : ""
-      onConfirmed: {
-        if (!cf) return
-        if (row.confirmStage < cf.stages) {
-          row.confirmStage = cf.stages
-        } else if (row.deleteArmed) {
-          row.requestDelete()
-        } else {
-          Menu.handleConfirm(itm)
-          row.confirmStage = 0
-          row.collapse()
-          if (itm && itm.close === true) Menu.close()
-        }
-      }
     }
   }
 

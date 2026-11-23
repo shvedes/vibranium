@@ -354,7 +354,7 @@ supplied.qs.common.MenuOverlayShadow=host: null
 supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 264 declared entries over 47 qmldir files, one of which is excluded from the
+# 265 declared entries over 47 qmldir files, one of which is excluded from the
 # work list (boot/Boot.qml), so 262 cases are built. The 138 that are not built
 # are the needs-environment and declared-but-uncreatable sets below. A
 # singleton (RowGeometry, Paths) is not creatable either; the probe's case for
@@ -364,7 +364,7 @@ supplied.qs.common.LyricsPane=player: null"
 # both clean headless builds - plain items over Icons/Texts.)
 # qs.common.BootGate is the shared milestone gate: a QtObject over a
 # Connections watch, declared through an explicit default child list.
-EXPECTED_DECLARED_COUNT=264
+EXPECTED_DECLARED_COUNT=265
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -388,7 +388,8 @@ EXPECTED_DECLARED_COUNT=264
 # qs.common.BootGate is clean: a QtObject whose only dependency is a
 # Connections watch on the already-constructed DesktopLayoutState singleton,
 # with no window or environment behind it.
-EXPECTED_CLEAN_COUNT=125
+# qs.common.PointerGuard is clean too: a MouseArea with no window behind it.
+EXPECTED_CLEAN_COUNT=126
 EXPECTED_NEEDS_COUNT=129
 EXPECTED_UNCREATABLE_COUNT=9
 

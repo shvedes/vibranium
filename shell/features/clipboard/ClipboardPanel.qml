@@ -96,7 +96,6 @@ PanelCard {
     panel.syncRows()
   }
   Component.onDestruction: Clipboard._detachPanel(panel)
-  TapHandler { onTapped: focusCtrl.grabFilter() }
 
   Connections {
     target: Clipboard
@@ -951,8 +950,8 @@ PanelCard {
           // survivors keep their delegates - and a title marquee keeps its
           // place through a delete.
           model: listModel
-          // Non-interactive default (List): no flick re-anchoring, and
-          // the library wheel handler steps one entry per notch.
+          // Non-interactive default (List): no flick re-anchoring and no
+          // wheel stepping - the keys own the cursor.
           // highlightMotion glides for focus moves - cursor-row gate
           // (menu parity): the bar snaps only while the focused row
           // stages its confirm (tracks it 1:1); an armed row left behind
@@ -991,8 +990,6 @@ PanelCard {
             restHeight: panel.rowH
             deleteOpen: panel._deleteIndex === index
             deleteStage: panel._deleteIndex === index ? panel._deleteStage : 0
-            onActivated: () => panel.activateCurrent()
-            onDeleteConfirm: () => panel.toggleDeleteCurrent()
           }
         }
 
@@ -1114,4 +1111,6 @@ PanelCard {
   }
 
   function probeFocus() { return focusCtrl.probe() }
+
+  PointerGuard {}
 }

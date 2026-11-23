@@ -3,8 +3,8 @@ import QtQuick
 import qs.common
 
 // Drop-in staged confirmation slot: hint -> armed -> confirmed.
-// Replaces the 3-step Rectangle+MouseArea triplicated in Entry and
-// LauncherEntry. Panels track stage externally; this is pure view.
+// Panels track stage externally and confirm through their key sink; this is
+// pure view with no pointer target of its own.
 //
 // PLACEMENT is owned here, not by each host. A confirm either hangs off a row
 // line (owns its lead and its trailing gap) or is a view inside another
@@ -56,9 +56,7 @@ DropdownSlot {
       width: parent.width
       height: Ui.buttonHeight
       radius: RoundingPolicy.radius
-      color: root.stage >= 2
-        ? (area.containsPress ? Qt.darker(Theme.color("red"), 1.2) : Theme.color("red"))
-        : (area.containsPress ? Ui.tint("red", 0.12) : "transparent")
+      color: root.stage >= 2 ? Theme.color("red") : "transparent"
       border.width: 1
       border.color: root.stage >= 2 ? Theme.color("red") : Ui.tint("red", 0.45)
       Behavior on color { ColorAnim {} }
@@ -73,14 +71,6 @@ DropdownSlot {
         font.bold: root.stage >= 2
         textFormat: Text.PlainText
         Behavior on color { ColorAnim {} }
-      }
-
-      MouseArea {
-        id: area
-        anchors.fill: parent
-        onClicked: {
-          root.confirmed()
-        }
       }
     }
   }

@@ -36,8 +36,8 @@ Rectangle {
   signal escaped()
   // Raised on empty/invalid commits - the row shows a fading error.
   signal invalid(string message)
-  // Live step: the picker stepped via +/- keys or buttons but has not
-  // committed yet. The row writes it through to the store immediately (no
+  // Live step: the picker stepped via +/- keys but has not committed yet.
+  // The row writes it through to the store immediately (no
   // onChange - that fires once on commit), so live previews bound to the
   // setting (OSD offset, Media OSD offset) fire while the dropdown is open,
   // exactly as they do when stepping the closed row.
@@ -121,13 +121,35 @@ Rectangle {
     Glide {}
   }
 
-  IconButton {
+  // Static step hints. The +/- keys own stepping; the picker is keyboard-only
+  // and its glyphs must not take a pointer press.
+  component StepHint: Rectangle {
+    id: hint
+
+    property string glyph
+    width: 16
+    height: 16
+    radius: RoundingPolicy.radius
+    color: "transparent"
+    border.width: 1
+    border.color: Ui.tint("foreground_1", 0.4)
+
+    Text {
+      anchors.centerIn: parent
+      text: hint.glyph
+      color: Theme.color("foreground_1")
+      font.pixelSize: Ui.fontXs
+      font.family: Ui.fontFamily
+      textFormat: Text.PlainText
+    }
+  }
+
+  StepHint {
     id: minus
 
     x: Ui.s
     anchors.verticalCenter: parent.verticalCenter
     glyph: "-"
-    onClicked: root.step(-1)
   }
 
   TextInput {
@@ -239,13 +261,12 @@ Rectangle {
     font.family: Ui.fontFamily
   }
 
-  IconButton {
+  StepHint {
     id: plus
 
     anchors.right: parent.right
     anchors.rightMargin: Ui.s
     anchors.verticalCenter: parent.verticalCenter
     glyph: "+"
-    onClicked: root.step(1)
   }
 }

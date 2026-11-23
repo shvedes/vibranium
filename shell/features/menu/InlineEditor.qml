@@ -56,8 +56,8 @@ Item {
   implicitHeight: Ui.buttonHeight
 
   // Enter routed through the panel (rather than straight into the field)
-  // still commits the value the user sees, so a key hold or a click on the
-  // row never folds the editor as if Escape had been pressed.
+  // still commits the value the user sees, so a held key or a row
+  // activation never folds the editor as if Escape had been pressed.
   function commitNow() {
     root.commit(root.isText ? editorField.text : picker.text)
   }

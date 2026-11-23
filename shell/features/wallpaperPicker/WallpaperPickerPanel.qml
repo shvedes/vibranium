@@ -22,9 +22,9 @@ import "../../common/ui/PanelKeys.js" as PanelKeys
 // the listing wraps to the other end, so the deck behaves as a ring of pictures
 // even though the row it draws is a line.
 //
-// APPLYING IS PART OF SELECTING. Enter, Space or a click sets the wallpaper
-// and ends the visit in the same act; the picker never defers the apply to the
-// close, and there is no separate confirm step.
+// APPLYING IS PART OF SELECTING. Enter or Space sets the wallpaper and ends
+// the visit in the same act; the picker never defers the apply to the close,
+// and there is no separate confirm step.
 //
 // ONE SURFACE, TWO VERBS. Delete / Ctrl+D removes the selected wallpaper from
 // here as well, so the picker and the deleter are the same visit: the key arms
@@ -673,41 +673,6 @@ Item {
   Keys.onPressed: event => panel.handleKey(event)
 
   // ---- surface -------------------------------------------------------------
-  // Empty space closes the visit; the tiles and the footer sit above it.
-  MouseArea {
-    anchors.fill: parent
-    onClicked: WallpaperPicker.close()
-  }
-
-  DropArea {
-    id: drop
-
-    anchors.fill: parent
-    enabled: Wallpaper.enabled
-    property bool dragOk: false
-    onEntered: drag => {
-      if (!Wallpaper.enabled) return
-      drop.dragOk = Wallpaper._dropIsSupported(drag)
-      if (drop.dragOk) drag.acceptProposedAction()
-    }
-    onExited: drop.dragOk = false
-    onDropped: drag => {
-      drop.dragOk = false
-      if (!Wallpaper._dropIsSupported(drag)) return
-      const uri = Wallpaper._droppedUri(drag)
-      if (uri === "") return
-      Wallpaper.handleDroppedUri(uri)
-    }
-  }
-
-  Rectangle {
-    anchors.fill: parent
-    visible: drop.dragOk
-    color: Ui.tint("accent", 0.10)
-    border.color: Ui.solid("accent")
-    border.width: 2
-  }
-
   Item {
     id: stage
 
@@ -747,11 +712,6 @@ Item {
         // was read in - the selection does not move on a removal - and leaves
         // from there, over the survivor that is growing into that slot.
         readonly property bool leaving: panel._leavingFile === cell.file
-        // A tile on its way out is a picture of a file that no longer exists,
-        // so it takes no clicks: the survivor underneath is the one a click
-        // belongs to, and it is already the selection.
-        enabled: !cell.leaving
-
         x: panel.tileX(cell.deckRel)
         y: panel.tileY(cell.deckRel)
         width: panel.tileW(cell.deckRel)
@@ -967,4 +927,5 @@ Item {
     }
   }
 
+  PointerGuard {}
 }
