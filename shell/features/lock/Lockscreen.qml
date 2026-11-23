@@ -38,7 +38,12 @@ Singleton {
   readonly property string tag: "lockscreen"
 
   property bool requested: false
-  readonly property bool locked: requested || sessionLock.locked || sessionLock.secure
+  // WlSessionLock in Quickshell 0.3.2 never emits lockStateChanged on unlock,
+  // so a binding reading `locked` keeps its last true value after the first
+  // release and every later lock request is refused as already_locked. The
+  // compositor's `secure` does notify on unlock and reads false there, so
+  // requested || secure clears on release and a later lock can engage again.
+  readonly property bool locked: requested || sessionLock.secure
 
   property bool authenticating: false
   property int failedAttempts: 0

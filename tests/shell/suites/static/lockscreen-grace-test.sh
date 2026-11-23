@@ -214,6 +214,19 @@ t_eq "suspend shares the sleep-lock verb rather than locking again" \
   "sleepLock:via:surface,systemctl" "${S[suspendCalls]}"
 t_eq "suspend still reports the sleep handoff" "ok" "${S[suspendVerdict]}"
 
+# --- a released lock can engage again --------------------------------------
+# Quickshell 0.3.2's WlSessionLock never notifies `locked` on unlock, so a
+# binding that reads it stays true after the first release. lock() and
+# answerLockRequest() both early-return on that stale value: an idle lock
+# after a grace unlock is refused, and the later suspend sleeps unlocked.
+# `secure` notifies on unlock, so the lock state must read request + secure.
+
+LOCKED_LINE="$(grep -F 'property bool locked:' "$LOCKSCREEN")"
+t_contains "lock state follows the request and the compositor's secure state" \
+  "requested || sessionLock.secure" "$LOCKED_LINE"
+t_not_contains "lock state does not read the stale locked property" \
+  "sessionLock.locked" "$LOCKED_LINE"
+
 # --- LCK-5: a policy flip mid-tween must stop the tween and snap its driver ---
 # appearAnim, fitAnim and progressAppearAnim each sample the animation gate once
 # when they start. A global switch flipped off mid-reveal left the tween running
