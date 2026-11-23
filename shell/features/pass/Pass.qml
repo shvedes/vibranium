@@ -257,6 +257,9 @@ Singleton {
       root._landing = null
       root._releaseFocusLanding(landing)
     }
+    const settlePanel = Menu.panel
+    if (settlePanel && typeof settlePanel.whenSettled === "function")
+      settlePanel.whenSettled(() => root._settlePassChrome())
   }
 
   // A landing is released on the page's real settled edge. The waiter's guard
@@ -357,6 +360,15 @@ Singleton {
           // pursuit aims at a viewport that has not grown to its final
           // height and overshoots, then snaps back when the card settles.
           panel.listView.autoRevealIndex = at2
+          // The row's slot settles a frame after the seat. Release the
+          // pin and any stale reveal claim once the view is quiet again;
+          // the commit publish below may arm them a second time.
+          panel.whenSettled(() => {
+            root._settlePassChrome()
+          }, () => {
+            const ok = ready() && panel.listView && !panel.listView.moving
+            return ok
+          })
         }, ready)
       })
     }, present)
@@ -462,23 +474,23 @@ Singleton {
       type: "group",
       id: Model.rowId("create-group", suffix),
       label: dir === "" ? "Create" : "Create here",
-      sub: "in " + (dir === "" ? "vault root" : dir),
+      sub: "Create files & folder",
       icon: "file",
       children: [
         {
           type: "select", id: Model.rowId("create-folder", suffix),
-          label: "Folder", sub: "new folder", icon: "file-folder",
+          label: "Folder", icon: "file-folder",
           marker: false, hideValue: true, keepOpen: true,
           flow: [
-            { kind: "text", placeholder: "Folder name or path", sub: "Create here", subAccent: "Folder name..." }
+            { kind: "text", placeholder: "Folder name or path", required: true, sub: "Create here", subAccent: "Folder name..." }
           ]
         },
         {
           type: "select", id: Model.rowId("create-file", suffix),
-          label: "File", sub: "new password", icon: "file",
+          label: "File", icon: "file",
           marker: false, hideValue: true, keepOpen: true,
           flow: [
-            { kind: "text", placeholder: "Entry name or path", sub: "Create here", subAccent: "Entry name..." },
+            { kind: "text", placeholder: "Entry name or path", required: true, sub: "Create here", subAccent: "Entry name..." },
             {
               kind: "select", sub: "Create here", subAccent: "Password source...",
               options: [
@@ -532,14 +544,17 @@ Singleton {
 
   function _folderRow(dir) {
     const ch = Model.childrenOf(root.entries, dir, root.allDirs)
-    // Create here is always the first child of a folder, with its own
-    // separator directly beneath it, before the folder's contents. Its
-    // scope is in the path-derived id, so the row carries no value copy.
-    const children = [root._createRows(dir)[0], {
-      type: "separator",
-      id: Model.rowId("sep", dir),
-      sepHeight: 22
-    }]
+    // Create here is always the first child. Its scope is in the path-derived
+    // id, so the row carries no value copy. The separator belongs between it
+    // and the folder's contents: an empty folder has no contents to divide,
+    // and the rule would only leave dead padding under the one child.
+    const children = [root._createRows(dir)[0]]
+    if (ch.dirs.length > 0 || ch.files.length > 0)
+      children.push({
+        type: "separator",
+        id: Model.rowId("sep", dir),
+        sepHeight: 22
+      })
     for (let i = 0; i < ch.dirs.length; i++) {
       const sub = dir === "" ? ch.dirs[i] : dir + "/" + ch.dirs[i]
       children.push(root._folderRow(sub))
@@ -802,6 +817,26 @@ Singleton {
     }
     return root.teardownController()
   }
+  // A publish swaps nested rows whose heights change with their children.
+  // The menu pins the selection bar and arms a reveal claim to hold the view
+  // steady across that swap. On the settled edge the new rows are in place,
+  // so the pin has to go: a bar left pinned to the outgoing row's height
+  // paints a tall highlight over a short survivor. A delete commit forces a
+  // second publish after the focus landing, and that write re-arms both, so
+  // this runs after EVERY publish rather than once in the landing.
+  function _settlePassChrome() {
+    const panel = Menu.panel
+    const list = panel && panel.listView
+    if (!list) return
+    if (typeof list.unpinHighlight === "function") list.unpinHighlight()
+    const idx = list.autoRevealIndex
+    if (idx >= 0) {
+      const it = panel.rowsModel && panel.rowsModel[idx]
+      if (!it || (!Menu.isExpanded(it) && !Menu.infoOpen(it)))
+        list.autoRevealIndex = -1
+    }
+  }
+
   Timer {
     id: idleRelease
     interval: 1200
