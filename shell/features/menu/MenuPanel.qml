@@ -124,8 +124,14 @@ Rectangle {
   // the ENTRY page's mode (an emoji bundle filters within its own grid);
   // otherwise the current page decides.
   function layoutPage() {
-    return MenuLib.layoutPageOf(Menu.bundle, panel.searching, panel.installedPage,
+    const pg = MenuLib.layoutPageOf(Menu.bundle, panel.searching, panel.installedPage,
       Menu.pageById, panel.currentPageId)
+    // A summon has a bundle and an entry page before it has an installed page
+    // or a frame id. Without this fallback the first width pass measures the
+    // grid page as a LIST (its long keyword labels), settles on a wider card,
+    // and then re-measures to the grid's own width - resizing the grid along
+    // the way. The bundle entry is the page this open is about to show.
+    return pg || (Menu.bundle ? Menu.bundle.byId[Menu.bundle.entry] : null)
   }
 
   readonly property bool gridMode: {
@@ -139,8 +145,12 @@ Rectangle {
 
   // Columns fit the card's inner width; cells stretch to fill it exactly,
   // staying square-ish via the shared side length.
+  // The grid's column count and side come from the SETTLED width. Reading the
+  // animated width made a cold summon fit at the previous page's width (4
+  // columns, side 55) and then refit when the tween reached 8 columns / side
+  // 49 - the bottom row was cut and the card shrank a few frames later.
   readonly property var gridGeometry: MenuLib.gridGeometry(
-    panel.width, Ui.outerPad, panel.gridCellSpec)
+    panel.widthTarget, Ui.outerPad, panel.gridCellSpec)
   readonly property int gridCols: panel.gridGeometry.cols
   readonly property real gridSide: panel.gridGeometry.side
 
@@ -453,7 +463,13 @@ Rectangle {
   // reading the region back there hands over the height the fit was
   // supposed to replace.
   function _modelListH() {
-    if (panel.gridMode) return panel.listRegionH
+    if (panel.gridMode) {
+      if (panel.rowsModel.length === 0)
+        return Math.min(Ui.emptyMinH, panel.cappedAvailH)
+      // The fit's own answer must be the row set's size, not listRegionH's
+      // on-screen hold: a pending fit reads this to learn where to GLIDE to.
+      return Math.min(panel._gridContentH(), panel.snappedListH(panel.availListH))
+    }
     if (panel.rowsModel.length === 0)
       return Math.min(Ui.emptyMinH, panel.cappedAvailH)
     // The resting fit, never an open slot's growth. This value is latched
@@ -677,6 +693,10 @@ Rectangle {
     // no view timing: keyed sync destroys a delegate exactly when its key
     // leaves, so anything pruned here has no delegate left to report.
     Menu.pruneSlotCloses(candidate)
+    // Width first: a grid fit reads gridGeometry, which now uses widthTarget,
+    // so the target must already describe THIS page's row set when the fit
+    // resolves - otherwise the first frame is sized from the old page's width.
+    metrics.recalcWidth()
     panel.queueFit()
   }
 
@@ -775,6 +795,10 @@ Rectangle {
 
   function queueFit() {
     const rows = panel.rowsModel || []
+    // A summon installs its grid rows a turn after the open edge. Fitting the
+    // empty set first drops the card to chrome height for one frame; the
+    // install's own fit immediately below is the one that matters.
+    if (panel.gridMode && rows.length === 0 && !panel.shown) return
     if (panel._fitPending) {
       panel._tryFit()
       return
@@ -1575,10 +1599,14 @@ Rectangle {
     // still-expanded row. Teardown there drops that claim, leaves the card at
     // the resting size and strips the region from the open dropdown.
     if (panel.searching) {
-      panel._searchReturnIdx = list.currentIndex
-      panel._searchReturnY = list.contentY
+      // Grid pages seat their cursor on GridList, not List. Reading List here
+      // saved -1, and the search-exit restore only starts its fade-in when a
+      // seat was saved, leaving a grid card blank after the query was erased.
+      const at = panel.gridMode ? Math.max(0, grid.currentIndex) : list.currentIndex
+      panel._searchReturnIdx = at
+      panel._searchReturnY = panel.gridMode ? -1 : list.contentY
       panel._searchReturnPage = Menu.frame ? Menu.frame.id : ""
-      panel._restoreSeatPending = list.currentIndex >= 0
+      panel._restoreSeatPending = at >= 0
       // A search re-projects the row set: a claim from the previous projection
       // (or an open slot on the page being searched) names no row in this one.
       // Keeping it sends pursuit after a ghost index when the model is narrow
@@ -2140,7 +2168,13 @@ Rectangle {
   // the moment the stack is seated, which is the invalidation the cached
   // projection lacks.
   readonly property int pageMaxHeight: {
+    // On a cold first summon the frame and the bundle can land in separate
+    // turns: reading only the frame gives no ceiling for that one fit, so a
+    // picker that declares a ceiling sizes from the screen share and then
+    // snaps down. The bundle's entry page is the page this open is about to
+    // show, and is already installed by the time the first fit runs.
     const pg = Menu.pageById(Menu.frame ? Menu.frame.id : "")
+      || Menu.pageById(Menu.bundle ? Menu.bundle.entry : "")
     return pg && typeof pg.maxHeight === "number" && pg.maxHeight > 120
       ? Math.round(pg.maxHeight) : 0
   }
@@ -2167,6 +2201,15 @@ Rectangle {
   // snappedListH below stays local - it answers about cells, not rows.
   function _sumRowsH(rows, maxRows) {
     return RowMetrics.contentH(rows, maxRows, panel.rowRestHeight, panel.rowSpacing)
+  }
+
+  // Live row count, not the cached `gridContentH` binding: inside the install
+  // that publishes rowsModel, the derived gridRows binding can still hold the
+  // OUTGOING set's count, which made the first fit see 0 rows and drop the
+  // card to chrome height for one frame.
+  function _gridContentH() {
+    return Math.ceil((panel.rowsModel || []).length / Math.max(1, panel.gridCols))
+      * panel.gridSide
   }
 
   function _snappedRowsH(rows, avail, maxRows) {
@@ -2416,7 +2459,7 @@ Rectangle {
       if (panel.gridSide > limit)
         return Math.min(panel.gridSide, panel.screenMaxListH)
       return Math.min(Math.floor(limit / panel.gridSide) * panel.gridSide,
-        Math.min(panel.gridContentH, panel.screenMaxListH))
+        Math.min(panel._gridContentH(), panel.screenMaxListH))
     }
     if (panel.rowsModel.length === 0) return 0
     return panel._snappedRowsH(panel.rowsModel, limit, maxRows)
@@ -2437,7 +2480,16 @@ Rectangle {
   readonly property real listRegionH: {
     if (panel.gridMode) {
       if (panel.rowsModel.length === 0) return Math.min(Ui.emptyMinH, panel.cappedAvailH)
-      return Math.min(panel.gridContentH, panel.snappedListH(panel.availListH))
+      // The same hold the list branch has: while a fit is pending the card
+      // must keep the size already on screen. Without it a grid search reads
+      // gridContentH from the OUTGOING row set for one frame, jumps to that
+      // height, then tweens back to the results' real size.
+      if (panel._fitPending || panel.exactListH < 0) {
+        const onScreen = panel._currentListH()
+        const fallback = onScreen > 0 ? onScreen : panel._restingFallbackH()
+        return Math.min(fallback, panel.screenMaxListH)
+      }
+      return Math.min(panel._gridContentH(), panel.snappedListH(panel.availListH))
     }
     const avail = panel.cappedAvailH
     if (panel.rowsModel.length === 0) return Math.min(Ui.emptyMinH, avail)
@@ -2600,6 +2652,10 @@ Rectangle {
   // inside the opening window, and a search keystroke landing there, are
   // sizes the user asked for.
   readonly property real modelListH: {
+    // A query's provisional answer is never the row set's size: the results
+    // are installed a turn later, so the outgoing rows would size the card
+    // for one frame. The fit after the install owns that resize.
+    if (panel.searching || panel.scopedSearching) return -1
     if (panel._heightAnimating || panel._slotRegionH > 0) return -1
     // The measured fit owns the card from the moment it lands, and it keeps
     // owning it while the NEXT fit is in flight. A committed fit is the size
@@ -2978,6 +3034,11 @@ Rectangle {
   // The outer clamp is the viewport, not a sizing rule: a card is
   // centered on the screen and must not run off either edge.
   readonly property real widthTarget: {
+    // A grid page has no label to shape and its columns come from this width.
+    // The host width is itself derived from the card, so clamping against it
+    // on a cold boot yielded 250 -> 4 columns -> a 732px fit, then 420 ->
+    // 8 columns -> 709px a few frames later. The grid's width is fixed.
+    if (panel.gridMode) return Ui.defWidth
     // The host has no width until its first layout. A zero-width host is
     // not room for a card: clamping against `0 - 64` yields a negative card
     // width. Use the default card width as the room until the host has one.
