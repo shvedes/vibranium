@@ -252,64 +252,96 @@ Item {
   // delegate's x resolve through one number each, where a scan of the
   // delegates per slot makes a single width change re-evaluate the row.
   //
-  // The copy is rebuilt from the delegates at ONE extraction point
-  // (refreshGeometry) and only when the invalidation signature actually
-  // moves - ordered membership, a width, a grow factor or the drag
-  // snapshot's revision. It is a copy, never a live view into the
-  // Repeater, so a per-frame delegate width change reads it back
-  // unchanged instead of re-entering the rebuild.
+  // The delegate-to-row association is cached: it changes only with the
+  // row's identity (membership, order, a birth, or the drag's frozen
+  // widths), never with a per-frame width. A width report then costs one
+  // numeric pass over the cached widths, with no Repeater scan, string-keyed
+  // map, signature string or row-index rebuild. Several modules revealing
+  // at once each report on the same animation frame, so those passes used
+  // to be paid once per reporting slot per frame; the only work left per
+  // report is the width read and, when a width actually moved, the prefix
+  // rebuild that positions the neighbors.
+  //
+  // The copy stays a copy, never a live view into the Repeater: a moved
+  // width publishes a fresh snapshot synchronously, so x and width are
+  // exact in the same frame (see _scheduleGeometryRefresh).
   property var geoSnapshot: null
-  property string _geoSig: ""
-  // The drag geometry's own revision: the frozen static widths are part of
-  // the row, so recording or releasing them invalidates it.
-  property int dragGeometryRevision: 0
+  // Delegate items in row order; null marks a row needing re-extraction.
+  property var _geoItems: null
+  property var _geoIds: []
+  property var _geoKinds: []
+  property var _geoWidths: []
+  property var _geoRowOf: null
 
-  // Single extraction point: ONE linear pass over the delegates collects
-  // their live widths and grow factors, keyed by row key, so a width
-  // change is caught by the same pass that fills the copy. A static slot
-  // mid-drag takes the frozen drag width instead, so a module animating
-  // under the cursor cannot shift the working arrangement; owned
-  // indicators have no frozen row and read their live width. A row whose
-  // delegate is not instantiated reads 0, the answer an unresolved slot gives.
-  // True when the copy changed.
-  function refreshGeometry() {
+  // Rebuild the delegate-to-row association. Called only on row identity
+  // changes and on births, never from a width notification. A static slot
+  // mid-drag has its frozen width read at publish time below, so a module
+  // animating under the cursor cannot shift the working arrangement; owned
+  // indicators have no frozen row and read their live width.
+  function _extractRow() {
     const order = root.displayOrder
     const n = order.length
     const ids = new Array(n)
     const kinds = new Array(n)
-    const widths = {}
-    const grows = {}
+    const items = new Array(n)
+    const rowOf = Object.create(null)
+    const byKey = Object.create(null)
+    const live = root._slotItems()
+    for (let i = 0; i < live.length; i++) {
+      const it = live[i]
+      byKey[ZoneGeometry.slotKey(it.modelData.kind, it.modelData.id)] = it
+    }
     for (let i = 0; i < n; i++) {
       const e = order[i]
       ids[i] = e.id
       kinds[i] = e.kind
-      const k = ZoneGeometry.slotKey(e.kind, e.id)
-      widths[k] = 0
-      grows[k] = 1
+      items[i] = byKey[ZoneGeometry.slotKey(e.kind, e.id)] || null
+      rowOf[e.id] = i
     }
+    root._geoItems = items
+    root._geoIds = ids
+    root._geoKinds = kinds
+    root._geoWidths = new Array(n)
+    root._geoRowOf = rowOf
+  }
+
+  // Read live widths into the cached row and publish only when one moved.
+  // An uninstantiated delegate reads 0, the answer an unresolved slot gives.
+  // True when the copy changed.
+  function refreshGeometry() {
+    if (root._geoItems === null) root._extractRow()
+    const items = root._geoItems
+    const ids = root._geoIds
+    const kinds = root._geoKinds
+    const widths = root._geoWidths
     const frozen = root.slotWidths
-    const items = root._slotItems()
+    let moved = false
     for (let i = 0; i < items.length; i++) {
       const it = items[i]
-      const k = ZoneGeometry.slotKey(it.modelData.kind, it.modelData.id)
-      if (widths[k] === undefined) continue
-      grows[k] = it.grow
-      widths[k] = it.modelData.kind === "static" && frozen !== null
-        && frozen[it.modelData.id] !== undefined
-        ? frozen[it.modelData.id] : it.width
+      let w = 0
+      // A destroyed delegate's wrapper reads undefined here; treat it as
+      // unresolved until the membership change re-extracts the row.
+      if (it && it.modelData && it.modelData.kind === kinds[i]
+        && it.modelData.id === ids[i]) {
+        w = kinds[i] === "static" && frozen !== null
+          && frozen[ids[i]] !== undefined ? frozen[ids[i]] : it.width
+      }
+      if (widths[i] !== w) {
+        widths[i] = w
+        moved = true
+      }
     }
-    const rev = root.dragGeometryRevision
-    const sig = ZoneGeometry.invalidationSig(ids, kinds, widths, grows, rev)
-    if (sig === root._geoSig) return false
-    root._geoSig = sig
-    const row = ZoneGeometry.orderedWidths(ids, kinds, widths)
+    if (!moved && root.geoSnapshot !== null) return false
+    const prefix = new Array(widths.length + 1)
+    prefix[0] = 0
+    for (let i = 0; i < widths.length; i++) prefix[i + 1] = prefix[i] + widths[i]
     root.geoSnapshot = {
       ids: ids,
       kinds: kinds,
-      widths: row,
-      prefix: ZoneGeometry.prefixX(row),
-      rowOf: ZoneGeometry.rowIndexMap(ids),
-      total: ZoneGeometry.totalWidth(row)
+      widths: widths,
+      prefix: prefix,
+      rowOf: root._geoRowOf,
+      total: prefix[widths.length]
     }
     return true
   }
@@ -330,27 +362,30 @@ Item {
   // every slot reports its own and the row copy is rebuilt from those
   // reports - synchronously, inside the width handler.
   //
-  // Deferring that rebuild to the next event-loop turn coalesces several
-  // slots reporting on the same frame into one O(n) extraction, and it is
-  // still wrong: `Slot.width` is a live binding while `Slot.x` resolves
-  // against this copy, so a deferred pass leaves every slot's width one
-  // frame ahead of the x that places it for the whole animation and snaps
-  // on the final pass. The centre zone's `anchors.horizontalCenterOffset`
-  // reads the same copy through `pivotX`, so it trails identically. The
-  // cost is one extraction per reporting slot per frame; the row is exact
-  // within every frame instead.
+  // Deferring the publish to the next event-loop turn would coalesce several
+  // slots reporting on the same frame, but it is still wrong: `Slot.width`
+  // is a live binding while `Slot.x` resolves against this copy, so a
+  // deferred pass leaves every slot's width one frame ahead of the x that
+  // places it for the whole animation and snaps on the final pass. The
+  // centre zone's `anchors.horizontalCenterOffset` reads the same copy
+  // through `pivotX`, so it trails identically. The row stays exact within
+  // every frame; the cached association keeps the per-report cost to a
+  // width read and a prefix rebuild.
   function _scheduleGeometryRefresh() {
     root.refreshGeometry()
   }
 
-  // The row's identity changed (order, membership, a retained departure):
-  // rebuild the copy the new row needs.
-  onDisplayOrderChanged: root.refreshGeometry()
-  // The frozen drag widths changed: a new revision, then a rebuild.
-  onSlotWidthsChanged: {
-    root.dragGeometryRevision++
+  // Drop the cached association when the row's identity changes (order,
+  // membership, a retained departure, a birth) so the next publish reads
+  // the new delegates rather than stale ones.
+  function _invalidateRow() {
+    root._geoItems = null
     root.refreshGeometry()
   }
+
+  onDisplayOrderChanged: root._invalidateRow()
+  // The frozen drag widths changed: re-extract with the new row.
+  onSlotWidthsChanged: root._invalidateRow()
 
   // Width of a slot for layout math, read from the row snapshot. During a
   // drag the static widths come from the geometry snapshot
@@ -986,8 +1021,8 @@ Item {
       // Arm the simultaneous fade: breaks the binding (stays 1), so the
       // later enteringIds cleanup cannot replay a second, delayed fade.
       if (root.enteringIds.indexOf(slot.modelData.id) >= 0) slot.enter = 1
-      // A birth is a membership change: publish this row's real width.
-      root.refreshGeometry()
+      // A birth changes the row's delegates: publish this row's real width.
+      root._invalidateRow()
     }
     Behavior on enter {
       enabled: MotionPolicy.enabled
