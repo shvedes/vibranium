@@ -328,8 +328,7 @@ check, use it when relevant, and state clearly when none exists.
   formatting in the subject.
 - The body is unrestricted: use it for technical context, rationale, and
   verification details.
-- Wrap body lines at 72-80 characters; never write a
-  body as one full-length paragraph line.
+- Keep body lines at 70-80 characters; paragraph count is unrestricted.
 - Before committing, inspect the worktree, diff, and recent log, and stage only
   the files belonging to the requested change.
 
