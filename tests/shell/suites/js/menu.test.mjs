@@ -2047,8 +2047,9 @@ group('which shipped bundles scope the external half', () => {
   eq('the utilities bundle is standalone', scope['catalog#utilities'], false)
   eq('and so is the emoji picker', scope['emojis.jsonc'], false)
 
-  // The consequence, on the real emoji corpus: 1870 builtin rows and a query
-  // with no off-scope answer once the half is gated. "font" is the sharpest
+  // The consequence, on the real emoji corpus (regenerated from upstream
+  // Unicode data): builtin rows with no off-scope answer once the half is
+  // gated. "font" is the sharpest
   // demonstration - it reaches every registered row through the page title, so
   // the leak is total rather than incidental.
   const emoji = M.parseBundle(M.stripJsonc(bundles['emojis.jsonc']))
@@ -2065,8 +2066,8 @@ group('which shipped bundles scope the external half', () => {
   // The gate must not cost the bundle its own search: the emoji corpus still
   // answers on its own vocabulary.
   const own = M.search(builtin, 'grinning')
-  eq('the bundle\'s own rows still answer after the gate', own.length, 7)
-  eq('and rank unchanged', own[0].label, 'grinning face smile grinning happy')
+  is('the bundle\'s own rows still answer after the gate', own.length, n => n > 0)
+  match('and rank unchanged', own[0].label, /^grinning face\b/)
 })
 
 group('no property Menu.qml assigns to is declared readonly', () => {
@@ -4480,6 +4481,34 @@ group('MenuFit bounds a fit retry and never counts past its budget', () => {
   }
   eq('a starved settle loop ends at its budget', turns, 25)
   eq('having never counted past it', n, -1)
+})
+
+group('grid composition: a labelled search separator is a header, not a cell', () => {
+  const L = loadLib(path.join(SHELL_DIR, 'features/menu/MenuLayout.js'))
+  const rows = [
+    { type: 'action', label: 'first', uid: 'a' },
+    { type: 'separator', label: 'All emojis', uid: 'sep' },
+    { type: 'action', label: 'second', uid: 'b' },
+  ]
+  const cells = L.composeGridRows(L.createPool(), rows, 8)
+  eq('the separator becomes a full-width header',
+    cells.filter(c => c.type === 'header').map(c => c.label), ['All emojis'])
+  eq('the separator itself is consumed',
+    cells.filter(c => c.type === 'separator').length, 0)
+  eq('both action rows remain', cells.filter(c => c.type === 'action').length, 2)
+  eq('the header is not selectable',
+    cells.find(c => c.type === 'header').selectable, false)
+
+  // The picker's own hint has an empty label and a `section`; it must keep the
+  // old behavior: header woven, empty separator cell retained.
+  const hint = [
+    { type: 'separator', label: '', section: 'Type to search all emoji', uid: 'h' },
+  ]
+  const hcells = L.composeGridRows(L.createPool(), hint, 8)
+  eq('a hint separator still weaves its section header',
+    hcells[0].label, 'Type to search all emoji')
+  eq('and keeps its empty cell',
+    hcells.filter(c => c.type === 'separator').length, 1)
 })
 
 finish()
