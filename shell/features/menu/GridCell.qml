@@ -10,9 +10,9 @@ import qs.common
 //   header/spacer- non-selectable chrome slots woven into the model by
 //                  MenuPanel.composeGridRows (this GridView build has no
 //                  native sections); headers span the card width.
-// Selection paints instantly like list rows; hovering MOVES THE CURSOR
-// instead of painting its own fill, so a parked pointer leaves no ghost
-// tint behind keyboard navigation (same rule as Entry). Corners follow
+// Selection paints instantly like list rows, and only a click moves the
+// cursor: a parked pointer must not steer keyboard navigation (same rule as
+// the list delegates). Corners follow
 // RoundingPolicy across the menu module.
 Rectangle {
   id: cell
@@ -117,15 +117,6 @@ Rectangle {
   MouseArea {
     enabled: !cell.isHeader && !cell.isSpacer
     anchors.fill: parent
-    hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
-    onContainsMouseChanged: {
-      const view = cell.view
-      if (containsMouse && view && view.currentIndex !== cell.index) {
-        if (view && typeof view.seat === "function") view.seat(cell.index, "click")
-        else view.currentIndex = cell.index
-      }
-    }
     onClicked: cell.activated()
   }
 }

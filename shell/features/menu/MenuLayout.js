@@ -75,7 +75,14 @@ function composeGridRows(pool, items, cols) {
   }
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
-    const section = String(item.section ?? "")
+    // A search bucket arrives as a labelled separator, not a `section` tag.
+    // In a list it paints as a divider; in a grid it was painted as an action
+    // cell whose glyph fell back to the label's first letter ("A" from "All
+    // emojis"), unselectable but in the cursor order. Weave it as a header
+    // instead and consume the separator row.
+    const label = String(item.label ?? "")
+    const sepHeader = item.type === "separator" && label !== ""
+    const section = sepHeader ? label : String(item.section ?? "")
     if (section !== "" && section !== lastSection) {
       padToRowEnd()
       out.push(headerFor(pool, section))
@@ -83,7 +90,7 @@ function composeGridRows(pool, items, cols) {
         out.push(spacerAt(pool, out.length))
       lastSection = section
     }
-    out.push(item)
+    if (!sepHeader) out.push(item)
   }
   return out
 }
