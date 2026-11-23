@@ -504,25 +504,25 @@ Item {
           const opt = kid.options[o] ?? {}
           maxValue = Math.max(maxValue, valueW(opt.label ?? opt.value, "opt" + o))
         }
-      } else if (Array.isArray(kid.flow)) {
-        // A staged flow draws its own option rows and editor field inside the
-        // child's dropdown. The card has to be as wide as the widest stage or
-        // every option label and placeholder elides when the stage opens.
-        for (let s = 0; s < kid.flow.length; s++) {
-          const stage = kid.flow[s] ?? {}
-          if (Array.isArray(stage.options)) {
-            for (let o = 0; o < stage.options.length; o++) {
-              const opt = stage.options[o] ?? {}
-              maxValue = Math.max(maxValue,
-                valueW(opt.label ?? opt.value, "flow" + s + "o" + o))
-            }
-          }
-          if (stage.kind === "text" || stage.kind === "number"
-            || stage.kind === "range") {
+      } else if (Array.isArray(kid.flow) && kid.flow.length > 0) {
+        // Only the live stage paints a field or option rows. Reserving every
+        // stage's copy widens the card for text nobody has opened, and shapes
+        // the whole wizard on every pass - the delay on a large folder.
+        // applyDropdownWidth re-runs on the rev when a stage opens.
+        const s = typeof Menu.flowIndexOf === "function" ? Menu.flowIndexOf(kid) : 0
+        const stage = kid.flow[s] ?? {}
+        if (Array.isArray(stage.options)) {
+          for (let o = 0; o < stage.options.length; o++) {
+            const opt = stage.options[o] ?? {}
             maxValue = Math.max(maxValue,
-              Math.max(valueW(stage.placeholder, "flowph" + s),
-                valueW(stage.subAccent, "flowsub" + s)))
+              valueW(opt.label ?? opt.value, "flow" + s + "o" + o))
           }
+        }
+        if (stage.kind === "text" || stage.kind === "number"
+          || stage.kind === "range") {
+          maxValue = Math.max(maxValue,
+            Math.max(valueW(stage.placeholder, "flowph" + s),
+              valueW(stage.subAccent, "flowsub" + s)))
         }
       } else if (kid.type === "number" || kid.type === "range") {
         // The readout includes the unit suffix, and its widest possible
@@ -538,7 +538,11 @@ Item {
       // A group inside a group paints its own dropdown one register deeper.
       // Measure it too, or the inner row's label and placeholders elide on a
       // card sized only for the outer children.
-      if (level < 3 && kid.type === "group"
+      // An unopened nested group paints nothing beyond its own row, so its
+      // children contribute no width and shaping them all is the delay seen
+      // when a folder with many subfolders opens. Its own open edge runs this
+      // pass again through applyDropdownWidth.
+      if (level < 3 && kid.type === "group" && Menu.isExpanded(kid)
         && Array.isArray(kid.children) && kid.children.length > 0) {
         nestedNeed = Math.max(nestedNeed, root._groupNeedW(kid, level + 1))
       }

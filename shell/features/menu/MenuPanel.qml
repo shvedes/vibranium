@@ -4575,6 +4575,16 @@ Rectangle {
       topOpen: !!(row && row.expanded)
     })
     if (deep && deep !== row) {
+      if (deep.isFlow) {
+        // The editor may have already stepped the flow back on this same
+        // Escape. Do not fold the row it just reopened.
+        if (deep.flowBackConsumed) {
+          deep.flowBackConsumed = false
+          return
+        }
+        if (deep.flowIndex > 0 && typeof deep.backFlow === "function"
+          && deep.backFlow()) return
+      }
       if (Menu.infoOpen(deep.itm)) {
         Menu.setInfo(deep.itm, false)
         return

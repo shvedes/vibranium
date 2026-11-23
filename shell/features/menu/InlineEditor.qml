@@ -44,6 +44,8 @@ Item {
   signal invalid(string message)
   signal recovered()
   signal escaped()
+  // Backspace on an empty field is a navigation key, not a text edit.
+  signal backspaceEmpty()
   // Live numeric step from the picker (see NumberPicker.stepped): the row
   // persists it without firing onChange, so setting-bound previews update
   // while the editor is open.
@@ -117,6 +119,7 @@ Item {
     // would re-fire the key on the list and re-open the row just committed).
     onAccepted: text => root.commit(text)
     onEscaped: root.escaped()
+    onBackspaceEmpty: root.backspaceEmpty()
   }
 
   NumberPicker {

@@ -1284,6 +1284,19 @@ Item {
   function advanceFlow(value) {
     const src = row.flowSrc
     if (!src || !itm) { return false }
+    // A stage swap keeps the outgoing editor alive for its fade, and that
+    // ghost can re-fire accepted() with an "undefined" seed after the row
+    // has already collapsed. Such a call is not a user answer: swallowing
+    // it keeps a cancelled wizard from advancing to a later stage.
+    if (!Menu.isExpanded(itm)) return true
+    const stage = MenuLib.flowStep(src, row.flowIndex)
+    // A required empty field cancels the wizard at the editor the user is
+    // looking at. Walking the remaining stages first would only have the
+    // service reject the empty value at commit time.
+    if (stage && stage.required && String(value === undefined ? "" : value).trim() === "") {
+      collapse()
+      return true
+    }
     Menu.setFlowValue(itm, row.flowIndex, value)
     // One read of the stage map: the skip rule weighs every stored value,
     // and the row must not re-read controller state per candidate stage.
@@ -1298,8 +1311,15 @@ Item {
     return true
   }
 
+  // Set while this delegate consumes an Escape as a stage step. The panel's
+  // escape chain walks into nested rows on the same key and would otherwise
+  // collapse the row the step just reopened.
+  property bool flowBackConsumed: false
+
   function backFlow() {
     if (!row.isFlow || row.flowIndex <= 0) return false
+    flowBackConsumed = true
+    Qt.callLater(() => { flowBackConsumed = false })
     // The previous stage is an editor; keep the row's slot open so the field
     // is on screen immediately instead of needing a second Enter to reopen.
     if (!Menu.isExpanded(itm)) Menu.setExpanded(itm, true)
@@ -1656,12 +1676,25 @@ Item {
 
     height: labelColH
 
+    // A flow stage declares its own sub line, which makes the text stack
+    // taller the moment the slot opens. The binding names the centred
+    // position; the icon's own Behavior carries it there from wherever it
+    // stands, so there is no first-frame jump when the stack grows, and the
+    // fold retraces the same path. Duration rides the slot's motion clock.
+    readonly property real iconY: Math.max(0, (labelColH - row.iconBox) / 2)
+
     Icon {
       id: iconImg
 
       visible: row.iconName !== ""
       anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
+      y: parent.iconY
+      Behavior on y {
+        NumberAnimation {
+          duration: Math.max(Ui.fastMs, row.slotMotionMs)
+          easing.type: Easing.OutCubic
+        }
+      }
       size: row.iconBox
       name: row.iconName
       // The glyph stays in the ordinary foreground so the swatch strip below
@@ -1685,7 +1718,13 @@ Item {
 
       visible: row.glyphText !== ""
       anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
+      y: parent.iconY
+      Behavior on y {
+        NumberAnimation {
+          duration: Math.max(Ui.fastMs, row.slotMotionMs)
+          easing.type: Easing.OutCubic
+        }
+      }
       width: row.iconBox
       height: row.iconBox
       horizontalAlignment: Text.AlignHCenter
@@ -2878,7 +2917,12 @@ Item {
         ParallelAnimation {
           id: swapAnim
 
-          onFinished: stageHost._swapping = false
+          onFinished: {
+            stageHost._swapping = false
+            // The incoming editor exists only after its layer slides in.
+            // The step caller's deferred grab lands on the outgoing one.
+            Qt.callLater(row.grabEditorFocus)
+          }
 
           NumberAnimation {
             id: inSlide
@@ -3143,6 +3187,13 @@ Item {
 
         function onItemAdded(index, item) { groupRoot.trackCursor() }
         function onItemRemoved(index, item) { groupRoot.trackCursor() }
+      }
+      // A row-set install can recycle the delegate at the cursor index for a
+      // different child. The index does not change then, so re-read it on the
+      // rev as well or the bar keeps the outgoing row's height.
+      Connections {
+        target: Menu
+        function onRevChanged() { Qt.callLater(groupRoot.trackCursor) }
       }
       // Exposed so the owning row can fold an open child editor with the
       // group, delegate keys to it, and publish its need-based growth to the
@@ -3687,6 +3738,11 @@ Item {
       onInvalid: msg => row.showEditorError(msg)
       onRecovered: row.clearEditorError()
       onEscaped: { if (stageEditor.ownsRow() && !row.backFlow()) row.collapse() }
+      // The shared field reports Backspace on empty copy. In a wizard that
+      // is the previous stage; at stage zero it closes the dropdown.
+      onBackspaceEmpty: {
+        if (stageEditor.ownsRow() && !row.backFlow()) row.collapse()
+      }
     }
   }
 
