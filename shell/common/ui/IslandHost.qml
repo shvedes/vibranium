@@ -404,6 +404,16 @@ LayerSurface {
       onPressed: root.close()
     }
 
+    // The card's elevation halo, on the same surface as the card so it keeps
+    // the exact parked geometry through every resize and re-park. Declared
+    // before the card so it paints behind the themed surface and border; its
+    // opacity tracks the card's placement gate so the frames before the first
+    // park paint neither the card nor a stray smudge of shadow.
+    SoftShadow {
+      host: cardItem
+      opacity: cardItem.opacity
+    }
+
     // The card, parked next to the served module. Both windows are
     // full-screen on the same screen, so coordinates inside the bar window
     // equal coordinates inside this one; positionCard() maps the module
