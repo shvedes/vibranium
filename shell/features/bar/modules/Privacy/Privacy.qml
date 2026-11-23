@@ -8,10 +8,12 @@ import qs.features.bar
 // Bar face of the privacy service (qs.services.privacy): a static right-zone
 // launcher for the privacy island. On a mic or camera start its glyph
 // slide-fades from the default incognito to the action in its own color,
-// holds 2s, then slide-fades back. A screenshare holds its glyph until the
-// share stops. The capture dots themselves are NOT drawn here - they
-// live on the bar's own privacy overlay (PrivacyOverlay.qml), an Overlay-layer
-// surface per screen, so they survive a fullscreen toplevel covering the bar.
+// holds 2s, then slide-fades back. The flash remembers which source armed
+// it, so that source stopping early returns the glyph at once instead of
+// leaving the action icon up until the dwell runs out. A screenshare holds
+// its glyph until the share stops. The capture dots themselves are NOT drawn
+// here - they live on the bar's own privacy overlay (PrivacyOverlay.qml), an
+// Overlay-layer surface per screen, so they survive a fullscreen covering the bar.
 // All state, the per-app ledger, the tooltip/island models and the link-cut
 // toggles live in the service, so the overlay's dots and the lockscreen dots
 // mirror the same state without duplicating any PipeWire code.
@@ -32,7 +34,15 @@ BarModule {
   // default incognito to the action, holds 2s, then fades back. The hold is
   // a dwell, not motion, so it is not motion-gated. A screenshare is not a
   // flash: it owns the glyph until the share ends.
-  property string actionIcon: ""
+  //
+  // `flashSource` is the source that armed the glyph now shown ("mic" or
+  // "cam"). Keeping it - rather than just the glyph - is what lets a source
+  // that stops early end the dwell at once. It is also the guard against a
+  // stale end: a second source that takes over the glyph becomes the new
+  // owner, so the first source going quiet cannot cut that flash short.
+  property string flashSource: ""
+  readonly property string actionIcon: root.flashSource === "mic" ? "mic-on"
+    : root.flashSource === "cam" ? "camera" : ""
   property bool _captureSeeded: false
   readonly property string captureGlyph: Core.Privacy.shareOn
     ? "screen-capture" : root.actionIcon
@@ -43,13 +53,25 @@ BarModule {
 
     interval: 2000
     repeat: false
-    onTriggered: root.actionIcon = ""
+    onTriggered: root._endFlash()
   }
-  function _flashAction(glyph) {
+  function _flashAction(source) {
     // A pending flash would surface again when the share ends.
     if (Core.Privacy.shareOn) return
-    root.actionIcon = glyph
+    root.flashSource = source
     actionTimer.restart()
+  }
+  // The one clear path: stop the dwell and release the glyph. Used by the
+  // timer, by the owning source's off-edge, and by a share taking over.
+  function _endFlash() {
+    actionTimer.stop()
+    root.flashSource = ""
+  }
+  // An off-edge ends the dwell only when that source still owns the glyph.
+  // A source that never armed it (or was superseded) must not cut a flash
+  // belonging to another source short.
+  function _endFlashFor(source) {
+    if (root.flashSource === source) root._endFlash()
   }
 
   // Action glyphs keep their dot colors; the idle glyph keeps the bar
@@ -103,24 +125,28 @@ BarModule {
   islandComponent: islandComp
 
   // The service owns the capture booleans and `active`; mic/camera starts arm
-  // the flash, a share owns the glyph while it lasts, and the idle edge closes
-  // a stale island. Mic/camera ends are silent - the dwell runs out on its
-  // own - while a share end returns the glyph at once.
+  // the flash, their ends release it early when that source still owns the
+  // glyph, a share owns the glyph while it lasts, and the idle edge closes a
+  // stale island. A source whose flash was superseded or dropped by a share
+  // leaves the current glyph alone.
   Connections {
     target: Core.Privacy
 
     function onMicOnChanged() {
-      if (root._captureSeeded && Core.Privacy.micOn) root._flashAction("mic-on")
+      if (!root._captureSeeded) return
+      if (Core.Privacy.micOn) root._flashAction("mic")
+      else root._endFlashFor("mic")
     }
     function onCamOnChanged() {
-      if (root._captureSeeded && Core.Privacy.camOn) root._flashAction("camera")
+      if (!root._captureSeeded) return
+      if (Core.Privacy.camOn) root._flashAction("cam")
+      else root._endFlashFor("cam")
     }
     function onShareOnChanged() {
       if (!root._captureSeeded || !Core.Privacy.shareOn) return
       // The share holds the glyph through `captureGlyph`; drop any pending
       // flash so it cannot pop back once the share ends.
-      actionTimer.stop()
-      root.actionIcon = ""
+      root._endFlash()
     }
     function onActiveChanged() {
       if (!Core.Privacy.active && root.islandOpen)
