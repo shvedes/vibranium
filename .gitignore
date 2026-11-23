@@ -3,5 +3,6 @@ site/
 .freebuff/
 specs/
 docs/.obsidian/
+bin/__pycache__/
 
 # Files
