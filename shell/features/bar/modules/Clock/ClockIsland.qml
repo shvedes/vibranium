@@ -119,6 +119,21 @@ Item {
     return at ? ClockFmt.clockLabel(at.getTime(), TimeFormat.use12h) : ""
   }
 
+  // A miniature month has no room for a hover card, so hovering lifts the
+  // day's own color instead. Selected and today stay accent so the current
+  // day never disappears into a dark background fill.
+  function miniDayColor(cell, hovered) {
+    if (cell.key === CalendarLib.keyForDate(root.selectedDate) || cell.today)
+      return hovered ? Ui.mix("accent", "foreground_0", 0.35) : Ui.solid("accent")
+    if (cell.weekend)
+      return Ui.tint("red", hovered ? (cell.inMonth ? 1 : 0.65)
+        : (cell.inMonth ? 0.85 : 0.4))
+    if (cell.inMonth)
+      return hovered ? Ui.mix("foreground_0", "accent", 0.25)
+        : Ui.solid("foreground_0")
+    return Ui.tint("foreground_0", hovered ? 0.62 : 0.3)
+  }
+
   // The weather service persists its configured location into shell state;
   // reading that section here avoids importing the whole services module
   // (whose singletons need a window backend) into an island. No coordinates
@@ -190,30 +205,19 @@ Item {
             height: root.miniH
             opacity: root.yearSlideOpacity
 
-            // The border hugs the slot, while the month sits further in, so
-            // the elevated fill has visible air around the content.
-            Rectangle {
-              anchors.fill: parent
-              anchors.margins: 1
-              opacity: monthHover.containsMouse ? 1 : 0
-              color: Ui.tint("foreground_0", 0.06)
-              border.width: 1
-              border.color: Ui.tint("accent", 0.35)
-              radius: 2
-
-              Behavior on opacity {
-                enabled: root.animOn
-                NumberAnimation { duration: Ui.fastMs }
-              }
-            }
-
             Text {
               x: root.miniPad
-              y: root.miniPad - 1
+              y: 1
               text: Qt.locale().monthName(parent.index, Locale.ShortFormat)
-              color: Ui.solid("accent")
+              color: monthHover.containsMouse
+                ? Ui.solid("accent") : Ui.tint("accent", 0.6)
               font.pixelSize: Ui.fontXs
               font.bold: true
+
+              Behavior on color {
+                enabled: root.animOn
+                ColorAnim {}
+              }
             }
 
             Repeater {
@@ -224,19 +228,22 @@ Item {
                 required property var modelData
 
                 x: root.miniPad + (index % 7) * 14
-                y: root.miniPad + 6 + Math.floor(index / 7) * 8
+                y: root.miniPad + 9 + Math.floor(index / 7) * 8
                 width: 13
                 height: 8
                 horizontalAlignment: Text.AlignHCenter
                 text: modelData.day
-                color: modelData.key === CalendarLib.keyForDate(root.selectedDate)
-                  ? Ui.solid("background_0")
-                  : (modelData.today ? Ui.solid("accent")
-                    : (modelData.inMonth
-                      ? (modelData.weekend ? Ui.tint("red", 0.85) : Ui.solid("foreground_0"))
-                      : (modelData.weekend ? Ui.tint("red", 0.4) : Ui.tint("foreground_0", 0.3))))
+                color: root.miniDayColor(modelData, monthHover.containsMouse)
                 font.pixelSize: 8
                 font.bold: modelData.key === CalendarLib.keyForDate(root.selectedDate)
+                  || modelData.today
+                font.underline: modelData.today
+                  && modelData.key !== CalendarLib.keyForDate(root.selectedDate)
+
+                Behavior on color {
+                  enabled: root.animOn
+                  ColorAnim {}
+                }
               }
             }
 
