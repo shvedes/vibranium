@@ -74,7 +74,18 @@ Singleton {
   })
 
   property bool _publishArmed: false
+  property bool _forcePublish: false
+  property string _lastPublishSig: ""
   onPageFactsChanged: root._schedulePublish()
+
+  // Republishing rebuilds every nested row and its search index. A fact
+  // change that leaves the projection identical (a probe or a refresh with
+  // no store change) must not pay that cost on the UI thread.
+  function _publishSig() {
+    const paths = root.entries.map(e => e && e.path ? e.path : "").join(",")
+    return [root.passBinary, root.initialized, root.gitReady, paths,
+      root.allDirs.join(",")].join("|")
+  }
 
   // Staged-delete marks belong to the controller work, but the shared map is
   // created here so a row's pending binding survives a controller teardown.
@@ -179,98 +190,62 @@ Singleton {
     Qt.callLater(root._publish)
   }
 
-  property var _providerIds: []
   property var _landing: null
   property bool _summonLanding: false
 
-  function _releaseProviders() {
-    const ids = root._providerIds
-    root._providerIds = []
-    for (let i = 0; i < ids.length; i++)
-      ProviderHost.unregisterProvider(ids[i], root)
-  }
-
-  // One surface per row id that can submit work. The id is path-derived, so
-  // the same row keeps its callback across a rescan that reorders everything.
-  function _surfaceFor(item) {
-    const id = String(item ? item.id : "")
-    if (Array.isArray(item.flow) && item.flow.length > 0)
+  // One resolver for every Pass row. The menu asks for a surface by row id;
+  // no per-row ProviderHost claim is needed, so a store change no longer
+  // copies the frozen provider table hundreds of times on the UI thread.
+  function _surfaceForId(id) {
+    const key = String(id || "")
+    if (key.indexOf("pass:") !== 0) return null
+    if (key.indexOf("pass:create-folder:") === 0
+      || key.indexOf("pass:create-file:") === 0
+      || key.indexOf("pass:rename:") === 0
+      || key.indexOf("pass:move:") === 0) {
       return {
         runFlow: (it, vals) => root._runFlow(it, vals),
         forget: value => root._forgetPath(String(value || ""))
       }
-    if (item && item.confirm)
+    }
+    if (key.indexOf("pass:delete:") === 0) {
       return {
-        // The shared Icon recolors its indicator from this accent key; "red"
-        // is the same key the other destructive rows use.
         iconAccent: () => "red",
         runConfirm: it => root._deletePath(String(it.value || "")),
         forget: value => root._forgetPath(String(value || ""))
       }
-    if (item && item.delCommand === "@forget")
-      return { forget: value => root._forgetPath(String(value || "")) }
-    return null
-  }
-
-  function _registerProviderIds(list) {
-    const out = []
-    for (let i = 0; i < list.length; i++) {
-      const spec = list[i]
-      const surface = root._surfaceFor(spec.item)
-      if (!surface) continue
-      // A nested child reaches the menu through a normalized mirror. Claim
-      // the row id AND its uid: whichever survives into the delegate, the
-      // provider is found and the flow really commits instead of silently
-      // mirroring the typed value into the row's value slot.
-      const keys = spec.uid && spec.uid !== spec.id ? [spec.id, spec.uid] : [spec.id]
-      for (let k = 0; k < keys.length; k++) {
-        if (ProviderHost.claimProvider(keys[k], surface, root)) out.push(keys[k])
-      }
     }
-    root._providerIds = out
+    if (key.indexOf("pass:dir:") === 0) {
+      return { forget: value => root._forgetPath(String(value || "")) }
+    }
+    return null
   }
 
   function _publish() {
     if (!root._publishArmed) return
     root._publishArmed = false
     if (typeof Menu === "undefined" || !Menu || !Menu.injectPage) return
+    const forced = root._forcePublish || root._summonLanding || root._landing !== null
+    root._forcePublish = false
+    const sig = root._publishSig()
+    if (!forced && sig === root._lastPublishSig) return
+    root._lastPublishSig = sig
 
     const menuItems = root._menuRows()
     const vaultItems = root._vaultRows()
     // The page API is re-supplied on every inject: a container reload drops
     // the dynamic API table along with the pages.
-    const api = { forget: value => root._forgetPath(String(value || "")) }
-    Menu.injectPage(Menu.buildDynamicPage(root.menuPage, "Password manager", 0, menuItems), api, false)
-    Menu.injectPage(Menu.buildDynamicPage(root.vaultPage, "Vault", 0, vaultItems), api, false)
-
-    const ids = []
-    function walk(list) {
-      for (let i = 0; i < list.length; i++) {
-        const it = list[i]
-        if (!it) continue
-        if (root._surfaceFor(it) !== null)
-          ids.push({ id: it.id, uid: it.uid, item: it })
-        if (Array.isArray(it.children)) walk(it.children)
-      }
+    const api = {
+      forget: value => root._forgetPath(String(value || "")),
+      provider: id => root._surfaceForId(id)
     }
-    // Walk the NORMALIZED pages: their rows carry both the declared id and
-    // the uid the delegate actually uses for provider lookup.
-    const pages = [Menu.pageById(root.menuPage), Menu.pageById(root.vaultPage)]
-    for (let p = 0; p < pages.length; p++) {
-      if (pages[p] && Array.isArray(pages[p].items)) walk(pages[p].items)
-    }
-    // The surfaces are generic closures keyed by id; an unchanged id set
-    // needs no claims at all. Re-claiming hundreds of ids on every fact
-    // change copies ProviderHost's frozen table one entry at a time, which
-    // is the visible lag on the first vault frame.
-    const nextIds = ids.map(s => s.id).concat(
-      ids.filter(s => s.uid && s.uid !== s.id).map(s => s.uid)).sort()
-    const oldIds = root._providerIds.slice().sort()
-    if (nextIds.length !== oldIds.length
-      || nextIds.some((v, i) => v !== oldIds[i])) {
-      root._releaseProviders()
-      root._registerProviderIds(ids)
-    }
+    // The vault can hold far more rows than the panel's default ceiling; a
+    // tall page ceiling keeps the last row visible instead of cropping it.
+    const pageOpts = { maxHeight: 1100 }
+    // Pass is a standalone menu that reuses the shared primitives. Its rows
+    // stay out of the global index, so typing narrows this vault only.
+    Menu.injectPage(Menu.buildDynamicPage(root.menuPage, "Password manager", 0, menuItems, pageOpts), api, false)
+    Menu.injectPage(Menu.buildDynamicPage(root.vaultPage, "Vault", 0, vaultItems, pageOpts), api, false)
 
     if (root._summonLanding) {
       root._summonLanding = false
@@ -293,10 +268,7 @@ Singleton {
     if (!panel || !panel.listView || !Array.isArray(landing.chain) || landing.chain.length === 0) return
     if (landing.closeGroup) {
       const group = Menu.itemByUid(landing.closeGroup)
-      // setExpanded(false) arms a slot-close latch that only lands when a
-      // slot actually folds. A group that was never opened has no such edge;
-      // writing it would hold Menu.slotClosing (and the fit) shut forever.
-      if (group && Menu.isExpanded(group)) {
+      if (group) {
         Menu.setExpanded(group, false)
         // The same publish swaps this group's delegate, so its fold never
         // reports slotCloseFinished and Menu.slotClosing would stay armed
@@ -340,21 +312,17 @@ Singleton {
       const idx = Menu.visibleIndexOfUid(landing.page, chain[0])
       if (idx < 0) return
       const list = panel.listView
-      list.seat(idx, "land")
-      let row = list.itemAtIndex(idx)
+      // landIndex takes the cursor without the generic center-follow that
+      // snapped contentY across the list. The reveal engine scrolls smoothly.
+      list.landIndex(idx)
+      // One state write for the whole ancestor chain instead of one rev bump
+      // per level; each bump re-projected and re-measured the entire vault.
+      const ancestors = []
       for (let i = 0; i + 1 < chain.length; i++) {
-        if (!row) return
-        const kids = row.groupChildren || []
-        let at = -1
-        for (let j = 0; j < kids.length; j++) {
-          if (kids[j] && kids[j].uid === chain[i + 1]) { at = j; break }
-        }
-        if (at < 0) return
-        // Expansion seeds its own child cursor at zero. Open the ancestor
-        // here; the child seat goes on the next settled edge, after that seed.
-        row.setExpanded(true) // ancestors only; the target stays closed
-        row = row._focusedChildRow ? row._focusedChildRow() : null
+        const it = Menu.itemByUid(chain[i])
+        if (it) ancestors.push(it)
       }
+      if (ancestors.length > 0) Menu.setExpandedBatch(ancestors, true)
       // A nested whenSettled waiter drains inside the same call and its child
       // seat is undone by the expansion's own cursor seed. One deferred turn
       // is an edge, not a retry budget: the expansion has landed by then.
@@ -374,8 +342,7 @@ Singleton {
           r.childIndex = found
           r = r._focusedChildRow ? r._focusedChildRow() : null
         }
-        list2.seat(at, "land")
-        list2.forceLayout()
+        list2.landIndex(at)
         // The group's slot geometry settles a frame after the child seat;
         // re-seat once more on that edge so the highlight cannot span the
         // rows the expansion just moved.
@@ -385,8 +352,11 @@ Singleton {
           if (at2 < 0) return
           // "click" is the persistent seat cause: track() records it as user
           // motion, so a later model swap cannot restore the pre-create row.
-          panel.listView.seat(at2, "click")
-          panel.listView.forceLayout()
+          panel.listView.landIndex(at2)
+          // Start the reveal only here, on the settled edge: an earlier
+          // pursuit aims at a viewport that has not grown to its final
+          // height and overshoots, then snaps back when the card settles.
+          panel.listView.autoRevealIndex = at2
         }, ready)
       })
     }, present)
@@ -477,8 +447,8 @@ Singleton {
         sub: "origin configured",
         icon: "git",
         children: [
-          { type: "action", id: "pass:push", label: "Push to remote", sub: "upload commits to origin", icon: "git", call: "pass push", keepOpen: true },
-          { type: "action", id: "pass:pull", label: "Pull from remote", sub: "fetch and rebase from origin", icon: "git", call: "pass pull", keepOpen: true }
+          { type: "action", id: "pass:push", label: "Push to remote", sub: "upload commits to origin", icon: "git", call: "pass push" },
+          { type: "action", id: "pass:pull", label: "Pull from remote", sub: "fetch and rebase from origin", icon: "git", call: "pass pull" }
         ]
       })
     }
@@ -529,20 +499,20 @@ Singleton {
 
   function _fileRows(path) {
     return [
-      { type: "text", id: Model.rowId("rename", path), value: path, label: "Rename", sub: "change the pass name", icon: "pencil",
+      { type: "text", id: Model.rowId("rename", path), value: path, label: "Rename", icon: "pencil", hideValue: true,
         placeholder: "New name or path", flow: [
-          { kind: "text", placeholder: "New name or path", sub: "Rename", subAccent: "New name..." }
+          { kind: "text", placeholder: "New name or path" }
         ] },
-      { type: "action", id: Model.rowId("copy", path), value: path, label: "Copy", sub: "copy line 1", icon: "copy",
+      { type: "action", id: Model.rowId("copy", path), value: path, label: "Copy", icon: "copy",
         call: "pass copy %v", hideValue: true, keepOpen: true },
-      { type: "select", id: Model.rowId("move", path), value: path, label: "Move", sub: "pick a destination", icon: "arrow-corner",
+      { type: "select", id: Model.rowId("move", path), value: path, label: "Move", icon: "arrow-corner",
         marker: false, hideValue: true, keepOpen: true,
         flow: [
-          { kind: "select", sub: "Move", subAccent: "Destination...", options: root._moveOptions() }
+          { kind: "select", options: root._moveOptions() }
         ] },
-      { type: "action", id: Model.rowId("edit", path), value: path, label: "Edit", sub: "open in a terminal", icon: "tui",
+      { type: "action", id: Model.rowId("edit", path), value: path, label: "Edit", icon: "tui",
         call: "pass edit %v", hideValue: true },
-      { type: "action", id: Model.rowId("delete", path), value: path, label: "Delete", sub: "remove this password", icon: "remove",
+      { type: "action", id: Model.rowId("delete", path), value: path, label: "Delete", icon: "remove", iconColor: "red", hideValue: true,
         confirm: {
           stages: 2,
           hint: "Press <b>Enter</b> again to delete this password",
@@ -574,18 +544,8 @@ Singleton {
       const sub = dir === "" ? ch.dirs[i] : dir + "/" + ch.dirs[i]
       children.push(root._folderRow(sub))
     }
-    for (let i = 0; i < ch.files.length; i++) {
-      const file = ch.files[i]
-      children.push({
-        type: "group",
-        id: Model.rowId("file", file.path),
-        label: file.name,
-        sub: file.dir,
-        icon: "lock",
-        delCommand: "",
-        children: root._fileRows(file.path)
-      })
-    }
+    for (let i = 0; i < ch.files.length; i++)
+      children.push(root._fileGroupRow(ch.files[i]))
     return {
       type: "group",
       id: Model.rowId("dir", dir),
@@ -605,18 +565,25 @@ Singleton {
     rows.push({ type: "separator", id: "pass:sep", sepHeight: 22 })
     const ch = Model.childrenOf(root.entries, "", root.allDirs)
     for (let i = 0; i < ch.dirs.length; i++) rows.push(root._folderRow(ch.dirs[i]))
-    for (let i = 0; i < ch.files.length; i++) {
-      const file = ch.files[i]
-      rows.push({
-        type: "group",
-        id: Model.rowId("file", file.path),
-        label: file.name,
-        sub: file.dir,
-        icon: "lock",
-        children: root._fileRows(file.path)
-      })
-    }
+    for (let i = 0; i < ch.files.length; i++)
+      rows.push(root._fileGroupRow(ch.files[i]))
     return rows
+  }
+
+  // A file row takes Delete / Ctrl+D through the same key-only staged path as
+  // a folder. `delCommand` arms the confirmation without changing Enter,
+  // which must still open the row's action dropdown.
+  function _fileGroupRow(file) {
+    return {
+      type: "group",
+      id: Model.rowId("file", file.path),
+      label: file.name,
+      icon: "lock",
+      value: file.path,
+      hideValue: true,
+      delCommand: "@forget",
+      children: root._fileRows(file.path)
+    }
   }
 
   // --- flow / confirm verbs ------------------------------------------------
@@ -641,6 +608,9 @@ Singleton {
     // Such a value is never a name the user typed: drop the late commit so
     // it cannot create a stray entry or overwrite the real focus landing.
     if (v0 === "undefined" || v0 === "null") return true
+    // An empty name is a cancelled create: close the flow without a notice.
+    if ((id.indexOf("pass:create-folder:") === 0
+      || id.indexOf("pass:create-file:") === 0) && v0 === "") return true
     if (id.indexOf("pass:rename:") === 0) {
       if (!Model.validPath(v0)) {
         root._notify("Password Manager", "Invalid name")
@@ -712,7 +682,9 @@ Singleton {
       root._landing = {
         page: root.vaultPage,
         chain: root._chainFor(path, neighbourIsDir),
-        closeGroup: "",
+        // A neighbour folder may still carry an open Create here from an
+        // earlier create; close it so one Esc appears to close that folder.
+        closeGroup: neighbourIsDir ? root._createGroupUid(path) : "",
         waitGone: waitGone
       }
     }
@@ -795,6 +767,13 @@ Singleton {
     root._schedulePublish()
     if (typeof Menu !== "undefined" && Menu && !Menu.open)
       Menu.openFile(Paths.settingsCatalogPath + "#main")
+    // A summon starts in list mode with the row cursor live. The field is a
+    // search entry point, not the initial focus: the first printable key goes
+    // through the panel's type-to-search route into the global query.
+    Qt.callLater(() => {
+      if (Menu.panel && typeof Menu.panel.focusFilter === "function")
+        Menu.panel.focusFilter("list")
+    })
     return "ok"
   }
   function ownsFrame() {
@@ -802,7 +781,11 @@ Singleton {
       && (Menu.frame.id === root.menuPage || Menu.frame.id === root.vaultPage)
   }
   function close() {
-    if (root.ownsFrame()) Menu.close()
+    if (root.ownsFrame()) {
+      if (Menu.panel && typeof Menu.panel.focusFilter === "function")
+        Menu.panel.focusFilter("list")
+      Menu.close()
+    }
     return "ok"
   }
   function toggle() { return root.ownsFrame() ? root.close() : root.open() }
@@ -846,12 +829,14 @@ Singleton {
   // the same derivation as a fact change - no retry loop, no fresh state.
   Connections {
     target: PageHost
-    function onPagesDropped() { root._schedulePublish() }
+    function onPagesDropped() {
+      root._forcePublish = true
+      root._schedulePublish()
+    }
   }
 
   Component.onDestruction: {
     idleRelease.stop()
-    root._releaseProviders()
     root.teardownController()
     root._releaseSecrets()
     if (copyProc.running) copyProc.running = false
@@ -905,7 +890,14 @@ Singleton {
     PassController {
       optimistic: root.optimistic
       onKeysReady: root.keysReady()
-      onDeleteCommitted: path => root.deleteCommitted(path)
+      onDeleteCommitted: path => {
+        // A committed delete always republishes, even when the cached fact
+        // signature happens to look unchanged. No deleted row survives a
+        // commit on a stale page.
+        root._forcePublish = true
+        root._schedulePublish()
+        root.deleteCommitted(path)
+      }
     }
   }
 }
