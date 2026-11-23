@@ -28,6 +28,11 @@ Singleton {
         "ping",
       ]
     })
+    // The menu reads this at its late idle prewarm, so boot order does not
+    // matter: the bundle path belongs to the picker that owns the data.
+    Registry.register("lazySearchBundles", {
+      paths: [Paths.vibraniumHome + "/shell/features/pickers/emoji/emojis.jsonc"]
+    })
   }
 
   IpcHandler {

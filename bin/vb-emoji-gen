@@ -1,0 +1,561 @@
+#!/usr/bin/env python3
+
+"""Regenerate the emoji picker bundle from Unicode and CLDR data.
+
+Sources (both are the upstream data files, not a vendored copy):
+  emoji-test.txt  - the RGI emoji list, names, groups and order
+  en.xml          - CLDR English annotations: display names and keywords
+
+Every sequence is checked against the installed Noto Color Emoji font with
+HarfBuzz, so a newly listed emoji that the font cannot render is left out.
+Skin-tone variants are skipped: the picker lists base emoji only, as it did
+before generation existed.
+
+Two files are written: the entry bundle holds the face grid, and a companion
+`<name>-all.jsonc` holds the search-only corpus. A `// lazy-search:` line in
+the entry file tells the menu to read the companion on the first query, so a
+session that never searches never parses the large bundle.
+
+Both files are committed build artifacts under shell/, not runtime cache.
+$VIBRANIUM_CACHE is disposable and may be absent on a fresh install; putting
+the picker's only dataset there would make it depend on this generator (and
+on Python, libharfbuzz and a network fetch) at runtime. The cache at
+`$VIBRANIUM_CACHE/emoji/` holds only DOWNLOADED SOURCES: conditional requests
+make repeated checks cheap, with a cached copy as an offline fallback. `--check`
+is the guard that keeps the committed artifacts in step with upstream data.
+
+Usage:
+  vb-emoji-gen [options]
+
+Options:
+  -o, --output PATH      entry bundle to write (default: shipped emojis.jsonc);
+                         the companion is written beside it as <name>-all.jsonc
+      --emoji-file PATH  use a local emoji-test.txt instead of downloading
+      --cldr-file PATH   use a local CLDR en.xml instead of downloading
+      --font PATH        color emoji font used for the coverage check
+      --keywords N       extra CLDR keywords per label (default: 3)
+      --check            do not write; exit 1 if the bundle is out of date
+  -h, --help             show this help and exit
+"""
+
+import gc
+
+gc.disable()  # short-lived process, nothing to collect
+
+import os
+import re
+import sys
+import threading
+from json.encoder import encode_basestring as enc
+from typing import NoReturn
+
+EMOJI_URL = "https://www.unicode.org/Public/emoji/latest/emoji-test.txt"
+CLDR_URL = (
+    "https://raw.githubusercontent.com/unicode-org/cldr/main/common/annotations/en.xml"
+)
+FONT_CANDIDATES = (
+    "/usr/share/fonts/noto/NotoColorEmoji.ttf",
+    "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+)
+
+FACE_SUBGROUPS = frozenset(
+    (
+        "face-smiling",
+        "face-affection",
+        "face-tongue",
+        "face-hand",
+        "face-neutral-skeptical",
+        "face-sleepy",
+        "face-unwell",
+        "face-hat",
+        "face-glasses",
+        "face-concerned",
+        "face-negative",
+        "face-costume",
+        "cat-face",
+        "monkey-face",
+    )
+)
+TONE_CHARS = frozenset(chr(cp) for cp in range(0x1F3FB, 0x1F3FF + 1))
+VS16 = "\ufe0f"
+COMMAND = "vb-emoji-insert %v"
+CACHE_DIR = os.path.join(
+    os.environ.get("VIBRANIUM_CACHE")
+    or os.path.join(os.path.expanduser("~"), ".cache", "vibranium"),
+    "emoji",
+)
+# cp attribute comes first in CLDR; any extra attributes land in group 2.
+ANNOTATION_RE = re.compile(r'<annotation cp="([^"]*)"([^>]*)>([^<]*)</annotation>')
+ENTITY_RE = re.compile(r"&#(x[0-9a-fA-F]+|[0-9]+);")
+SEPARATOR_ROW = (
+    '{"type":"separator","label":"","value":"","glyph":"",'
+    '"section":"Type to search all emoji"}'
+)
+
+
+def read_file(path):
+    with open(path, encoding="utf-8") as fh:
+        return fh.read()
+
+
+def fetch(url, name):
+    """Download a source with a conditional request and a cached fallback."""
+    import http.client
+
+    cached = os.path.join(CACHE_DIR, name)
+    meta = cached + ".meta"
+    have = os.path.isfile(cached)
+    headers = {
+        "User-Agent": "vb-emoji-gen",
+        "Accept-Encoding": "gzip",
+        "Connection": "close",
+    }
+    if have and os.path.isfile(meta):
+        with open(meta, encoding="utf-8") as fh:
+            for line in fh:
+                key, _, value = line.rstrip("\r\n").partition("=")
+                if not value:
+                    continue
+                if key == "etag":
+                    headers["If-None-Match"] = value
+                elif key == "last-modified":
+                    headers["If-Modified-Since"] = value
+
+    def connect(scheme, host, path):
+        """Return (connection, request target), honouring proxy env vars."""
+        target, _, port_text = host.partition(":")
+        port = int(port_text) if port_text else (443 if scheme == "https" else 80)
+        proxy = (
+            os.environ.get(scheme + "_proxy")
+            or os.environ.get(scheme.upper() + "_PROXY")
+            or os.environ.get("all_proxy")
+            or os.environ.get("ALL_PROXY")
+            or ""
+        )
+        if proxy:
+            proxy = proxy.split("://", 1)[-1].rsplit("@", 1)[-1]
+            phost, _, pport = proxy.partition(":")
+            pnum = int(pport) if pport else (443 if scheme == "https" else 80)
+            if scheme == "https":
+                conn = http.client.HTTPSConnection(phost, pnum, timeout=30)
+                conn.set_tunnel(target, port)
+                return conn, "/" + path
+            return (
+                http.client.HTTPConnection(phost, pnum, timeout=30),
+                scheme + "://" + host + "/" + path,
+            )
+        cls = (
+            http.client.HTTPSConnection
+            if scheme == "https"
+            else http.client.HTTPConnection
+        )
+        return cls(target, port, timeout=30), "/" + path
+
+    try:
+        for _ in range(6):
+            scheme, _, rest = url.partition("://")
+            host, _, path = rest.partition("/")
+            conn, target = connect(scheme, host, path)
+            conn.request("GET", target, headers=headers)
+            resp = conn.getresponse()
+            if resp.status in (301, 302, 303, 307, 308):
+                loc = resp.getheader("Location") or ""
+                conn.close()
+                url = (
+                    loc
+                    if "://" in loc
+                    else scheme + "://" + host + "/" + loc.lstrip("/")
+                )
+                continue
+            break
+        else:
+            raise RuntimeError(f"too many redirects: {url}")
+        if resp.status == 304 and have:
+            conn.close()
+            return read_file(cached)
+        if resp.status != 200:
+            raise RuntimeError(f"HTTP {resp.status} for {url}")
+        body = resp.read()
+        if "gzip" in (resp.getheader("Content-Encoding") or "").lower():
+            import zlib
+
+            body = zlib.decompress(body, 31)
+        etag = resp.getheader("ETag") or ""
+        modified = resp.getheader("Last-Modified") or ""
+        conn.close()
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        tmp = cached + ".tmp"
+        with open(tmp, "wb") as fh:
+            fh.write(body)
+        os.replace(tmp, cached)
+        with open(meta, "w", encoding="utf-8") as fh:
+            fh.write("etag=" + etag + "\nlast-modified=" + modified + "\n")
+        return body.decode("utf-8")
+    except (OSError, RuntimeError, http.client.HTTPException):
+        if not have:
+            raise
+        print(
+            "vb-emoji-gen: using cached " + name + " (download failed)", file=sys.stderr
+        )
+        return read_file(cached)
+
+
+def start_sources(emoji_file, cldr_file):
+    """Begin both reads; downloads run in threads. Returns a join function."""
+    slots: list[str | Exception | None] = [None, None]
+    threads = []
+
+    def work(i, url, name):
+        try:
+            slots[i] = fetch(url, name)
+        except Exception as exc:  # noqa: BLE001 - stored, re-raised in join()
+            slots[i] = exc
+
+    for i, (path, url, name) in enumerate(
+        ((emoji_file, EMOJI_URL, "emoji-test.txt"), (cldr_file, CLDR_URL, "en.xml"))
+    ):
+        if path:
+            slots[i] = read_file(path)
+            continue
+        t = threading.Thread(target=work, args=(i, url, name), daemon=True)
+        t.start()
+        threads.append((i, t))
+
+    pending = dict(threads)
+
+    def join(i):
+        t = pending.pop(i, None)
+        if t is not None:
+            t.join()
+        value = slots[i]
+        if isinstance(value, Exception):
+            raise value
+        if value is None:
+            raise RuntimeError("source was not loaded: " + str(i))
+        return value
+
+    return join
+
+
+def parse_emoji_test(text):
+    """Return ([(value, name, is_face)], version)."""
+    entries = []
+    add = entries.append
+    group = subgroup = version = ""
+    is_face = False
+    for line in text.splitlines():
+        if not line:
+            continue
+        if line[0] == "#":
+            line = line.strip()
+            if line.startswith("# Version:"):
+                version = line.split(":", 1)[1].strip()
+            elif line.startswith("# group:"):
+                group = line[8:].strip()
+                is_face = group == "Smileys & Emotion" and subgroup in FACE_SUBGROUPS
+            elif line.startswith("# subgroup:"):
+                subgroup = line[11:].strip()
+                is_face = group == "Smileys & Emotion" and subgroup in FACE_SUBGROUPS
+            continue
+        code, sep, meta = line.partition(";")
+        if not sep or not meta.lstrip().startswith("fully-qualified"):
+            continue
+        value = "".join([chr(int(cp, 16)) for cp in code.split()])
+        if not TONE_CHARS.isdisjoint(value):
+            continue
+        comment = meta.partition("#")[2].strip()
+        # "glyph E15.0 name" - the name is everything after the version tag.
+        parts = comment.split(None, 2)
+        add((value, parts[2].strip() if len(parts) == 3 else comment, is_face))
+    return entries, version
+
+
+def unescape(text):
+    if "&" not in text:
+        return text
+    text = ENTITY_RE.sub(
+        lambda m: chr(
+            int(m.group(1)[1:], 16) if m.group(1)[0] == "x" else int(m.group(1))
+        ),
+        text,
+    )
+    return (
+        text.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+    )
+
+
+def parse_cldr(text):
+    """Return (names, raw keyword strings); keywords are split on demand."""
+    names = {}
+    keywords = {}
+    for cp, attrs, value in ANNOTATION_RE.findall(text):
+        value = unescape(value).strip()
+        if not value:
+            continue
+        key = unescape(cp).replace(VS16, "")
+        if 'type="tts"' in attrs:
+            names[key] = value
+        else:
+            keywords[key] = value
+    return names, keywords
+
+
+def font_coverage(font_path):
+    """Return a predicate (can the font shape a sequence to real glyphs?),
+    or None when HarfBuzz is unavailable. Talks to libharfbuzz directly:
+    no PyGObject import, no per-call introspection overhead."""
+    import ctypes
+
+    try:
+        hb = ctypes.CDLL("libharfbuzz.so.0")
+        vp, cu, ci = ctypes.c_void_p, ctypes.c_uint, ctypes.c_int
+        hb.hb_blob_create_from_file_or_fail.restype = vp
+        hb.hb_blob_create_from_file_or_fail.argtypes = (ctypes.c_char_p,)
+        hb.hb_face_create.restype = vp
+        hb.hb_face_create.argtypes = (vp, cu)
+        hb.hb_font_create.restype = vp
+        hb.hb_font_create.argtypes = (vp,)
+        hb.hb_buffer_create.restype = vp
+        hb.hb_buffer_reset.argtypes = (vp,)
+        hb.hb_buffer_add_utf8.argtypes = (vp, ctypes.c_char_p, ci, cu, ci)
+        hb.hb_buffer_guess_segment_properties.argtypes = (vp,)
+        hb.hb_shape.argtypes = (vp, vp, vp, cu)
+        hb.hb_buffer_get_length.restype = cu
+        hb.hb_buffer_get_length.argtypes = (vp,)
+        hb.hb_buffer_get_glyph_infos.restype = ctypes.POINTER(ctypes.c_uint32)
+        hb.hb_buffer_get_glyph_infos.argtypes = (vp, vp)
+        hb.hb_ot_font_set_funcs.argtypes = (vp,)
+    except (OSError, AttributeError):
+        print(
+            "vb-emoji-gen: HarfBuzz unavailable, skipping font coverage",
+            file=sys.stderr,
+        )
+        return None
+
+    blob = hb.hb_blob_create_from_file_or_fail(os.fsencode(font_path))
+    if not blob:
+        sys.exit("vb-emoji-gen: cannot load font " + font_path)
+    face = hb.hb_face_create(blob, 0)
+    font = hb.hb_font_create(face)
+    # Older libharfbuzz leaves a fresh font without cmap funcs: every glyph
+    # id then equals its codepoint and nothing ever looks uncovered.
+    hb.hb_ot_font_set_funcs(font)
+    buf = hb.hb_buffer_create()
+    reset, add_utf8, shape = hb.hb_buffer_reset, hb.hb_buffer_add_utf8, hb.hb_shape
+    guess = hb.hb_buffer_guess_segment_properties
+    get_len, get_infos = hb.hb_buffer_get_length, hb.hb_buffer_get_glyph_infos
+
+    def covered(value):
+        data = value.encode("utf-8")
+        reset(buf)
+        add_utf8(buf, data, len(data), 0, -1)
+        guess(buf)
+        shape(font, buf, None, 0)
+        infos = get_infos(buf, None)
+        # hb_glyph_info_t is 5 x uint32; the glyph id is the first field.
+        for i in range(0, get_len(buf) * 5, 5):
+            if infos[i] == 0:
+                return False
+        return True
+
+    return covered
+
+
+def labels(entries, covered, names, keywords, limit):
+    """Yield (is_face, row_json) for every supported entry, in order."""
+    out = []
+    add = out.append
+    names_get = names.get
+    kw_get = keywords.get
+    for value, name, is_face in entries:
+        if covered is not None and not covered(value):
+            continue
+        key = value.replace(VS16, "")
+        name = names_get(key, name)
+        words = name.lower().split()
+        parts = [name]
+        raw = kw_get(key)
+        if raw and limit > 0:
+            extra = []
+            for part in raw.split("|"):
+                word = part.strip()
+                if not word:
+                    continue
+                low = word.lower()
+                for w in words:
+                    if low in w:
+                        break
+                else:
+                    if word not in extra:
+                        extra.append(word)
+                        if len(extra) >= limit:
+                            break
+            parts += extra
+        enc_value = enc(value)
+        add(
+            (
+                is_face,
+                '{"label":'
+                + enc(" ".join(parts))
+                + ',"value":'
+                + enc_value
+                + ',"glyph":'
+                + enc_value
+                + "}",
+            )
+        )
+    return out
+
+
+def bundle(page_id, title, rows):
+    return (
+        '{"pages":[{"id":'
+        + enc(page_id)
+        + ',"title":'
+        + enc(title)
+        + ',"layout":"grid","cell":46,"width":360,"maxHeight":0,"command":'
+        + enc(COMMAND)
+        + ',"items":['
+        + ",".join(rows)
+        + "]}]}\n"
+    )
+
+
+def render(rows, version, companion_name, checked):
+    if checked:
+        coverage = (
+            f"// Unicode Emoji {version}; English keywords from CLDR; checked against the\n"
+            "// installed color emoji font. Regenerate: bin/vb-emoji-gen\n"
+        )
+    else:
+        coverage = (
+            f"// Unicode Emoji {version}; English keywords from CLDR; font coverage\n"
+            "// was unavailable at generation time. Regenerate: bin/vb-emoji-gen\n"
+        )
+    header = "// Generated by bin/vb-emoji-gen - do not edit by hand.\n" + coverage
+    faces = [r for f, r in rows if f]
+    faces.append(SEPARATOR_ROW)
+    rest = [r for f, r in rows if not f]
+    primary = (
+        header + f"// lazy-search: {companion_name}\n" + bundle("emoji", "Emoji", faces)
+    )
+    return primary, header + bundle("emoji-all", "All emojis", rest)
+
+
+def write_pair_atomic(pairs):
+    """Write both temp files first, then replace both artifacts."""
+    pending = []
+    for path, text in pairs:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        pending.append((tmp, path))
+    for tmp, path in pending:
+        os.replace(tmp, path)
+
+
+def parse_args(argv):
+    opts = {
+        "output": os.path.join(
+            os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+            "shell/features/pickers/emoji/emojis.jsonc",
+        ),
+        "emoji_file": None,
+        "cldr_file": None,
+        "font": FONT_CANDIDATES[0],
+        "keywords": 3,
+        "check": False,
+    }
+    valued = {
+        "-o": "output",
+        "--output": "output",
+        "--emoji-file": "emoji_file",
+        "--cldr-file": "cldr_file",
+        "--font": "font",
+        "--keywords": "keywords",
+    }
+
+    def die(msg: str) -> NoReturn:
+        sys.stderr.write("vb-emoji-gen: error: " + msg + "\n")
+        sys.exit(2)
+
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        i += 1
+        if arg in ("-h", "--help"):
+            sys.stdout.write(__doc__ or "")
+            sys.exit(0)
+        if arg == "--check":
+            opts["check"] = True
+            continue
+        name, eq, value = arg.partition("=")
+        if not eq and arg.startswith("-o") and len(arg) > 2 and arg[1] != "-":
+            name, eq, value = "-o", "=", arg[2:]
+        dest = valued.get(name)
+        if dest is None:
+            die("unrecognized argument: " + arg)
+        if not eq:
+            if i >= len(argv):
+                die(f"argument {name}: expected one argument")
+            value = argv[i]
+            i += 1
+        if dest == "keywords":
+            try:
+                value = int(value)
+            except ValueError:
+                die("argument --keywords: invalid int value: " + repr(value))
+        opts[dest] = value
+    return opts
+
+
+def main():
+    args = parse_args(sys.argv[1:])
+    join = start_sources(args["emoji_file"], args["cldr_file"])
+
+    # Font setup overlaps with the network wait.
+    font_path = args["font"]
+    if not os.path.isfile(font_path):
+        font_path = next((p for p in FONT_CANDIDATES if os.path.isfile(p)), font_path)
+    covered = font_coverage(font_path)
+
+    entries, version = parse_emoji_test(join(0))
+    names, keywords = parse_cldr(join(1))
+
+    output = args["output"]
+    base, ext = os.path.splitext(output)
+    companion = base + "-all" + ext
+    rows = labels(entries, covered, names, keywords, args["keywords"])
+    primary, all_text = render(
+        rows, version, os.path.basename(companion), covered is not None
+    )
+
+    if args["check"]:
+        for path, text in ((output, primary), (companion, all_text)):
+            current = read_file(path) if os.path.isfile(path) else ""
+            if current != text:
+                print(
+                    f"{path} is out of date: run bin/vb-emoji-gen",
+                    file=sys.stderr,
+                )
+                return 1
+        print("emoji bundles are up to date")
+        return 0
+    write_pair_atomic(((output, primary), (companion, all_text)))
+    faces = sum(1 for f, _ in rows if f)
+    print(
+        f"wrote {output} and {companion}: {len(rows)} emoji "
+        f"({faces} faces), Unicode {version}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    rc = main()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(rc)  # skip interpreter teardown
