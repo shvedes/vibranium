@@ -4,10 +4,24 @@ set -euo pipefail
 
 # This script is triggered by a systemd timer and runs non-interactively.
 # It is intentionally silent (no log/usage functions) because all output
-# goes to the journal and the user is notified via statusbar or notify-send
-# only when an update is actually found.
+# goes to the journal. The shell renders the update indicator itself while
+# its statusbar is up; notify-send is only the fallback for a disabled or
+# hidden bar, which the shell reports over its own IPC.
+
+# The shell's `effectiveEnabled` folds the persisted master switch and the
+# transient hide into one answer. An unresponsive shell has no bar either,
+# so a failed query keeps the notification enabled.
+statusbar_visible() {
+	local state
+	state="$("$VIBRANIUM/bin/vb-shell" bar status 2> /dev/null)" || return 1
+	[[ "$(jq -r '.effectiveEnabled // false' <<< "$state" 2> /dev/null)" == "true" ]]
+}
 
 notify_update() {
+	if statusbar_visible; then
+		return 0
+	fi
+
 	local body=$1
 	local action=""
 
