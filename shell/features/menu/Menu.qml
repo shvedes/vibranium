@@ -112,6 +112,11 @@ Singleton {
   property var _optionPages: ({})
   property var _dynamicApis: ({})
   property var _indexProviders: []
+  // Path -> companion bundle for pickers whose search-only rows live in a
+  // separate file. The marker is a `// lazy-search:` line in the primary
+  // file, read during _buildFromFile; the companion is loaded on the first
+  // query so a session that never searches never parses the large corpus.
+  property var _lazySearchPaths: ({})
   property int _pendingQueryGen: 0
   property var _claimToken: null
   property bool _settingsFamily: false
@@ -128,6 +133,11 @@ Singleton {
   }
   FileView {
     id: extensionLoader
+    path: ""
+    printErrors: false
+  }
+  FileView {
+    id: lazyLoader
     path: ""
     printErrors: false
   }
@@ -246,6 +256,12 @@ Singleton {
     root.rev++
     SurfaceClaim.release(root._claimToken)
     root._claimToken = null
+    // A preload that found the menu open skipped itself; the close edge is
+    // the next safe moment to build the companion without disturbing a fit.
+    if (!root._lazyPreloaded && !root._lazyPreloadScheduled) {
+      root._lazyPreloadScheduled = true
+      Idle.run(root._preloadLazySearches)
+    }
   }
 
   // Build (or reuse cached) containers for `path` WITHOUT touching any
@@ -273,9 +289,11 @@ Singleton {
     if (!loader.waitForJob()) return false
     root._lastPath = path
     const text = loader.text()
+    root._registerLazySearch(text, filePath)
 
     // Repeat-summon cache: parsing/normalizing a bundle costs enough to
-    // justify reusing the two most recent built containers. Any change to
+    // justify reusing the three most recent built containers (the two boot
+    // entries plus a lazily preloaded picker). Any change to
     // source file, extension, or settings-store generation rebuilds it.
     const extPath = Paths.configHome
     extensionLoader.path = extPath + "/vibranium/user-menu.jsonc"
@@ -304,7 +322,7 @@ Singleton {
     try {
       root._loadContainers(text, extText, frag)
       const keys = Object.keys(root._bundleCache)
-      if (keys.length >= 2) delete root._bundleCache[keys[0]]
+      if (keys.length >= 3) delete root._bundleCache[keys[0]]
       root._bundleCache[path] = {
         text: text,
         ext: extText,
@@ -326,6 +344,102 @@ Singleton {
     }
     root._restoreExternalPages()
     return true
+  }
+
+  // A bundle can point at a companion file holding rows that only search
+  // needs. The marker lives in the JSONC header, so the data owns the
+  // contract and the generic menu needs no per-picker path.
+  function _lazyCompanion(text, filePath) {
+    const m = /^\/\/ lazy-search:[ \t]*(\S+)[ \t]*$/m.exec(String(text ?? ""))
+    if (!m) return ""
+    const name = m[1]
+    const slash = String(filePath).lastIndexOf("/")
+    return slash < 0 ? name : String(filePath).substring(0, slash + 1) + name
+  }
+
+  function _registerLazySearch(text, filePath) {
+    const companion = root._lazyCompanion(text, filePath)
+    const current = root._lazySearchPaths[filePath]
+    if (companion === "") {
+      if (current === undefined) return
+      const cleared = Object.assign({}, root._lazySearchPaths)
+      delete cleared[filePath]
+      root._lazySearchPaths = cleared
+      return
+    }
+    if (current !== undefined && current.companion === companion) return
+    const next = Object.assign({}, root._lazySearchPaths)
+    next[filePath] = { companion: companion }
+    root._lazySearchPaths = next
+  }
+
+  // Read the companion of one cached bundle and fold its pages into that
+  // container. Mutating the cached object (rather than installing a new one)
+  // keeps the panel's onBundleChanged out of an active search: a wholesale
+  // bundle swap there drops the seat the search exit needs to fade back in.
+  function _mergeLazyCompanion(cached, companion) {
+    if (!cached || !cached.bundle || cached.bundle.lazySearchLoaded === true) return false
+    lazyLoader.path = ""
+    lazyLoader.path = companion
+    if (!lazyLoader.waitForJob()) return false
+    let extra = null
+    try {
+      extra = MenuLib.parseBundle(lazyLoader.text())
+    } catch (e) {
+      return false
+    }
+    if (!extra || !Array.isArray(extra.pages) || extra.pages.length === 0) return false
+    const bundle = cached.bundle
+    bundle.pages = bundle.pages.concat(extra.pages)
+    Object.assign(bundle.byId, extra.byId)
+    bundle.lazySearchLoaded = true
+    cached.index = MenuLib.buildIndex(bundle)
+    return true
+  }
+
+  // Fold the companion's pages into the live bundle on the first query. The
+  // entry's uids stay untouched: pages keep their own id prefix, so no
+  // re-normalization (and no second pass over the face rows) is needed.
+  function _ensureLazySearch(q) {
+    if (String(q ?? "") === "") return false
+    const entry = root._lazySearchPaths[root._lastPath]
+    if (entry === undefined || entry.companion === "") return false
+    const cached = root._bundleCache[root._lastPath]
+    if (cached === undefined || !root.bundle || root.bundle !== cached.bundle) return false
+    if (!root._mergeLazyCompanion(cached, entry.companion)) return false
+    root._builtinIndex = cached.index
+    root._rebuildSearchIndex()
+    return true
+  }
+
+  // Late prewarm: units register their lazy bundle paths on the Registry at
+  // boot; once the entrance is over and the loop is idle, build those bundles
+  // into the cache and merge their companions. The first query then finds a
+  // merged cached container and pays no parse at all.
+  function _preloadLazySearches() {
+    root._lazyPreloadScheduled = false
+    // Building a bundle installs its containers even when the caller restores
+    // them afterwards. Doing that under an open picker refits the card mid
+    // summon - the cold-boot first-open flicker. Wait for a closed surface;
+    // until then an ordinary first query loads the companion on demand.
+    if (root.open) return
+    const paths = Registry.get("lazySearchBundles", "paths")
+    if (!Array.isArray(paths) || paths.length === 0) return
+    const priorBundle = root.bundle
+    const priorIndex = root._builtinIndex
+    const priorFamily = root._settingsFamily
+    for (let i = 0; i < paths.length; i++) {
+      const path = paths[i]
+      if (!root._buildFromFile(path)) continue
+      const entry = root._lazySearchPaths[path]
+      if (entry === undefined) continue
+      root._mergeLazyCompanion(root._bundleCache[path], entry.companion)
+    }
+    root.bundle = priorBundle
+    root._builtinIndex = priorIndex
+    root._settingsFamily = priorFamily
+    root._rebuildSearchIndex()
+    root._lazyPreloaded = true
   }
 
   // The external pages - the idle timer list, the font rows - belong to the
@@ -351,6 +465,8 @@ Singleton {
   property string _lastPath: ""
   property var _bundleCache: ({})
   property bool _prewarmed: false
+  property bool _lazyPreloaded: false
+  property bool _lazyPreloadScheduled: false
 
   // Icon raster prewarm, fed from the warm bundles in _maybePrewarm. The
   // panel's IconWarmer decodes each (glyph, tone) into Qt's shared pixmap
@@ -442,7 +558,15 @@ Singleton {
     && MiscSettings.ready === true
   // Defer off the binding edge: the build mutates store/menu state that the
   // gate reads, so running it inline re-enters evaluation as a binding loop.
-  on_PrewarmCanRunChanged: if (root._prewarmCanRun) Qt.callLater(root._maybePrewarm)
+  on_PrewarmCanRunChanged: if (root._prewarmCanRun) {
+    Qt.callLater(root._maybePrewarm)
+    // The lazy companion parse is deferred again to the next idle turn, so it
+    // never lands in the same frame as the prewarm's guard batches.
+    if (!root._lazyPreloaded && !root._lazyPreloadScheduled) {
+      root._lazyPreloadScheduled = true
+      Idle.run(root._preloadLazySearches)
+    }
+  }
 
   function _maybePrewarm() {
     if (root._prewarmed) return
@@ -746,6 +870,7 @@ Singleton {
     // re-enters search and drops the restored page's reveal claim, leaving
     // its expanded dropdown with no region or background.
     root._pendingQueryGen++
+    root._ensureLazySearch(q)
     if (root.frame && root.hasDynamicPage(root.frame.id)) {
       const pg = root.pageById(root.frame.id)
       if (!pg || pg.searchGlobal !== true) {
