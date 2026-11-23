@@ -11,6 +11,7 @@ import "../../common/text/Duration.js" as Duration
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/math/Range.js" as Range
 import "../../common/process/JobResult.js" as Job
+import "Login1Sleep.js" as Login1Sleep
 // Idle + sleep inhibitor backed by org.freedesktop.login1. The Inhibit()
 // call returns a Unix file descriptor — closing it releases the lock —
 // so the busctl process must stay alive while the inhibitor is active.
@@ -714,6 +715,11 @@ Singleton {
       // banner ("Monitoring signals from...") is ignored.
       if (data.indexOf("/org/freedesktop/login1:") !== 0) return
       _monitorStream.noteAlive()
+      // The same stream already carries inhibition changes. A sleep boundary
+      // closes any grace window on the lock surface; one topic served by the
+      // single monitor keeps lock and sleep from drifting apart.
+      const preparing = Login1Sleep.preparingFromLine(data)
+      if (preparing !== null) Bus.publish("session.sleep", { preparing: preparing })
       _coalesceTimer.restart()
     }
   }

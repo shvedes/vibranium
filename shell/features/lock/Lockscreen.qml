@@ -27,11 +27,10 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 // Keyboard state (caps, layout) lives in the shared Keyboard singleton.
 // An optional grace window (Settings.lockscreenGraceSeconds) releases a fresh
 // lock on the first real input inside that window, so a user already back is
-// not asked for a password. It is measured against the wall clock: a suspend
-// advances that clock but freezes a QML timer, so time asleep always consumes
-// the grace and wake input can never ride a window armed before sleep. A lock
-// that belongs to a suspend never arms grace at all, so a failed suspend still
-// leaves the session held.
+// not asked for a password. A sleep boundary closes the window whether the
+// lock was fresh or already held: the wall clock alone would let a short sleep
+// fit inside the window. Locks that belong to a sleep never arm grace at all,
+// so a failed sleep still leaves the session held.
 Singleton {
   id: root
 
@@ -118,18 +117,29 @@ Singleton {
   }
 
   // Wall-clock deadline for the armed grace window, 0 when unarmed. A suspend
-  // advances this clock but freezes a QML timer, so the deadline is the only
-  // authority on whether input still counts as grace activity.
+  // advances this clock but freezes a QML timer, so the deadline bounds a
+  // window that no sleep has interrupted.
   property double _graceDeadlineMs: 0
 
-  // Grace covers every fresh lock except one that belongs to a suspend. The
-  // suspend reason is the only one that must never release on input: its wake
-  // cannot be mistaken for a user who never left, and a suspend that fails to
-  // sleep still has to hold the session. The wall-clock deadline expires any
-  // other grace that a later suspend carries past its window.
+  // The sleep boundary is authoritative for grace. A reason gate only covers
+  // a fresh lock: one already held keeps the window it armed, and a sleep
+  // shorter than that window would not advance the wall clock past it.
+  readonly property var _sleepState: Bus.latest("session.sleep")
+
+  on_SleepStateChanged: {
+    if (root._sleepState && root._sleepState.preparing === true) root._endGrace()
+  }
+
+  // A lock that belongs to a sleep or a session end never releases on input.
+  // The gate is deliberately narrow: a caller with a new reason must opt in.
+  function _graceMayArm(reason) {
+    return reason !== "suspend" && reason !== "sleep"
+      && reason !== "logout" && reason !== "reboot" && reason !== "poweroff"
+  }
+
   function _armGrace(reason) {
     root._endGrace()
-    if (reason === "suspend") return
+    if (!root._graceMayArm(reason)) return
     if (Settings.lockscreenGraceSeconds <= 0) return
     root._graceDeadlineMs = Date.now() + Settings.lockscreenGraceSeconds * 1000
   }
@@ -146,8 +156,9 @@ Singleton {
     if (root._graceDeadlineMs === 0) return
     const armed = root._graceDeadlineMs
     root._endGrace()
-    // A deadline in the past means the window elapsed, possibly across a
-    // suspend; no password is bypassed in that case.
+    // Turning the setting off while a window is armed consumes it, and a
+    // deadline in the past means the window elapsed - no password bypass.
+    if (Settings.lockscreenGraceSeconds <= 0) return
     if (Date.now() >= armed) return
     root.finishRelease()
   }
@@ -296,6 +307,10 @@ Singleton {
     root.requested = false
     root.backdropPath = ""
     root.resetAuth("release")
+    // Input delivered to a lock surface need not move the compositor's
+    // activity monitor, so the idle daemon cannot rely on that edge to
+    // re-arm a timer the lock already spent.
+    IdleDaemon.rearmAfterRelease()
   }
 
   WlSessionLock {

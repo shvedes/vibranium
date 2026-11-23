@@ -48,7 +48,7 @@ function lift(name) {
   return src.slice(m.index, end)
 }
 
-const code = ["_armGrace", "_endGrace", "graceActivity"].map(lift).join("\n")
+const code = ["_graceMayArm", "_armGrace", "_endGrace", "graceActivity"].map(lift).join("\n")
 
 let now = 1_000_000
 const state = { release: 0 }
@@ -61,7 +61,7 @@ const Settings = { lockscreenGraceSeconds: 5 }
 const Clock = { now: () => now }
 
 const fns = new Function("root", "Settings", "Date",
-  code + "\nreturn { _armGrace, _endGrace, graceActivity }")(root, Settings, Clock)
+  code + "\nroot._graceMayArm = _graceMayArm\nreturn { _armGrace, _endGrace, graceActivity }")(root, Settings, Clock)
 
 const out = {}
 const armed = () => root._graceDeadlineMs > 0
@@ -186,7 +186,8 @@ const root = {
   lockForSleep(via) { calls.push("sleepLock:" + root._via(via)); return "ok" },
   _suspendViaSystemctl() { calls.push("systemctl"); return "ok" }
 }
-const sleepFn = new Function("root", lift("lockForSleep") + "\nreturn lockForSleep")(root)
+const Bus = { publish(topic, payload) { calls.push("publish:" + topic + ":" + String(payload.preparing)) } }
+const sleepFn = new Function("root", "Bus", lift("lockForSleep") + "\nreturn lockForSleep")(root, Bus)
 const suspendFn = new Function("root", lift("suspend") + "\nreturn suspend")(root)
 
 const verdict = sleepFn("surface")
@@ -208,8 +209,8 @@ done <<<"$SLEEP_LOCK"
 
 t_section "the pre-sleep lock carries the suspend reason"
 t_eq "the sleep-lock verb reports the lock verdict" "ok" "${S[verdict]}"
-t_eq "the sleep-lock verb locks with the suspend reason, without sleeping" \
-  "lock:suspend:via:surface" "${S[sleepCalls]}"
+t_eq "the sleep-lock verb closes the window and locks with suspend" \
+  "publish:session.sleep:true,lock:suspend:via:surface" "${S[sleepCalls]}"
 t_eq "suspend shares the sleep-lock verb rather than locking again" \
   "sleepLock:via:surface,systemctl" "${S[suspendCalls]}"
 t_eq "suspend still reports the sleep handoff" "ok" "${S[suspendVerdict]}"
@@ -226,6 +227,84 @@ t_contains "lock state follows the request and the compositor's secure state" \
   "requested || sessionLock.secure" "$LOCKED_LINE"
 t_not_contains "lock state does not read the stale locked property" \
   "sessionLock.locked" "$LOCKED_LINE"
+
+# --- a release re-arms the idle timers --------------------------------------
+# A spent lock row stays spent until an activity edge. Input on a lock
+# surface need not move the compositor's activity monitor, so without an
+# explicit rearm on release the next idle period skips its lock and the
+# suspend timer locks only at the last moment.
+
+IDLE="$SHELL_DIR/services/session/IdleDaemon.qml"
+t_file "the idle daemon owns the timer rearm" "$IDLE"
+
+REARM="$(LOCKSCREEN="$LOCKSCREEN" IDLE="$IDLE" node - <<'NODE'
+const fs = require("fs")
+const lockSrc = fs.readFileSync(process.env.LOCKSCREEN, "utf8")
+const idleSrc = fs.readFileSync(process.env.IDLE, "utf8")
+
+function lift(src, name) {
+  const m = new RegExp("function\\s+" + name + "\\s*\\([^)]*\\)\\s*\\{").exec(src)
+  if (!m) throw new Error("no function " + name)
+  let depth = 0
+  let end = m.index + m[0].length - 1
+  for (; end < src.length; end++) {
+    const c = src[end]
+    if (c === "{") depth++
+    else if (c === "}") { depth--; if (depth === 0) { end++; break } }
+  }
+  return src.slice(m.index, end)
+}
+
+const calls = []
+const lockRoot = {
+  requested: true,
+  backdropPath: "wallpaper",
+  _endGrace() { calls.push("endGrace") },
+  resetAuth() { calls.push("resetAuth") }
+}
+const IdleDaemon = { rearmAfterRelease() { calls.push("rearm") } }
+const finish = new Function("root", "IdleDaemon",
+  lift(lockSrc, "finishRelease") + "\nreturn finishRelease")(lockRoot, IdleDaemon)
+finish()
+
+const idleRoot = {
+  enabled: true,
+  epoch: 5,
+  fired: { 0: 5 },
+  _onActivity() { calls.push("onActivity") },
+  _setRows() { calls.push("setRows") }
+}
+const rearm = new Function("root",
+  lift(idleSrc, "rearmAfterRelease") + "\nreturn rearmAfterRelease")(idleRoot)
+const activity = new Function("root",
+  lift(idleSrc, "_onActivity") + "\nreturn _onActivity")(idleRoot)
+calls.length = 0
+rearm()
+const rearmCalls = calls.join(",")
+calls.length = 0
+activity()
+
+const out = {}
+out.releaseRearmsIdle = rearmCalls === "onActivity"
+out.releaseDropsRequest = lockRoot.requested === false
+out.epochBumped = idleRoot.epoch === 6
+out.firedCleared = Object.keys(idleRoot.fired).length === 0
+out.rowsRebuilt = calls.join(",") === "setRows"
+for (const k of Object.keys(out)) process.stdout.write(k + "=" + out[k] + "\n")
+NODE
+)" || { t_block "node could not evaluate the release rearm"; }
+
+declare -A RE
+while IFS='=' read -r key value; do
+  [[ -n $key ]] && RE["$key"]="$value"
+done <<<"$REARM"
+
+t_section "a lock release re-arms the idle timers"
+t_eq "finishRelease asks the idle daemon to rearm" "true" "${RE[releaseRearmsIdle]}"
+t_eq "finishRelease still drops the lock request" "true" "${RE[releaseDropsRequest]}"
+t_eq "the rearm path bumps the epoch" "true" "${RE[epochBumped]}"
+t_eq "the rearm path clears spent rows" "true" "${RE[firedCleared]}"
+t_eq "the rearm path rebuilds the monitors" "true" "${RE[rowsRebuilt]}"
 
 # --- LCK-5: a policy flip mid-tween must stop the tween and snap its driver ---
 # appearAnim, fitAnim and progressAppearAnim each sample the animation gate once

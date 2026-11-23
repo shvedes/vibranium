@@ -424,14 +424,21 @@ Singleton {
     root._onActivity()
   }
 
+  // A session release is a fresh idle period even when the compositor's
+  // activity monitor saw no edge: input on a lock surface can leave its
+  // isIdle unchanged, and a spent row would otherwise stay spent until the
+  // suspend timer runs and locks only at the last moment.
+  function rearmAfterRelease() {
+    root._onActivity()
+  }
+
   // A real activity transition: a new epoch, a cleared fired map, and a
   // fresh monitor set. Re-arming is what invalidates the retired
   // monitors' pending callbacks - fire() drops any callback whose epoch
   // is spent, and the retired activity monitor is not the armed one.
   //
-  // This is the resume path, and the one place a timer can silently stop
-  // being able to fire: a disabled daemon returns here without re-arming,
-  // which is correct.
+  // Both the activity edge and a session release come through here, and a
+  // disabled daemon returns without re-arming, which is correct.
   function _onActivity() {
     if (!root.enabled) return
     root.epoch += 1

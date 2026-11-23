@@ -187,6 +187,10 @@ Singleton {
   // engage a lock that carries this reason: it is what withholds grace on
   // wake. The verdict is the lock call's own report; no sleep child starts.
   function lockForSleep(via) {
+    // A lock already held keeps the grace it armed when it engaged, so the
+    // reason on a fresh lock is not enough. The sleep topic closes that
+    // window on the resident surface before logind starts the transition.
+    Bus.publish("session.sleep", { preparing: true })
     return root.lock("suspend", root._via(via))
   }
 

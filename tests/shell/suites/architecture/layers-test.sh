@@ -245,7 +245,9 @@ for layer in boot common features services; do
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
 t_count "features/ holds the tree's 183 .qml and .js files" "183" "$(layer_files features)"
-t_count "services/ holds the 27 files the README publishes" "27" "$(layer_files services)"
+# services/ gained Login1Sleep.js when grace began closing on the logind
+# sleep boundary rather than on the wall clock alone.
+t_count "services/ holds the 28 files the README publishes" "28" "$(layer_files services)"
 t_count "common/ holds the 162 files the README publishes" "162" "$(layer_files common)"
 t_count "boot/ holds the 4 files the README publishes" "4" "$(layer_files boot)"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
