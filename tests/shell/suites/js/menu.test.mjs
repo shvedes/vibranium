@@ -586,9 +586,9 @@ group('defaultsFor fills every key a row renderer branches on', () => {
   // README: "normalizeItem must fill every role the row renderer reads, so
   // views never branch on a missing key." The count is the contract; a new
   // role has to show up as a diff here.
-  eq('51 roles', Object.keys(d).length, 51)
+  eq('52 roles', Object.keys(d).length, 52)
   const expected = [
-    'type', 'id', 'label', 'sub', 'icon', 'glyph', 'desc', 'warning', 'enabled',
+    'type', 'id', 'label', 'sub', 'icon', 'iconColor', 'glyph', 'desc', 'warning', 'enabled',
     'when', 'checked', 'disabled', 'requires', 'command', 'call', 'page',
     'checked_', 'onToggle', 'close', 'value', 'options', 'onSelect', 'onCall',
     'marker', 'editValue', 'editText', 'editCall', 'keepOpen', 'hideValue',
@@ -756,7 +756,7 @@ group('buildPage normalizes items and stamps the page chrome', () => {
     { type: 'action', label: 'b' },
     { type: 'toggle', label: 'c', command: 'own' },
   ], { command: 'page %v', layout: 'grid', cell: 40, maxHeight: 300 })
-  eq('the page publishes exactly these fields', Object.keys(p), ['id', 'label', 'width', 'layout', 'cell', 'maxHeight', 'command', 'filterDefault', 'items', '_raw'])
+  eq('the page publishes exactly these fields', Object.keys(p), ['id', 'label', 'width', 'layout', 'cell', 'maxHeight', 'command', 'filterDefault', 'searchGlobal', 'items', '_raw'])
   eq('id', p.id, 'p1')
   eq('label', p.label, 'Title')
   eq('width', p.width, 420)
@@ -767,6 +767,9 @@ group('buildPage normalizes items and stamps the page chrome', () => {
   eq('filtering defaults to off', p.filterDefault, false)
   eq('filterDefault rides through', M.buildPage('p', 't', 0, [], { filterDefault: true }).filterDefault, true)
   eq('a non-boolean filterDefault is off', M.buildPage('p', 't', 0, [], { filterDefault: 1 }).filterDefault, false)
+  eq('searchGlobal defaults to off', M.buildPage('p', 't', 0, []).searchGlobal, false)
+  eq('searchGlobal rides through', M.buildPage('p', 't', 0, [], { searchGlobal: true }).searchGlobal, true)
+  eq('a non-boolean searchGlobal is off', M.buildPage('p', 't', 0, [], { searchGlobal: 1 }).searchGlobal, false)
   eq('items are keyed by position when anonymous', p.items.map(i => i.uid), ['p1#0', 'p1#1', 'p1#2'])
   eq('every item carries the page width for its value slot', p.items.map(i => i._pageWidth), [420, 420, 420])
   // "Page-level fallback command: action rows without their own inherit the
@@ -3881,11 +3884,11 @@ group('keyRoute: staged deletion, then staged confirmation, then the filter', ()
   eq('a confirm row confirms on Delete', routeName({ key: 'deleteKey', confirm: true }), 'confirm')
   eq('and on Ctrl+D', routeName({ key: 'keyD', ctrl: true, confirm: true }), 'confirm')
   eq('del wins over confirm when both are declared', routeName({ key: 'deleteKey', del: true, confirm: true }), 'delete')
-  eq('with neither, Delete opens the filter', routeName({ key: 'deleteKey' }), 'filter')
+  eq('with neither, Delete is a swallowed row verb', routeName({ key: 'deleteKey' }), 'delete')
   // keyD has no case in the switch: with no delCommand and no confirm it
   // falls all the way through, and the typing gate refuses it because ctrl is
   // held. So an unbound Ctrl+D is unclaimed rather than the filter route.
-  eq('an unbound Ctrl+D is unclaimed, not the filter', routeName({ key: 'keyD', ctrl: true }), null)
+  eq('an unbound Ctrl+D is a swallowed row verb', routeName({ key: 'keyD', ctrl: true }), 'delete')
   eq('while a bare keyD with no text is unclaimed too', routeName({ key: 'keyD' }), null)
   eq('Backspace walks the escape chain, the conventional way back',
     routeName({ key: 'backspace' }), 'escape')
@@ -3902,8 +3905,8 @@ group('keyRoute: staged deletion, then staged confirmation, then the filter', ()
     routeName({ key: 'backspace', mode: 'filter' }), '')
   // The flags are read through `=== true`, so a truthy stand-in cannot arm a
   // destructive route off a page that never declared one.
-  eq('a truthy non-boolean del does not arm', routeName({ key: 'deleteKey', del: 1 }), 'filter')
-  eq('a truthy non-boolean confirm does not arm', routeName({ key: 'deleteKey', confirm: 'yes' }), 'filter')
+  eq('a truthy non-boolean del still swallows Delete', routeName({ key: 'deleteKey', del: 1 }), 'delete')
+  eq('a truthy non-boolean confirm still swallows Delete', routeName({ key: 'deleteKey', confirm: 'yes' }), 'delete')
   eq('a truthy non-boolean grid is not a grid', routeName({ key: 'left', grid: 1 }), 'optionOrStep')
   eq('a truthy non-boolean editor is not an editor', routeName({ key: 'up', editor: 1 }), 'move')
   eq('a truthy non-boolean field is not the field', routeName({ key: 'returnKey', field: 1 }), 'activate')
