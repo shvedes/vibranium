@@ -203,6 +203,7 @@ describe() {
   capture-annotations) printf 'RectMath, ShotLib, AnnotationTools' ;;
   bar-models) printf 'BarLib, the bar module models, and the media helpers' ;;
   services-calendar-weather) printf 'CalendarLib, PrivacyLib, PrintersLib, weather Model' ;;
+  moon-phase) printf 'MoonPhaseLib: lunar phase, illumination and the four-day forecast' ;;
   registry-bus) printf 'the service locator and the one-way notification bus' ;;
   
   paths-presence) printf 'path derivation invariants and refcounted file presence' ;;

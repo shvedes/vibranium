@@ -28,7 +28,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 264 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 267 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
@@ -136,7 +136,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # `model` unqualified, which cost 11 `unqualified` warnings and 12 info notes.
 # The delegate now declares `required property var modelData` and reads it
 # through its own id, matching the ArchUpdates table, so both figures fell.
-RECORDED_FILE_COUNT=266
+RECORDED_FILE_COUNT=267
 RECORDED_WARNING_COUNT=103
 RECORDED_INFO_COUNT=23
 

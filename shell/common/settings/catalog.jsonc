@@ -903,6 +903,14 @@
                 "desc": "Show full date before time.\nMon, Sep 21 | 21:30."
             },
             {
+                "key": "shell.statusbar.clockMoonPhase",
+                "type": "bool",
+                "default": true,
+                "label": "Show moon phase",
+                "sub": "Moon pane in calendar",
+                "desc": "Show the moon phase pane beside the calendar in the clock island."
+            },
+            {
                 "key": "shell.statusbar.clockRightClick",
                 "type": "string",
                 "default": "",
@@ -1093,6 +1101,7 @@
                                 "shell.statusbar.clockSeconds",
                                 "shell.statusbar.clockSecondsTooltip",
                                 "shell.statusbar.clockFullDate",
+                                "shell.statusbar.clockMoonPhase",
                                 "shell.statusbar.clockRightClick"
                             ]
                         },
