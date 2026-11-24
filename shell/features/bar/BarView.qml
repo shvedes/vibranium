@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell.Wayland
 import qs.common
 import qs.features.bar
+import qs.features.bar.modules.ColorPicker
 import "../../common/text/DropPayload.js" as DropPayload
 
 // Per-screen bar surface on the bottom layer. One window per real screen,
@@ -317,6 +318,30 @@ LayerSurface {
   function wireModule(item) {
     item.barScreen = win.screen
     item.barWindow = win
+  }
+
+  // Headless color-pick engine for the keybind. Disabling the statusbar slot
+  // removes the icon, not the feature: this engine is a fallback owner for
+  // the `colorPicker` IPC verb when no module is loaded. It lives in this
+  // real bar window because the sampler's Canvas needs a scene graph to
+  // paint, but it is not a layout slot and barScreen stays null, so it never
+  // claims the verb from a visible module and beginPick() falls back to the
+  // primary screen. Only the primary-screen window hosts it.
+  Loader {
+    active: win.screen === Ui.primaryScreen
+
+    sourceComponent: Component {
+      ColorPicker {
+        id: pickerEngine
+
+        visible: false
+        width: 0
+        height: 0
+
+        Component.onCompleted: Bar.registerFallbackPicker(pickerEngine)
+        Component.onDestruction: Bar.unregisterFallbackPicker(pickerEngine)
+      }
+    }
   }
 
 }

@@ -1643,10 +1643,17 @@ Singleton {
   // The ColorPicker module instantiates once per bar window (per monitor),
   // so it cannot host the IpcHandler itself: a target must be unique and
   // quickshell drops duplicate registrations with a warning. The singleton
-  // owns the single handler; the first loaded module instance registers
-  // here (registerPicker) and the verbs delegate to it. `pick` starts a
-  // native pick on that instance's screen - the keybind surface is
+  // owns the single handler; the loaded primary-screen module registers here
+  // (registerPicker) and the verbs delegate to it. `pick` starts a native
+  // pick on that instance's screen - the keybind surface is
   // `vb-shell colorPicker pick`.
+  //
+  // The feature outlives its statusbar slot: disabling the module removes
+  // the bar icon, not the keybind. BarView hosts a headless engine on the
+  // primary screen as a fallback owner; it is not a layout slot and its
+  // barScreen stays null, so it never claims the verb from a visible module
+  // and beginPick() falls back to the primary screen.
+  property Item _pickerFallback: null
   property Item _pickerOwner: null
 
   function registerPicker(m) {
@@ -1655,6 +1662,14 @@ Singleton {
 
   function unregisterPicker(m) {
     if (_pickerOwner === m) _pickerOwner = null
+  }
+
+  function registerFallbackPicker(m: Item) {
+    _pickerFallback = m
+  }
+
+  function unregisterFallbackPicker(m) {
+    if (_pickerFallback === m) _pickerFallback = null
   }
 
   IpcHandler {
@@ -1668,12 +1683,13 @@ Singleton {
     function status(): string {
       return JSON.stringify({
         unit: "colorPicker",
-        healthy: root._pickerOwner !== null
+        healthy: root._pickerOwner !== null || root._pickerFallback !== null
       })
     }
     function pick(): string {
-      if (root._pickerOwner === null) return "error: no picker module loaded"
-      return root._pickerOwner.beginPick() ? "ok" : "error: no screen to pick on"
+      const picker = root._pickerOwner !== null ? root._pickerOwner : root._pickerFallback
+      if (picker === null) return "error: no picker available"
+      return picker.beginPick() ? "ok" : "error: no screen to pick on"
     }
   }
 
