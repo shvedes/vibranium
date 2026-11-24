@@ -219,6 +219,9 @@ Rectangle {
   // at the height its own row set implies. Cleared wherever _transitionActive
   // is, so it is exactly "the spawn owns the card right now".
   property bool _summoning: false
+  // A navigation chosen while the opening layout is still settling. The show
+  // gate suppresses the spawn's own fit; it must not suppress this resize.
+  property bool _navInGate: false
   property bool _heightAnimating: false
   // The height the transition in flight latched as its starting point.
   // Written by beginPageTransition and by both branches of
@@ -270,6 +273,7 @@ Rectangle {
     panel._heightAnimGen = -1
     panel._transitionActive = false
     panel._summoning = false
+    panel._navInGate = false
     // A row glide the surface no longer shows must not hold the fit shut
     // on the next summon.
     panel._rowsMoving = false
@@ -309,10 +313,17 @@ Rectangle {
     // page had, and the page on screen now is a different one. The new
     // page's restore arms its own.
     panel._placeIdx = -1
-    // A summon claims the marker, and only a summon does: a page navigation
-    // that lands inside the same opening window is still part of that spawn,
-    // and the show gate snaps it regardless (see _startHeightTransition).
-    if (summon === true) panel._summoning = true
+    // A summon claims the marker, and only a summon does. A page navigation
+    // that lands inside the opening window is a new intent from the user, not
+    // a continuation of the spawn: it takes the visible height as its hold
+    // and escapes the show gate (see _startHeightTransition).
+    panel._summoning = summon === true
+    // The summon's own page assignment also lands here, at the depth the open
+    // just claimed. A deeper stack is a page the user pushed, so its resize
+    // must animate even though the opening layout has not settled yet.
+    if (summon === false && !panel.shown
+      && Menu.stack.length > Math.max(0, listBox.lastDepth))
+      panel._navInGate = true
     // Armed on the summon edge only: a navigation mid-flight is not a spawn
     // and has no inherited size to be measured against.
     if (summon === true) panel._armSpawnProbe()
@@ -356,6 +367,7 @@ Rectangle {
     const depth = panel._pendingSlideDepth
     panel._transitionActive = false
     panel._summoning = false
+    panel._navInGate = false
     // The transition's end is where the card owns its final size, so it is
     // also where the spawn probe's window closes. A spawn that never got
     // here did not settle - a close landed inside the fit - and keeping
@@ -403,10 +415,12 @@ Rectangle {
     // to prevent. Snapping hands the open fade a card that is already its own
     // size.
     //
-    // `searching` is the width gate's own escape: a keystroke landing inside
-    // the gate window is a real resize the user asked for, not the opening
-    // layout, and tweening it is what the card has always done.
+    // `searching` and `_navInGate` are the gate's escapes: a keystroke or a
+    // submenu pick landing inside the window is a real resize the user asked
+    // for, not the opening layout, and tweening it is what the card has always
+    // done for search.
     const gateShut = !panel.shown && !panel.searching && !panel.scopedSearching
+      && !panel._navInGate
     // A live slot claim owns the card's size through _slotRegionH, animated
     // at the slot's own pace. A fit tween to the RESTING size takes precedence
     // in layoutListH for its whole duration (it prefers _animatedListH over

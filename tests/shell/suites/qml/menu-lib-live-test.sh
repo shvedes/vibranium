@@ -362,6 +362,36 @@ if sys.argv[2] == "on":
         sys.exit("short dropdown scroll jumped during the resize")
 PY
 
+  # A submenu picked inside the opening window is a real resize, not part of
+  # the spawn. The show gate still snaps the summon's own fit; the navigation
+  # that follows must tween from the height on screen to the new page.
+  p close >/dev/null
+  p debugDeep on >/dev/null
+  p deepPhase instant-open >/dev/null
+  p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#main" >/dev/null
+  p debugSetCurrentIdx 0 >/dev/null
+  p deepPhase instant-nav >/dev/null
+  p debugActivatePanel >/dev/null
+  sleep 0.6
+  p debugDeep off >/dev/null
+  local nav_trace="${part}-instant-nav.json"
+  drain_trace "$nav_trace" || return 1
+  python3 - "$nav_trace" "$motion" <<'PY' || return 1
+import json, sys
+
+frames = json.load(open(sys.argv[1]))
+opening = [f for f in frames
+           if f["phase"] == "instant-open" and f["base"]["page"] == "main"]
+nav = [f for f in frames
+       if f["phase"] == "instant-nav" and f["base"]["page"] == "settings"]
+if not opening or not nav:
+    sys.exit("instant navigation did not reach the submenu")
+if sys.argv[2] == "on":
+    heights = [f["card"]["rendered"] for f in nav]
+    if len(heights) < 4 or len(set(round(h) for h in heights)) < 3:
+        sys.exit("instant navigation switched height in one frame")
+PY
+
   # Seeded, not fixed: the walk is reproducible but still crosses entries,
   # nested groups, editors, option grids, search and filter in odd orders.
   RANDOM=90210
