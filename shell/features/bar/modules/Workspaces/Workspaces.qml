@@ -84,32 +84,59 @@ BarModule {
         readonly property bool focused: root.activeId === wsId
         readonly property bool urgent: slot.ws !== null && slot.ws.urgent === true
 
+        // One driver for the glyph swap. Both layers derive their opacity
+        // from it, so they cannot drift apart mid-fade. Glide carries the
+        // shared motion policy and duration.
+        property real focusK: slot.focused ? 1 : 0
+        Behavior on focusK {
+          Glide {}
+        }
+
         width: root.cellWidth
         height: Bar.height
 
+        // Number and focus glyph share one fixed cell and both read focusK.
+        // Each layer owns its resting size, so a focus change only moves the
+        // shared fade and cannot resize or shift the strip.
         Title {
           id: label
 
           level: 3
           anchors.centerIn: parent
-          anchors.verticalCenterOffset: slot.focused ? 0 : Math.round(Ui.fontS * 0.08)
-          font.pixelSize: slot.focused ? Math.round(Ui.fontS / 1.2) : Ui.fontS
-          text: slot.focused ? "\uDB85\uDCFB" : String(slot.wsId)
+          anchors.verticalCenterOffset: Math.round(Ui.fontS * 0.08)
+          font.pixelSize: Ui.fontS
+          text: String(slot.wsId)
           color: Ui.solid("foreground_0")
-          opacity: 1
+          opacity: 1 - slot.focusK
+          visible: !slot.urgent
+        }
+
+        Title {
+          id: focusIcon
+
+          level: 3
+          anchors.centerIn: parent
+          // Title nudges text down for optical centring; keep the glyph at
+          // zero offset so it sits where the single-layer swap placed it.
+          anchors.verticalCenterOffset: 0
+          font.pixelSize: Math.round(Ui.fontS / 1.2)
+          text: "\uDB85\uDCFB"
+          color: Ui.solid("foreground_0")
+          opacity: slot.focusK
           visible: !slot.urgent
         }
 
         // Urgency flashes on its own layer so the animation owns this opacity,
-        // not the label's. Ending urgency only hides the wash; no handler has
-        // to correct a value the stopped animation left behind.
+        // not the glyph layers'. Ending urgency only hides the wash; no handler
+        // has to correct a value the stopped animation left behind.
         Title {
           id: urgentWash
 
           level: 3
-          anchors.centerIn: label
-          font.pixelSize: label.font.pixelSize
-          text: label.text
+          anchors.centerIn: parent
+          anchors.verticalCenterOffset: slot.focused ? 0 : Math.round(Ui.fontS * 0.08)
+          font.pixelSize: slot.focused ? focusIcon.font.pixelSize : label.font.pixelSize
+          text: slot.focused ? focusIcon.text : label.text
           color: Ui.solid("red")
           visible: slot.urgent
           opacity: 0

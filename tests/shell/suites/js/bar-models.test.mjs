@@ -2654,7 +2654,7 @@ group('a slot is the label plus equal padding', () => {
 // BAR-5 and BAR-6 live in Workspaces.qml, not in the pure Model.js, so the
 // behavioural change is pinned at the source level: the strip must render the
 // live derivation with no second copy, and the urgency flash must ride its own
-// layer with label.opacity left at a constant 1. A QML probe cannot construct
+// layer instead of writing a glyph layer's opacity. A QML probe cannot construct
 // this module headlessly (it needs a BarModule host plus Hyprland), so the
 // structure is asserted directly from the file the shell loads.
 const WS_QML = fs.readFileSync(path.join(SHELL, 'features', 'bar', 'modules', 'Workspaces', 'Workspaces.qml'), 'utf8')
@@ -2667,13 +2667,24 @@ group('BAR-5: the strip renders the live ids, with no second copy', () => {
   notMatch('no onIdsChanged resync handler remains', WS_QML, /onIdsChanged\s*:/)
   notMatch('no click fallback re-sync remains', WS_QML, /root\.syncIds\(\)/)
 })
-group('BAR-6: the urgency flash is its own layer, label.opacity is left alone', () => {
+group('BAR-6: the urgency flash is its own layer, no glyph opacity is written', () => {
   notMatch('no handler writes label.opacity', WS_QML, /label\.opacity\s*=/)
   notMatch('no onUrgentChanged correction remains', WS_QML, /onUrgentChanged\b/)
-  match('the label keeps a constant opacity 1', WS_QML, /id:\s*label\b[\s\S]*?opacity:\s*1\b/)
+  match('the number layer derives its opacity from focusK', WS_QML, /id:\s*label\b[\s\S]*?opacity:\s*1 - slot\.focusK\b/)
   match('a dedicated urgentWash layer exists', WS_QML, /id:\s*urgentWash\b/)
   match('the flash animation rides the wash, after the label', WS_QML, /id:\s*label\b[\s\S]*?id:\s*urgentWash\b[\s\S]*?SequentialAnimation on opacity/)
   eq('there is still exactly one flash animation', (WS_QML.match(/SequentialAnimation on opacity/g) || []).length, 1)
+})
+group('the focus swap has one driver and two derivations', () => {
+  match('one live focus progress is published', WS_QML, /property real focusK: slot\.focused \? 1 : 0\b/)
+  match('the driver animates through the shared Glide primitive', WS_QML, /Behavior on focusK\s*\{\s*Glide\s*\{\s*\}\s*\}/)
+  match('a dedicated focus glyph layer exists', WS_QML, /id:\s*focusIcon\b/)
+  match('the glyph derives its opacity from the same driver', WS_QML, /id:\s*focusIcon\b[\s\S]*?opacity:\s*slot\.focusK\b/)
+  notMatch('no per-layer opacity tween remains', WS_QML, /Behavior on opacity\b/)
+  notMatch('the module repeats no duration token', WS_QML, /duration:\s*Ui\.fastMs/)
+  deepEqual('the two readings are complementary, so they cannot drift',
+    [...WS_QML.matchAll(/opacity:\s*(1 - slot\.focusK|slot\.focusK)\b/g)].map((m) => m[1]),
+    ['1 - slot.focusK', 'slot.focusK'])
 })
 group('the click contract survives both refactors', () => {
   match('left click still activates the workspace', WS_QML, /slot\.ws\.activate\(\)/)
