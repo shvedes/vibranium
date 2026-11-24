@@ -163,6 +163,28 @@ Singleton {
     : PowerProfiles.profile === PowerProfile.PowerSaver ? "power-power-saver"
     : ""
 
+  // The flash is its own, default-on preference. Reads directly so a change
+  // in Settings takes effect on the next switch without a restart.
+  readonly property bool osdEnabled: Settings.value("shell.power.profileOsd") !== false
+
+  // Keyed by the target name, not by the live D-Bus mirror: the mirror already
+  // holds the new profile by the time the card is shown. Each glyph is the
+  // name of a shipped SVG; an unknown profile falls back to the generic one.
+  function _osdViewFor(name: string): var {
+    switch (name) {
+      case "performance": return { label: "Performance", icon: "power-performance" }
+      case "power-saver": return { label: "Power saver", icon: "power-power-saver" }
+      case "balanced": return { label: "Balanced", icon: "power-balanced" }
+    }
+    return { label: name, icon: "power" }
+  }
+
+  function _showOSD(name: string) {
+    if (!root.osdEnabled) return
+    const view = root._osdViewFor(name)
+    Registry.call("osd", "show", "power", 0, view.label, view.icon, false)
+  }
+
   Component.onCompleted: {
     Registry.offer("powerProfile", {
       title: "Power profile",
@@ -306,6 +328,7 @@ Singleton {
     // default, so `unavailable` reads false and everything else looks like a
     // healthy session.
     if (root._asked !== null) root._asked = null
+    if (answered && settled === name) root._showOSD(name)
     return true
   }
 

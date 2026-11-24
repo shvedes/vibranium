@@ -12,7 +12,8 @@ import "../../common/math/Range.js" as Range
 // screen edge named by `shell.osd.position` and sits `shell.osd.offset` px
 // away from that same edge: top and bottom center it horizontally, left and
 // right center it vertically and rotate it 90 degrees so the meter reads
-// along the edge.
+// along the edge. A power-profile flash ignores that position and is pinned
+// to the bottom edge, keeping the same global offset.
 // The card body lives in OSDCard.qml. Session-lock surfaces render above
 // all layer-shell windows, so this window stays unmapped while the session
 // is locked (OSD.desktopSuppressed) and no OSD is shown over the lockscreen.
@@ -40,7 +41,11 @@ LayerSurface {
   // the edge the card hugs, and the clamp keeps it on screen when the
   // offset is pushed past the opposite edge.
   readonly property int margin: 12
-  readonly property bool vertical: OSD.vertical
+  // A profile flash keeps the global offset but not the global edge: the
+  // slot below, its clamp and the card's rotation all read these two, so the
+  // override needs no second placement path.
+  readonly property string placement: OSD.anchoredBottom ? "bottom" : OSD.position
+  readonly property bool vertical: !OSD.anchoredBottom && OSD.vertical
 
   // Placement is in SCREEN coordinates. A mapping layer surface is still at its
   // 100x100 placeholder, so an OSD centred on the surface lands in the
@@ -59,9 +64,9 @@ LayerSurface {
     readonly property real freeY: Math.max(0, win.screenH - slot.height)
     // Top/bottom: offset from that edge, horizontally centered. Left/right:
     // offset from that edge, vertically centered.
-    readonly property real preferredX: OSD.position === "right"
+    readonly property real preferredX: win.placement === "right"
       ? slot.freeX - OSD.offset : OSD.offset
-    readonly property real preferredY: OSD.position === "bottom"
+    readonly property real preferredY: win.placement === "bottom"
       ? slot.freeY - OSD.offset : OSD.offset
     x: win.vertical
       ? Range.clamp(slot.preferredX, win.margin, Math.max(win.margin, slot.freeX - win.margin))
@@ -77,7 +82,7 @@ LayerSurface {
       maxWidth: Math.max(0, (win.vertical ? win.screenH : win.screenW) - 2 * win.margin)
       // Right reads top-to-bottom, left bottom-to-top: the glyphs face the
       // edge they sit on. Rotation of the reading, not of the geometry.
-      rotation: !win.vertical ? 0 : (OSD.position === "right" ? 90 : -90)
+      rotation: !win.vertical ? 0 : (win.placement === "right" ? 90 : -90)
       transformOrigin: Item.Center
       // The card turns, the icon does not: the label and meter follow the
       // edge, but a speaker or sun glyph has an upright orientation of its
@@ -86,7 +91,7 @@ LayerSurface {
       // A clockwise turn (right edge) sends the row's leading edge and the
       // meter's 0 mark to the top, so mirror the content there: the glyph
       // and the fill's origin both stay at the bottom of the vertical card.
-      mirrored: win.vertical && OSD.position === "right"
+      mirrored: win.vertical && win.placement === "right"
       x: (slot.width - width) / 2
       y: (slot.height - height) / 2
     }

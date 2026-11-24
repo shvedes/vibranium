@@ -1892,6 +1892,14 @@
                     }
                 },
                 {
+                    "key": "shell.power.profileOsd",
+                    "type": "bool",
+                    "default": true,
+                    "label": "OSD notifications",
+                    "sub": "Show the new profile on switch",
+                    "desc": "Show an on-screen notification with the target power profile's icon and name when the profile changes."
+                },
+                {
                     "key": "shell.power.lowBattery",
                     "type": "bool",
                     "default": true,

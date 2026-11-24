@@ -10,11 +10,11 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/theme/DeviceIcons.js" as DeviceIcons
 import "../../common/math/Range.js" as Range
 
-// OSD service: transient screen meters. Holds the visible payload
-// (kind/value/label/icon/muted), the configurable bottom offset and the
-// lock suppression flag, drives the auto-hide Timer, and publishes the
-// `qs ipc call osd flash <json>` surface. View is in OSDView.qml; this
-// file owns only state and policy.
+// OSD service: transient screen overlays (level meters and profile flashes).
+// Holds the visible payload (kind/value/label/icon/muted), the configurable
+// bottom offset and the lock suppression flag, drives the auto-hide Timer,
+// and publishes the `qs ipc call osd flash <json>` surface. The view lives in
+// OSDView.qml; this file owns only state and policy.
 Singleton {
   id: root
 
@@ -61,6 +61,13 @@ Singleton {
   property string label: ""
   property string iconName: "volume-max"
   property bool muted: false
+
+  // A power-profile payload is pinned to the bottom edge whatever the global
+  // position says; it still uses the global offset. Derived from the payload
+  // kind rather than written beside it, so placement cannot disagree with the
+  // card: the next volume or brightness flash restores the configured edge on
+  // the same turn the kind changes.
+  readonly property bool anchoredBottom: root.kind === "power"
 
   // A fresh payload is not a level change: the card appears AT its level
   // instead of sweeping to it from the last flash's. True only for the turn
@@ -130,7 +137,7 @@ Singleton {
   // used for icon+bar-only displays).
   function show(kind, value, label, icon, muted) {
     const k = String(kind || "volume").toLowerCase()
-    const allowed = { volume: 1, microphone: 1, brightness: 1 }
+    const allowed = { volume: 1, microphone: 1, brightness: 1, power: 1 }
     if (!allowed[k]) return false
     let v = Number(value)
     if (isNaN(v)) v = 0
@@ -158,6 +165,7 @@ Singleton {
 
   function _iconFor(kind, v, muted) {
     if (muted) return "volume-off"
+    if (kind === "power") return "power"
     if (kind === "brightness") return "brightness"
     if (kind === "microphone") return v <= 0 ? "mic-off" : "mic-on"
     // Percent-scale volume leg, canonicalized in
@@ -170,7 +178,7 @@ Singleton {
   // as _iconFor above, mirrored from Audio.volumeDimTiersFor). The view
   // binds this next to the icon name; non-tiered glyphs ignore it.
   function _dimTiersFor(kind, v, muted) {
-    if (kind === "brightness" || kind === "microphone" || muted) return 0
+    if (kind === "brightness" || kind === "microphone" || kind === "power" || muted) return 0
     const n = Number(v)
     if (isNaN(n) || n <= 0) return 0
     if (n < 33) return 1
@@ -318,6 +326,7 @@ Singleton {
         label: root.label,
         icon: root.iconName,
         muted: root.muted,
+        anchoredBottom: root.anchoredBottom,
         position: root.position,
         offset: root.offset,
         surfaceVisible: root.surfaceVisible,

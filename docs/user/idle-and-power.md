@@ -66,6 +66,8 @@ power-saver -> balanced -> performance -> power-saver -> ...
 ```
 
 Use ++super+b++ to cycle through the available profiles.
+With **OSD notifications** on (the default), each switch flashes the target profile's icon and name at the bottom of the screen.
+The flash follows the OSD offset but ignores the OSD position setting.
 
 The bar's power profile slot shows the active profile and is an indicator only: clicking it does nothing, and `balanced` takes no room at all, so switching profiles never leaves a gap in the bar.
 
@@ -77,6 +79,7 @@ The bar's power profile slot shows the active profile and is an indicator only: 
 |---|---|
 | **Power profile (AC)** | the profile applied when the charger is connected |
 | **Power profile (battery)** | the profile applied when the charger is unplugged |
+| **OSD notifications** | flash the target profile's icon and name on switch |
 | **Low battery alerts** | master switch for the warnings |
 | **Warning level** | the charge level a draining battery warns at |
 | **Critical level** | the charge level it warns about urgently |

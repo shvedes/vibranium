@@ -19,6 +19,7 @@ Card {
   // Vertical breathing room for the OSD card. Slimmer than Ui.outerPad
   // (14): a 1.5s flash overlay needs less chrome than a resident island.
   readonly property bool hasText: OSD.label !== ""
+  readonly property bool isProfile: OSD.kind === "power"
   captureInput: false
   readonly property int padV: 10
   readonly property int padH: 14
@@ -29,6 +30,11 @@ Card {
   // width between two presses.
   readonly property real minWidth: Math.min(320, root.availableWidth)
   property real maxWidth: 9999
+  // Meters keep one fixed rail so the fill never jumps between flashes. A
+  // profile has no meter, so its card measures the glyph and the name. The
+  // measurement is independent of the width assigned to the same Column below,
+  // so this is a derivation rather than a feedback loop.
+  readonly property real huggedWidth: Math.min(root.maxWidth, colProfile.implicitWidth + 2 * root.padH)
   // Hosts that rotate the card (a side placement) pass the inverse angle so
   // the glyph stays upright: the card reads along the edge, but a speaker or
   // sun icon must never lie on its side.
@@ -39,7 +45,7 @@ Card {
   // one, so a vertical meter keeps both its icon and its 0% at the bottom on
   // both sides, where the reading starts.
   property bool mirrored: false
-  width: root.minWidth
+  width: root.isProfile ? root.huggedWidth : root.minWidth
   height: body.implicitHeight + 2 * root.padV
   opacity: OSD.visible ? 1 : 0
   border.color: Ui.tint("accent", 1)
@@ -65,14 +71,16 @@ Card {
     anchors.bottomMargin: root.padV
     anchors.leftMargin: root.padH
     anchors.rightMargin: root.padH
-    implicitHeight: root.hasText ? colText.implicitHeight : colPlain.implicitHeight
+    implicitHeight:
+      root.isProfile ? colProfile.implicitHeight
+      : root.hasText ? colText.implicitHeight : colPlain.implicitHeight
 
     // Text variant: icon left (scaled to box) + text above thin bar
     Column {
       id: colText
       width: parent.width
       spacing: Ui.s
-      visible: root.hasText
+      visible: root.hasText && !root.isProfile
 
       Row {
         width: parent.width
@@ -150,6 +158,47 @@ Card {
 
     }
 
+    // Profile variant: the target glyph beside its name. A profile has no
+    // level, so this variant carries no meter and the card hugs its content.
+    Column {
+      id: colProfile
+      width: parent.width
+      visible: root.isProfile
+
+      Row {
+        // Unbounded: the Row measures its children, which is what lets the
+        // card shrink to the glyph and the name instead of a meter rail. No
+        // child reads the Row's width, so its implicit width stays independent
+        // of the card width derived from it above.
+        spacing: Ui.m
+        layoutDirection: root.mirrored ? Qt.RightToLeft : Qt.LeftToRight
+
+        Item {
+          id: iconBoxProfile
+          implicitWidth: 28
+          implicitHeight: 28
+          width: implicitWidth
+          height: implicitHeight
+          Icon {
+            anchors.centerIn: parent
+            size: Math.min(iconBoxProfile.width, iconBoxProfile.height)
+            rotation: root.iconRotation
+            name: OSD.iconName
+            colorKey: "foreground_0"
+          }
+        }
+
+        Title {
+          anchors.verticalCenter: parent.verticalCenter
+          level: 1
+          // A flash gets one glance: use the card headline size, not the
+          // compact island-header size the meter labels use.
+          font.pixelSize: Ui.fontCardTitle
+          text: OSD.label
+        }
+      }
+    }
+
     // No-text variant: icon centered + bar bold next to it, both centered in card.
     // Progress bar spans vertically bold (tall) across the row.
     // The whole Column is centered in the body so icon+bar are centered when no text.
@@ -157,7 +206,7 @@ Card {
       id: colPlain
       width: parent.width
       spacing: Ui.s
-      visible: !root.hasText
+      visible: !root.hasText && !root.isProfile
       anchors.centerIn: parent
 
       Row {
