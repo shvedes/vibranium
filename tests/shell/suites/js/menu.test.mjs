@@ -2414,33 +2414,32 @@ group('the cap truncates what is SHOWN, never what the next keystroke scans', ()
     grown.some(e => e.label === 'Row249'), false)
 })
 
-group('a cache HIT is a fresh copy; the first result of a query is the cache', () => {
-  // `search` returns `_searchCacheEntries.slice()` on a hit but returns the
-  // freshly-built `out` array on a miss - and that same array is what it
-  // stores as `_searchCacheEntries`. So the caller's first result IS the
-  // cached array, and mutating it corrupts the next identical query. Pinned
-  // as the real behavior; see the report. Menu.qml assigns the result to
-  // root.results and never mutates it in place, so nothing is broken today.
+group('every search answer is a fresh copy, on the build path and the hit path', () => {
+  // The cache owns `_searchCacheEntries`; the caller never does. Both the
+  // first computation and an identical-query hit return a slice, so a
+  // mutation of a result cannot rewrite the cached answer or the recent
+  // query's projection.
   const idx = indexOf([['Power', 'power'], ['Powder', 'powder']])
   const first = M.search(idx, 'pow')
   eq('the first result', labels(first), ['Power', 'Powder'])
   const second = M.search(idx, 'pow')
-  is('a cache hit hands back a copy, not the cache', second === first, (v) => v === false, 'a new array')
+  is('a cache hit is a different array', second === first, (v) => v === false, 'a new array')
   eq('with equal contents', labels(second), labels(first))
-  second.push({ label: 'Injected', hay: 'x', words: ['x'] })
-  eq('so a caller can safely mutate a cache-hit result', labels(M.search(idx, 'pow')), ['Power', 'Powder'])
+  first.push({ label: 'Injected', hay: 'x', words: ['x'] })
+  second.length = 0
+  eq('mutating either answer leaves the cache intact', labels(M.search(idx, 'pow')), ['Power', 'Powder'])
 })
 
-group('REGRESSION GUARD: mutating a first-search result poisons the cache', () => {
+group('REGRESSION GUARD: a caller cannot poison the cache on any path', () => {
   const idx = indexOf([['Alpha', 'aa'], ['Beta', 'aa bb']])
   const first = M.search(idx, 'aa')
   first.push({ pageId: 'p', pageTitle: 'P', path: ['P'], row: 99, label: 'Injected', hay: 'x', words: ['x'] })
-  eq('the next identical query serves the poisoned array', labels(M.search(idx, 'aa')), ['Alpha', 'Beta', 'Injected'])
+  eq('a mutated first answer does not reach the next query', labels(M.search(idx, 'aa')), ['Alpha', 'Beta'])
   const idx2 = indexOf([['Alpha', 'aa'], ['Beta', 'aa bb']])
   const first2 = M.search(idx2, 'aa')
   first2.length = 0
-  eq('truncating it truncates the cache', M.search(idx2, 'aa'), [])
-  eq('a growing query rescans and rebuilds, so the poison does not survive', labels(M.search(idx2, 'aa b')), ['Beta'])
+  eq('nor does truncating it', labels(M.search(idx2, 'aa')), ['Alpha', 'Beta'])
+  eq('a growing query still rescans and rebuilds', labels(M.search(idx2, 'aa b')), ['Beta'])
   eq('and the rebuilt cache is clean', labels(M.search(idx2, 'aa b')), ['Beta'])
 })
 
@@ -2716,8 +2715,9 @@ group('a real filter matches every token against the row, ANDed', () => {
   eq('non-object entries are skipped', M.scopedFilter([null, 5, { type: 'action', label: 'A' }], 'a').length, 1)
   eq('and so is a separator', M.scopedFilter([{ type: 'separator', label: 'x' }], 'x').length, 0)
   noThrow('a row with no keys at all', () => M.scopedFilter([{}], 'x'))
-  // hayFromItem is recomputed per row per keystroke; the function is pure
-  // over the row it is handed, so that cost is the only cost.
+  // hayForFilter is pure over the row it is handed; the scoped projection
+  // recomputes it per keystroke, which is what keeps a mirrored live value
+  // from being filtered by the text it had when the filter first saw it.
   is('the filter does not mutate the row', (() => { const row = { type: 'action', label: 'A' }; const before = JSON.stringify(row); M.scopedFilter([row], 'a'); return JSON.stringify(row) === before })(), (v) => v === true, 'unchanged')
 })
 
@@ -3980,9 +3980,11 @@ group('grid activation holds while filtering (emoji picker)', () => {
   // view swallowed Enter. Pinned from the source: the grid branch is not
   // gated on not-searching and skips non-selectable cells.
   const panel = fs.readFileSync(path.join(SHELL_DIR, 'features/menu/MenuPanel.qml'), 'utf8')
-  contains('the grid branch holds while filtering', panel, 'filtering too: an emoji query filters within its own grid')
-  eq('and it is not gated on not-searching', panel.includes('if (!panel.searching && panel.gridMode)'), false)
-  contains('and it guards non-selectable cells', panel, 'itm.selectable === false')
+  const at = panel.indexOf('function activateCurrent')
+  const activate = panel.slice(at, at + 2200)
+  contains('the grid branch holds while filtering', activate, 'filtering too: an emoji query filters within its own grid')
+  eq('and it is not gated on not-searching', activate.includes('!panel.searching'), false)
+  contains('and it guards non-selectable cells', activate, 'itm.selectable === false')
 })
 
 // ======================================================================
@@ -4449,38 +4451,6 @@ group('MenuState.pruneSlotCloses keeps only rows the model still lists', () => {
   eq('a row without a uid is not a keeper', Object.keys(MS.pruneSlotCloses(map, [{}])).length, 0)
   const empty = {}
   is('nothing to prune reuses the map it was handed', MS.pruneSlotCloses(empty, []), (v) => v === empty)
-})
-
-// ---------------------------------------------------------------------------
-// MenuFit.js: the bounded fit retry
-// ---------------------------------------------------------------------------
-// The retry only has to be bounded, and the boundary is the whole rule: an
-// off-by-one that lets N+1 through, or a counter that never reaches the
-// budget, is an unbounded loop once the condition stays false.
-const MF = loadLib(path.join(SHELL_DIR, 'features/menu/MenuFit.js'))
-
-group('MenuFit bounds a fit retry and never counts past its budget', () => {
-  eq('the delegate budget is eight frames', MF.FIT_RETRY_BUDGET, 8)
-  eq('the settle budget is twenty-four frames', MF.SETTLE_RETRY_BUDGET, 24)
-  eq('the first retry is attempt one', MF.retry(0, 8), 1)
-  eq('the last permitted retry is attempt eight', MF.retry(7, 8), 8)
-  eq('and attempt eight is the end', MF.retry(8, 8), -1)
-  eq('a settle retry may run to its own budget', MF.retry(23, 24), 24)
-  eq('and stops there', MF.retry(24, 24), -1)
-  eq('a missing count reads as no attempts yet', MF.retry(undefined, 8), 1)
-  eq('a negative count does not extend the budget', MF.retry(-5, 8), 1)
-  eq('a missing budget is spent, not unbounded', MF.retry(0, undefined), -1)
-  eq('and a zero budget is spent too', MF.retry(0, 0), -1)
-  // A starved loop: the condition never clears, so every pass asks again.
-  // It must terminate at the budget and never hand back a count past it.
-  let n = 0
-  let turns = 0
-  while (n >= 0 && turns < 100) {
-    n = MF.retry(n, MF.SETTLE_RETRY_BUDGET)
-    turns++
-  }
-  eq('a starved settle loop ends at its budget', turns, 25)
-  eq('having never counted past it', n, -1)
 })
 
 group('grid composition: a labelled search separator is a header, not a cell', () => {

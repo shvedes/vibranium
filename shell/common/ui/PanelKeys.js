@@ -19,22 +19,51 @@
 //
 // The empty string means "not a panel route", which is what lets a caller tell
 // a foreign key (a letter, a shortcut) from a route that does nothing.
-function route(key, qt, listMode, fieldFocused) {
+// A row's in-flow slots are DropdownSlots with the same `open`/`closing`
+// contract on every surface. This is the one place that turns them plus a
+// panel's confirmation flag into the "a dropdown owns the keys" verdict.
+function dropdownOpen(confirmOpen, row) {
+  if (confirmOpen === true) return true
+  if (!row) return false
+  const live = (s) => !!s && (s.open === true || s.closing === true)
+  return live(row.descSlot) || live(row.deleteSlot) || live(row.expandSlot)
+}
+
+function isNavigation(name) {
+  return name === "next" || name === "prev" || name === "pageUp"
+    || name === "pageDown" || name === "first" || name === "last"
+}
+
+// One rule for every list panel: while a dropdown is open, navigation keys
+// belong to the dropdown, not to the list underneath it. A selection dropdown
+// is the exception - its arrows move the option cursor, so the row handles
+// those keys before asking for a route. Anything else (a confirmation, an
+// input field, a number picker, a description) must swallow them; otherwise
+// Tab walks focus out of a dialog that is still on screen.
+function gateNavigation(name, openDropdown, selectionDropdown) {
+  return openDropdown === true && selectionDropdown !== true
+    && isNavigation(name) ? "swallow" : name
+}
+
+function route(key, qt, listMode, fieldFocused, openDropdown, selectionDropdown) {
   if (!qt) return ""
-  if (key === qt.Key_Down || key === qt.Key_Tab) return "next"
-  if (key === qt.Key_Up || key === qt.Key_Backtab) return "prev"
-  if (key === qt.Key_PageUp) return "pageUp"
-  if (key === qt.Key_PageDown) return "pageDown"
-  if (key === qt.Key_Home) return "first"
-  if (key === qt.Key_End) return "last"
-  if (key === qt.Key_Return || key === qt.Key_Enter) return "activate"
-  if (key === qt.Key_Escape) return "escape"
-  if (key === qt.Key_Backspace) return "back"
+  if (openDropdown === true && selectionDropdown !== true && key !== undefined
+    && (key === qt.Key_Left || key === qt.Key_Right)) return "swallow"
+  let r = ""
+  if (key === qt.Key_Down || key === qt.Key_Tab) r = "next"
+  else if (key === qt.Key_Up || key === qt.Key_Backtab) r = "prev"
+  else if (key === qt.Key_PageUp) r = "pageUp"
+  else if (key === qt.Key_PageDown) r = "pageDown"
+  else if (key === qt.Key_Home) r = "first"
+  else if (key === qt.Key_End) r = "last"
+  else if (key === qt.Key_Return || key === qt.Key_Enter) r = "activate"
+  else if (key === qt.Key_Escape) r = "escape"
+  else if (key === qt.Key_Backspace) r = "back"
   // Space is a space in a query and "activate" on a list row, so the caller's
   // focus state decides which. A field that owns the keyboard gets the key
   // back unclaimed rather than having it swallowed as a route.
-  if (key === qt.Key_Space) return listMode && !fieldFocused ? "activate" : ""
-  return ""
+  else if (key === qt.Key_Space && listMode && !fieldFocused) r = "activate"
+  return gateNavigation(r, openDropdown, selectionDropdown)
 }
 
 // Ctrl-V from a row whose field has no caret: the native paste never sees the

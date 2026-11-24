@@ -210,7 +210,7 @@ const QT = {
   Key_Down: 101, Key_Tab: 102, Key_Up: 103, Key_Backtab: 104,
   Key_PageUp: 105, Key_PageDown: 106, Key_Home: 107, Key_End: 108,
   Key_Return: 109, Key_Enter: 110, Key_Escape: 111, Key_Backspace: 112,
-  Key_Space: 113,
+  Key_Space: 113, Key_Left: 114, Key_Right: 115,
 }
 const route = (key, listMode = true, fieldFocused = false) =>
   PK.route(key, QT, listMode, fieldFocused)
@@ -249,6 +249,40 @@ group('a key that is not a panel route answers empty', () => {
 group('a missing Qt table is refused rather than thrown', () => {
   eq('null', PK.route(1, null, true, false), '')
   eq('undefined', PK.route(1, undefined, true, false), '')
+})
+
+group('an open dropdown owns navigation keys', () => {
+  const blocked = (key) => PK.route(key, QT, true, false, true, false)
+  eq('tab is swallowed', blocked(QT.Key_Tab), 'swallow')
+  eq('backtab is swallowed', blocked(QT.Key_Backtab), 'swallow')
+  eq('down is swallowed', blocked(QT.Key_Down), 'swallow')
+  eq('up is swallowed', blocked(QT.Key_Up), 'swallow')
+  eq('left is swallowed', blocked(QT.Key_Left), 'swallow')
+  eq('right is swallowed', blocked(QT.Key_Right), 'swallow')
+  eq('horizontal keys reach the field when no dropdown is open', route(QT.Key_Left), '')
+  eq('page keys are swallowed', blocked(QT.Key_PageDown), 'swallow')
+  eq('home and end are swallowed', blocked(QT.Key_Home), 'swallow')
+  eq('activate still reaches the dialog', blocked(QT.Key_Return), 'activate')
+  eq('escape still reaches the dialog', blocked(QT.Key_Escape), 'escape')
+  eq('backspace still reaches the dialog', blocked(QT.Key_Backspace), 'back')
+  eq('a selection dropdown keeps its arrows',
+    PK.route(QT.Key_Down, QT, true, false, true, true), 'next')
+})
+
+group('the dropdown verdict is one question for every surface', () => {
+  eq('no row, no dropdown', PK.dropdownOpen(false, null), false)
+  eq('a confirmation opens it', PK.dropdownOpen(true, null), true)
+  eq('a bare row does not', PK.dropdownOpen(false, {}), false)
+  eq('a delete slot does',
+    PK.dropdownOpen(false, { deleteSlot: { open: true } }), true)
+  eq('an info slot does',
+    PK.dropdownOpen(false, { descSlot: { closing: true } }), true)
+  eq('a number/editor slot does',
+    PK.dropdownOpen(false, { expandSlot: { open: true } }), true)
+  eq('closed slots do not',
+    PK.dropdownOpen(false, {
+      deleteSlot: { open: false }, descSlot: { open: false },
+    }), false)
 })
 
 finish()

@@ -148,7 +148,7 @@ discover
 # sees, so they need a live vibranium-shell and spend seconds per step. The
 # default run is CLI-only; --ui opts in. An explicit --only still runs a named
 # UI suite, since naming one is already an explicit request for it.
-declare -A UI_SUITE=(["menu-nested-live"]=1 ["menu-result-fade"]=1 ["menu-dropdown-scrolloff"]=1)
+declare -A UI_SUITE=(["menu-nested-live"]=1 ["menu-result-fade"]=1 ["menu-dropdown-scrolloff"]=1 ["menu-lib-live"]=1 ["launcher-keys-live"]=1)
 
 ui_suite() {
   [[ -n ${UI_SUITE[$1]:-} ]]
@@ -197,6 +197,8 @@ describe() {
   menu-dropdown-scrolloff) printf 'long group dropdowns cap and scroll inside the card on the live shell' ;;
   menu-nested-live) printf 'reveal restore, layered Escape and staged swaps on the live shell' ;;
   menu-result-fade) printf 'one handoff progress behind four result presentations on the live shell' ;;
+  menu-lib-live) printf 'frame-level menu geometry with motion on and off' ;;
+  launcher-keys-live) printf 'launcher navigation while delete confirmation is open' ;;
   dropdown-land) printf 'a landed DropdownSlot keeps following its content height' ;;
   list-follow-curve) printf 'keyboard follow keeps the centre on a held key' ;;
   list-hold) printf 'held-key centre lock: a pinned bar and sliding rows' ;;
@@ -483,6 +485,8 @@ _run_one() {
 if ((JOBS > 1)); then
   running=0
   for i in "${!SUITE_NAME[@]}"; do
+    # Live suites share a single shell and must run one at a time.
+    ui_suite "${SUITE_NAME[$i]}" && continue
     if ((${#SELECTED[@]} > 0)) && [[ " ${SELECTED[*]} " != *" $i "* ]]; then
       continue
     fi
@@ -517,7 +521,7 @@ for i in "${!SUITE_NAME[@]}"; do
   rc="$(cat "$WORKROOT/$name.rc" 2>/dev/null || echo 1)"
   ms="$(cat "$WORKROOT/$name.ms" 2>/dev/null || echo 0)"
 
-  if ((JOBS <= 1)); then
+  if ((JOBS <= 1)) || ui_suite "$name"; then
     _run_one "$name" "${SUITE_PATH[$i]}" "${SUITE_KIND[$i]}"
     rc="$(cat "$WORKROOT/$name.rc")"
     ms="$(cat "$WORKROOT/$name.ms")"

@@ -1176,6 +1176,14 @@ Singleton {
     }
     function ping(): string { return "pong" }
 
+    function debugConfirmNavigation(): string {
+      if (!root.visible) return "unavailable"
+      for (const panel of root._panels) {
+        if (panel.primarySurface) return panel.debugConfirmNavigation()
+      }
+      return "unavailable"
+    }
+
     function toggle(): string { return root._toggleVerb() }
 
     function open(): string { return root._openVerb() }

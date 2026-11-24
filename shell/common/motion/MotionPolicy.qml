@@ -7,7 +7,13 @@ import qs.common
 Singleton {
   id: root
 
-  readonly property bool enabled: HyprlandSettings.value("hypr.animations.enabled") === true
+  // A live-suite override: the live trace suite needs a second pass with every
+  // tween collapsed, and writing the user's Hyprland config from a test is
+  // not acceptable. The default keeps the setting as the only source.
+  property bool debugDisabled: false
+  property bool debugForceOn: false
+  readonly property bool enabled: debugForceOn || (!debugDisabled
+    && HyprlandSettings.value("hypr.animations.enabled") === true)
 
   // The one place that turns a requested duration into a runnable one. A
   // NumberAnimation has no `enabled` member to switch off, so a primitive

@@ -527,12 +527,15 @@ ListView {
     }
   }
 
-  // Step tween: one animation on the shared curve; duration scales
-  // with distance so a wrap lap glides and a single step stays snappy.
+  // Clamp the tween's position against the current bounds. A shrinking row
+  // can retire space that still existed when the scroll destination was set.
+  property real _seatFrameY: 0
+  on_SeatFrameYChanged: root._writeSeat(root.clampY(root._seatFrameY))
+
   NumberAnimation {
     id: scrollAnim
     target: root
-    property: "contentY"
+    property: "_seatFrameY"
     // A reveal seat crosses a large distance and a slow-starting curve keeps
     // its first frames gentle. A follow seat is restarted on every key repeat;
     // a slow start there spends each leg catching up, so the cursor drifts
@@ -1351,8 +1354,7 @@ ListView {
 
   // Single programmatic writer for contentY. Every seat - keyboard
   // step, wheel step, page, restore, pursuit, reconciliation - routes
-  // through here. Direct `contentY =` writes outside this function
-  // are forbidden.
+  // through here. The immediate seat and the tween share _writeSeat.
   //
   // paceMs overrides the distance-paced duration for a seat that must
   // land together with another motion: a pursuit chasing an open slot
@@ -1394,7 +1396,7 @@ ListView {
     // hold below has to be able to tell a no-op from a landed seat.
     root._seatWrites++
     root._lastWriteTag = owner
-    if (animated === true) {
+    if (animated === true && MotionPolicy.enabled) {
       const distance = Math.abs(target - root.contentY)
       let distanceMs = root.stepMs(distance)
       if (owner === "follow" && root._holdLegMs > 0) {
@@ -1427,6 +1429,7 @@ ListView {
       scrollAnim.easing.type = owner === "follow" && root._holdLegMs > 0
         ? Easing.Linear
         : (owner === "follow" || pacedReveal ? Easing.OutCubic : Easing.InOutCubic)
+      scrollAnim.from = root.contentY
       scrollAnim.to = target
       // Re-aiming a running tween by moving `to` alone does NOT work in
       // this engine: the endpoints are captured when the animation
@@ -1446,13 +1449,16 @@ ListView {
     } else {
       scrollAnim.stop()
       if (!root._highlightHandoff) root._sweepMs = -1
-      // The single QML writer of contentY. The flag lets the reconcile
-      // handler tell this write from a foreign one (debugRawWrites).
-      root._insideSeatTo = true
-      root.contentY = target
-      root._insideSeatTo = false
+      root._writeSeat(target)
     }
     return target
+  }
+
+  function _writeSeat(target) {
+    const writing = root._insideSeatTo
+    root._insideSeatTo = true
+    root.contentY = target
+    root._insideSeatTo = writing
   }
 
   // --- follow policy ---

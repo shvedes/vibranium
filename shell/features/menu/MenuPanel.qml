@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
+import QtQuick as QQ
 import Quickshell
 import qs.common
 import qs.features.clipboard
@@ -227,6 +228,11 @@ Rectangle {
   property real _animatedListH: -1
   property real _heightTargetH: -1
   property int _heightAnimGen: -1
+  // An expanded row restored from a search projection owns the resize through
+  // its live slot height. The search card's height is the floor until that row
+  // arrives; a resting-page fit must not tween underneath its unfold.
+  property real _restoreSlotStartH: -1
+  property bool _searchReturnOpen: false
   property int _pendingSlideDepth: -1
   readonly property real exactListH: panel._latchedListH
 
@@ -270,6 +276,8 @@ Rectangle {
     rowsMotionTimer.stop()
     panel._pendingSlideDepth = -1
     panel._animatedListH = -1
+    panel._restoreSlotStartH = -1
+    panel._searchReturnOpen = false
     // The resting size this surface was showing when it closed, and the
     // measurement that produced it, describe the menu that was open. Carried
     // into the next summon they are what a freshly spawned card sized itself
@@ -499,6 +507,11 @@ Rectangle {
     const target = measured
       ? Math.min(fit, panel.screenMaxListH)
       : panel._modelListH()
+    if (panel._restoreSlotStartH >= 0 && !panel._transitionActive) {
+      panel._committedListH = target
+      panel._latchedListH = measured ? fit : -1
+      return
+    }
     // Navigation and content-driven resizes share the one tween; a page
     // transition takes the gen so its slide waits for the height, and a
     // plain resize passes -1 because it has no slide to finish.
@@ -623,7 +636,7 @@ Rectangle {
       // nesting. A row that matched in its own right keeps its subtree.
       candidate = MenuLib.scopedResultRows(
         panel.installedPage, Menu.scopedQuery)
-      if (!panel.searching)
+      if (!panel.searching && panel.gridMode)
         candidate = panel.composeGridRows(candidate)
     } else {
       // Read the target page FRESH: panel.currentPageId (a cached var
@@ -636,9 +649,11 @@ Rectangle {
       // under a mute box, so the row set only changes when the page itself is
       // rebuilt.
       candidate = src.filter(item => Menu.isListed(item))
-      // Grid pages weave section headers and row-fill spacers into the
-      // flat slot list; search results stay flat (no chrome mid-filter).
-      if (!panel.searching)
+      // Only grid pages weave section headers and row-fill spacers into the
+      // flat slot list. Running this on a list page padded every labelled
+      // separator out to the grid column count, so plain menus grew blank
+      // spacer rows that the cursor could land on. Search results stay flat.
+      if (!panel.searching && panel.gridMode)
         candidate = panel.composeGridRows(candidate)
     }
 
@@ -752,7 +767,6 @@ Rectangle {
   // The latch is left to _resolveFit, which arms the height before publishing
   // it; a write here would invalidate the region binding a turn early.
   function _fitModelFromPending() {
-    panel._latchedListH = -1
     panel._fitPending = false
     panel._resolveFit(-1, panel._fitGen, panel._fitTransGen)
   }
@@ -792,7 +806,6 @@ Rectangle {
       panel._fitModelFromPending()
       return
     }
-    panel._latchedListH = fit
     panel._fitPending = false
     panel._resolveFit(fit, panel._fitGen, panel._fitTransGen)
   }
@@ -810,7 +823,6 @@ Rectangle {
     const fitGen = ++panel._fitGen
     panel._fitTransGen = panel._transitionGen
     if (panel.gridMode || rows.length === 0) {
-      panel._latchedListH = -1
       panel._fitPending = false
       panel._resolveFit(-1, fitGen, panel._fitTransGen)
       return
@@ -846,7 +858,6 @@ Rectangle {
   // holds can commit the height now instead of three frames from now.
   function fitFromModel() {
     panel._fitGen++
-    panel._latchedListH = -1
     panel._fitPending = false
     panel._resolveFit(-1, panel._fitGen, panel._transitionGen)
   }
@@ -1325,6 +1336,10 @@ Rectangle {
         // the fit sizes the card from the restored rows in this turn. With no
         // saved seat to honour, the ordinary path still arms immediately.
         if (returnIdx < 0) panel._rearmOpenSlot()
+        else if (!MotionPolicy.enabled && !panel.gridMode && !panel._searchClearByResult
+          && returnY >= 0 && Menu.frame?.id === panel._searchReturnPage) {
+          list.restoreAt(returnIdx, returnY, panel._modelListH())
+        }
       }
       Idle.run(() => {
         panel._reseatFrameSel()
@@ -1364,17 +1379,24 @@ Rectangle {
               || (panel._searchReturnPage !== ""
                 && Menu.frame && Menu.frame.id !== panel._searchReturnPage)) {
               panel._searchReturnPage = ""
+              panel._restoreSlotStartH = -1
               panel._searchClearByResult = false
               if (panel._fadeRestoreOwed) panel._startModeFadeIn()
               return
             }
             panel._searchReturnPage = ""
+            panel._restoreSlotStartH = -1
             panel._recommitRestingH()
             panel._rearmOpenSlot()
             panel._followSlotRow()
             panel._latchClaim()
             if (returnY >= 0) list.restoreAt(returnIdx, returnY)
             if (panel._fadeRestoreOwed) panel._startModeFadeIn()
+          }, function(row) {
+            if (panel._restoreSlotStartH < 0 || panel._searchClearByResult
+              || Menu.frame?.id !== panel._searchReturnPage) return true
+            return list.currentIndex === returnIdx
+              && Math.abs(row.height - row.settledHeight) < 0.5
           })
         }
       }, 2)
@@ -1527,13 +1549,16 @@ Rectangle {
     return true
   }
 
-  // Row-motion latch, true while an add/remove glide is still running.
-  // Gated on MotionPolicy, so a kill-switched shell never waits for a
-  // transition that has a zero duration.
+  // Row-motion latch, true while the view's add/remove-displaced glide is
+  // still running. ListView does not publish an end edge for those
+  // transitions, so this is a grace window matched to their source clock
+  // (Ui.fastGraceMs), not a guess at readiness: the live fit verdict below
+  // still gates every measurement. Gated on MotionPolicy through the token,
+  // so a kill-switched shell never waits for a transition that is off.
   Timer {
     id: rowsMotionTimer
 
-    interval: MotionPolicy.duration(Ui.fastMs) + 20
+    interval: Ui.fastGraceMs
     repeat: false
     onTriggered: {
       panel._rowsMoving = false
@@ -1603,6 +1628,7 @@ Rectangle {
     // still-expanded row. Teardown there drops that claim, leaves the card at
     // the resting size and strips the region from the open dropdown.
     if (panel.searching) {
+      panel._restoreSlotStartH = -1
       // Grid pages seat their cursor on GridList, not List. Reading List here
       // saved -1, and the search-exit restore only starts its fade-in when a
       // seat was saved, leaving a grid card blank after the query was erased.
@@ -1611,6 +1637,9 @@ Rectangle {
       panel._searchReturnY = panel.gridMode ? -1 : list.contentY
       panel._searchReturnPage = Menu.frame ? Menu.frame.id : ""
       panel._restoreSeatPending = at >= 0
+      const saved = panel.rowsModel[at]
+      panel._searchReturnOpen = !!saved
+        && (Menu.isExpanded(saved) || Menu.infoOpen(saved))
       // A search re-projects the row set: a claim from the previous projection
       // (or an open slot on the page being searched) names no row in this one.
       // Keeping it sends pursuit after a ghost index when the model is narrow
@@ -1618,10 +1647,27 @@ Rectangle {
       Menu.trace("panel.clear", { site: "search", auto: list.autoRevealIndex })
       list.autoRevealIndex = -1
       list._followIdx = -1
+      const from = panel._currentListH()
+      const base = panel._restingFallbackH()
       list.contentY = 0
       // The page's slot-driven region growth no longer applies to the search
-      // projection: release it so pursuit is not silenced or mis-sized.
+      // projection. Keep the height it showed as the starting point for the
+      // filtered fit; releasing the region alone would drop an open dropdown
+      // to the page's resting height in one frame.
       panel._releaseSlotRegion()
+      if (from > base + 0.5 && !panel._heightAnimating
+        && !panel._transitionActive && panel.shown && MotionPolicy.enabled)
+        panel._startHeightTransition(base, -1, from)
+    } else {
+      if (panel._searchReturnOpen && !panel.gridMode && !panel._searchClearByResult) {
+        panel._restoreSlotStartH = panel._currentListH()
+        panel._slotRegionH = panel._restoreSlotStartH
+        panel._heightAnimating = false
+        heightAnim.stop()
+        panel._animatedListH = -1
+        panel._heightTargetH = -1
+      }
+      panel._searchReturnOpen = false
     }
     // QoL: picking a search result clears the bar and returns focus to the list.
     // consumePendingResult already does this for keyboard, but mouse via
@@ -1653,6 +1699,8 @@ Rectangle {
     if (!panel.searching) panel.recomputeRows("rebuild", true)
   }
   onCurrentPageIdChanged: {
+    panel._restoreSlotStartH = -1
+    panel._searchReturnOpen = false
     // A new page means a new row set: any reveal claim from the page being
     // left (an open slot, a search projection) no longer names a row here,
     // and a stale out-of-bounds index would make pursuit scroll the new
@@ -1966,7 +2014,7 @@ Rectangle {
       }, 2)
     }
 
-    function onScopedRowsChanged() {
+    function onScopedProjectionRevChanged() {
       panel.recomputeRows("reveal", true)
     }
 
@@ -2725,11 +2773,10 @@ Rectangle {
     // A COMMITTED size is a hold too, and this is the one the tests above miss.
     // `exactListH` is the fit latch, and a fit that could not be measured drops
     // it to -1 while the card is still standing at the last committed height:
-    // `tryFit`'s _rowsMoving branch does exactly that on every keystroke of a
-    // filter whose rows glide in, and `fail()` does it whenever the budget runs
-    // out, and an empty row set does it in queueFit. So `-1` on the latch is
-    // not "this surface has no size", it is "this surface has no MEASUREMENT",
-    // and the two are different questions.
+    // `tryFit`'s unmeasurable branch does exactly that on every keystroke of
+    // a filter whose rows glide in, and an empty row set does it in queueFit.
+    // So `-1` on the latch is not "this surface has no size", it is "this
+    // surface has no MEASUREMENT", and the two are different questions.
     //
     // The cost of reading it as the first one is the whole visible artifact: the
     // card is showing _committedListH, `renderedListH` reads this answer above
@@ -2791,7 +2838,16 @@ Rectangle {
     // the region below floors out at the resting base when a slot fits, so
     // following it costs nothing, and it starts on the first unfold frame
     // instead of waiting for growForSlot's settled geometry.
+    // During a filter install the outgoing delegate can keep folding after
+    // rowsModel already names the new projection. Its height cannot drive
+    // this projection's region, even if it still occupies the same index.
+    const projected = list.currentIndex >= 0
+      ? panel.rowsModel[list.currentIndex] : null
+    const filterSlot = !panel.searching && !panel.scopedSearching
+      || (!!row && (row.expanded === true || row.infoOpen === true))
     const needsGrowth = live > 0 && !Menu.slotClosing
+      && row.itm === projected && filterSlot
+    if (panel._restoreSlotStartH >= 0 && !needsGrowth) return
     if ((!claimed || panel._claimListH <= 0) && !needsGrowth) {
       const from = panel._slotRegionH
       const base = panel._restingFallbackH()
@@ -2811,8 +2867,10 @@ Rectangle {
     // resting answer when the group's claim arms, so the region would drop to
     // the trimmed height for a frame before the group unfolds. The page fit
     // that the handoff is revealing is the real base on that edge.
-    const base = panel._handoffReveal && panel._animatedListH > 0
-      ? panel._animatedListH : panel._restingFallbackH()
+    const base = panel._restoreSlotStartH >= 0
+      ? panel._restoreSlotStartH
+      : (panel._handoffReveal && panel._animatedListH > 0
+        ? panel._animatedListH : panel._restingFallbackH())
     // The group's claim is the handoff's landing: from here on the normal
     // resting base applies and the reveal flag can retire.
     if (panel._claimListH > 0) panel._handoffReveal = false
@@ -2942,6 +3000,13 @@ Rectangle {
   // relative to the viewport). The card itself does not need this turn - it
   // follows the row's live height frame by frame through _followSlotRow.
   function _latchClaim() {
+    const current = list.currentItem
+    if ((panel.searching || panel.scopedSearching) && current
+      && (current.itm !== panel.rowsModel[list.currentIndex]
+        || (!current.expanded && !current.infoOpen))) {
+      panel._releaseSlotRegion()
+      return
+    }
     // Latch the slot's own duration while the row is publishing it. The claim
     // goes live a tick BEFORE the row reports a duration - Entry raises
     // `expanded` on the keystroke, and the slot's `open` binding (and with it
@@ -2958,7 +3023,8 @@ Rectangle {
     // collapse at 120ms, the two directions of one motion on two clocks.
     const live = list.revealSlotMs
     if (live > panel._slotMsLatch) panel._slotMsLatch = live
-    const base = panel._restingFallbackH()
+    const base = panel._restoreSlotStartH >= 0
+      ? panel._restoreSlotStartH : panel._restingFallbackH()
     let want = panel.growForSlot(base)
     // A nested restore holds the reveal claim clear, which makes growForSlot
     // answer "fits" while the parent's slot is still folding. The row itself
@@ -4849,6 +4915,17 @@ Rectangle {
       get confirm() {
         const r = cur()
         return !!r && Menu.confirmFor(r.itm) !== null
+      },
+      // True for every dropdown that is NOT an option/group selector: those
+      // keep their arrows (optionOrStep); everything else swallows them.
+      get dropdown() {
+        let r = cur()
+        while (r) {
+          if (r.dropdownOpen !== true)
+            return r.expanded === true || r.descInSlot === true || r._shellClosing === true
+          r = r.isGroup ? r._focusedChildRow() : null
+        }
+        return false
       }
     }
   }
@@ -4902,8 +4979,10 @@ Rectangle {
       case "gridRow":
         panel.moveGridRow(arg)
         break
-      // The caret already took the key; nothing is left to do but say so.
+      // The caret, an editor or a blocking dropdown owns the key. Say so:
+      // leaving it unaccepted lets Tab walk focus out of the open dialog.
       case "swallow":
+        event.accepted = true
         break
       case "delete": {
         const drow = panel.focusedRow()
@@ -5030,7 +5109,12 @@ Rectangle {
   }
 
   function debugSetCurrentIdx(idx) {
+    const previous = panel.currentRow()
     list.seat(idx, "step")
+    if (previous && previous !== panel.currentRow()) {
+      if (previous.expanded) previous.collapse()
+      panel.closeTrailingInfo()
+    }
     return list.currentIndex
   }
 
@@ -5301,6 +5385,136 @@ Rectangle {
     })
   }
 
+  // --- deep live trace -------------------------------------------------
+  // A frame sampler for the running shell. Armed only by `debugDeep`, it
+  // records every visible row and every open dropdown at each tick, beside
+  // the reactive verdicts that decide the card and the viewport. The test
+  // suite reads the ring with `probeDeep` and asserts frame sequences, not
+  // just the state a gesture happens to end in.
+
+  property bool deepArmed: false
+  property string deepPhase: ""
+  property var deepFrames: []
+  readonly property int deepLimit: 600
+
+  function _deepNum(v) {
+    return Math.round(Number(v || 0) * 10) / 10
+  }
+
+  function _deepRow(r, depth) {
+    if (!r || depth > 5) return null
+    const gv = r.isGroup && r._groupView ? r._groupView : null
+    const kids = []
+    const repeater = gv ? gv.childrenRepeater : null
+    if (repeater) {
+      for (let i = 0; i < repeater.count; i++) {
+        const it = repeater.itemAt(i)
+        if (it && it.liveRow) kids.push(_deepRow(it.liveRow, depth + 1))
+      }
+    }
+    return {
+      id: r.itm && r.itm.id !== undefined ? String(r.itm.id) : "",
+      label: r.itm ? String(r.itm.label ?? "") : "",
+      type: r.ptype,
+      idx: r.index !== undefined ? r.index : -1,
+      y: panel._deepNum(r.y), h: panel._deepNum(r.height),
+      settled: panel._deepNum(r.settledHeight),
+      barH: panel._deepNum(r.nestedBarH),
+      barSettled: panel._deepNum(r.nestedSettledBarH),
+      expanded: r.expanded === true, dropdown: r.dropdownOpen === true,
+      editor: r.editorOpen === true, info: r.infoOpen === true,
+      descH: panel._deepNum(r.descSlotH),
+      expandH: panel._deepNum(r.expandSlotH),
+      optionIndex: r.optionIndex, optionCount: r.optionCount,
+      childIndex: r.childIndex,
+      childCount: r.groupChildren ? r.groupChildren.length : 0,
+      group: gv ? {
+        h: panel._deepNum(gv.height),
+        natural: panel._deepNum(gv.naturalH),
+        viewport: panel._deepNum(gv.viewportH),
+        ceiling: panel._deepNum(gv.ceilingH),
+        capped: gv.capped === true,
+        colH: panel._deepNum(gv.groupCol ? gv.groupCol.height : 0),
+        colY: panel._deepNum(gv.groupCol ? gv.groupCol.y : 0),
+        barY: panel._deepNum(gv.focusBar ? gv.focusBar.y : 0),
+        barH: panel._deepNum(gv.focusBar ? gv.focusBar.height : 0),
+        scroll: panel._deepNum(gv.scrollY()),
+        overflow: panel._deepNum(gv.overflow),
+        box: panel._deepNum(gv.boxNeed),
+        push: Math.round(gv.pushProgress * 1000) / 1000
+      } : null,
+      children: kids
+    }
+  }
+
+  function deepSnapshot() {
+    const rows = []
+    for (let i = 0; i < list.count; i++) {
+      const it = list.itemAtIndex(i)
+      if (it) rows.push(_deepRow(it, 0))
+    }
+    const n = panel._deepNum
+    return {
+      t: Date.now() % 1000000,
+      phase: panel.deepPhase,
+      an: MotionPolicy.enabled,
+      base: JSON.parse(panel.probeSnapshot()),
+      rows: rows,
+      card: {
+        h: n(panel.height), listH: n(listBox.height), listY: n(listBox.y),
+        filterH: n(filterBar.height), chrome: n(panel.regionChromeH),
+        rendered: n(panel.renderedListH), model: n(panel.modelListH),
+        claim: n(panel._claimListH), region: n(panel._slotRegionH),
+        committed: n(panel._committedListH), hardMax: n(panel.hardMaxHeight),
+        max: n(panel.maxHeight), fitPending: panel._fitPending,
+        rowsMoving: panel._rowsMoving, transition: panel._transitionActive,
+        heightAnimating: panel._heightAnimating,
+        viewFade: Math.round(panel.viewFade * 1000) / 1000,
+        handoff: Math.round(panel.handoff * 1000) / 1000
+      },
+      scroll: {
+        contentY: n(list.contentY), contentH: n(list.contentHeight),
+        maxY: n(list.tableMaxY()), h: n(list.height),
+        moving: list.moving, sweeping: list._sweeping,
+        animating: list.debugAnimRunning, clip: list.clip
+      }
+    }
+  }
+
+  function deepStart(phase) {
+    panel.deepFrames = []
+    panel.deepPhase = String(phase || "")
+    panel.deepArmed = true
+    deepTimer.restart()
+    return "deep on"
+  }
+
+  function deepMark(phase) {
+    panel.deepPhase = String(phase || "")
+    return panel.deepPhase
+  }
+
+  function deepStop() {
+    panel.deepArmed = false
+    deepTimer.stop()
+    return "deep off"
+  }
+
+  function deepFramesJson(from, count) {
+    return JSON.stringify(panel.deepFrames.slice(from, from + count))
+  }
+
+  QQ.Timer {
+    id: deepTimer
+    interval: 16
+    repeat: true
+    running: panel.deepArmed
+    onTriggered: {
+      if (panel.deepFrames.length >= panel.deepLimit) panel.deepFrames.shift()
+      panel.deepFrames.push(panel.deepSnapshot())
+    }
+  }
+
   // Filter block: the header component owns the field's input contract (role,
   // chip, hint, the four routes); the panel keeps what those routes do and
   // reads the field through the alias below, so SearchScope's call sites are
@@ -5434,7 +5648,7 @@ Rectangle {
           target: pageHost
           property: "x"
           to: 0
-          duration: Ui.fastMs + 20
+          duration: Ui.fastGraceMs
           easing.type: Easing.OutCubic
         }
         NumberAnimation {
@@ -5442,7 +5656,7 @@ Rectangle {
           target: panel
           property: "_pageSlideOpacity"
           to: 1
-          duration: Ui.fastMs + 20
+          duration: Ui.fastGraceMs
           easing.type: Easing.OutCubic
       }
     }

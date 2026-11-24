@@ -750,6 +750,13 @@ PanelCard {
   property alias mode: focusCtrl.mode
 
   function currentRow() { return list.currentItem }
+  // The one question the shared key table asks: is a dropdown on screen that
+  // owns the navigation keys? The launcher's dropdowns are all blocking ones
+  // (delete dialog, info/description), so there is no selection exception.
+  function dropdownOpen() {
+    return PanelKeys.dropdownOpen(confirmStage.open || _infoIndex >= 0,
+      panel.currentRow())
+  }
   function moveSelection(direction, autoRepeat) {
     const prev = panel.currentRow()
     // A held key re-arms the follow before the last leg can land. Passing the
@@ -826,6 +833,29 @@ PanelCard {
   // The delete confirm lives in the shared stage machine; this panel keeps
   // the key namespace (row indices), the service calls and the reveal claim.
   ConfirmStage { id: confirmStage }
+
+  function debugConfirmNavigation(): string {
+    const index = list.currentIndex
+    if (index < 0 || list.count < 2 || panel.dropdownOpen()) return "unavailable"
+    confirmStage.arm(index)
+    try {
+      const results = []
+      for (const [key, modifiers] of [
+        [Qt.Key_Tab, Qt.NoModifier], [Qt.Key_Tab, Qt.ShiftModifier],
+        [Qt.Key_Backtab, Qt.ShiftModifier], [Qt.Key_Up, Qt.NoModifier],
+        [Qt.Key_Down, Qt.NoModifier], [Qt.Key_Left, Qt.NoModifier],
+        [Qt.Key_Right, Qt.NoModifier]
+      ]) {
+        const event = { key, modifiers, text: "", accepted: false }
+        panel.handleKey(event)
+        results.push({ accepted: event.accepted, index: list.currentIndex,
+          open: confirmStage.isArmed(index) })
+      }
+      return JSON.stringify({ index, results })
+    } finally {
+      confirmStage.close()
+    }
+  }
 
   // Three-step delete: hint -> armed -> confirm.
   function toggleDeleteCurrent() {
@@ -957,20 +987,14 @@ PanelCard {
     if (k === Qt.Key_I && ctrl) { panel.toggleInfoCurrent(); event.accepted = true; return }
     if (k === Qt.Key_F && ctrl) { focusCtrl.grabFilter(); event.accepted = true; return }
 
-    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused)) {
+    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused,
+      panel.dropdownOpen(), false)) {
+      case "swallow":
+        event.accepted = true
+        return
       case "next":
-        // A staged delete owns Down/Tab: Tab closes it and moves, Down is
-        // refused so the row under the cursor cannot slip away mid-confirm.
-        if (confirmStage.open) {
-          if (k !== Qt.Key_Tab) break
-          panel.closeDelete()
-        }
         panel.moveSelection(1, event.isAutoRepeat === true); event.accepted = true; return
       case "prev":
-        if (confirmStage.open) {
-          if (k !== Qt.Key_Backtab) break
-          panel.closeDelete()
-        }
         panel.moveSelection(-1, event.isAutoRepeat === true); event.accepted = true; return
       case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
       case "pageDown": panel.scrollBy(0.8); event.accepted = true; return

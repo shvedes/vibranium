@@ -140,6 +140,12 @@ Singleton {
 
   // Durations shared by press/expansion feedback.
   readonly property int fastMs: 120
+  // Grace beat for view-driven glides whose end is not an observable edge:
+  // ListView's add/remove-displaced transitions and the menu's opacity
+  // slides. The panel's row-motion latch waits this long as well, so the
+  // fit never measures a row that is still being displaced. One token keeps
+  // all three clocks at the same source instead of copying a margin.
+  readonly property int fastGraceMs: MotionPolicy.duration(fastMs) + 20
   // Dropdown unfold velocity (see common/ui/DropdownSlot): slots open at
   // constant speed instead of constant time, so a 60px description snaps
   // in at the fastMs floor while a 400px option wall takes the slowMs

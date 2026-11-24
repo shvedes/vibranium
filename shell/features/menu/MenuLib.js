@@ -542,14 +542,16 @@ function search(index, query) {
   } else {
     // Longest token first -> the cheapest reject runs first. The AND total
     // is a sum, so the evaluation order never moves the score or the rank.
-    const ordered = tokens.slice().sort((a, b) => b.length - a.length)
+    // `tokens` is local to this call and never read in its original order,
+    // so the sort is in place instead of allocating a throwaway array.
+    tokens.sort((a, b) => b.length - a.length)
     for (let i = 0; i < n; i++) {
       const entry = source[i]
       const hay = entry.hay
       let total = 0
       let ok = true
       for (let t = 0; t < tlen; t++) {
-        const tok = ordered[t]
+        const tok = tokens[t]
         if (SL.lengthReject(tok, hay)) { ok = false; break }
         const s = fuzzyScore(hay, entry.words, tok)
         if (s < 0) { ok = false; break }
@@ -625,7 +627,10 @@ function search(index, query) {
   // returned above, so this list never holds a duplicate.
   _searchCacheRecent.push({ q: q, hits: hitEntries, rows: out })
   if (_searchCacheRecent.length > 8) _searchCacheRecent.shift()
-  return out
+  // Copy on return on every path. The cache keeps `out`; handing the caller
+  // that same array let a mutation of a first-search result rewrite both the
+  // identical-query answer and the recent-query projection.
+  return out.slice()
 }
 
 // Filter counter shared with the app launcher (its normal + action modes)
@@ -651,24 +656,7 @@ function scopedFilter(items, query) {
     const it = list[i]
     if (!it || typeof it !== "object") continue
     if (it.type === "separator") continue
-    // The visible-only hay (hayForFilter) is built on the first keystroke that
-    // looks at this row and cached against the row object, so every later
-    // keystroke over the same page only pays for the raw join and a compare.
-    // The cache is a WeakMap and not a property on the row: scopedFilter is
-    // documented as read-only over its input, and a row may be a host object
-    // that refuses new fields. Rows that arrive with the hay already stamped
-    // (older call sites) are read as-is.
-    let hay = it.hayNoMeta
-    if (typeof hay !== "string") {
-      const raw = hayFilterRaw(it)
-      const cached = _filterHay.get(it)
-      if (cached !== undefined && cached.raw === raw) {
-        hay = cached.hay
-      } else {
-        hay = hayFilterOf(raw)
-        _filterHay.set(it, { raw: raw, hay: hay })
-      }
-    }
+    let hay = hayForFilter(it)
     let ok = true
     for (let t = 0; t < tokens.length; t++) {
       if (hay.indexOf(tokens[t]) < 0) {
@@ -1400,6 +1388,15 @@ function keyRoute(ctx) {
   const meta = ctx.meta === true
   const list = ctx.mode === "list"
   const unclaimed = { name: "", arg: null }
+
+  // A blocking dropdown (confirmation, editor, description) owns the
+  // navigation keys until it closes. A SELECTION dropdown is the exception:
+  // its arrows move the option cursor below, through optionOrStep. This is
+  // the same rule PanelKeys.gateNavigation applies in the other panels.
+  if (ctx.dropdown === true && (k === "down" || k === "up" || k === "tab"
+    || k === "backtab" || k === "left" || k === "right" || k === "home" || k === "endKey"
+    || k === "pageUp" || k === "pageDown"))
+    return { name: "swallow", arg: null }
 
   // Modified-letter binds live OUTSIDE the switch: a bare case would
   // swallow the plain letter and break type-to-search ("i", "w", ...).

@@ -80,14 +80,21 @@ Singleton {
 
   // Current search query; non-empty flips panels into results mode.
   property string query: ""
+  // Ranked window of `searchIndex x query`, republished on both of its
+  // inputs. _applyQuery is the one writer; an index rebuild re-runs it so a
+  // late external registration cannot leave the old window on screen.
   property var results: []
+  property bool _applyingQuery: false
   readonly property bool searching: root.query !== ""
 
   // In-page "/" quick-filter. Unlike cross-page search it does not alter
   // the navigation frame; it simply filters the current page's rows.
   property bool scopedActive: false
   property string scopedQuery: ""
-  property var scopedRows: []
+  // The panel derives its flat result rows from scopedQuery through
+  // MenuLib.scopedResultRows; this counter is only the publish edge that
+  // tells it to re-derive. Storing the rows here created a second copy.
+  property int scopedProjectionRev: 0
   // The filter's tree scope: every uid kept at any depth, and the groups whose
   // child lists are narrowed to that set. Entry.groupChildren reads these so a
   // group under a filter shows only the branches that matched, at its own
@@ -845,6 +852,10 @@ Singleton {
   function _rebuildSearchIndex() {
     root.searchIndex = MenuIndex.sectionRows(root._builtinIndex,
       root._indexRegistrations, root._settingsFamily)
+    // `results` is a derivation of the index and the query. Re-run the writer
+    // on the index edge; _applyingQuery stops a scan that itself registers a
+    // page from re-entering before it has finished.
+    if (root.query !== "" && !root._applyingQuery) root._applyQuery(root.query)
   }
 
   // Global search publishes every keystroke.
@@ -870,21 +881,28 @@ Singleton {
     // re-enters search and drops the restored page's reveal claim, leaving
     // its expanded dropdown with no region or background.
     root._pendingQueryGen++
+    // A lazy merge rebuilds the index here; the new query is applied below,
+    // so an intermediate re-scan of the outgoing query would only churn.
+    root._applyingQuery = true
     root._ensureLazySearch(q)
     if (root.frame && root.hasDynamicPage(root.frame.id)) {
       const pg = root.pageById(root.frame.id)
       if (!pg || pg.searchGlobal !== true) {
+        root._applyingQuery = false
         if (!root.scopedActive) root.beginScoped()
         root.setScopedQuery(q)
         return
       }
     }
+    root._applyingQuery = false
     root._applyQuery(String(q ?? ""))
   }
 
   // Publish one query: the applied text, its ranked window, and any provider
   // that wants the scan deferred until its rows exist.
   function _applyQuery(q) {
+    if (root._applyingQuery) return
+    root._applyingQuery = true
     Menu.trace("menu.query", {
       q: q, gen: root._pendingQueryGen, frame: root.frame ? root.frame.id : ""
     })
@@ -904,6 +922,7 @@ Singleton {
         })
       }
     }
+    root._applyingQuery = false
   }
 
   function _indexProviderFor(q) {
@@ -2068,11 +2087,10 @@ Singleton {
   // with an empty query it shows the full visible page so the first
   // keystroke simply narrows it.
   function beginScoped() {
-    // The rows first, the flag second. Arming re-projects the panel's row set
-    // off `scopedRows`, and publishing the flag while that still holds the
-    // previous (or the initial empty) set installs a projection of nothing:
-    // the card drops to its empty state and restores a beat later. Computing
-    // the same visible set first leaves the recompute with nothing to install.
+    // The projection first, the flag second. Arming re-projects the panel's
+    // rows off `scopedQuery`; publishing the flag before the empty query has
+    // published its visible set installs a projection of nothing and drops
+    // the card to its empty state for a beat.
     root.setScopedQuery("")
     root.scopedActive = true
   }
@@ -2148,7 +2166,7 @@ Singleton {
     if (!tree || !Array.isArray(tree.rows)) {
       tree = _scopedTree(root.pageById(root.frame ? root.frame.id : ""), q)
     }
-    root.scopedRows = tree.rows
+    root.scopedProjectionRev++
     root.scopedVisibleUids = tree.visible
     root.scopedTrimmedGroups = tree.trimmed
   }
@@ -2165,11 +2183,13 @@ Singleton {
   function clearScoped() {
     scopedTimer.stop()
     root._scopedPending = ""
-    if (!root.scopedActive && root.scopedQuery === "" && root.scopedRows.length === 0
+    if (!root.scopedActive && root.scopedQuery === ""
       && Object.keys(root.scopedTrimmedGroups).length === 0) return
     root.scopedActive = false
     root.scopedQuery = ""
-    root.scopedRows = []
+    // Publish the restore edge for the panel as well: clearing the filter
+    // re-projects the full page, and the seat hand-back rides that install.
+    root.scopedProjectionRev++
     root.scopedVisibleUids = ({})
     root.scopedTrimmedGroups = ({})
   }
@@ -2492,6 +2512,59 @@ Singleton {
       return root.traceEnabled ? "on" : "off"
     }
 
+    // Force motion on or off independently of the system setting.
+    function debugAnims(mode: string): string {
+      const on = mode === "on" || mode === "1" || mode === "true"
+      MotionPolicy.debugForceOn = on
+      MotionPolicy.debugDisabled = !on
+      return MotionPolicy.enabled ? "on" : "off"
+    }
+
+    function restoreAnims(): string {
+      MotionPolicy.debugForceOn = false
+      MotionPolicy.debugDisabled = false
+      return MotionPolicy.enabled ? "system-on" : "system-off"
+    }
+
+    // Frame sampler for the live live trace suite. One verb arms, one marks the
+    // phase a frame belongs to, one returns the recorded ring.
+    function debugDeep(on: string): string {
+      const panel = root.panel
+      if (!panel) return "no panel"
+      return (on === "on" || on === "1" || on === "true")
+        ? panel.deepStart("") : panel.deepStop()
+    }
+
+    function deepPhase(name: string): string {
+      const panel = root.panel
+      if (!panel) return "no panel"
+      return panel.deepMark(name)
+    }
+
+    // Chunked because one IPC reply cannot carry 600 full frame records.
+    function probeDeep(from: int, count: int): string {
+      const panel = root.probeSource || root.panel
+      const at = Math.max(0, Number(from) || 0)
+      const take = Math.max(1, Math.min(Number(count) || 20, 30))
+      return panel ? panel.deepFramesJson(at, take) : "[]"
+    }
+
+    // Drive literal characters through the same key route a typist uses, so
+    // an open editor receives them instead of the global search field.
+    function debugText(text: string): string {
+      const panel = root.panel
+      if (!panel) return "no panel"
+      const s = String(text ?? "")
+      for (let i = 0; i < s.length; i++) {
+        const ch = s[i]
+        const code = ch === " " ? Qt.Key_Space
+          : ch >= "0" && ch <= "9" ? Qt.Key_0 + (ch.charCodeAt(0) - 48)
+          : Qt.Key_A + (ch.toLowerCase().charCodeAt(0) - 97)
+        panel.handleKey({ key: code, modifiers: 0, text: ch, accepted: false })
+      }
+      return "text " + s.length
+    }
+
     function debugAutoMove(dir: int): string {
       const panel = root.panel
       if (!panel || typeof panel.moveSelection !== "function") return "no panel"
@@ -2523,8 +2596,11 @@ Singleton {
     function debugType(text: string): string {
       const panel = root.panel
       if (!panel) return "no panel"
-      panel.searchField.text = text
-      panel.onFieldEdited(text)
+      // The field's own pipeline is the one writers use: it performs the
+      // idempotent assignment and emits edited(), which reaches the panel's
+      // deferred publish. Writing .text behind it left the field and the
+      // applied query describing two different searches.
+      panel.searchField.type(String(text ?? ""))
       return "typed " + JSON.stringify(text)
     }
 
@@ -2536,8 +2612,11 @@ Singleton {
     }
 
     function debugSetQuery(q: string): string {
-      root.setQuery(q)
-      return "query=" + root.query
+      const text = String(q ?? "")
+      const panel = root.panel
+      if (panel) panel.searchField.type(text)
+      else root.setQuery(text)
+      return "query=" + text
     }
 
     function debugInfo(): string {
@@ -2588,14 +2667,16 @@ Singleton {
     }
 
     function debugMoveOption(dir: int): string {
-      const list = root._debugList()
-      const row = list ? list.currentItem : null
-      if (!row || row.optionIndex === undefined) return "no option row"
-      const opts = row.optionCount !== undefined ? row.optionCount : -1
-      let next = row.optionIndex + dir
-      if (opts >= 0) next = opts > 0 ? Range.clamp(next, 0, opts - 1) : 0
-      row.optionIndex = next
-      return "option " + next
+      const panel = root.panel
+      if (!panel || typeof panel.currentRow !== "function") return "no option row"
+      const row = panel.currentRow()
+      if (!row || typeof row.moveOption !== "function") return "no option row"
+      // Same route as the human side arrow: the row owns grid stride, an
+      // open child dropdown and group children. A raw optionIndex write
+      // could reach a state no key press produces.
+      if (row.moveOption(dir * row.optionColumnStride)) return "option moved"
+      panel.stepCurrent(dir)
+      return "stepped"
     }
 
     function debugActivate(): string {

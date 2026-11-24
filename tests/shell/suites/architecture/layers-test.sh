@@ -225,7 +225,7 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 4, features 181, services 28, common 171.
+# The table: composition 1, boot 4, features 180, services 28, common 171.
 # common/ gained ScrollLabel, SectionLabel, BusySpinner, DismissNet, GlassPill
 # and ConfirmStage (plus KeyHint.js and PickerChipKeys.js) when the shared UI
 # primitives were promoted out of the feature qmldirs, and features/ lost the
@@ -248,7 +248,7 @@ for layer in boot common features services; do
   t_true "the $layer/ layer directory exists" test -d "$SHELL_DIR/$layer"
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
-t_count "features/ holds the tree's 181 .qml and .js files" "181" "$(layer_files features)"
+t_count "features/ holds the tree's 180 .qml and .js files" "180" "$(layer_files features)"
 # services/ gained Login1Sleep.js when grace began closing on the logind
 # sleep boundary rather than on the wall clock alone.
 t_count "services/ holds the 28 files the README publishes" "28" "$(layer_files services)"

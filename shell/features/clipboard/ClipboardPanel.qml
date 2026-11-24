@@ -694,7 +694,9 @@ PanelCard {
 
     if (k === Qt.Key_F && ctrl) { focusCtrl.grabFilter(); event.accepted = true; return }
 
-    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused)) {
+    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused,
+      PanelKeys.dropdownOpen(confirmStage.open, panel.currentRow()), false)) {
+      case "swallow": event.accepted = true; return
       case "next": panel.moveSelection(1); event.accepted = true; return
       case "prev": panel.moveSelection(-1); event.accepted = true; return
       case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return

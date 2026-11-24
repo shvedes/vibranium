@@ -107,6 +107,7 @@ p close >/dev/null 2>&1
 sleep 0.3
 p open "$(<"$LONG")" >/dev/null 2>&1
 sleep 0.5
+p debugSetCurrentIdx 0 >/dev/null
 base_card="$(probe_field 'd["geom"]["cardH"]')"
 
 p debugActivatePanel >/dev/null 2>&1
@@ -118,8 +119,8 @@ t_eq "the group is capped against it" "True" "$capped"
 t_true "the group's natural height exceeds the cap" test "$natural" -gt "$grp_ceil"
 t_eq "the viewport is the cap" "True" \
   "$(cmp2 'abs(a-b)<0.6' "$viewport" "$grp_ceil")"
-t_true "the row never claims more than the ceiling" \
-  test "$(probe_field 'd["rowH"]')" -le "$ceiling"
+t_eq "the row never claims more than the ceiling" "True" \
+  "$(cmp2 'a<=b' "$(probe_field 'd["rowH"]')" "$ceiling")"
 
 t_section "the cursor scrolls the column without resizing the card"
 
