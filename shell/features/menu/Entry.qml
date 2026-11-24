@@ -372,6 +372,9 @@ Item {
     const stNow = Menu.stateOf(itm)
     if (p && p._restoreSeatPending && stNow.expanded === true && !searchResult) {
       row._restoreUnfold = true
+      // Held for the whole unfold, not just the spawn tick: the slot's open
+      // curve must stay gentle while the card follows its live height.
+      row._restoreUnfoldSoft = true
       syncExpanded()
       Qt.callLater(() => { row._restoreUnfold = false })
     } else syncExpanded()
@@ -391,6 +394,9 @@ Item {
   // closed while the delegate is created, then opens from rest on the next
   // turn. Owned here, read only by this row's own slot bindings.
   property bool _restoreUnfold: false
+  // Latched until this row's slots come to rest, so a restore open keeps its
+  // gentle curve for the whole unfold the card is following.
+  property bool _restoreUnfoldSoft: false
   // Generic staged confirmation (replaces per-service timerStage etc.)
   property int confirmStage: 0
   readonly property var confirm: Menu.confirmFor(itm)
@@ -940,6 +946,7 @@ Item {
     })
     if (!live) {
       row._slotMsLatch = 0
+      row._restoreUnfoldSoft = false
       row.slotMotionEnded()
       // The held verdict belongs to the unfold that is over. Releasing here
       // rather than on the next open is what lets a dropdown that does NOT
@@ -2309,6 +2316,7 @@ Item {
     anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
     topGap: nested ? row.nestedSlotTopGap : 0
     open: row.descInSlot
+    softOpen: row._restoreUnfoldSoft
     onOpenChanged: row._latchSlotMs()
     onClosingChanged: row._latchSlotMs()
     onHeightChanged: if (Menu.traceEnabled) Menu.trace("entry.descH", {
@@ -2380,6 +2388,7 @@ Item {
     anchors.topMargin: nested ? row.nestedSlotLead : Ui.m
     topGap: nested ? row.nestedSlotTopGap : 0
     open: row.expanded && !row._restoreUnfold
+    softOpen: row._restoreUnfoldSoft
     // Only while the group is OPEN. A live nested child's geometry is the
     // motion an open group rides; once the group itself folds, THIS slot's
     // close is the motion. Following a child's closing tail there switched

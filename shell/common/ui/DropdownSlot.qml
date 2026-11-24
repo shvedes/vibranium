@@ -62,6 +62,11 @@ Item {
 
   // Drives both the height and the fade.
   property bool open: false
+  // A restore unfolds a slot whose live height the card follows frame by
+  // frame. OutCubic spends its first frames steeply, which lands a tall
+  // dropdown a quarter of the way in one frame and reads as a jump; the
+  // symmetric curve starts at rest so the card's growth is continuous.
+  property bool softOpen: false
   // Breathing room below the content while open.
   property real gap: Ui.m
   // Breathing room above the content while open, owned here rather than by
@@ -316,8 +321,10 @@ Item {
     Glide {
       duration: root.slotMs
       // OutCubic starts fast; on a tall body that first step reads as a
-      // stutter. The fold uses a gentler curve while the open stays snappy.
-      easing.type: root.closing ? Easing.InOutCubic : Easing.OutCubic
+      // stutter. The fold is always gentle, and a restore open is too when
+      // its height drives the card resize.
+      easing.type: root.closing || root.softOpen
+        ? Easing.InOutCubic : Easing.OutCubic
     }
   }
 

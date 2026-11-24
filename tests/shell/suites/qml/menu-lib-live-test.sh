@@ -269,15 +269,25 @@ if not last or not last["expanded"] or abs(restored[-1]["card"]["rendered"] - la
     sys.exit("nested dropdown did not restore its full height")
 if sys.argv[2] == "on":
     heights = [f["card"]["rendered"] for f in restored]
-    if any(b < a - 2 or b - a > (last["settled"] - filtered[-1]["card"]["rendered"]) * 0.55
+    total = last["settled"] - filtered[-1]["card"]["rendered"]
+    if any(b < a - 2 or b - a > total * 0.55
            for a, b in zip(heights, heights[1:])):
         sys.exit("nested dropdown jumped during restore")
-    for frame in restored:
+    # The first growing frame is where the steep open curve showed up: the
+    # card used to land a third of the way in a single tick, then ease the
+    # rest. The swap may lift the card to the row's rest height, but the
+    # unfold itself has to start from rest.
+    if len(heights) > 1 and heights[1] - heights[0] > total * 0.2:
+        sys.exit("nested dropdown jumped on its first restoring frame")
+    # The first restored frame still carries the filter card's height while
+    # the taller page row appears underneath it. From the first unfold frame
+    # on, the card has to cover the row's live height: a shorter viewport
+    # would clip the dropdown while its content is on screen.
+    for frame in restored[1:]:
         row = group(frame)
-        if frame["card"]["viewFade"] > 0.05 and row and (
-                abs(row["h"] - row["settled"]) > 2
-                or frame["card"]["rendered"] < row["h"] - 2):
-            sys.exit("nested dropdown became visible before it fit")
+        if frame["card"]["viewFade"] > 0.05 and row \
+                and frame["card"]["rendered"] < row["h"] - 2:
+            sys.exit("nested dropdown was clipped while visible")
 PY
 
   # Seeded, not fixed: the walk is reproducible but still crosses entries,

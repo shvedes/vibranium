@@ -278,6 +278,7 @@ Rectangle {
     panel._animatedListH = -1
     panel._restoreSlotStartH = -1
     panel._searchReturnOpen = false
+    panel._scopedReturnOpen = false
     // The resting size this surface was showing when it closed, and the
     // measurement that produced it, describe the menu that was open. Carried
     // into the next summon they are what a freshly spawned card sized itself
@@ -1381,7 +1382,6 @@ Rectangle {
               panel._searchReturnPage = ""
               panel._restoreSlotStartH = -1
               panel._searchClearByResult = false
-              if (panel._fadeRestoreOwed) panel._startModeFadeIn()
               return
             }
             panel._searchReturnPage = ""
@@ -1391,7 +1391,6 @@ Rectangle {
             panel._followSlotRow()
             panel._latchClaim()
             if (returnY >= 0) list.restoreAt(returnIdx, returnY)
-            if (panel._fadeRestoreOwed) panel._startModeFadeIn()
           }, function(row) {
             if (panel._restoreSlotStartH < 0 || panel._searchClearByResult
               || Menu.frame?.id !== panel._searchReturnPage) return true
@@ -1701,6 +1700,7 @@ Rectangle {
   onCurrentPageIdChanged: {
     panel._restoreSlotStartH = -1
     panel._searchReturnOpen = false
+    panel._scopedReturnOpen = false
     // A new page means a new row set: any reveal claim from the page being
     // left (an open slot, a search projection) no longer names a row here,
     // and a stale out-of-bounds index would make pursuit scroll the new
@@ -1909,10 +1909,27 @@ Rectangle {
           ? panel.rowsModel[list.currentIndex] : null
         panel._scopedReturnUid = it && it.uid !== undefined ? String(it.uid) : ""
         panel._scopedReturnPage = Menu.frame ? Menu.frame.id : ""
+        panel._scopedReturnOpen = !!it
+          && (Menu.isExpanded(it) || Menu.infoOpen(it))
         const rowItem = list.currentItem
         panel._scopedReturnChild = rowItem && rowItem.isGroup
           ? rowItem.childIndex : -1
       }
+      if (leaving && panel._scopedReturnOpen && !panel.gridMode
+        && !panel._scopedClearByAction) {
+        // Same floor as a search restore: hand the trim's height to the
+        // restored slot's unfold instead of fitting the full page first,
+        // which landed the card at the resting size in one frame and left
+        // the open dropdown below it clipped until the slot grew past that
+        // size on its own.
+        panel._restoreSlotStartH = panel._currentListH()
+        panel._slotRegionH = panel._restoreSlotStartH
+        panel._heightAnimating = false
+        heightAnim.stop()
+        panel._animatedListH = -1
+        panel._heightTargetH = -1
+      }
+      if (leaving) panel._scopedReturnOpen = false
       // Arming or clearing the "/" filter trims and restores the CURRENT
       // page's rows: rows leave and come back in place, so this is a
       // reveal like any other. Clearing also restores the full page box in
@@ -1989,6 +2006,10 @@ Rectangle {
         panel._fitGen++
         panel._restoreSeatPending = false
         panel.whenSettled(function() {
+          // The slot has unfolded to its settled height, so the restored
+          // page owns the card again. Retire the trim-height floor before
+          // recommitting the resting base and re-arming the claim.
+          panel._restoreSlotStartH = -1
           panel._recommitRestingH()
           if (y >= 0) list.restoreAt(at, y, panel._modelListH())
           // The filter left a claim and growth sized for its one-row trim.
@@ -2003,13 +2024,20 @@ Rectangle {
           panel._releaseSlotRegion()
           panel._followSlotRow()
           if (hadClaim) panel._latchClaim()
-          if (panel._fadeRestoreOwed) panel._startModeFadeIn()
           // The projection cleared the claim with the filter rows. Re-arm it
           // on THIS edge, not a turn later: deferring let the restored slot
           // unfold halfway before the claim appeared, so the region was
           // published from a height the card had never shown and jumped.
           if (!Menu.scopedActive && list.autoRevealIndex < 0)
             list.autoRevealIndex = at
+        }, function(row) {
+          // A pinned restore keeps the trim-height floor until the slot has
+          // fully unfolded. Without the guard the waiter drains as soon as
+          // the rows install, retiring the floor before the first grow frame
+          // and landing the card at the resting page size in one step.
+          if (panel._restoreSlotStartH < 0) return true
+          return list.currentIndex === at
+            && Math.abs(row.height - row.settledHeight) < 0.5
         })
       }, 2)
     }
@@ -2931,8 +2959,10 @@ Rectangle {
   // --- slot-driven region ---
   //
   // The card and the viewport are the same box, so they have to move as one.
-  // Both read this one number. It is written by _followSlotRow() straight from
-  // the row's own unfold - there is no second animation for the card, so there
+  // Both read this one number. A mode clear arms it at the outgoing card's
+  // height so a restored slot has a floor to unfold from; from the first grow
+  // frame on, _followSlotRow() is the only writer and drives it straight from
+  // the row's own unfold. There is no second animation for the card, so there
   // is no handoff between two clocks at the end of an unfold.
   //
   // -1 means "no slot is driving the region", which is every page transition,
@@ -3696,9 +3726,9 @@ Rectangle {
     // Only the first character of a mode and its erase are edges. Re-ranking
     // a live query installs its rows immediately, as before.
     if ((text === "") !== (query === "")) {
-      // Only an erase owes the page its old seat. The fade-in waits for that
-      // restore; entering a mode starts it as soon as the swap lands.
-      panel._fadeRestoreOwed = text === ""
+      // Hide only the frame the row set swaps. The restored card then grows
+      // to the page while its content is already drawn: the resize is the
+      // reveal, not a curtain held until the height has landed.
       panel.fadeModeChange(publish)
     } else Qt.callLater(publish)
   }
@@ -4036,6 +4066,9 @@ Rectangle {
   property string _scopedReturnUid: ""
   property string _scopedReturnPage: ""
   property int _scopedReturnChild: -1
+  // The filter was armed on an expanded row, so its clear restores an open
+  // slot whose unfold drives the card. The trim's height is that grow's floor.
+  property bool _scopedReturnOpen: false
   // Armed while a mode swap owes the page its old cursor and scroll seat.
   // Every claim rearm waits for this to clear: an arm made against the
   // projection's transient short viewport seats the restored row past where
@@ -4149,7 +4182,6 @@ Rectangle {
         // staged action could publish onto a closed panel.
         panel._restoreSeatPending = false
         panel._searchReturnPage = ""
-        panel._fadeRestoreOwed = false
         panel._viewFadeAction = null
         viewFadeOut.stop()
         viewFadeIn.stop()
@@ -4265,13 +4297,8 @@ Rectangle {
   // them can fade on a clock of its own or land a frame apart.
   property real viewFade: 1
   property var _viewFadeAction: null
-  // Set when the state change staged by a mode fade owns a cursor/seat
-  // restore. The fade-in waits for that restore so the bar is not seen
-  // moving from the result row to the saved page row.
-  property bool _fadeRestoreOwed: false
 
   function _startModeFadeIn() {
-    panel._fadeRestoreOwed = false
     viewFadeIn.restart()
   }
 
@@ -4305,7 +4332,7 @@ Rectangle {
       const action = panel._viewFadeAction
       panel._viewFadeAction = null
       if (action) action()
-      if (!panel._fadeRestoreOwed) panel._startModeFadeIn()
+      panel._startModeFadeIn()
     }
   }
 
