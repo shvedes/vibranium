@@ -354,6 +354,12 @@ if sys.argv[2] == "on":
     if total > 0 and any(b - a > total * 0.45
                          for a, b in zip(heights, heights[1:])):
         sys.exit("short dropdown jumped mid-resize")
+    # The saved scroll stays put while the viewport grows around it. A
+    # pursuit that scrolls down and is snapped back on settle reads as a
+    # second, late animation instead of one parallel resize.
+    offsets = [f["scroll"]["contentY"] for f in frames]
+    if any(abs(b - a) > 2 for a, b in zip(offsets, offsets[1:])):
+        sys.exit("short dropdown scroll jumped during the resize")
 PY
 
   # Seeded, not fixed: the walk is reproducible but still crosses entries,

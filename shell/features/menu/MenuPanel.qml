@@ -1974,7 +1974,12 @@ Rectangle {
       // let the row grow halfway and made the region publish a height the
       // card had never shown. The row's live height then drives the card.
       const returnRow = panel.rowsModel[panel._scopedReturnIdx]
-      if (panel._scopedReturnIdx >= 0 && returnRow && Menu.isExpanded(returnRow))
+      // A fit-owned restore keeps the saved scroll fixed while the viewport
+      // grows: pursuit would scroll down to keep the short dropdown in view
+      // and the final seat would then snap it back. The reveal is armed at
+      // the end of that restore instead.
+      if (panel._scopedReturnIdx >= 0 && returnRow && Menu.isExpanded(returnRow)
+        && !panel._modeRestoreFitOwned)
         list.autoRevealIndex = panel._scopedReturnIdx
       // Seat the captured row back after the page's rows are installed. The
       // uid names the row, not the number it had in the trim; the scroll goes
