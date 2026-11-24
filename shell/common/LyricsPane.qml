@@ -155,16 +155,32 @@ Item {
     root._load()
   }
   onPositionChanged: root._track()
+  // Several inputs ask for the same follow in one turn - a height step, a new
+  // cue, a fresh sheet - and the height one arrives on every frame of the host
+  // card's resize. One queued follow per turn is enough; `_centre` re-aims a
+  // scroll already in flight instead of restarting it, so a resize cannot
+  // spend an animation construction on each of its frames.
+  property bool _followPending: false
+
+  function _queueFollow() {
+    if (root._followPending) return
+    root._followPending = true
+    Qt.callLater(() => {
+      root._followPending = false
+      root._follow()
+    })
+  }
+
   onActiveIndexChanged: {
     // A new cue releases the fresh anchor so playback follows normally. Read
     // the edge directly: the derived currentIndex can still lag inside this
     // handler, which would leave a stale anchor behind.
     root._freshAnchor = false
-    Qt.callLater(root._follow)
+    root._queueFollow()
   }
   // The slot can resize under the transcript while the card grows or shrinks;
   // keep the cue in the middle without waiting for the next position tick.
-  onHeightChanged: Qt.callLater(root._follow)
+  onHeightChanged: root._queueFollow()
 
   function _load() {
     if (root._exitingSheet) return
@@ -276,7 +292,7 @@ Item {
       root._sheetOpacity = 1
     }
     root._track()
-    Qt.callLater(root._follow)
+    root._queueFollow()
   }
 
   function _track() {
@@ -326,13 +342,13 @@ Item {
   // placement and happens at once.
   function _centre(index) {
     const row = view.itemAtIndex(index)
-    scrollTo.stop()
     // A fresh sheet is a cut rather than a cue change: it is placed on its
     // line instead of gliding there from the offset the previous track left.
     // The flag stays up through the layout settle, so a placement made before
     // the delegates exist is corrected in place rather than gliding into view.
     // No motion policy, or a caller that disables gliding, is a cut too.
     if (root._freshSheet || !root.animOn || !root.glide) {
+      scrollTo.stop()
       root._placing = true
       // A new model only schedules a layout, so the first placement used to
       // run against the previous sheet's geometry. Force it, then use the
@@ -364,7 +380,15 @@ Item {
     // clamping to zero instead drops the cue to the top of the slot.
     const minY = view.headerItem ? -view.headerItem.height : 0
     const maxY = Math.max(minY, view.contentHeight - view.height)
-    scrollTo.to = Math.max(minY, Math.min(maxY, target))
+    const to = Math.max(minY, Math.min(maxY, target))
+    // A resize step usually lands while a previous re-aim is still gliding.
+    // Aim that run at the new target instead of rebuilding it: stop()+start()
+    // on every height frame allocated a fresh animation clone each time.
+    if (scrollTo.running) {
+      scrollTo.to = to
+      return
+    }
+    scrollTo.to = to
     scrollTo.start()
   }
 
@@ -539,7 +563,7 @@ Item {
         width: view.width
         height: Math.max(0, Math.round(view.height / 2) - 13)
       }
-      onCountChanged: Qt.callLater(root._follow)
+      onCountChanged: root._queueFollow()
       onContentHeightChanged: settleGuard.restart()
       // A drag owns the view until the reader comes back to the current line:
       // the transcript must not yank itself away from the line about to be

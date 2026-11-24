@@ -322,6 +322,22 @@ LayerSurface {
   // Input only over the cards. An empty region while the pile is down, which
   // is the same answer a window with no mask gives for a surface nothing is
   // drawn on - except that a full-screen mask is the wrong answer here, so the
-  // region is bound to the pile's own geometry.
-  mask: Region { item: pile }
+  // region is bound to the pile's box.
+  //
+  // The box's HEIGHT animates (Behavior on pile.height, 380ms), and its y is
+  // derived from that height at the bottom dock. A Region bound to the Item
+  // followed both live, so every frame of a reflow reposted the input region to
+  // the compositor and stalled animations on the same GUI thread. The mask
+  // instead uses the box's TARGET height - the same value the Behavior eases
+  // toward - so it moves once when the pile changes and holds still through
+  // the glide. x, width and the insets are step bindings already; pileHeight()
+  // is a pure read of the settled content, not the animated geometry.
+  mask: Region {
+    x: pile.x
+    y: Notifications.atTop
+      ? win.topInset
+      : win.height - win.bottomInset - Notifications.pileHeight()
+    width: pile.width
+    height: Notifications.pileHeight()
+  }
 }

@@ -584,9 +584,20 @@ LayerSurface {
     try { islandName = root.screen ? String(root.screen.name || "") : "" } catch (e) { islandName = "" }
     if (root._islandKey !== "" && root._islandKey !== islandName) DesktopLayoutState.releaseIsland(root._islandKey)
     if (islandName !== "") root._islandKey = islandName
+    // The pile's clearance is published from the settled height, not from
+    // parkH. parkH is the card's LIVE height and moves on every frame of the
+    // resize tween; publishing it rebuilt the shared islands map and re-docked
+    // the notifications pile on each of those frames, which stalled bar
+    // animations sharing the GUI thread. h is the destination the tween is
+    // easing toward, so the record changes once per content size instead of
+    // once per tween frame. The pile parks at the final edge from the start
+    // of a resize rather than gliding with the card.
+    const clearY = Range.clamp(root.barPosition === "bottom"
+      ? screenH - barH - h - root.margin : y,
+      root.margin, screenH - h - root.margin)
     if (islandName !== "") {
       if (screenW > 100 && screenH > 100) {
-        DesktopLayoutState.publishIsland(islandName, root.open, y, y + parkH, x, x + w)
+        DesktopLayoutState.publishIsland(islandName, root.open, clearY, clearY + h, x, x + w)
       } else if (!root.open) {
         DesktopLayoutState.publishIsland(islandName, false, 0, 0)
       }

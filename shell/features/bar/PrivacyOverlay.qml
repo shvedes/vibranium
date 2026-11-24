@@ -41,8 +41,18 @@ LayerSurface {
   anchors.right: !root.dotOnLeftEdge
   anchors.top: root.dotOnTopEdge
   anchors.bottom: !root.dotOnTopEdge
-  width: root.clusterW + 2 * Ui.s
-  height: root.clusterH + 2 * Ui.s
+  // Fixed to the largest cluster the surface can hold. Each dot's slot width
+  // animates, so a surface sized from the live cluster wrote a new width (or
+  // height) to the compositor on every frame of every dot reveal - each write
+  // reconfigures the layer surface and stalls the GUI thread, which stutters
+  // any bar animation running at the same time (the mic dot on island open,
+  // the share dot on recording start). The surface now stays the same size
+  // for the session; the dots animate INSIDE it and the empty inner end is
+  // click-through (the zero region below). The content offset keeps the lit
+  // cluster flush to the anchored corner as it grows inward.
+  readonly property int dotCount: 3
+  width: root.dotCount * (root.dotSize + root.dotGap) + 2 * Ui.s
+  height: root.dotSize + 2 * Ui.s
 
   // The window's own `visible` is never bound to the privacy state. The
   // surface stays mapped for the whole session and only the content
@@ -173,7 +183,9 @@ LayerSurface {
     // is the wrapper's right edge and the cluster sits flush to the corner
     // whichever dots happen to be on. The row's width tracks the lit dots, so
     // this does too, and the cluster grows inward from the edge.
-    x: Ui.s
+    // The surface is a fixed max size; dock the row to the anchored corner so
+    // the cluster still grows inward from the screen edge whichever dots lit.
+    x: root.dotOnLeftEdge ? Ui.s : root.width - root.clusterW - Ui.s
     y: Ui.s
     width: root.clusterW
     height: root.clusterH

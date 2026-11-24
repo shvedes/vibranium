@@ -154,7 +154,9 @@ LayerSurface {
     enabled: editor.animOn
     NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
   }
-  onCropDimOpacityChanged: board.requestPaint()
+  // The veil is on its own canvas: fading it repaints four fillRects instead
+  // of re-walking every committed stroke on the ink canvas.
+  onCropDimOpacityChanged: veilCanvas.requestPaint()
   property var textRect: null
   property var textAnchor: null
   // Inline field metrics for the staged text rect (display px).
@@ -1837,19 +1839,9 @@ LayerSurface {
           ctx.lineWidth = Math.max(1, Math.round(editor._bufPerPx))
           ctx.strokeRect(c.x - vr.x, c.y - vr.y, c.w, c.h)
         }
-         if (editor._cropDimRect !== null) {
-           // Staged and applied crop rectangles dim the cut-away sides.
-           // The outline for a staged rect is drawn above; an applied
-           // frame also gets its persistent outline here.
-           const f = editor._cropDimRect
-           const fx = f.x - vr.x
-           const fy = f.y - vr.y
-           ctx.fillStyle = "rgba(0, 0, 0, " + (0.55 * editor.cropDimOpacity) + ")"
-           ctx.fillRect(0, 0, fx, vr.h)
-           ctx.fillRect(fx + f.w, 0, vr.x + vr.w - (f.x + f.w), vr.h)
-           ctx.fillRect(fx, 0, f.w, fy)
-           ctx.fillRect(fx, fy + f.h, f.w, vr.y + vr.h - (f.y + f.h))
-         }
+         // Crop dimming lives on veilCanvas now: filling it here made the
+         // 220ms opacity fade repaint every stroke on this canvas per frame.
+         // The outline for a staged or applied frame stays here.
          if (editor.cropFrame !== null) {
            const f = editor.cropFrame
            ctx.strokeStyle = Ui.solid("accent")
@@ -1869,6 +1861,62 @@ LayerSurface {
         ctx.restore()
        }
      }
+
+    // The crop veil on its own canvas. Same geometry and document transform
+    // as the ink canvas, but its paint is four fillRects rather than a walk
+    // over every stroke and point, so fading it does not repaint the ink.
+    Canvas {
+      id: veilCanvas
+
+      x: board.x
+      y: board.y
+      width: board.width
+      height: board.height
+      scale: board.scale
+      transformOrigin: Item.TopLeft
+      visible: board.visible
+      contextType: "2d"
+      renderStrategy: Canvas.Immediate
+
+      onWidthChanged: requestPaint()
+      onHeightChanged: requestPaint()
+
+      Connections {
+        target: editor
+
+        function onCropDimRectChanged() { veilCanvas.requestPaint() }
+        function onViewRectChanged() { veilCanvas.requestPaint() }
+        function onRotAnimChanged() { veilCanvas.requestPaint() }
+        function onBoardReadyChanged() { veilCanvas.requestPaint() }
+      }
+
+      onPaint: {
+        const ctx = veilCanvas.getContext("2d")
+        if (ctx === null) return
+        ctx.save()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.clearRect(0, 0, veilCanvas.canvasSize.width, veilCanvas.canvasSize.height)
+        ctx.restore()
+        if (!editor.boardReady || editor.imgW <= 0) return
+        if (editor._cropDimRect === null || editor.cropDimOpacity <= 0) return
+
+        const vr = editor.viewRect
+        ctx.save()
+        ctx.setTransform(editor._boardPaintK, 0, 0, editor._boardPaintK, 0, 0)
+        ctx.translate(editor._docW / 2, editor._docH / 2)
+        ctx.rotate(editor._rotAnim * Math.PI / 180)
+        ctx.translate(-vr.w / 2, -vr.h / 2)
+        const f = editor._cropDimRect
+        const fx = f.x - vr.x
+        const fy = f.y - vr.y
+        ctx.fillStyle = "rgba(0, 0, 0, " + (0.55 * editor.cropDimOpacity) + ")"
+        ctx.fillRect(0, 0, fx, vr.h)
+        ctx.fillRect(fx + f.w, 0, vr.x + vr.w - (f.x + f.w), vr.h)
+        ctx.fillRect(fx, 0, f.w, fy)
+        ctx.fillRect(fx, fy + f.h, f.w, vr.y + vr.h - (f.y + f.h))
+        ctx.restore()
+      }
+    }
 
     Canvas {
       id: exportCanvas
