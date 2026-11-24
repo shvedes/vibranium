@@ -70,17 +70,24 @@ const armed = () => root._graceDeadlineMs > 0
 fns._armGrace("idle")
 out.idleArmed = armed()
 now += 1000
-fns.graceActivity()
+// True is the signal for a keyboard surface to swallow the key that unlocked.
+out.idleKeyConsumed = fns.graceActivity() === true
 out.idleReleased = state.release
 out.idleConsumed = root._graceDeadlineMs === 0
-fns.graceActivity()
+out.idleSecondKeyNotConsumed = fns.graceActivity() === false
 out.idleSecondRelease = state.release
+
+// Input during an exit fade cannot consume a key again.
+fns._armGrace("idle")
+root.releasing = true
+out.releasingKeyNotConsumed = fns.graceActivity() === false
+root.releasing = false
 
 // A suspend lock never arms grace, so wake input cannot ride it.
 state.release = 0
 fns._armGrace("suspend")
 out.suspendArmed = armed()
-fns.graceActivity()
+out.suspendKeyNotConsumed = fns.graceActivity() === false
 out.suspendReleased = state.release
 
 // A manual lock still arms grace: the setting promises activity after any
@@ -97,7 +104,7 @@ now = 1_000_000
 fns._armGrace("idle")
 const beforeSleep = armed()
 now += 3_600_000
-fns.graceActivity()
+out.sleepKeyNotConsumed = fns.graceActivity() === false
 out.sleepArmedBefore = beforeSleep
 out.sleepReleased = state.release
 out.sleepConsumed = root._graceDeadlineMs === 0
@@ -107,7 +114,7 @@ state.release = 0
 Settings.lockscreenGraceSeconds = 0
 fns._armGrace("idle")
 out.offArmed = armed()
-fns.graceActivity()
+out.offKeyNotConsumed = fns.graceActivity() === false
 out.offReleased = state.release
 
 for (const k of Object.keys(out)) process.stdout.write(k + "=" + out[k] + "\n")
@@ -141,6 +148,31 @@ t_eq "an idle lock with grace off arms no window" "false" "${R[offArmed]}"
 t_eq "input with grace off does not release" "0" "${R[offReleased]}"
 
 t_note "The deadline is wall-clock, not a QML timer: monotonic timers freeze during suspend, so the old timer-based window survived sleep and the wake input unlocked the session. Date.now() advances across suspend, so a window armed before sleep is expired on wake."
+
+# --- a grace unlock swallows the key that caused it -------------------------
+# The field emits keyPressed before its control handles the event, so the lock
+# surface can accept the press that unlocked and keep it out of the password.
+# A press that does not unlock must still type normally.
+
+PASSWORD_BOX="$SHELL_DIR/common/ui/PasswordBox.qml"
+KEY_SURFACE="$SHELL_DIR/features/lock/LockscreenSurfaceView.qml"
+t_file "the shared password field source exists" "$PASSWORD_BOX"
+
+t_section "grace reports whether a key press unlocked"
+t_eq "the unlocking press is reported as consumed" "true" "${R[idleKeyConsumed]}"
+t_eq "a press after the window is spent is not consumed" "true" "${R[idleSecondKeyNotConsumed]}"
+t_eq "input during the exit fade is not consumed" "true" "${R[releasingKeyNotConsumed]}"
+t_eq "wake input after a suspend lock is not consumed" "true" "${R[suspendKeyNotConsumed]}"
+t_eq "wake input after sleep is not consumed" "true" "${R[sleepKeyNotConsumed]}"
+t_eq "input with grace off is not consumed" "true" "${R[offKeyNotConsumed]}"
+
+t_section "the unlocking press never reaches the password field"
+t_contains "the field sends the key event with keyPressed" \
+  "signal keyPressed(var event)" "$(<"$PASSWORD_BOX")"
+t_contains "an accepted press stops before text input" \
+  "if (event.accepted) return" "$(<"$PASSWORD_BOX")"
+t_contains "the lock surface accepts only the press that unlocked" \
+  "if (Lockscreen.graceActivity()) event.accepted = true" "$(<"$KEY_SURFACE")"
 
 # --- every pre-sleep lock uses the suspend reason ---------------------------
 # Grace is keyed on the lock reason, so a lock taken just before logind sleeps

@@ -165,16 +165,19 @@ Singleton {
   // first input inside the armed window releases; once the wall-clock window
   // is past this is inert, so grace can never bypass a password after a
   // suspend even while a monotonic countdown would still have time left.
+  // True means this input unlocked through grace, so a keyboard surface can
+  // swallow the keystroke instead of letting it land in the password field.
   function graceActivity() {
-    if (root.releasing) return
-    if (root._graceDeadlineMs === 0) return
+    if (root.releasing) return false
+    if (root._graceDeadlineMs === 0) return false
     const armed = root._graceDeadlineMs
     root._endGrace()
     // Turning the setting off while a window is armed consumes it, and a
     // deadline in the past means the window elapsed - no password bypass.
-    if (Settings.lockscreenGraceSeconds <= 0) return
-    if (Date.now() >= armed) return
+    if (Settings.lockscreenGraceSeconds <= 0) return false
+    if (Date.now() >= armed) return false
     root.beginRelease()
+    return true
   }
 
   // Stable identity for the neutral request contract: adopt() and release()

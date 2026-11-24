@@ -547,8 +547,11 @@ WlSessionLockSurface {
       onSubmitted: Lockscreen.tryUnlock()
 
       // Any real key press is activity for the grace window, including keys
-      // the field swallows or that do not edit its text.
-      onKeyPressed: Lockscreen.graceActivity()
+      // the field swallows or that do not edit its text. A press that unlocks
+      // is consumed here so it never lands in the field as a character.
+      onKeyPressed: event => {
+        if (Lockscreen.graceActivity()) event.accepted = true
+      }
 
       onEdited: text => Lockscreen.setPassword(text)
       onCancelled: Lockscreen.setPassword("")

@@ -137,7 +137,9 @@ Rectangle {
   // Real keystrokes only - programmatic text syncs never fire this.
   signal edited(string text)
   // Every real key press, including modifiers and keys the field swallows.
-  signal keyPressed()
+  // The event travels with it so a consumer can accept a press it claims; an
+  // accepted event never reaches the control's text input.
+  signal keyPressed(var event)
   // Escape; consumers decide whether that means wipe or cancel.
   signal cancelled()
   // CapsLock pressed; consumers without a caps indicator ignore it.
@@ -304,7 +306,8 @@ Rectangle {
     onAccepted: root.submitted(text)
 
     Keys.onPressed: event => {
-      root.keyPressed()
+      root.keyPressed(event)
+      if (event.accepted) return
       // No caret exists here (cursorDelegate is empty), so caret-motion
       // keys would only move the invisible insertion point and corrupt
       // later typing. Swallow them with their modifiers - unless the
