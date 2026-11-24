@@ -1166,7 +1166,19 @@ Singleton {
     const p = root._providerFor(item.id)
     const hooked = MenuLib.hookValue(p, "sub", item, root._hookCtx(item), "")
     if (hooked !== "") return String(hooked)
-    return String(item?.sub ?? "")
+    // A search hit is a copy: the child it names can carry no sub of its own
+    // while the live page row the hit points at does. Read the live copy here
+    // rather than in the delegate alone - the model's height estimate and the
+    // row's own text must ask one question, or the card is sized for one line
+    // and the delegate draws two. The rev read re-evaluates on an in-place
+    // count refresh without any model churn.
+    root.rev
+    const pg = typeof item.pageId === "string" && typeof item.row === "number"
+      ? root.pageById(item.pageId) : null
+    const live = pg && Array.isArray(pg.items) ? pg.items[item.row] : null
+    if (live && live.sub !== undefined && live.sub !== null)
+      return String(live.sub)
+    return String(item.sub ?? "")
   }
 
   function displayFor(item) {
@@ -1190,8 +1202,10 @@ Singleton {
   function rowFactsFor(item) {
     if (!item) return { sub: "", widest: "" }
     const p = root._providerFor(item.id)
-    const hooked = MenuLib.hookValue(p, "sub", item, root._hookCtxShared, "")
-    const sub = hooked !== "" ? String(hooked) : String(item.sub ?? "")
+    // The sub is the delegate's own resolution, not a second one: a search
+    // hit whose visible sub comes from its live page row has the same second
+    // line in the estimate as in the rendered delegate.
+    const sub = root.subFor(item)
     const wide = MenuLib.hookValue(p, "widestDisplay", item, root._hookCtxShared, null)
     return {
       sub: sub,

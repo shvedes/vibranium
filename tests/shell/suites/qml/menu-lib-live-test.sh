@@ -290,6 +290,35 @@ if sys.argv[2] == "on":
             sys.exit("nested dropdown was clipped while visible")
 PY
 
+  # A search hit can carry no sub of its own while the live page row it
+  # points at does. The card's model-side fit and the delegate must resolve
+  # that sub the same way, or the last result is cut through by a row gap.
+  p close >/dev/null
+  p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc" >/dev/null
+  sleep 0.6
+  p debugDeep on >/dev/null
+  p deepPhase search-fit >/dev/null
+  p debugType night >/dev/null
+  sleep 0.5
+  p debugDeep off >/dev/null
+  local search_trace="${part}-search-fit.json"
+  drain_trace "$search_trace" || return 1
+  python3 - "$search_trace" <<'PY' || return 1
+import json, sys
+
+frames = [f for f in json.load(open(sys.argv[1]))
+          if f["phase"] == "search-fit" and f["base"]["count"] > 1]
+if not frames:
+    sys.exit("search projection did not install")
+# The head of the phase still holds the outgoing page, whose taller content
+# is legitimately scrollable. Only the settled tail can answer whether the
+# fit left the last result cut through.
+for f in frames[-3:]:
+    card, scroll, base = f["card"], f["scroll"], f["base"]
+    if card["rendered"] < scroll["contentH"] - 2 or base["blank"] < -2:
+        sys.exit(f"search card clipped {base['blank']}px of its last row")
+PY
+
   # Seeded, not fixed: the walk is reproducible but still crosses entries,
   # nested groups, editors, option grids, search and filter in odd orders.
   RANDOM=90210

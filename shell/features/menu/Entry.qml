@@ -681,17 +681,10 @@ Item {
       // breadcrumb, so repeating it under every row would restate the
       // section once per entry. Single-page hits have no path to
       // show and keep the same fallback.
-      Menu.rev
-      const sov = Menu.subFor(itm)
-      if (sov !== "") return sov
-      // A search result is a copy, so an in-place "N items" refresh on the
-      // bundle row would otherwise stay frozen in the projection. Read the
-      // count text from the live row the hit points at; the rev capture above
-      // re-evaluates this binding when that text changes.
-      const pg = typeof itm?.pageId === "string" && typeof itm.row === "number"
-        ? Menu.pageById(itm.pageId) : null
-      const live = pg && Array.isArray(pg.items) ? pg.items[itm.row] : null
-      return String((live && live.sub !== undefined ? live.sub : itm?.sub) ?? "")
+      // subFor resolves the live page row behind a hit as well as its own
+      // copy, so a search row and the card's height estimate read the same
+      // string. It also captures rev for in-place "N items" refreshes.
+      return Menu.subFor(itm)
     }
     Menu.rev
     const stage = MenuLib.stageText(row.expanded, row.flowStep, "sub")
