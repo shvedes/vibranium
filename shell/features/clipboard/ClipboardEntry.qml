@@ -36,6 +36,10 @@ Item {
 
   readonly property string titleText: modelData ? String(modelData.title || "") : ""
   readonly property bool pathLike: modelData ? modelData.pathLike === true : false
+  // Rows are keyed by id, so a cursor move flips this in place rather than
+  // recreating the delegates: only the selected title is allowed to travel.
+  readonly property bool current: row.ListView.view !== null
+    && row.ListView.view.currentIndex === row.index
   readonly property string subLeftText: modelData ? String(modelData.subLeft || "") : ""
   readonly property string timeText: modelData ? String(modelData.timeStr || "") : ""
   readonly property string iconName: modelData ? String(modelData.icon || "text") : "text"
@@ -121,18 +125,21 @@ Item {
 
       // Path rows scroll instead of eliding, the same shared marquee the bar's
       // Now Playing island uses for long titles: a pause at each end, then an
-      // eased leg to the other end. The clip is the row column, so the full
-      // path is readable without painting over the time or the icon. Prose
-      // keeps the ordinary elide - only a path is worth the motion.
+      // eased leg to the other end. Only the selected row travels; the rest of
+      // the column reads from the left. When the selection moves on, the old
+      // row glides back from wherever its leg reached rather than snapping.
+      // The clip is the row column, so the full path is readable without
+      // painting over the time or the icon. Prose keeps the ordinary elide.
       ScrollLabel {
         id: titleMarquee
 
         width: parent.width
         height: implicitHeight
-        scrolling: row.pathLike
-        // When the path cannot scroll, keep the old left elide so the file
-        // name stays visible; prose elides on the right.
-        idleElide: row.pathLike ? Text.ElideLeft : Text.ElideRight
+        scrolling: row.pathLike && row.current
+        returnOnGateClose: true
+        // An idle title is parked at its head: the right elide keeps the start
+        // of the path on screen on every unfocused row.
+        idleElide: Text.ElideRight
         text: row.titleText
         color: Ui.tint("foreground_0", 1)
         fontSize: Ui.fontL

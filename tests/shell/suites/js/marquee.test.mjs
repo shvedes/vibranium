@@ -18,6 +18,8 @@ const NI = fs.readFileSync(path.join(SHELL, 'features', 'bar', 'modules',
   'NowPlaying', 'NowPlayingIsland.qml'), 'utf8')
 const LE = fs.readFileSync(path.join(SHELL, 'features', 'launcher',
   'LauncherEntry.qml'), 'utf8')
+const CE = fs.readFileSync(path.join(SHELL, 'features', 'clipboard',
+  'ClipboardEntry.qml'), 'utf8')
 const SL = fs.readFileSync(path.join(SHELL, 'common', 'ui', 'ScrollLabel.qml'), 'utf8')
 
 suite('marquee', 'the shared text-scroll overflow gate')
@@ -40,6 +42,19 @@ group('the duration is clamped', () => {
   eq('a short overflow still gets the floor', M.legMs(-5), 1800)
   eq('a long overflow is capped', M.legMs(100000), 9000)
   eq('a malformed overflow uses the floor', M.legMs(NaN), 1800)
+})
+
+section('returnMs - a handed-back title parks on the same curve, faster')
+group('the return scales with distance but runs at a fraction of a leg', () => {
+  is('the library publishes the return pace', M.returnMs,
+    (v) => typeof v === 'function', 'a function')
+  eq('a short distance lands near the floor', M.returnMs(10), 163)
+  eq('a further offset takes longer', M.returnMs(200) > M.returnMs(50), true)
+  eq('the cap is a fraction of the full leg cap', M.returnMs(100000), 720)
+  eq('a malformed distance uses the floor', M.returnMs(NaN), 144)
+  eq('the return is much quicker than the leg over the same distance',
+    M.returnMs(200) < M.legMs(200), true)
+  eq('the factor is published too', M.RETURN_FACTOR, 0.08)
 })
 
 section('endpointPauseMs - one published dwell for every marquee row')
@@ -75,11 +90,35 @@ group('the shared type is the only reader of the timing library', () => {
 })
 group('one reset puts the label back at the head', () => {
   contains('reset parks the label at the head', SL, 'label.x = 0')
-  eq('every way the question can change calls reset',
+  eq('every content change calls reset',
     ['onWidthChanged: root.reset()', 'onTextChanged: root.reset()',
-      'onScrollingChanged: root.reset()', 'Component.onCompleted: root.reset()']
+      'Component.onCompleted: root.reset()']
       .every(s => SL.includes(s)), true)
+  notContains('the gate no longer resets unconditionally', SL,
+    'onScrollingChanged: root.reset()')
   contains('a stopped leg also parks at the head', SL, 'onStopped: label.x = 0')
+})
+group('an opted-in row glides back instead of snapping', () => {
+  contains('the handback is opt-in on the shared type', SL,
+    'property bool returnOnGateClose: false')
+  contains('a closing gate takes the handback path', SL, 'root.returnToHead()')
+  contains('the handback captures the interrupted offset', SL,
+    'returnLeg.from = from')
+  contains('the return leg lands at the head', SL, 'id: returnLeg')
+  contains('its duration comes from the shared return pace', SL,
+    'returnLeg.duration = Marquee.returnMs(-from)')
+  eq('the return keeps the travelling curve',
+    (SL.match(/easing\.type: Easing\.InOutSine/g) || []).length, 3)
+  contains('the leg is driven imperatively, not by a running binding', SL,
+    '// Driven only from the functions above.')
+  contains('the imperative start reads live inputs, not the stale binding', SL,
+    'if (root.scrolling && Marquee.scrollable(label.implicitWidth - root.width))')
+  contains('the label stays unwrapped until it lands', SL,
+    'readonly property bool travelling: root.scrollable || root._returning')
+  contains('full width for the whole handback', SL,
+    'width: root.travelling ? implicitWidth : root.width')
+  contains('no elide for the whole handback', SL,
+    'elide: root.travelling ? Text.ElideNone : root.idleElide')
 })
 group('the former call sites instantiate ScrollLabel instead of hand-rolling', () => {
   eq('three Downloader rows use ScrollLabel',
@@ -120,6 +159,20 @@ group('current row marquees, the rest read from the left', () => {
     'elide: Text.ElideRight')
   eq('only the title still middle-elides, never the sub',
     (LE.match(/Text\.ElideMiddle/g) || []).length, 1)
+})
+
+section('the clipboard title scrolls only on the focused row')
+group('the selected path row marquees, the rest read from the left', () => {
+  eq('one ScrollLabel carries the title',
+    (CE.match(/\bScrollLabel \{/g) || []).length, 1)
+  contains('the path gate still applies', CE,
+    'scrolling: row.pathLike && row.current')
+  contains('currentness is the view cursor, not a row flag', CE,
+    'row.ListView.view.currentIndex === row.index')
+  contains('the selected row hands its scroll back when focus moves on', CE,
+    'returnOnGateClose: true')
+  contains('an idle title is parked at its head, not its tail', CE,
+    'idleElide: Text.ElideRight')
 })
 
 finish()
