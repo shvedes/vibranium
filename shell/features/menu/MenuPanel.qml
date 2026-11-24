@@ -1380,22 +1380,19 @@ Rectangle {
               || (panel._searchReturnPage !== ""
                 && Menu.frame && Menu.frame.id !== panel._searchReturnPage)) {
               panel._searchReturnPage = ""
-              panel._restoreSlotStartH = -1
+              panel._finishModeRestore()
               panel._searchClearByResult = false
               return
             }
             panel._searchReturnPage = ""
-            panel._restoreSlotStartH = -1
-            panel._recommitRestingH()
+            panel._finishModeRestore()
             panel._rearmOpenSlot()
             panel._followSlotRow()
             panel._latchClaim()
             if (returnY >= 0) list.restoreAt(returnIdx, returnY)
           }, function(row) {
-            if (panel._restoreSlotStartH < 0 || panel._searchClearByResult
-              || Menu.frame?.id !== panel._searchReturnPage) return true
-            return list.currentIndex === returnIdx
-              && Math.abs(row.height - row.settledHeight) < 0.5
+            return panel._modeRestoreSettled(row, returnIdx,
+              panel._searchReturnPage, panel._searchClearByResult)
           })
         }
       }, 2)
@@ -1627,7 +1624,6 @@ Rectangle {
     // still-expanded row. Teardown there drops that claim, leaves the card at
     // the resting size and strips the region from the open dropdown.
     if (panel.searching) {
-      panel._restoreSlotStartH = -1
       // Grid pages seat their cursor on GridList, not List. Reading List here
       // saved -1, and the search-exit restore only starts its fade-in when a
       // seat was saved, leaving a grid card blank after the query was erased.
@@ -1639,33 +1635,11 @@ Rectangle {
       const saved = panel.rowsModel[at]
       panel._searchReturnOpen = !!saved
         && (Menu.isExpanded(saved) || Menu.infoOpen(saved))
-      // A search re-projects the row set: a claim from the previous projection
-      // (or an open slot on the page being searched) names no row in this one.
-      // Keeping it sends pursuit after a ghost index when the model is narrow
-      // and scrolls the list into empty space. Drop it at this edge.
-      Menu.trace("panel.clear", { site: "search", auto: list.autoRevealIndex })
-      list.autoRevealIndex = -1
-      list._followIdx = -1
-      const from = panel._currentListH()
-      const base = panel._restingFallbackH()
+      panel._beginModeRestore("search")
       list.contentY = 0
-      // The page's slot-driven region growth no longer applies to the search
-      // projection. Keep the height it showed as the starting point for the
-      // filtered fit; releasing the region alone would drop an open dropdown
-      // to the page's resting height in one frame.
-      panel._releaseSlotRegion()
-      if (from > base + 0.5 && !panel._heightAnimating
-        && !panel._transitionActive && panel.shown && MotionPolicy.enabled)
-        panel._startHeightTransition(base, -1, from)
     } else {
-      if (panel._searchReturnOpen && !panel.gridMode && !panel._searchClearByResult) {
-        panel._restoreSlotStartH = panel._currentListH()
-        panel._slotRegionH = panel._restoreSlotStartH
-        panel._heightAnimating = false
-        heightAnim.stop()
-        panel._animatedListH = -1
-        panel._heightTargetH = -1
-      }
+      panel._pinModeRestoreFloor(panel._searchReturnOpen,
+        panel._searchClearByResult)
       panel._searchReturnOpen = false
     }
     // QoL: picking a search result clears the bar and returns focus to the list.
@@ -1782,6 +1756,61 @@ Rectangle {
     return found
   }
 
+  // --- shared mode restore ---
+  // Search and the scoped filter project a row set away and hand it back.
+  // Their seats differ - global search re-seats from the frame, the filter
+  // resolves a uid and a group child - but the geometry contract does not.
+  // These four rules live here once so a fix to one mode cannot drift out of
+  // the other; the mode handlers only supply their seat and their claim tail.
+
+  // Mode arm: retire any floor left by a previous clear, drop the claim that
+  // names a row of the outgoing projection, and hand the dropdown's shrink
+  // to the one height tween instead of snapping the card to the resting size.
+  function _beginModeRestore(site) {
+    panel._restoreSlotStartH = -1
+    Menu.trace("panel.clear", { site: site, auto: list.autoRevealIndex })
+    list.autoRevealIndex = -1
+    list._followIdx = -1
+    const from = panel._currentListH()
+    const base = panel._restingFallbackH()
+    panel._releaseSlotRegion()
+    if (from > base + 0.5 && !panel._heightAnimating
+      && !panel._transitionActive && panel.shown && MotionPolicy.enabled)
+      panel._startHeightTransition(base, -1, from)
+  }
+
+  // Mode clear with an expanded row: pin the outgoing card height as the
+  // floor the restored slot unfolds from. Without it the fit commits the
+  // full page resting size on the swap and the last dropdown is cut off.
+  function _pinModeRestoreFloor(open, blocked) {
+    if (!open || blocked || panel.gridMode) return
+    panel._restoreSlotStartH = panel._currentListH()
+    panel._slotRegionH = panel._restoreSlotStartH
+    panel._heightAnimating = false
+    heightAnim.stop()
+    panel._animatedListH = -1
+    panel._heightTargetH = -1
+  }
+
+  // The settle edge that retires the floor: the saved row is back under the
+  // cursor and its slot has reached the height the fit measured. A landing
+  // that superseded the saved seat (`blocked`), or a page change, retires it
+  // immediately instead of leaving a waiter parked on a row that never came.
+  function _modeRestoreSettled(row, idx, page, blocked) {
+    if (panel._restoreSlotStartH < 0 || blocked
+      || (page !== "" && Menu.frame && Menu.frame.id !== page)) return true
+    return list.currentIndex === idx
+      && Math.abs(row.height - row.settledHeight) < 0.5
+  }
+
+  // Common geometry completion. The mode handler still owns its own seat and
+  // claim choreography; this is the one place the card stops being a mode
+  // projection and starts being the page again.
+  function _finishModeRestore() {
+    panel._restoreSlotStartH = -1
+    panel._recommitRestingH()
+  }
+
   // Re-derive the open-slot claim from the CURRENT row set. The service rev
   // handler derives it on state changes; the search restore installs the
   // original rows in a separate pass. Both paths need this derivation so an
@@ -1886,18 +1915,6 @@ Rectangle {
       panel._summonSeat = false
       const leaving = !panel.scopedSearching
       if (!leaving) {
-        // The filter re-projects the page, so a slot claim from the page that
-        // is being filtered names no row in this projection and must not keep
-        // the card grown to the outgoing dropdown's size. Clearing the region
-        // here would take the card from the dropdown's height to rest in one
-        // frame. Hand that shrink to the one height tween first, then let the
-        // fit for the filtered rows retarget the same tween.
-        const from = panel._currentListH()
-        const base = panel._restingFallbackH()
-        panel._releaseSlotRegion()
-        if (from > base + 0.5 && !panel._heightAnimating
-          && !panel._transitionActive && panel.shown && MotionPolicy.enabled)
-          panel._startHeightTransition(base, -1, from)
         // Arming: remember where on the page the user stood. A nested hit is
         // rendered at the top register while the filter is up and the group
         // row underneath it is unmounted, so this is the only copy of the seat
@@ -1914,22 +1931,13 @@ Rectangle {
         const rowItem = list.currentItem
         panel._scopedReturnChild = rowItem && rowItem.isGroup
           ? rowItem.childIndex : -1
+        panel._beginModeRestore("filter")
       }
-      if (leaving && panel._scopedReturnOpen && !panel.gridMode
-        && !panel._scopedClearByAction) {
-        // Same floor as a search restore: hand the trim's height to the
-        // restored slot's unfold instead of fitting the full page first,
-        // which landed the card at the resting size in one frame and left
-        // the open dropdown below it clipped until the slot grew past that
-        // size on its own.
-        panel._restoreSlotStartH = panel._currentListH()
-        panel._slotRegionH = panel._restoreSlotStartH
-        panel._heightAnimating = false
-        heightAnim.stop()
-        panel._animatedListH = -1
-        panel._heightTargetH = -1
+      if (leaving) {
+        panel._pinModeRestoreFloor(panel._scopedReturnOpen,
+          panel._scopedClearByAction)
+        panel._scopedReturnOpen = false
       }
-      if (leaving) panel._scopedReturnOpen = false
       // Arming or clearing the "/" filter trims and restores the CURRENT
       // page's rows: rows leave and come back in place, so this is a
       // reveal like any other. Clearing also restores the full page box in
@@ -2006,11 +2014,7 @@ Rectangle {
         panel._fitGen++
         panel._restoreSeatPending = false
         panel.whenSettled(function() {
-          // The slot has unfolded to its settled height, so the restored
-          // page owns the card again. Retire the trim-height floor before
-          // recommitting the resting base and re-arming the claim.
-          panel._restoreSlotStartH = -1
-          panel._recommitRestingH()
+          panel._finishModeRestore()
           if (y >= 0) list.restoreAt(at, y, panel._modelListH())
           // The filter left a claim and growth sized for its one-row trim.
           // Clear them before re-arming, or the stale growth makes pursuit
@@ -2031,13 +2035,9 @@ Rectangle {
           if (!Menu.scopedActive && list.autoRevealIndex < 0)
             list.autoRevealIndex = at
         }, function(row) {
-          // A pinned restore keeps the trim-height floor until the slot has
-          // fully unfolded. Without the guard the waiter drains as soon as
-          // the rows install, retiring the floor before the first grow frame
-          // and landing the card at the resting page size in one step.
-          if (panel._restoreSlotStartH < 0) return true
-          return list.currentIndex === at
-            && Math.abs(row.height - row.settledHeight) < 0.5
+          // The filter's page check already ran in the seat pass above, so
+          // only the shared floor and settled-row verdict gates the finish.
+          return panel._modeRestoreSettled(row, at, "", false)
         })
       }, 2)
     }
