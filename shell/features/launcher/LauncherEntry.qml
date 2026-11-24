@@ -28,7 +28,20 @@ Item {
   property bool infoOpen: false
 
   readonly property string descText: String(modelData?.desc ?? "")
-  readonly property string subText: modelData ? String(modelData.sub ?? "") : ""
+  // A pending fetch whose sub line never changes reads as a frozen plugin.
+  // The fx engine tags only its inflation wait row, so only that row cycles
+  // dots; every other sub line stays exactly as its engine wrote it.
+  readonly property bool loadingDots: modelData ? modelData.loadingDots === true : false
+  // One clock, one writer: the timer below owns the tick. The stage shown is
+  // a pure function of it, the same shape PasswordBox uses for caps jitter.
+  // No stop-time reset - a new wait joins the running cycle rather than
+  // rewinding a property another handler would also have to write.
+  property int dotTick: 0
+  readonly property var dotStages: [".", "..", "..."]
+  readonly property string dotText: row.dotStages[row.dotTick % row.dotStages.length]
+  readonly property string subText: modelData
+    ? String(modelData.sub ?? "") + (row.loadingDots ? row.dotText : "")
+    : ""
 
   // A Ctrl-D/Delete on a row with no delete behind it gets a 1.5s red notice
   // in the line the row actually shows: the description when inline
@@ -128,6 +141,16 @@ Item {
     running: row.badgeList.length > 1
     onTriggered: row.badgeIndex = (row.badgeIndex + 1) % row.badgeList.length
     onRunningChanged: if (!running) row.badgeIndex = 0
+  }
+
+  // One dot stage every 250ms: ".", "..", "...", repeat. Outside the
+  // animation policy for the same reason as the badge cycle - the motion
+  // IS the liveness signal, so parking it would recreate the frozen look.
+  Timer {
+    interval: 250
+    repeat: true
+    running: row.loadingDots
+    onTriggered: row.dotTick += 1
   }
 
   // Live line metrics for the resting line heights below. clipFontMetrics

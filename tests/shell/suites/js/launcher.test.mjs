@@ -5477,9 +5477,22 @@ group('fx: scale words and year suffixes extend every currency form', () => {
     kind: 'fx', uid: 'fx:infl', label: '100 USD in 2000',
     sub: 'Fetching inflation data', desc: '', icon: 'accessories-calculator',
     fxValue: '', fxExpr: '100 USD in 2000', incomplete: true, pending: true,
+    loadingDots: true,
     item: { copyValue: '' },
   }])
   eq('and only the CPI document was asked for', pending.rec.calls.map((c) => c[1]), [CPI_URL])
+  eq('the rate wait is not tagged for dots', fxImpl().impl.items('100 usd in eur')[0].loadingDots,
+    undefined)
+  // The shared online verdict is reused while a fetch is still in flight: no
+  // link means no spinner and the offline wording, but the request still goes.
+  const darkPending = fxImpl({ online: false })
+  const darkRow = darkPending.impl.items('100 usd in 2000')[0]
+  eq('the fetch is still asked for while offline', darkPending.rec.calls.map((c) => c[1]), [CPI_URL])
+  eq('an offline pending row names the link', darkRow.sub, 'No internet connection')
+  eq('and it carries no dots', darkRow.loadingDots, undefined)
+  eq('and it raises the alert', darkRow.alert, true)
+  eq('the rate wait uses the same offline wording',
+    fxImpl({ online: false }).impl.items('100 usd in eur')[0].sub, 'No internet connection')
   const failed = fxImpl({ net: { [CPI_URL]: '' } })
   eq('a settled empty CPI body is not a pending row',
     failed.impl.items('100 usd in 2000')[0].sub,

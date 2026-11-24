@@ -1256,13 +1256,16 @@ function tryAll(query, snapshot, history, cpi) {
         // launcher card renders several of these at once, so one uid for the
         // whole set would collapse them into one identity.
         const uid = r.uid || (r.to === undefined ? "fx:hint" : "fx:" + r.to)
-        const offline = r.error === "unavailable" && !onlineNow()
+        // The watcher's verdict also applies while a body is still in flight:
+        // a spinner there would promise a fetch that cannot land. The request
+        // itself is unchanged - only the row's wording follows the link state.
+        const offline = (r.pending === true || r.error === "unavailable") && !onlineNow()
         if (r.ok && r.pending) {
           rows.push({
             kind: "fx",
             uid: uid,
             label: r.label,
-            sub: r.sub,
+            sub: offline ? "No internet connection" : r.sub,
             desc: "",
             icon: icon,
             fxValue: "",
@@ -1271,6 +1274,12 @@ function tryAll(query, snapshot, history, cpi) {
             pending: true,
             item: { copyValue: "" }
           })
+          // A year query waits on a second document. Without a changing sub
+          // line, that wait is indistinguishable from a wedged plugin, so
+          // only this row asks the view to cycle trailing dots - and only
+          // while there is a link for the fetch to complete on.
+          if (!offline && r.year !== undefined) rows[rows.length - 1].loadingDots = true
+          if (offline) rows[rows.length - 1].alert = true
           continue
         }
         if (r.ok) {
