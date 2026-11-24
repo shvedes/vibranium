@@ -252,7 +252,7 @@ WlSessionLockSurface {
         autohideTimer.stop()
         return
       }
-      if (Lockscreen.requested) surface.grabFocus()
+      if (Lockscreen.requested && !Lockscreen.releasing) surface.grabFocus()
     }
 
     function onPasswordChanged() {
@@ -428,6 +428,10 @@ WlSessionLockSurface {
     anchors.fill: parent
     active: surface.screenValid && surface.backgroundMode !== "none"
     sourceComponent: backdropComp
+    // The backdrop paints from its first captured frame, so it needs the
+    // release driver too: otherwise it stays lit after the card has faded
+    // and pops away when the compositor unmaps the surface.
+    opacity: Lockscreen.releaseFade
   }
 
   // Vignette: radial edge darkening over any backdrop. Drawn outside the
@@ -463,7 +467,7 @@ WlSessionLockSurface {
     sourceComponent: Vignette {
       anchors.fill: parent
       intensity: surface.vignetteK
-      progress: surface.appearFade
+      progress: surface.appearFade * Lockscreen.releaseFade
     }
   }
 
@@ -480,7 +484,7 @@ WlSessionLockSurface {
 
   // Huge time, with the optional date directly under it. The block is sized
   // from the band above and pinned to its lower edge, so it never touches the
-  // field, and it rides the same entry fade as the panel.
+  // field, and it rides the panel's entry and release fades.
   LockClock {
     id: lockClock
 
@@ -492,13 +496,14 @@ WlSessionLockSurface {
     withDate: Settings.lockscreenDate
     showSeconds: Settings.lockscreenSeconds
     visible: Settings.lockscreenClock && surface.clockMaxH > 0
-    opacity: panel.appearK * surface.clockIdleK
+    opacity: panel.appearK * surface.clockIdleK * Lockscreen.releaseFade
   }
 
   // The field itself sits dead center; indicators hang off it absolutely
-  // so toggling them can never shift the input. Only this panel animates,
-  // and only on entry - unlock tears the whole surface down instantly.
-  // Sized from the box so the dimensions live in PasswordBox alone.
+  // so toggling them can never shift the input. Its opacity carries the
+  // entry, idle and release fades; the lock is only dropped after the last
+  // one reaches zero. Sized from the box so the dimensions live in
+  // PasswordBox alone.
   Item {
     id: panel
 
@@ -516,9 +521,10 @@ WlSessionLockSurface {
     anchors.centerIn: parent
     width: authBox.width
     height: authBox.height
-    // The entry fade and the idle autohide multiply into one opacity; neither
-    // touches visibility or enabled, so the field stays interactive throughout.
-    opacity: appearK * surface.autohideK
+    // Entry, idle and release are three readings folded into one opacity;
+    // none of them touches visibility. Input is gated separately on
+    // authenticating/releasing, so a faded field is never a live one.
+    opacity: appearK * surface.autohideK * Lockscreen.releaseFade
     scale: 0.94 + 0.06 * appearK
 
     PasswordBox {
@@ -526,7 +532,7 @@ WlSessionLockSurface {
 
       anchors.centerIn: parent
 
-      enabled: !Lockscreen.authenticating
+      enabled: !Lockscreen.authenticating && !Lockscreen.releasing
       busy: Lockscreen.authenticating
 
       // The field names itself with a glyph instead of a word: the same
@@ -572,8 +578,8 @@ WlSessionLockSurface {
   }
 
   // Currently-playing pill floating 5% of the screen height above the
-  // bottom edge - proportional on any display. Rides the same entry fade
-  // (and its gate) as the panel above.
+  // bottom edge - proportional on any display. Rides the panel's entry fade
+  // and the shared release driver, so it cannot outlive the card.
   //
   // The track gate lives HERE: the pill derives its visibility from the
   // setting and the live track in one place, and NowPlaying.qml owns none.
@@ -584,7 +590,7 @@ WlSessionLockSurface {
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.bottom: parent.bottom
     anchors.bottomMargin: parent.height * 0.05
-    opacity: panel.appearK
+    opacity: panel.appearK * Lockscreen.releaseFade
   }
 
   // Sleep-inhibitor hint at the right bottom, driven straight from
@@ -602,10 +608,10 @@ WlSessionLockSurface {
     anchors.rightMargin: Ui.outerPad
     anchors.bottomMargin: Ui.outerPad
     spacing: Ui.s / 2
-    // Rides the panel's own entry value like the pill above: appearK is
-    // already animated and gated, so a second tween here would trail it and
-    // would still fade when motion is off.
-    opacity: panel.appearK
+    // Rides the panel's entry value like the pill above, plus the shared
+    // release driver: both are already animated and gated, so a second tween
+    // here would trail them and would still fade when motion is off.
+    opacity: panel.appearK * Lockscreen.releaseFade
 
     readonly property real maxLineW: surface.width * 0.45
 

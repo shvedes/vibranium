@@ -37,6 +37,15 @@ Singleton {
   readonly property string tag: "lockscreen"
 
   property bool requested: false
+  // The session lock stays engaged while these surfaces fade their content
+  // out. One driver in the owner (not one per surface) means every screen
+  // reaches zero together and teardown waits on a single animation edge.
+  // releaseAnim owns releaseFade while a fade runs; lock() only arms it for
+  // the next session. The two writes cannot overlap because lock() refuses
+  // to engage while `locked` still holds.
+  property bool releasing: false
+  property real releaseFade: 1
+
   // WlSessionLock in Quickshell 0.3.2 never emits lockStateChanged on unlock,
   // so a binding reading `locked` keeps its last true value after the first
   // release and every later lock request is refused as already_locked. The
@@ -105,6 +114,10 @@ Singleton {
   function lock(from, requestReason) {
     if (root.locked) return
     root.resetAuth("new-lock")
+    // A finished release left the fade driver at zero; arm it for this session
+    // before any surface can bind to it. `releasing` is already false here:
+    // finishRelease() clears it, and a new lock cannot engage while held.
+    root.releaseFade = 1
     // Freeze the backdrop source for this session up front: background mode
     // pins the wallpaper path here so a swap while locked cannot replace the
     // security backdrop the user is authenticating against. A disabled
@@ -153,6 +166,7 @@ Singleton {
   // is past this is inert, so grace can never bypass a password after a
   // suspend even while a monotonic countdown would still have time left.
   function graceActivity() {
+    if (root.releasing) return
     if (root._graceDeadlineMs === 0) return
     const armed = root._graceDeadlineMs
     root._endGrace()
@@ -160,7 +174,7 @@ Singleton {
     // deadline in the past means the window elapsed - no password bypass.
     if (Settings.lockscreenGraceSeconds <= 0) return
     if (Date.now() >= armed) return
-    root.finishRelease()
+    root.beginRelease()
   }
 
   // Stable identity for the neutral request contract: adopt() and release()
@@ -179,8 +193,8 @@ Singleton {
   }
 
   onRequestedChanged: {
-    // Every release routes through finishRelease(), whether a PAM success or
-    // input inside the grace window, so this is the single resume point. Pause is
+    // Every release routes through finishRelease(), after the exit fade has
+    // drawn its last frame, so this is the single resume point. Pause is
     // handled in lock() to keep the lock request synchronous; resume runs
     // when requested flips false.
     if (!root.requested) {
@@ -198,8 +212,8 @@ Singleton {
   onLockedChanged: {
     // The far end of the transition lock() opened. `requested` is the only
     // input that can move `locked` back down; finishRelease is its only
-    // writer, reached from a successful PAM answer or real input inside the
-    // grace window, so the release is handled there and never here.
+    // writer, reached from the release fade's finished edge after both PAM
+    // success and grace input enter beginRelease, so never from here.
     OSD.desktopSuppressed = root.locked
     root._publishState()
   }
@@ -263,6 +277,7 @@ Singleton {
   // `_exchange` counter was removed rather than left dead. (LOCK-2)
   function tryUnlock() {
     if (!root.requested) return
+    if (root.releasing) return
     if (root.authenticating) return
     if (root.password === "") return
     root.authenticating = true
@@ -290,7 +305,7 @@ Singleton {
     root.submitted = ""
     if (!root.requested) return
     if (ok) {
-      root.finishRelease()
+      root.beginRelease()
     } else {
       root.failedAttempts += 1
       // Surfaces flash their own field on this via fail(); the wipe here
@@ -299,10 +314,26 @@ Singleton {
     }
   }
 
-  // The single release point, reached from a PAM success or a grace-window
-  // input edge. Runs after the surfaces are gone, so resetting here never
-  // paints through.
+  // Every unlock enters here, from a PAM success or a grace-window input
+  // edge. `requested` stays true until the fade ends, so the compositor keeps
+  // the lock (and its input grab) for the whole exit instead of unmapping a
+  // surface mid-frame. With motion off the fade is skipped entirely.
+  function beginRelease() {
+    if (root.releasing || !root.requested) return
+    root._endGrace()
+    root.releasing = true
+    if (MotionPolicy.enabled) {
+      releaseAnim.restart()
+      return
+    }
+    root.finishRelease()
+  }
+
+  // The single release point, reached from beginRelease once the exit fade
+  // has drawn its last frame. Runs after the surfaces are gone, so resetting
+  // here never paints through.
   function finishRelease() {
+    root.releasing = false
     root._endGrace()
     root.requested = false
     root.backdropPath = ""
@@ -311,6 +342,35 @@ Singleton {
     // activity monitor, so the idle daemon cannot rely on that edge to
     // re-arm a timer the lock already spent.
     IdleDaemon.rearmAfterRelease()
+  }
+
+  // One clock for every screen. onFinished is the real edge that releases
+  // the session lock; no timer guesses how long the fade took.
+  NumberAnimation {
+    id: releaseAnim
+
+    target: root
+    property: "releaseFade"
+    from: 1
+    to: 0
+    // Shared duration token, not a second clock: the whole exit reads the
+    // one driver this animation owns.
+    duration: Ui.slowMs
+    easing.type: Easing.InCubic
+    onFinished: root.finishRelease()
+  }
+
+  // The gate is sampled once when beginRelease starts the tween. A global
+  // switch flipped off mid-fade must not leave the driver easing to zero
+  // under an already-torn-down session.
+  Connections {
+    target: MotionPolicy
+
+    function onEnabledChanged() {
+      if (MotionPolicy.enabled || !root.releasing) return
+      releaseAnim.stop()
+      root.finishRelease()
+    }
   }
 
   WlSessionLock {

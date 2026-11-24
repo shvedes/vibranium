@@ -55,7 +55,7 @@ const state = { release: 0 }
 const root = {
   _graceDeadlineMs: 0,
   _endGrace() { root._graceDeadlineMs = 0 },
-  finishRelease() { state.release++ }
+  beginRelease() { state.release++ }
 }
 const Settings = { lockscreenGraceSeconds: 5 }
 const Clock = { now: () => now }

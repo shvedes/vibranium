@@ -84,7 +84,7 @@ const fns = new Function("root", "Settings", "Date", "IdleDaemon", [
   lift(src.lock, "graceActivity"),
   lift(src.lock, "finishRelease")
 ].join("\n") + "\nroot._graceMayArm = _graceMayArm\nroot._finishRelease = finishRelease\nreturn { _armGrace, graceActivity }")(root, Settings, Clock, IdleDaemon)
-root.finishRelease = function () { releases++; root._finishRelease() }
+root.beginRelease = function () { releases++; root._finishRelease() }
 const onSleep = new Function("root", "return function () {" + body(src.lock, "on_SleepStateChanged:") + "}")(root)
 
 function reset() {
