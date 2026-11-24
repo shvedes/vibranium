@@ -279,6 +279,7 @@ Rectangle {
     panel._restoreSlotStartH = -1
     panel._searchReturnOpen = false
     panel._scopedReturnOpen = false
+    panel._modeRestoreFitOwned = false
     // The resting size this surface was showing when it closed, and the
     // measurement that produced it, describe the menu that was open. Carried
     // into the next summon they are what a freshly spawned card sized itself
@@ -436,6 +437,9 @@ Rectangle {
 
   function finishHeightTransition() {
     if (heightAnim.running) return
+    // The fit tween owned the card for a short-dropdown restore. With it
+    // landed, the normal region chain can own the size again.
+    panel._modeRestoreFitOwned = false
     Menu.trace("panel.heightDone", {
       target: Math.round(panel._heightTargetH * 10) / 10,
       claim: Math.round(panel._claimListH * 10) / 10,
@@ -1635,6 +1639,7 @@ Rectangle {
       const saved = panel.rowsModel[at]
       panel._searchReturnOpen = !!saved
         && (Menu.isExpanded(saved) || Menu.infoOpen(saved))
+      panel._modeReturnGrows = panel._modeWillGrow(list.currentItem)
       panel._beginModeRestore("search")
       list.contentY = 0
     } else {
@@ -1675,6 +1680,7 @@ Rectangle {
     panel._restoreSlotStartH = -1
     panel._searchReturnOpen = false
     panel._scopedReturnOpen = false
+    panel._modeRestoreFitOwned = false
     // A new page means a new row set: any reveal claim from the page being
     // left (an open slot, a search projection) no longer names a row here,
     // and a stale out-of-bounds index would make pursuit scroll the new
@@ -1779,11 +1785,29 @@ Rectangle {
       panel._startHeightTransition(base, -1, from)
   }
 
+  // Whether the row open at arm time grows the card past the page's resting
+  // height. A dropdown that fits the page needs no slot-driven restore: the
+  // fit tween owns the card from the projection's height to the page's height.
+  property bool _modeReturnGrows: false
+  property bool _modeRestoreFitOwned: false
+
+  function _modeWillGrow(row) {
+    return !!row && row.settledHeight > panel._modelListH() + 0.5
+  }
+
   // Mode clear with an expanded row: pin the outgoing card height as the
   // floor the restored slot unfolds from. Without it the fit commits the
   // full page resting size on the swap and the last dropdown is cut off.
+  // A dropdown that already fits the page is the other case: leave the
+  // region clear and let the fit tween carry the card the whole way.
   function _pinModeRestoreFloor(open, blocked) {
     if (!open || blocked || panel.gridMode) return
+    if (!panel._modeReturnGrows) {
+      // With motion off the fit snaps, so there is no tween to own and no
+      // onFinished to retire the gate.
+      panel._modeRestoreFitOwned = MotionPolicy.enabled
+      return
+    }
     panel._restoreSlotStartH = panel._currentListH()
     panel._slotRegionH = panel._restoreSlotStartH
     panel._heightAnimating = false
@@ -1929,6 +1953,7 @@ Rectangle {
         panel._scopedReturnOpen = !!it
           && (Menu.isExpanded(it) || Menu.infoOpen(it))
         const rowItem = list.currentItem
+        panel._modeReturnGrows = panel._modeWillGrow(rowItem)
         panel._scopedReturnChild = rowItem && rowItem.isGroup
           ? rowItem.childIndex : -1
         panel._beginModeRestore("filter")
@@ -2840,6 +2865,7 @@ Rectangle {
   // - A fold keeps following its live height until the row reaches rest, then
   //   the region is released - there is no second tween to hand off to.
   function _followSlotRow() {
+    if (panel._modeRestoreFitOwned) return
     // The folding row, not the row under the cursor: a step taken mid-close
     // moves the cursor, but the card still has to follow the row that folds.
     const row = panel._closePageMode && panel._closeRow
@@ -2976,6 +3002,7 @@ Rectangle {
   // published, while both still agree, so the one derived chain follows the
   // row's live geometry. Called by both region writers.
   function _yieldFitToRegion() {
+    if (panel._modeRestoreFitOwned) return
     if (panel._slotRegionH <= 0 || !panel._heightAnimating
       || panel._transitionActive || Menu.slotClosing) return
     panel._heightAnimating = false
@@ -5663,7 +5690,10 @@ Rectangle {
       target: panel
       property: "_animatedListH"
       duration: Ui.resizeMs
-      easing.type: Easing.OutCubic
+      // A short-dropdown mode restore grows the whole card on this tween,
+      // so it starts from rest instead of OutCubic's steep first frame.
+      easing.type: panel._modeRestoreFitOwned
+        ? Easing.InOutCubic : Easing.OutCubic
       onFinished: panel.finishHeightTransition()
     }
 

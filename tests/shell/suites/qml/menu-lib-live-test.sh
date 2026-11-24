@@ -319,6 +319,43 @@ for f in frames[-3:]:
         sys.exit(f"search card clipped {base['blank']}px of its last row")
 PY
 
+  # A short dropdown on a long page must not reach its own settled bottom and
+  # then jump to the page's resting height when the slot settles. The fit
+  # tween owns the whole resize in that case.
+  p close >/dev/null
+  p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#bar" >/dev/null
+  sleep 0.6
+  p debugSetCurrentIdx 2 >/dev/null
+  p debugActivatePanel >/dev/null
+  sleep 0.5
+  p debugDeep on >/dev/null
+  p debugBeginScoped >/dev/null
+  p debugType night >/dev/null
+  sleep 0.4
+  p deepPhase short-dropdown >/dev/null
+  p debugType "" >/dev/null
+  sleep 0.6
+  p debugDeep off >/dev/null
+  local short_trace="${part}-short-dropdown.json"
+  drain_trace "$short_trace" || return 1
+  python3 - "$short_trace" "$motion" <<'PY' || return 1
+import json, sys
+
+frames = [f for f in json.load(open(sys.argv[1]))
+          if f["phase"] == "short-dropdown" and f["base"]["count"] == 6]
+if not frames:
+    sys.exit("short dropdown restore did not install")
+last = frames[-1]
+if abs(last["card"]["rendered"] - last["base"]["tenRowH"]) > 2:
+    sys.exit("short dropdown did not land on the page's resting height")
+if sys.argv[2] == "on":
+    heights = [f["card"]["rendered"] for f in frames]
+    total = heights[-1] - heights[0]
+    if total > 0 and any(b - a > total * 0.45
+                         for a, b in zip(heights, heights[1:])):
+        sys.exit("short dropdown jumped mid-resize")
+PY
+
   # Seeded, not fixed: the walk is reproducible but still crosses entries,
   # nested groups, editors, option grids, search and filter in odd orders.
   RANDOM=90210
