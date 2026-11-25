@@ -100,10 +100,10 @@ t_section "the registry is the single table of surfaces"
 
 REG_KEYS="$(reg_namespaces)"
 t_unique "no namespace is declared twice in the registry" "$REG_KEYS"
-t_eq "the registry keeps fourteen surface classes" "14" \
+t_eq "the registry keeps fifteen surface classes" "15" \
   "$(printf '%s\n' "$REG_KEYS" | grep -c .)"
 t_eq "the classes account for every window the shell maps" "24" "$(reg_client_count)"
-t_eq "and every class names at least one client" "14" \
+t_eq "and every class names at least one client" "15" \
   "$(grep -E '^  "vibranium:' "$REGISTRY" | grep -c 'clients: \[')"
 
 # The declared side of the same set: literal keys, the menu family's bound
@@ -125,8 +125,8 @@ t_section "the table is a closed schema"
 # the domain the spec names. A row that adds a field is rejected by the JS
 # suite as an unknown key, and here by the shape, so neither file can grow an
 # extension the other does not know about.
-ROW_SCHEMA='^  "vibranium:[a-z-]+": . layer: (BACKGROUND|BOTTOM|TOP|OVERLAY), focus: "(none|ondemand|exclusive)", exclusion: "(normal|ignore)", mask: "(none|empty|content)", mapped: "(always|open)", order: -?[0-9]+, rule: (true|false), clients: \[("[a-z-]+"(, "[a-z-]+")*)\] .[,]?$'
-t_count "every row declares the full schema, in field order" "14" \
+ROW_SCHEMA='^  "vibranium:[a-z-]+": . layer: (BACKGROUND|BOTTOM|TOP|OVERLAY), focus: "(none|ondemand|exclusive)", exclusion: "(normal|ignore)", mask: "(none|empty|content|open)", mapped: "(always|open|primary)", order: -?[0-9]+, rule: (true|false), clients: \[("[a-z-]+"(, "[a-z-]+")*)\] .[,]?$'
+t_count "every row declares the full schema, in field order" "15" \
   "$(grep -E '^  "vibranium:' "$REGISTRY" | grep -cE "$ROW_SCHEMA" || true)"
 t_eq "and no row escapes the schema" "0" \
   "$(grep -E '^  "vibranium:' "$REGISTRY" | grep -vcE "$ROW_SCHEMA" || true)"
@@ -152,6 +152,7 @@ annotate:OVERLAY
 color-pick:OVERLAY
 hud:OVERLAY
 island:OVERLAY
+launcher:OVERLAY
 modal:OVERLAY
 notifications:OVERLAY
 popup:OVERLAY
@@ -196,6 +197,13 @@ t_contains "the move proxy's region is computed" "mask: Region {" \
   "$(<"$SHELL_DIR/features/bar/MoveWindow.qml")"
 t_not_contains "a modal scrim is not masked" "mask:" \
   "$(<"$SHELL_DIR/common/ui/OverlayWindow.qml")"
+LAUNCHER_VIEW="$(<"$SHELL_DIR/features/launcher/AppLauncherView.qml")"
+t_contains "only the primary launcher stays mapped after the entrance" \
+  "AppLauncher.visible || (win.primary && DesktopLayoutState.bootEntrancePlayed)" "$LAUNCHER_VIEW"
+t_contains "closing the launcher installs its empty input region" \
+  "mask: AppLauncher.visible ? null : closedInput" "$LAUNCHER_VIEW"
+t_contains "launcher open state drives the scrim and keyboard grab" \
+  "overlayOpen: AppLauncher.visible" "$LAUNCHER_VIEW"
 
 t_section "an exclusive grab has a release branch"
 

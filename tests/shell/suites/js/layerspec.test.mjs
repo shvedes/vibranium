@@ -57,8 +57,8 @@ group('the shipped table conforms to its own schema', () => {
   eq('the shipped table validates', validate(), [])
 })
 
-group('the table is fourteen classes over twenty-four windows', () => {
-  eq('fourteen classes', names().length, 14)
+group('the table is fifteen classes over twenty-four windows', () => {
+  eq('fifteen classes', names().length, 15)
   eq('twenty-four windows', allClients().length, 24)
   eq('a client maps exactly one class', new Set(allClients()).size, 24)
 })
@@ -72,8 +72,8 @@ group('every row carries the declared fields, in the declared order', () => {
 group('the domains are the closed sets the spec names', () => {
   eq('the layer domain', allowed('layer'), [L.BACKGROUND, L.BOTTOM, L.TOP, L.OVERLAY])
   eq('the focus domain', allowed('focus'), ['none', 'ondemand', 'exclusive'])
-  eq('the mask domain', allowed('mask'), ['none', 'empty', 'content'])
-  eq('the mapped domain', allowed('mapped'), ['always', 'open'])
+  eq('the mask domain', allowed('mask'), ['none', 'empty', 'content', 'open'])
+  eq('the mapped domain', allowed('mapped'), ['always', 'open', 'primary'])
   eq('the exclusion domain', allowed('exclusion'), ['normal', 'ignore'])
 })
 

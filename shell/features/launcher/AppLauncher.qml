@@ -605,23 +605,17 @@ Singleton {
   }
 
   function close() {
-    // A close inside the open wait retires the pending open before it ever
-    // painted: no claim was taken and no window mapped, so there is nothing
-    // to hide or release. The controller stays warm (usage, index and the
-    // verdict the probe just landed all serve the next summon) - it is
-    // resident, so there is no idle grace to arm.
+    // Closing during the open wait cancels the pending reveal. No surface
+    // claim was taken and the controller stays available for the next open.
     if (root._openWaiting) {
       root._openWaiting = false
       openProbeTimeout.stop()
       return
     }
     if (!root.visible) return
-    // The tree stays attached while the window hides: panel items are
-    // destroyed only with their Loader, never against a torn-down surface
-    // (see the Loader note in AppLauncherView - unloading here races the
-    // hide and segfaults in derefWindow after close). The card vanishes with the
-    // press instead of fading with the scrim; that pop is the price of
-    // never stranding a delegate on a dead window.
+    // AppLauncherView hides the card and releases input while retaining the
+    // primary surface. Panel items stay attached to their Loader because
+    // destroying delegates during a surface teardown can race derefWindow.
     root.visible = false
     SurfaceClaim.release(root._claimToken)
     root._claimToken = null

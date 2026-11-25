@@ -26,30 +26,32 @@ Variants {
       growthFraction: 0.85
     }
 
-    visible: AppLauncher.visible
+    // Keep the primary native surface after the boot entrance. The scrim
+    // owns opacity and OverlayWindow releases its keyboard grab on close.
+    // An empty input region also lets pointer input reach the desktop.
+    visible: AppLauncher.visible || (win.primary && DesktopLayoutState.bootEntrancePlayed)
+    mask: AppLauncher.visible ? null : closedInput
     overlayOpen: AppLauncher.visible
     primary: modelData === Ui.primaryScreen
     dim: Settings.menuDimBackground ? Settings.menuDimLevel : 0
+    animateDimIn: true
 
-    wlrNamespace: "vibranium:modal"
+    wlrNamespace: "vibranium:launcher"
+
+    Region {
+      id: closedInput
+      width: 0
+      height: 0
+    }
 
     onCloseRequested: AppLauncher.close()
 
     Loader {
       anchors.fill: parent
-      // Panels stay loaded across closes, exactly like MenuView: hiding the
-      // window keeps the tree attached, so no item is ever destroyed against
-      // a dead surface. Unloading here would race the hide - Loader
-      // unload is deferred (deleteLater) while the hide tears the native
-      // surface down, and the deferred deletes then landed in
-      // QQuickItemPrivate::derefWindow on a dangling window (SIGSEGV after
-      // close, usually when event-loop load delayed the deletes past the
-      // surface death). Secondary screens hold no panel tree at all (no
-      // `|| AppLauncher.visible` tail): building one per open only to tear
-      // it down on the matching close is the same race on every other
-      // output. The controller stays resident once prewarmed; its
-      // children hold no windows, so even a unit teardown cascade
-      // (Boot's hook) is safe.
+      // The primary retains its panel across closes. Unloading on close
+      // can race a surface teardown because the Loader deletes its items
+      // later, after the underlying QQuickWindow has already gone.
+      // Secondary windows only draw the scrim.
       active: win.primary
       sourceComponent: launcherPanelComp
     }
@@ -60,6 +62,37 @@ Variants {
       // Plain Item absorbs the Loader's explicit size; the panel keeps its
       // own width binding and centerIn anchor as a child.
       Item {
+        id: panelVisual
+
+        Connections {
+          target: AppLauncher
+
+          function onVisibleChanged() {
+            openFade.stop()
+            if (!AppLauncher.visible) return
+            panelVisual.opacity = win.animationsEnabled ? 0 : 1
+            if (win.animationsEnabled) openFade.start()
+          }
+        }
+
+        Connections {
+          target: win
+
+          function onAnimationsEnabledChanged() {
+            if (win.animationsEnabled) return
+            openFade.stop()
+            panelVisual.opacity = 1
+          }
+        }
+
+        NumberAnimation {
+          id: openFade
+          target: panelVisual
+          property: "opacity"
+          to: 1
+          duration: Ui.fastMs
+          easing.type: Easing.OutCubic
+        }
 
         // Halo follows the Drop shadow row, independent of the scrim.
         MenuOverlayShadow { host: card }

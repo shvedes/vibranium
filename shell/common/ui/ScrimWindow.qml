@@ -16,42 +16,38 @@ LayerSurface {
   property real dim: 0.45
   property bool overlayOpen: false
   property bool isPrimary: false
-  // Kill switch: disables the close fade; the overlay still snaps
-  // to final opacity. Defaults on for consumers off the menu.
+  property bool animateDimIn: false
   property bool animationsEnabled: true
 
   signal closeRequested()
 
   default property alias content: container.data
 
-  // Arms the close fade; see the note on the Behavior below for why this is a
-  // handler rather than a binding.
-  onOverlayOpenChanged: scrimFade.enabled = root.animationsEnabled && !root.overlayOpen
+  onOverlayOpenChanged: {
+    scrimFade.enabled = root.animationsEnabled && !root.overlayOpen
+    dimFade.stop()
+    if (!root.overlayOpen) return
+
+    if (root.animateDimIn && root.animationsEnabled && root.dim > 0) {
+      scrim.dimProgress = 0
+      dimFade.restart()
+    } else {
+      scrim.dimProgress = 1
+    }
+  }
+
+  onAnimationsEnabledChanged: {
+    if (root.animationsEnabled) return
+    dimFade.stop()
+    scrim.dimProgress = 1
+  }
 
   Item {
     anchors.fill: parent
     opacity: root.overlayOpen ? 1 : 0
-    // Only the CLOSE animates. Every consumer of this window is summoned by a
-    // keypress or a click, and the surface is mapped within a few ms of that
-    // input, so an opacity Behavior that eases up from zero spends the whole
-    // of fastMs painting nothing the user asked for - the launcher measures
-    // mapped at +4ms and still needs fastMs to become visible, all of it
-    // here. The same fade on the way out reads as polish, so it stays.
-    //
-    // Deliberately no mapped hold for this fade (no `visible || fading`
-    // staging): consumers unmap on the close tick, and the compositor's own
-    // layersOut fade animates the unmap. Holding the surface mapped through
-    // our fade first plays two fades back-to-back - dim lifts, then the
-    // opaque card fades - which reads as a flash after the close. Tried;
-    // reverted.
-    //
-    // `enabled` is armed from onOverlayOpenChanged rather than bound to
-    // overlayOpen: overlayOpen drives this opacity target too, and the engine
-    // does not order those two re-evaluations, so a binding reads the previous
-    // value on the opening turn and animates the summon anyway. A signal
-    // handler runs before the binding pump, which is the order this needs.
-    // Default false, so the window's first open (construction to visible)
-    // cannot animate either.
+    // Snap the parent on open so the card and dim can animate independently.
+    // The signal handler disables the Behavior before the opacity binding
+    // updates; a second binding can read the previous state.
     Behavior on opacity {
       id: scrimFade
       enabled: false
@@ -62,7 +58,17 @@ LayerSurface {
       id: scrim
       anchors.fill: parent
       color: "#000000"
-      opacity: root.dim
+      property real dimProgress: 1
+      opacity: root.dim * scrim.dimProgress
+
+      NumberAnimation {
+        id: dimFade
+        target: scrim
+        property: "dimProgress"
+        to: 1
+        duration: Ui.fastMs
+        easing.type: Easing.OutCubic
+      }
     }
 
     MouseArea {

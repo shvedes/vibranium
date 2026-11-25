@@ -34,8 +34,8 @@
 //   layer      integer, wlr enum    BACKGROUND|BOTTOM|TOP|OVERLAY   yes
 //   focus      string               none|ondemand|exclusive     yes
 //   exclusion  string               normal|ignore               yes
-//   mask       string               none|empty|content          yes
-//   mapped     string               always|open                 yes
+//   mask       string               none|empty|content|open     yes
+//   mapped     string               always|open|primary          yes
 //   order      integer              Hyprland rule order, 0 = default   yes
 //   rule       boolean              true if a layer rule is required   yes
 //   clients    array of strings     the views that map the class, non-empty   yes
@@ -54,8 +54,8 @@ var DOMAINS = {
   layer: [BACKGROUND, BOTTOM, TOP, OVERLAY],
   focus: ["none", "ondemand", "exclusive"],
   exclusion: ["normal", "ignore"],
-  mask: ["none", "empty", "content"],
-  mapped: ["always", "open"]
+  mask: ["none", "empty", "content", "open"],
+  mapped: ["always", "open", "primary"]
 }
 
 var NAME_PATTERN = /^vibranium:[a-z]+(-[a-z]+)*$/
@@ -102,12 +102,16 @@ var SPECS = {
   // are not MenuLib (the polkit prompt and the network QR). One class because
   // they keep one contract - a dim on every screen, the panel and the exclusive
   // keyboard on the primary alone - and because they are already mutually
-  // exclusive through SurfaceClaim: eight of these nine claim the screen when
+  // exclusive through SurfaceClaim: seven of these eight claim the screen when
   // they open, so only one can be up at a time. The polkit prompt is the
   // exception - it is summoned by the system rather than by the user, and
   // standing it down for a menu would deny an authentication nobody asked the
   // shell to cancel - so it shares the class but not the claim.
-  "vibranium:modal": { layer: OVERLAY, focus: "exclusive", exclusion: "ignore", mask: "none", mapped: "open", order: 0, rule: false, clients: ["menu", "launcher", "clipboard", "power", "pass", "theme-picker", "wallpaper-picker", "polkit", "network-qr"] },
+  "vibranium:modal": { layer: OVERLAY, focus: "exclusive", exclusion: "ignore", mask: "none", mapped: "open", order: 0, rule: false, clients: ["menu", "clipboard", "power", "pass", "theme-picker", "wallpaper-picker", "polkit", "network-qr"] },
+
+  // The launcher retains its primary surface after the boot entrance. All
+  // screens map on open; the closed primary takes neither pointer nor keys.
+  "vibranium:launcher": { layer: OVERLAY, focus: "exclusive", exclusion: "ignore", mask: "open", mapped: "primary", order: 0, rule: false, clients: ["launcher"] },
 
   // The transient menus that hang off something else: the tray's context menu
   // and the desktop's right-click menu. OnDemand only while open - neither has
