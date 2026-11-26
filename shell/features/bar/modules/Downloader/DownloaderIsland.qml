@@ -8,7 +8,7 @@ import "DownloadsLib.js" as DL
 import "../../../../common/collections/TableSort.js" as TableSort
 
 // Downloader island: preview, URL field and the format table. The table is
-// the ArchUpdates package table with one change - single selection, so there
+// the SystemUpdates package table with one change - single selection, so there
 // is no checkbox and no select-all; the chosen row names the format the
 // download will use.
 //
@@ -1764,14 +1764,14 @@ Item {
               // The view seats index 0 synchronously as part of the model
               // assignment, before this edge fires. Unseating here (rather
               // than a turn later) means the unpointed band never reaches a
-              // frame - the same synchronous gate ArchUpdates uses.
+              // frame - the same synchronous gate SystemUpdates uses.
               onModelChanged: {
                 if (formatList.currentIndex !== -1) formatList.seat(-1, "land")
               }
             }
 
             // The placeholder rows stay perfectly still and one wash breathes
-            // over them, the ArchUpdates pattern: per-bar pulses staggered on
+            // over them, the SystemUpdates pattern: per-bar pulses staggered on
             // their own read as random flicker rather than as loading.
             Item {
               anchors.fill: parent
@@ -1910,7 +1910,7 @@ Item {
               contentY: 0
               // Padded to the window exactly like the format table, so the
               // rows the history does not fill stand as the same skeleton bars
-              // (ArchUpdates' placeholder) and the table keeps one footprint.
+              // (SystemUpdates' placeholder) and the table keeps one footprint.
               stableModel: root._historyRows
               spacing: root._rowGap
               currentIndex: -1

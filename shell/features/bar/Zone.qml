@@ -924,6 +924,9 @@ Item {
     id: slot
 
     required property var modelData
+    // The delegate this slot last published to the per-view IPC index. Set
+    // only from onLoaded; identity is what keeps a replacement safe.
+    property var _ipcItem: null
     // Layout slots are draggable unless fixed: pinned slots and
     // non-draggable owned modules stay put while remaining fully toggleable
     // upstream (static case). No layout slot is pinned today.
@@ -1073,8 +1076,16 @@ Item {
       sourceComponent: root.resolveSlot(slot.modelData.id)
 
       onLoaded: {
-        if (contentLoader.item && root.hostWindow)
-          root.hostWindow.wireModule(contentLoader.item)
+        const loaded = contentLoader.item
+        // A replaced delegate must release the IPC entry it held, by identity:
+        // a stale loader callback can then never remove the replacement row.
+        if (slot._ipcItem && slot._ipcItem !== loaded && root.hostWindow)
+          root.hostWindow.forgetIpcModule(slot.modelData.id, slot._ipcItem)
+        if (loaded && root.hostWindow) {
+          root.hostWindow.wireModule(loaded)
+          root.hostWindow.noteIpcModule(slot.modelData.id, loaded)
+        }
+        slot._ipcItem = loaded
         // Modules learn their slot id for the settings-key namespace (click
         // commands resolve shell.statusbar.<id><action>).
         if (contentLoader.item && contentLoader.item.moduleId !== undefined)

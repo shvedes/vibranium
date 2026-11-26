@@ -204,9 +204,16 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("power", root, {
+      "power.open": function () { return ipc.open() },
+      "power.close": function () { return ipc.close() },
+      "power.toggle": function () { return ipc.toggle() },
+      "power.status": function () { return ipc.status() },
+      "power.ping": function () { return ipc.ping() }
+    })
     Registry.offer("powerMenu", {
       title: "Power menu",
-      description: "session power actions",
+      description: "Open the session power menu",
       verbNames: [
         "close",
         "open",
@@ -221,6 +228,7 @@ Singleton {
   }
 
   Component.onDestruction: {
+    IpcRouter.unregister("power", root)
     SurfaceClaim.releaseOwner(root)
   }
 
@@ -401,9 +409,10 @@ Singleton {
   property int totalCount: 0
 
   IpcHandler {
+    id: ipc
     target: "power"
     function help(command: string): string {
-      return UnitIpc.help("power", "Power menu", "session power actions", [
+      return UnitIpc.help("power", "Power menu", "Open the session power menu", [
         { name: "close", help: "hide the menu" },
         { name: "open", help: "show the menu" },
         { name: "toggle", help: "show/hide" },

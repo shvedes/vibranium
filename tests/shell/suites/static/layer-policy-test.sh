@@ -191,7 +191,9 @@ for rel in \
   t_contains "$(basename "$rel") declares an empty region" \
     "mask: Region { width: 0; height: 0 }" "$(<"$SHELL_DIR/$rel")"
 done
-t_contains "the pile's region follows the pile" "mask: Region { item: pile }" \
+t_contains "the pile's region follows the pile" "x: pile.x" \
+  "$(<"$SHELL_DIR/features/notifications/NotificationsView.qml")"
+t_contains "the pile's region uses the settled height" "height: Notifications.pileHeight()" \
   "$(<"$SHELL_DIR/features/notifications/NotificationsView.qml")"
 t_contains "the move proxy's region is computed" "mask: Region {" \
   "$(<"$SHELL_DIR/features/bar/MoveWindow.qml")"

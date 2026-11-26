@@ -78,8 +78,8 @@ section('LogScope.scopeFromPath - the derivation')
 group('the layer directory is stripped, and so is every other layer', () => {
   // The documented spellings, first, because they are the contract.
   eq('features/clipboard/Clipboard.qml', Scope.scopeFromPath('features/clipboard/Clipboard.qml'), 'clipboard')
-  eq('features/bar/modules/ArchUpdates/ArchUpdates.qml',
-    Scope.scopeFromPath('features/bar/modules/ArchUpdates/ArchUpdates.qml'), 'bar.archUpdates')
+  eq('features/bar/modules/SystemUpdates/SystemUpdates.qml',
+    Scope.scopeFromPath('features/bar/modules/SystemUpdates/SystemUpdates.qml'), 'bar.systemUpdates')
   eq('common/text/StringUtils.js', Scope.scopeFromPath('common/text/StringUtils.js'), 'text.stringUtils')
   eq('services/media/MediaState.qml', Scope.scopeFromPath('services/media/MediaState.qml'), 'media.mediaState')
   eq('boot/Boot.qml', Scope.scopeFromPath('boot/Boot.qml'), 'boot')
@@ -96,7 +96,7 @@ group('a file stem repeats its directory name only once', () => {
   eq('case-insensitively, so Wallpaper.qml in wallpaper/', Scope.scopeFromPath('features/wallpaper/Wallpaper.qml'), 'wallpaper')
   eq('Bar.qml in bar/ collapses too', Scope.scopeFromPath('features/bar/Bar.qml'), 'bar')
   eq('a different stem keeps both', Scope.scopeFromPath('features/clipboard/ClipboardPanel.qml'), 'clipboard.clipboardPanel')
-  eq('an island under a module keeps all three', Scope.scopeFromPath('features/bar/modules/ArchUpdates/ArchUpdatesIsland.qml'), 'bar.archUpdates.archUpdatesIsland')
+  eq('an island under a module keeps all three', Scope.scopeFromPath('features/bar/modules/SystemUpdates/SystemUpdatesIsland.qml'), 'bar.systemUpdates.systemUpdatesIsland')
 })
 group('modules is dropped and every other directory is kept', () => {
   // A bar module is grouped under the bar for layout reasons, so it is one
@@ -130,7 +130,7 @@ group('lowerFirst is the rule, stated on its own', () => {
   // Lowering only the first character of a capital run produces `oSDView`,
   // which is a spelling nobody writes and not the `osdView` the bar's own
   // module ids use.
-  eq('a word that starts capitalised', Scope.lowerFirst('ArchUpdates'), 'archUpdates')
+  eq('a word that starts capitalised', Scope.lowerFirst('SystemUpdates'), 'systemUpdates')
   eq('an acronym followed by a word', Scope.lowerFirst('OSDView'), 'osdView')
   eq('an acronym and a word', Scope.lowerFirst('IPCView'), 'ipcView')
   eq('a run with nothing after it', Scope.lowerFirst('IPC'), 'ipc')
@@ -150,14 +150,14 @@ group('matchingChain is every covering key, least specific first', () => {
   // PINS a value. Once a key ADDS to what it inherits, every covering key
   // contributes and the order they apply in is part of the answer - so the two
   // functions have to agree about what covers a scope.
-  const map = { bar: 1, 'bar.archUpdates': 2, clipboard: 3 }
-  eq('the whole covering chain', Scope.matchingChain(map, 'bar.archUpdates'), ['bar', 'bar.archUpdates'])
+  const map = { bar: 1, 'bar.systemUpdates': 2, clipboard: 3 }
+  eq('the whole covering chain', Scope.matchingChain(map, 'bar.systemUpdates'), ['bar', 'bar.systemUpdates'])
   eq('ordered least specific first, by length', Scope.matchingChain(map, 'bar.battery'), ['bar'])
   eq('a scope no key covers', Scope.matchingChain(map, 'wallpaper'), [])
   eq('an exact key is its own chain', Scope.matchingChain(map, 'clipboard'), ['clipboard'])
   eq('the same specificity comparison mostSpecificMatch uses',
-    Scope.matchingChain(map, 'bar.archUpdates').slice(-1)[0],
-    'bar.archUpdates')
+    Scope.matchingChain(map, 'bar.systemUpdates').slice(-1)[0],
+    'bar.systemUpdates')
   eq('a non-map', [Scope.matchingChain(null, 'bar'), Scope.matchingChain(undefined, 'bar')], [[], []])
   eq('an empty map', Scope.matchingChain({}, 'bar'), [])
   eq('and it does not stop at a segment boundary the matcher rejects',
@@ -287,19 +287,19 @@ section('LogScope.matching - a scope is hierarchical and case-insensitive')
 // ---------------------------------------------------------------------------
 group('a key covers itself and its dot-descendants', () => {
   eq('bar covers bar', Scope.matchesKey('bar', 'bar'), true)
-  eq('bar covers bar.archUpdates', Scope.matchesKey('bar.archUpdates', 'bar'), true)
-  eq('bar.archUpdates covers itself', Scope.matchesKey('bar.archUpdates', 'bar.archUpdates'), true)
+  eq('bar covers bar.systemUpdates', Scope.matchesKey('bar.systemUpdates', 'bar'), true)
+  eq('bar.systemUpdates covers itself', Scope.matchesKey('bar.systemUpdates', 'bar.systemUpdates'), true)
   eq('bar does not reach a sibling', Scope.matchesKey('clipboard', 'bar'), false)
   eq('and a prefix is not a descendant', Scope.matchesKey('barn', 'bar'), false)
-  eq('matching ignores case', Scope.matchesKey('bar.archUpdates', 'BAR.ARCHUPDATES'), true)
+  eq('matching ignores case', Scope.matchesKey('bar.systemUpdates', 'BAR.SYSTEMUPDATES'), true)
   eq('a non-string scope is no match', Scope.matchesKey(null, 'bar'), false)
   eq('a non-string key is no match', Scope.matchesKey('bar', null), false)
 })
 group('the longest covering key wins, so nesting is expressible', () => {
-  // This is what makes `bar=warn,bar.archUpdates=trace` split one subtree at
+  // This is what makes `bar=warn,bar.systemUpdates=trace` split one subtree at
   // the deeper key rather than one of them overruling the other.
-  const map = { bar: 'warn', 'bar.archUpdates': 'trace' }
-  eq('the deeper key for the deeper scope', Scope.mostSpecificMatch(map, 'bar.archUpdates'), 'trace')
+  const map = { bar: 'warn', 'bar.systemUpdates': 'trace' }
+  eq('the deeper key for the deeper scope', Scope.mostSpecificMatch(map, 'bar.systemUpdates'), 'trace')
   eq('the shallow key elsewhere under bar', Scope.mostSpecificMatch(map, 'bar.battery'), 'warn')
   eq('nothing at all outside bar', Scope.mostSpecificMatch(map, 'clipboard'), null)
   eq('no map is no match', Scope.mostSpecificMatch(null, 'bar'), null)
@@ -374,7 +374,7 @@ group('* is every band, not the widest one', () => {
 })
 group('isScopeName is the validator, and it is stricter than a string check', () => {
   eq('a single segment', Spec.isScopeName('clipboard'), true)
-  eq('a dotted scope', Spec.isScopeName('bar.archUpdates'), true)
+  eq('a dotted scope', Spec.isScopeName('bar.systemUpdates'), true)
   eq('a dash inside a segment', Spec.isScopeName('bar.now-playing'), true)
   eq('an underscore', Spec.isScopeName('bar.a_b'), true)
   eq('a leading digit is refused, because every real scope starts with a letter',
@@ -410,15 +410,15 @@ group('a spec that names no level leaves the base to decide', () => {
   eq('a non-string spec', parse(42).levels, null)
 })
 group('-term is a level when it names one and a scope when it does not', () => {
-  const p = parse('-warn,-bar.archUpdates')
+  const p = parse('-warn,-bar.systemUpdates')
   eq('warn was dropped as a level', kinds(p.dropped), ['warn'])
-  eq('bar.archUpdates was silenced as a scope', kinds(p.silenced), ['bar.archupdates'])
+  eq('bar.systemUpdates was silenced as a scope', kinds(p.silenced), ['bar.systemupdates'])
   eq('and neither became a scope name', p.bare.length, 0)
 })
 group('the scope=level override is repeatable and its scope is validated', () => {
-  const p = parse('bar=warn,bar.archUpdates=trace')
-  eq('both overrides', JSON.stringify(p.overrides), '{"bar":"warn","bar.archupdates":"trace"}')
-  eq('and the spelling each author used is kept for the echo', JSON.stringify(p.labels), '{"bar":"bar","bar.archupdates":"bar.archUpdates"}')
+  const p = parse('bar=warn,bar.systemUpdates=trace')
+  eq('both overrides', JSON.stringify(p.overrides), '{"bar":"warn","bar.systemupdates":"trace"}')
+  eq('and the spelling each author used is kept for the echo', JSON.stringify(p.labels), '{"bar":"bar","bar.systemupdates":"bar.systemUpdates"}')
   eq('a level that is not one', parse('bar=louder').warnings.length, 1)
   eq('a scope that is not one', parse('bar modules=loud').warnings.length, 1)
   eq('a leading = has no scope to read', parse('=debug').warnings.length, 1)
@@ -491,32 +491,32 @@ group('silence outranks everything, and a scope term ADDS to the global set', ()
     levelsFor(resolve('info,pass.passController=debug', 'warn', null), 'bar'), ['error', 'info', 'warn'])
 })
 group('every covering scope term applies, least specific first', () => {
-  const r = resolve('bar=warn,bar.archUpdates=trace', 'info', null)
+  const r = resolve('bar=warn,bar.systemUpdates=trace', 'info', null)
   eq('the shallow term contributes to the deep scope',
-    levelsFor(r, 'bar.archUpdates'), ['error', 'info', 'trace', 'warn'])
+    levelsFor(r, 'bar.systemUpdates'), ['error', 'info', 'trace', 'warn'])
   eq('the shallow term alone applies elsewhere under bar', levelsFor(r, 'bar.battery'), ['error', 'info', 'warn'])
   eq('and the global set outside bar', levelsFor(r, 'clipboard'), ['error', 'info', 'warn'])
   // Pinning used to make the deeper key REPLACE the shallower one, so a parent
   // could not be widened without being overruled by its own child. Additive
   // terms mean a child adds to its parent instead.
   eq('a parent widened for a subtree only widens the subtree',
-    levelsFor(resolve('bar=debug', 'info', null), 'bar.archUpdates'), ['debug', 'error', 'info', 'warn'])
+    levelsFor(resolve('bar=debug', 'info', null), 'bar.systemUpdates'), ['debug', 'error', 'info', 'warn'])
   eq('and a sibling is unaffected', levelsFor(resolve('bar.battery=debug', 'info', null), 'bar.network'),
     ['error', 'info', 'warn'])
 })
 group('off still silences, and a descendant can re-enable', () => {
-  const r = resolve('bar=off,bar.archUpdates=debug', 'info', null)
+  const r = resolve('bar=off,bar.systemUpdates=debug', 'info', null)
   eq('the silenced scope', levelsFor(r, 'bar'), [])
   eq('and its other descendants', levelsFor(r, 'bar.battery'), [])
-  eq('a deeper term adds back from nothing', levelsFor(r, 'bar.archUpdates'), ['debug', 'error', 'warn'])
-  eq('off alone is still total', levelsFor(resolve('bar=off', 'info', null), 'bar.archUpdates'), [])
+  eq('a deeper term adds back from nothing', levelsFor(r, 'bar.systemUpdates'), ['debug', 'error', 'warn'])
+  eq('off alone is still total', levelsFor(resolve('bar=off', 'info', null), 'bar.systemUpdates'), [])
 })
 group('a bare scope term empties the global set and pins that scope to the base', () => {
   const r = resolve('clipboard', 'debug', null)
   eq('nothing outside it', levelsFor(r, 'bar'), [])
   eq('the scope itself is at the base level', levelsFor(r, 'clipboard'), ['debug', 'error', 'warn'])
   eq('and its subtree with it', levelsFor(r, 'clipboard.clipboardLib'), ['debug', 'error', 'warn'])
-  eq('several scopes at once', levelsFor(resolve('clipboard,bar', 'info', null), 'bar.archUpdates'), ['error', 'info', 'warn'])
+  eq('several scopes at once', levelsFor(resolve('clipboard,bar', 'info', null), 'bar.systemUpdates'), ['error', 'info', 'warn'])
   // The bare term EMPTIES the global set, so what the explicit term adds to is
   // empty and the result is exactly that term's bands. This is the one place
   // where "adds" is not visible, and it is visible for a reason.
@@ -773,8 +773,8 @@ group('mayAllow is a sound upper bound: it is never false where allows is true',
 section('LogSpec.describe and grammar - what status and help report')
 // ---------------------------------------------------------------------------
 group('describe echoes the spelling the author used, not the folded key', () => {
-  const d = Spec.describe(resolve('bar.archUpdates=trace,-Clipboard', 'info', null))
-  eq('the override key', Object.keys(d.overrides), ['bar.archUpdates'])
+  const d = Spec.describe(resolve('bar.systemUpdates=trace,-Clipboard', 'info', null))
+  eq('the override key', Object.keys(d.overrides), ['bar.systemUpdates'])
   eq('the silenced key, sorted', d.silenced, ['Clipboard'])
   eq('the levels, most severe first', d.levels, ['error', 'warn', 'info'])
   eq('the base level', d.baseLevel, 'info')
@@ -958,12 +958,12 @@ group('the memo is dropped on every reconfigure, so a changed rule is a changed 
 })
 group('the startup line reports what the spec resolved to, once, and only for a spec', () => {
   const out = captureConsole(() => {
-    Core.configure('debug,-bar.archUpdates,bar.clock=trace')
+    Core.configure('debug,-bar.systemUpdates,bar.clock=trace')
   })
   const lines = printedAt('info')
-  contains('the variable and its value', lines[0], 'VIBRANIUM_SHELL_LOG=debug,-bar.archUpdates,bar.clock=trace')
+  contains('the variable and its value', lines[0], 'VIBRANIUM_SHELL_LOG=debug,-bar.systemUpdates,bar.clock=trace')
   contains('and what it enabled', lines[0], 'error, warn, debug')
-  contains('the silenced scope, spelled as it was written', lines.join('\n'), 'silenced bar.archUpdates')
+  contains('the silenced scope, spelled as it was written', lines.join('\n'), 'silenced bar.systemUpdates')
   contains('and the pinned one', lines.join('\n'), 'bar.clock=trace')
   eq('and one line per fact, no more', lines.length, 3)
 

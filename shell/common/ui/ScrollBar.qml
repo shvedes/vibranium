@@ -15,7 +15,7 @@ import qs.common
 // Canonical placement: the bar belongs to the list and is always drawn
 // INSIDE its viewport edge, overlaid - never in a gutter outside it.
 // The list keeps its full width; rows reserve a small right inset
-// (ArchUpdates' _vBarGutter, Battery/Network's rowPad) so nothing runs
+// (SystemUpdates' _vBarGutter, Battery/Network's rowPad) so nothing runs
 // underneath the bar:
 //
 //   List { id: myList; width: parent.width; ... }

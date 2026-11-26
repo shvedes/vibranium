@@ -268,9 +268,15 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("osd", root, {
+      "osd.flash": function (_a, c) { return ipc.flash(c.tokens.json) },
+      "osd.hide": function () { return ipc.hide() },
+      "osd.status": function () { return ipc.status() },
+      "osd.ping": function () { return ipc.ping() }
+    })
     Registry.offer("osd", {
       title: "OSD",
-      description: "on-screen display overlays",
+      description: "Show on-screen display overlays",
       verbNames: [
         "hide",
         "flash",
@@ -282,12 +288,16 @@ Singleton {
     Registry.register(root.tag, root)
     root._bootAt = Date.now()
   }
-  Component.onDestruction: Registry.unregister(root.tag)
+  Component.onDestruction: {
+    IpcRouter.unregister("osd", root)
+    Registry.unregister(root.tag)
+  }
 
   IpcHandler {
+    id: ipc
     target: "osd"
     function help(command: string): string {
-      return UnitIpc.help("osd", "OSD", "on-screen display overlays", [
+      return UnitIpc.help("osd", "OSD", "Show on-screen display overlays", [
         { name: "hide", help: "hide the OSD" },
         { name: "flash", help: "(kind, value, label, icon, muted) flash the OSD" },
       ], command)
@@ -304,12 +314,20 @@ Singleton {
     function flash(json: string): string {
       let o = json
       for (let i = 0; i < 3 && typeof o === "string"; i++) {
+        const text = o.trim()
+        // The first value may be a quoted JSON token; a later string is only
+        // unwrapped again when it still looks like JSON. `"hello"` therefore
+        // stops as the label instead of failing a second parse.
+        if (i > 0 && (text === "" || "{[\"".indexOf(text.charAt(0)) < 0)) break
         try {
-          o = JSON.parse(o)
+          o = JSON.parse(text)
         } catch (e) {
           return "error: invalid JSON"
         }
       }
+      // A bare JSON string is a label-only flash: the one documented shape
+      // that does not need a meter. Objects keep the full payload contract.
+      if (typeof o === "string") o = { label: o }
       if (o === null || typeof o !== "object" || Array.isArray(o)) return "error: invalid JSON"
       const ok = root.show(o.kind, o.value, o.label, o.icon, o.muted)
       return ok ? "ok" : "error"

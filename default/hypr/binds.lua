@@ -391,29 +391,29 @@ hl.bind(
 
 hl.bind(mainMod .. " + Return", hl.dsp.exec_raw("vb-launch-terminal"), { description = "Open terminal" })
 
-hl.bind("CTRL + ALT + L", hl.dsp.exec_raw("vb-shell lockscreen lock"), { description = "Lock session" })
-hl.bind("switch:on:Lid Switch", hl.dsp.exec_raw("vb-shell session lockForSleep"), { description = "Lock session on lid close" })
+Hypr.Helpers.BindShell("CTRL + ALT + L", "session.lock", { description = "Lock session" })
+Hypr.Helpers.BindShell("switch:on:Lid Switch", "session.lockForSleep", { description = "Lock session on lid close" })
 
-hl.bind("CTRL + ALT + C", hl.dsp.exec_raw("vb-shell colorPicker pick"), { description = "Color picker" })
-hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
-hl.bind(mainMod .. " + ALT + ESCAPE", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
-hl.bind("XF86PowerOff", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
+Hypr.Helpers.BindShell("CTRL + ALT + C", "colorPicker.pick", { description = "Color picker" })
+Hypr.Helpers.BindShell("CTRL + ALT + DELETE", "power.toggle", { description = "Power menu" })
+Hypr.Helpers.BindShell(mainMod .. " + ALT + ESCAPE", "power.toggle", { description = "Power menu" })
+Hypr.Helpers.BindShell("XF86PowerOff", "power.toggle", { description = "Power menu" })
 
-hl.bind("CTRL + ALT + W", hl.dsp.exec_raw("vb-shell wallpaperPicker toggle"), { description = "Wallpaper picker" })
-hl.bind("CTRL + ALT + T", hl.dsp.exec_raw("vb-shell themePicker toggle"), { description = "Change theme" })
+Hypr.Helpers.BindShell("CTRL + ALT + W", "wallpaperPicker.toggle", { description = "Wallpaper picker" })
+Hypr.Helpers.BindShell("CTRL + ALT + T", "themePicker.toggle", { description = "Change theme" })
 
-hl.bind(mainMod .. " + A", hl.dsp.exec_raw("vb-shell appLauncher toggle"), { description = "App launcher" })
-hl.bind("XF86Search", hl.dsp.exec_raw("vb-shell appLauncher toggle"), { description = "App launcher" })
+Hypr.Helpers.BindShell(mainMod .. " + A", "appLauncher.toggle", { description = "App launcher" })
+Hypr.Helpers.BindShell("XF86Search", "appLauncher.toggle", { description = "App launcher" })
 
 hl.bind(mainMod .. " + E", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "File manager" })
 
 -- Vibranium menus
 
-hl.bind("CTRL + ALT + V", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#main" ), { description = "Vibranium menu" })
-hl.bind("XF86Tools", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#main"), { description = "Vibranium menu" })
-hl.bind("CTRL + ALT + U", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#utilities"), { description = "Utilities menu" })
+Hypr.Helpers.BindShell("CTRL + ALT + V", "menu.main", { description = "Vibranium menu" })
+Hypr.Helpers.BindShell("XF86Tools", "menu.main", { description = "Vibranium menu" })
+Hypr.Helpers.BindShell("CTRL + ALT + U", "menu.utilities", { description = "Utilities menu" })
 hl.bind("CTRL + ALT + P", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call pass open"), { description = "Password manager" })
-hl.bind(mainMod .. " + period", hl.dsp.exec_raw("vb-shell menu toggleFile \"$VIBRANIUM/shell/features/pickers/emoji/emojis.jsonc\""), { description = "Emoji picker" })
+Hypr.Helpers.BindShell(mainMod .. " + period", "emojiPicker.toggle", { description = "Emoji picker" })
 
 if chassis_type ~= "vm" then
   hl.bind("CTRL + ALT + R", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call recording toggle"), { description = "Record screen" })
@@ -421,32 +421,37 @@ end
 
 -- Clipboard
 
-hl.bind(mainMod .. " + V", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call clipboard toggle"), { description = "Show clipboard" })
-hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call clipboard clear"), { description = "Clear clipboard" })
+Hypr.Helpers.BindShell(mainMod .. " + V", "clipboard.window.toggle", { description = "Show clipboard" })
+Hypr.Helpers.BindShell(mainMod .. " + SHIFT + V", "clipboard.clear", { description = "Clear clipboard" })
 
 -- Screenshots
 
-hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_raw("vb-shell screenshots picker"), { description = "Screenshots: open overlay" })
-hl.bind("Print", hl.dsp.exec_raw("vb-shell screenshots picker"), { description = "Screenshots: open overlay" })
+Hypr.Helpers.BindShell(mainMod .. " + SHIFT + S", "screenshots.picker", { description = "Screenshots: open overlay" })
+Hypr.Helpers.BindShell("Print", "screenshots.picker", { description = "Screenshots: open overlay" })
 
 -- Volume
 
-hl.bind(
+-- Keyboard volume and microphone controls use the public CLI verbs. A step
+-- may be given explicitly as `vb-shell audio volume down step 10` (and
+-- `volume up step 10`); `set N` is now `volume set N` (or `microphone set N`).
+-- The old micdown/micup spellings are renamed microphone down/microphone up; the shipped
+-- binds below only use microphone toggle, so none needed renaming here.
+Hypr.Helpers.BindShell(
   "XF86AudioLowerVolume",
-  hl.dsp.exec_raw("vb-shell audio voldown"),
+  "audio.volume.down",
   { description = "Volume down", locked = true, repeating = true }
 )
-hl.bind(
+Hypr.Helpers.BindShell(
   "XF86AudioRaiseVolume",
-  hl.dsp.exec_raw("vb-shell audio volup"),
+  "audio.volume.up",
   { description = "Volume up", locked = true, repeating = true }
 )
-hl.bind("XF86AudioMute", hl.dsp.exec_raw("vb-shell audio voltoggle"), { description = "Volume mute" })
-hl.bind("XF86AudioMicMute", hl.dsp.exec_raw("vb-shell audio mictoggle"), { description = "Mute microphone" })
+Hypr.Helpers.BindShell("XF86AudioMute", "audio.volume.toggle", { description = "Volume mute" })
+Hypr.Helpers.BindShell("XF86AudioMicMute", "audio.microphone.toggle", { description = "Mute microphone" })
 
-hl.bind(
+Hypr.Helpers.BindShell(
   mainMod .. " + SHIFT + XF86AudioMute",
-  hl.dsp.exec_raw("vb-shell audio mictoggle"),
+  "audio.microphone.toggle",
   { description = "Mute microphone" }
 )
 
@@ -502,7 +507,7 @@ end
 
 -- Power profile
 
-hl.bind(mainMod .. " + B", hl.dsp.exec_raw("vb-shell powerProfile next"), { description = "Next power profile" })
+Hypr.Helpers.BindShell(mainMod .. " + B", "powerProfile.next", { description = "Next power profile" })
 
 -- System monitoring
 

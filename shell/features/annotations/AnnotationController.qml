@@ -132,7 +132,7 @@ Item {
       seedFrameW: immediate ? 0 : Number(request.frameW) || 0,
       seedFrameH: immediate ? 0 : Number(request.frameH) || 0,
       immediate: immediate,
-      _uid: Number(request.jobId) || 0,
+      silentSelection: request.silent === true,
       visible: false
     })
     if (view === null) return false

@@ -66,6 +66,14 @@ BarModule {
     flashTimer.restart()
   }
 
+  // IPC's explicit temperature flash: the existing three-second reveal and
+  // no network refresh. Guards stay in _startFlash, not in a second copy.
+  function ipcTrigger(name) {
+    if (name !== "flashTemperature") return false
+    root._startFlash()
+    return true
+  }
+
   function _stopFlash() {
     flashTimer.stop()
     root.flashActive = false

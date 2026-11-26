@@ -164,13 +164,14 @@ function makeSim() {
   root._intentSeq = 0
   root._isVm = () => false
   root._notifyVm = () => {}
+  const params = { _setIntent: ['want'], _start: ['region'], start: ['region'] }
   for (const name of [
     '_publish', '_syncOngoing', '_refresh', '_setIntent', '_start',
     '_stopOngoing', 'start', 'stop', 'toggle', 'open', 'close',
     '_registerMenuProvider',
   ]) {
     const body = maybeFunction(SRC, name)
-    if (body) root[name] = bind(body, name === '_setIntent' ? ['want'] : [])
+    if (body) root[name] = bind(body, params[name])
   }
 
   // Component.onCompleted registers the provider before the watcher runs.
@@ -235,6 +236,18 @@ group('the bus contract is untouched', () => {
 
 // ---------------------------------------------------------------------------
 section('a stop never publishes the opposite frame')
+
+group('picking a region waits for actual recording state', () => {
+  const sim = makeSim()
+  eq('start accepts a region', sim.root.start(true), true)
+  eq('the helper opens the region picker', sim.spawns, [
+    ['/home/bin/vb-core-recording', '--region'],
+  ])
+  eq('the recording stays idle while picking', sim.root.shownOngoing, false)
+  sim.marker = true
+  sim.watchTick()
+  eq('the marker publishes the recording', framesOf(sim), [true])
+})
 
 group('a coalesced tick before marker deletion is inert', () => {
   const sim = makeSim()

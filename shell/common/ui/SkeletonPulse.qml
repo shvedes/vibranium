@@ -18,7 +18,7 @@ import qs.common
 // The cadence lives here because thirty call sites across three islands had
 // each written it out, in two dialects: the bluetooth and network copies
 // guarded the index through `Number(x) || 0` and floored the result, the
-// arch-updates copy did neither, so an undefined index produced a NaN
+// the updates copy did neither, so an undefined index produced a NaN
 // duration there. Both read as the same numbers because they were meant to
 // be the same animation.
 SequentialAnimation {

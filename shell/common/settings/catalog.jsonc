@@ -675,7 +675,7 @@
                         "powerProfile",
                         "privacy",
                         "printers",
-                        "archUpdates",
+                        "systemUpdates",
                         "nightLight",
                         "bluetooth",
                         "network",
@@ -684,7 +684,7 @@
                         "session"
                     ],
                     "disabled": [
-                        "archUpdates",
+                        "systemUpdates",
                         "colorPicker",
                         "nightLight",
                         "keyboardLayout",
@@ -839,7 +839,7 @@
             {
                 "key": "shell.statusbar.volumeRightClick",
                 "type": "string",
-                "default": "vb-shell app audioMixer",
+                "default": "vb-shell app toggle audioMixer",
                 "label": "Right-click action",
                 "sub": "Command on right-click",
                 "allowEmpty": true,
@@ -857,7 +857,7 @@
             {
                 "key": "shell.statusbar.volumeMicRightClick",
                 "type": "string",
-                "default": "vb-shell app audioMixer",
+                "default": "vb-shell app toggle audioMixer",
                 "label": "Microphone right-click action",
                 "sub": "Command on mic right-click",
                 "allowEmpty": true,
@@ -990,7 +990,7 @@
                 "visibility": "hidden"
             },
             {
-                "key": "shell.statusbar.archUpdatesHeavyWarning",
+                "key": "shell.statusbar.systemUpdatesHeavyWarning",
                 "type": "bool",
                 "default": true,
                 "label": "Heavy backlog warning",
@@ -1023,12 +1023,12 @@
                         "shell.statusbar.updateLeftClick",
                         {
                             "type": "group",
-                            "id": "mod-bar-module-archupdates",
+                            "id": "mod-bar-module-systemupdates",
                             "label": "Arch updates",
                             "sub": "",
                             "icon": "",
                             "children": [
-                                "shell.statusbar.archUpdatesHeavyWarning"
+                                "shell.statusbar.systemUpdatesHeavyWarning"
                             ]
                         },
                         {
@@ -1142,7 +1142,7 @@
                             "label": "Power profile"
                         },
                         {
-                            "id": "bar-archUpdates",
+                            "id": "bar-systemUpdates",
                             "type": "toggle",
                             "label": "Arch updates"
                         },
@@ -1779,20 +1779,20 @@
                     "type": "timers",
                     "default": [
                         {
-                            "minutes": 10,
+                            "seconds": 600,
                             "action": "command",
                             "command": "vb-shell session lock",
                             "commandClass": "lock"
                         },
                         {
-                            "minutes": 15,
+                            "seconds": 900,
                             "action": "command",
                             "command": "vb-shell session suspend",
                             "commandClass": "suspend"
                         }
                     ],
                     "label": "Idle timers",
-                    "desc": "Ordered idle timers, strictly increasing by minute.\nManaged by the idle service through its IPC verbs.",
+                    "desc": "Ordered idle timers in seconds, strictly increasing.\nManaged by the idle service through its IPC verbs.",
                     "visibility": "internal"
                 }
             ],

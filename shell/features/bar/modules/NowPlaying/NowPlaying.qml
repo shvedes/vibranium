@@ -159,6 +159,14 @@ CollapsibleSlot {
     flashTimer.restart()
   }
 
+  // IPC's explicit track flash. It never observes the track or updates a
+  // track key: automatic announcements keep their existing behavior.
+  function ipcTrigger(name) {
+    if (name !== "flashTrack") return false
+    root._startFlash()
+    return true
+  }
+
   function _stopFlash() {
     flashTimer.stop()
     root.flashActive = false

@@ -15,6 +15,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
 t_init "menu-dropdown-scrolloff" "long group dropdowns cap and scroll inside the card"
 
+# Serialise against the other live menu suites: they all drive one shell.
+MENU_LIVE_LOCK="${TMPDIR:-/tmp}/vb-menu-live.lock"
+exec 9>"$MENU_LIVE_LOCK"
+flock -w 600 9 || t_block "could not acquire the menu live lock"
+
 if ! command -v qs >/dev/null 2>&1; then
   t_block "qs is not on PATH"
 fi

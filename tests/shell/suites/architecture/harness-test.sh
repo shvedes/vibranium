@@ -370,7 +370,9 @@ if command -v node >/dev/null 2>&1; then
     const p = loadPlugin('$SHELL_DIR/features/launcher/plugins/calc/main.js', {})
     ok('a plugin exposes items()', typeof p.items === 'function')
     ok('a plugin exposes activate()', typeof p.activate === 'function')
-    ok('a plugin declares nothing else', Object.keys(p).sort().join(',') === 'activate,init,items')
+    // `ipc` is the explicit typed plugin contract added by the shell IPC work
+    // order; no other undeclared member is allowed on a plugin namespace.
+    ok('a plugin declares nothing else', Object.keys(p).sort().join(',') === 'activate,init,ipc,items')
 
     // The three rejection paths from PluginInstance.qml.
     const os = (await import('node:os')).tmpdir()

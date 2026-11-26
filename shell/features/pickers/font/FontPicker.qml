@@ -7,7 +7,6 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import qs.features.menu
-import "../../../common/text/UnitIpc.js" as UnitIpc
 
 // Font picker service. Ports font discovery into the shell: fc-list
 // enumeration (monospace only, the same filter vb-font-set applies),
@@ -58,20 +57,6 @@ Singleton {
   property int _landingGen: 0
 
   Component.onCompleted: {
-    Registry.offer("fontPicker", {
-      title: "Font picker",
-      description: "system font selection",
-      verbNames: [
-        "close",
-        "open",
-        "refresh",
-        "set",
-        "toggle",
-        "status",
-        "help",
-        "ping",
-      ]
-    })
     // Registry.call routes runCall specs ("fontPicker pick %v") here;
     // offer() alone only feeds the IPC manifest.
     Registry.register("fontPicker", root)
@@ -425,7 +410,7 @@ Singleton {
         type: "action",
         id: "font-none",
         label: "No monospace fonts found",
-        sub: "Install fonts system-wide, then run: qs ipc call fontPicker refresh",
+        sub: "Install fonts system-wide, then run: vb-shell settings fonts reload",
         icon: "font",
         command: "",
         selectable: false
@@ -595,23 +580,4 @@ Singleton {
     })
   }
 
-  IpcHandler {
-    target: "fontPicker"
-    function help(command: string): string {
-      return UnitIpc.help("fontPicker", "Font picker", "system font selection", [
-        { name: "close", help: "hide the picker" },
-        { name: "open", help: "show the picker" },
-        { name: "refresh", help: "rescan installed fonts" },
-        { name: "set", help: "(family, style) set the system font" },
-        { name: "toggle", help: "show/hide" },
-      ], command)
-    }
-    function ping(): string { return "pong" }
-    function open(): string { return root.open() }
-    function close(): string { return root.close() }
-    function toggle(): string { return root.toggle() }
-    function refresh(): string { return root.refresh() }
-    function set(family: string, style: string): string { return root.set(family, style) }
-    function status(): string { return root.status() }
-  }
 }

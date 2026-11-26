@@ -17,7 +17,6 @@ import "../../common/capture/ShotLib.js" as ShotLib
 LayerSurface {
   id: overlay
 
-  property int _uid: -1
   signal accepted(real x, real y, real w, real h)
   signal cancelled()
   signal failed(string reason)
@@ -56,6 +55,7 @@ LayerSurface {
   // Cursor position for the lens; magnifier scale in integer steps.
   property real cursorX: -1
   property real cursorY: -1
+  property bool silentSelection: false
   property var keyboardAnchor: null
   property bool keyboardMode: false
   property int magScale: 10
@@ -110,33 +110,11 @@ LayerSurface {
     id: view
 
     property int attempts: 0
-    // The compositor's scale for this monitor: how a frame pixel relates to
-    // a surface pixel. It is NOT the ratio that maps this window's logical
-    // pixels onto the frame - the window's logical size already carries
-    // Qt's own ratio - so nothing may scale a selection by it. The frame
-    // ratio is measured from the frame and the item instead (see
-    // frameScale), and the crop scale from the saved image
-    // (ShotLib.grabRectScale). Needed explicitly because grabToImage's
-    // implicit "grab at item size" default is NOT reliable under
-    // fractional scale (1.25/1.5/etc) - it rounds itemSize
-    // independently of whatever the compositor actually backs the
-    // surface with, so the grabbed PNG ends up a few percent smaller
-    // than the real frame. Passed as an explicit targetSize below
-    // instead of trusting the default.
+    // grabToImage's implicit "grab at item size" default is not reliable
+    // under fractional scale (1.25/1.5/etc): it rounds itemSize apart from
+    // what backs the surface, so the PNG ends up smaller than the frame.
+    // An explicit targetSize is passed below instead.
     property int grabAttempt: 0
-    // The compositor's scale for this monitor: how a frame pixel relates to
-    // a surface pixel. It is NOT the ratio that maps this window's logical
-    // pixels onto the frame - the window's logical size already carries
-    // Qt's own ratio - so nothing may scale a selection by it. The frame
-    // ratio is measured from the frame and the item instead (see
-    // frameScale), and the crop scale from the saved image
-    // (ShotLib.grabRectScale). Needed explicitly because grabToImage's
-    // implicit "grab at item size" default is NOT reliable under
-    // fractional scale (1.25/1.5/etc) - it rounds itemSize
-    // independently of whatever the compositor actually backs the
-    // surface with, so the grabbed PNG ends up a few percent smaller
-    // than the real frame. Passed as an explicit targetSize below
-    // instead of trusting the default.
     readonly property real dpr: {
       let scale = 0
       try {
@@ -502,7 +480,7 @@ LayerSurface {
     y: Math.max(0, overlay.selY - height - 4)
     width: badgeText.width + 12
     height: 20
-    visible: overlay.hasSelection
+    visible: overlay.hasSelection && !overlay.silentSelection
     color: Ui.solid("background_1")
     border.color: Ui.solid("accent")
     border.width: 1

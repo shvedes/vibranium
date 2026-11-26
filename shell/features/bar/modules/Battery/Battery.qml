@@ -244,6 +244,17 @@ CollapsibleSlot {
     }
     root._startFlash(text)
   }
+
+  // IPC's explicit charge announcement. The caller has already resolved the
+  // announcement text (kind, else the displayed percentage); this method
+  // never calls _observeCharge or touches AC/session counters.
+  function ipcTrigger(name): void {
+    if (name !== "flashCharge") return
+    const text = root.announceKind && String(root.announceKind) !== ""
+      ? String(root.announceKind) : String(root.percentageText || "")
+    if (text === "") return
+    root._fireFlash(text)
+  }
   onFullscreenActiveChanged: {
     if (root.fullscreenActive) {
       if (chargeFlash.active) {

@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
+import QtCore as QtCore
 import Quickshell
 import Quickshell.Io
 import qs.common
@@ -843,12 +844,16 @@ Singleton {
   // (only --show-jobs for the queue window), so the per-printer target
   // is http://localhost:631/printers/<name> - the page carrying that
   // queue's defaults, jobs and administration.
-  function openPrinterConfig(name) {
+  function openPrinterConfig(name): bool {
     if (name === "") {
+      // StandardPaths is the synchronous PATH probe: a hit is a file URL and
+      // a miss is empty, so the caller can answer before spawning anything.
+      if (String(QtCore.StandardPaths.findExecutable("system-config-printer")) === "") return false
       Exec.run(["system-config-printer"])
-      return
+      return true
     }
     Exec.run(["xdg-open", "http://localhost:631/printers/" + encodeURIComponent(String(name))])
+    return true
   }
 
   // Test page: armed then confirmed within 3 s (two presses), then a
@@ -886,10 +891,11 @@ Singleton {
   // --- IPC ---
 
   IpcHandler {
+    id: ipc
     target: "printers"
 
     function help(command: string): string {
-      return UnitIpc.help("printers", "Printers", "CUPS queues", [
+      return UnitIpc.help("printers", "Printers", "Manage CUPS printers and jobs", [
         { name: "refresh", help: "re-read printers and jobs" },
         { name: "connect", help: "set the user default printer: connect <name>" },
         { name: "hold", help: "hold a job: hold <printer> <jobid>" },
@@ -961,8 +967,7 @@ Singleton {
     }
 
     function config(name: string): string {
-      root.openPrinterConfig(name)
-      return "ok"
+      return root.openPrinterConfig(name) ? "ok" : "error: unavailable"
     }
   }
 
@@ -976,13 +981,35 @@ Singleton {
     // aliases (persisted from a previous session) here.
     root.aliases = Model.aliasesFrom(root._aliasState)
     root._loadDismissed()
+    IpcRouter.register("printers", root, {
+      "printers.refresh": function () { return ipc.refresh() },
+      "printers.connect": function (a) { return ipc.connect(a.name) },
+      "printers.hold": function (a) { return ipc.hold(a.printer, a.jobid) },
+      "printers.release": function (a) { return ipc.release(a.printer, a.jobid) },
+      "printers.cancel": function (a) { return ipc.cancel(a.printer, a.jobid) },
+      "printers.dismiss": function (a) { return ipc.dismiss(a.jobid) },
+      "printers.clear": function () { return ipc.clear() },
+      "printers.rename": function (a) { return ipc.rename(a.name, a.label) },
+      "printers.remove": function (a) { return ipc.remove(a.name) },
+      "printers.config": function (a) {
+        const name = a.name === undefined ? "" : a.name
+        if (root.openPrinterConfig(name)) return { v: 1, ok: true }
+        return { v: 1, ok: false, error: {
+          code: "unavailable", message: "system-config-printer is not installed"
+        } }
+      },
+      "printers.status": function () { return ipc.status() },
+      "printers.ping": function () { return ipc.ping() }
+    })
     Registry.offer("printers", {
       title: "Printers",
-      description: "CUPS queues",
+      description: "Manage CUPS printers and jobs",
       verbNames: ["refresh", "connect", "hold", "release", "cancel", "dismiss", "clear", "rename", "remove", "config", "status", "help", "ping"]
     })
     Registry.register(root.tag, root)
     root.refresh()
     root._spawnMonitor()
   }
+
+  Component.onDestruction: IpcRouter.unregister("printers", root)
 }

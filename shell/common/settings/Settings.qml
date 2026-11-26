@@ -240,9 +240,9 @@ Singleton {
   // before the schema catalog lands.
   readonly property bool statusbarEnabled: root.value("shell.statusbar.enabled") !== false
   readonly property bool statusbarShowBorder: root.value("shell.statusbar.showBorder") === true
-  // ArchUpdates island heavy-backlog caution (red box + red total).
+  // SystemUpdates island heavy-backlog caution (red box + red total).
   // Default on; the island folds every consumer off the same flag.
-  readonly property bool statusbarArchUpdatesHeavyWarning: root.value("shell.statusbar.archUpdatesHeavyWarning") !== false
+  readonly property bool statusbarSystemUpdatesHeavyWarning: root.value("shell.statusbar.systemUpdatesHeavyWarning") !== false
 
   readonly property bool blurBackground: root.value("shell.lockscreen.blurBackground") !== false
   readonly property string lockscreenBlurPower: {
@@ -366,11 +366,11 @@ Singleton {
   // --- idle daemon settings (shell.idle) ---
   //
   // Persisted as one object under the idle namespace: an enabled flag
-  // plus a strictly increasing timer list. SettingsLib owns the contract -
-  // positive integer minutes, known actions, known declared class, strict
-  // order - and a write path here rejects rather than committing a list
-  // that breaks it. An empty list is legal in any state: a daemon with
-  // nothing armed simply never fires.
+  // plus a strictly increasing timer list in seconds. SettingsLib owns the
+  // contract - one positive integer seconds/minutes field, known actions,
+  // known declared class, strict order - and a write path here rejects
+  // rather than committing a list that breaks it. An empty list is legal in
+  // any state: a daemon with nothing armed simply never fires.
   //
   // A row's declared class is what the daemon's inhibitor guard reads, so
   // the shipped rows declare theirs: a lock command guarded by the idle
@@ -383,8 +383,8 @@ Singleton {
   // default is the one source of truth while it exists, so the two cannot
   // drift into a shape mismatch that makes every timer commit look deviant.
   readonly property var _fallbackIdleTimers: [
-    { minutes: 10, action: "command", command: "vb-shell session lock", commandClass: "lock" },
-    { minutes: 15, action: "command", command: "vb-shell session suspend", commandClass: "suspend" }
+    { seconds: 600, action: "command", command: "vb-shell session lock", commandClass: "lock" },
+    { seconds: 900, action: "command", command: "vb-shell session suspend", commandClass: "suspend" }
   ]
 
   readonly property var _defaultIdleTimers: {
@@ -443,9 +443,21 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("settings", root, {
+      "settings.get": function (a) { return ipc.get(a.key) },
+      "settings.set": function (_a, c) { return ipc.set(c.tokens.key, c.tokens.json) },
+      "settings.toggle": function (a) { return ipc.toggle(a.key) },
+      "settings.dump": function () { return ipc.dump() },
+      "settings.reload": function () { return ipc.reload() },
+      // Constant in-process bridge to the existing fontPicker registration.
+      // No arbitrary member is selected from an argv name.
+      "settings.fonts.reload": function () { return Registry.call("fontPicker", "refresh") },
+      "settings.status": function () { return ipc.status() },
+      "settings.ping": function () { return ipc.ping() }
+    })
     Registry.offer("settings", {
       title: "Settings",
-      description: "settings engine store",
+      description: "Read and write shell settings",
       verbNames: [
         "dump",
         "get",
@@ -470,6 +482,7 @@ Singleton {
     root._loadSchema()
   }
   Component.onDestruction: {
+    IpcRouter.unregister("settings", root)
     if (root._settingsWatchUnsub) root._settingsWatchUnsub()
     if (root._envWatchUnsub) root._envWatchUnsub()
   }
@@ -506,7 +519,11 @@ Singleton {
       root.optionError(key, check.error)
       return false
     }
-    root._commit(key, check.value, hook || "")
+    // A generic write of the timer list takes the same canonical path as
+    // setIdleTimers: a legacy minutes row lands as seconds, and only known
+    // fields are persisted.
+    root._commit(key, key === "shell.idle.timers" && opt.type === "timers"
+      ? SL.buildIdleTimerRows(check.value) : check.value, hook || "")
     return true
   }
 
@@ -1144,9 +1161,10 @@ Singleton {
   // --- ipc ---
 
   IpcHandler {
+    id: ipc
     target: "settings"
     function help(command: string): string {
-      return UnitIpc.help("settings", "Settings", "settings engine store", [
+      return UnitIpc.help("settings", "Settings", "Read and write shell settings", [
         { name: "dump", help: "all stored values" },
         { name: "get", help: "(key) read one value" },
         { name: "reload", help: "re-read the store" },

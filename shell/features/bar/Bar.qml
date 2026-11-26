@@ -4,7 +4,6 @@ pragma ComponentBehavior: Bound
 import QtQml
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import qs.common
 import qs.services as Core
 import qs.features.bar
@@ -15,7 +14,7 @@ import qs.features.bar.modules.Bluetooth
 import qs.features.bar.modules.Battery
 import qs.features.bar.modules.Network
 import qs.features.bar.modules.PowerProfile
-import qs.features.bar.modules.ArchUpdates
+import qs.features.bar.modules.SystemUpdates
 import qs.features.bar.modules.ColorPicker
 import qs.features.bar.modules.NightLight
 import qs.features.bar.modules.Privacy
@@ -33,7 +32,8 @@ import qs.features.bar.modules.Workspaces
 import qs.features.bar.modules.Downloader
 import "../../common/math/Range.js" as Range
 import "BarLib.js" as BarLib
-import "../../common/text/UnitIpc.js" as UnitIpc
+import "BarIpc.js" as BarIpc
+import "../../common/text/IpcCatalog.js" as Catalog
 
 // The bar. Owns the bar's shell-internal settings (the raw "statusbar"
 // section under shell.* in settings.json: enabled, position, showBorder
@@ -66,6 +66,12 @@ Singleton {
   id: root
 
   readonly property string tag: "bar"
+  // Bound components throw on an assignment to an undeclared property. This
+  // must exist before Component.onCompleted stores the registration verdict,
+  // or the rest of the completion hook (registry + layout + menu providers)
+  // never runs and the bar renders empty.
+  property bool _ipcRegistered: false
+  property bool _colorIpcRegistered: false
 
   // Real screens for the per-monitor surfaces: one bar window and one move
   // gesture window per valid screen (placeholder screens that appear on
@@ -355,6 +361,17 @@ Singleton {
   // BarLib.js.
   property var _owned: []
   property var _ownedComps: ({})
+  // Public presentation metadata, keyed by the real layout id. Shipped ids
+  // come from BarIpc.js; a dynamic owner may extend its own entry through
+  // ownModule(spec). This table never guesses a name from a filename.
+  property var _ipcMeta: ({})
+
+  function ipcMetaFor(id) {
+    const isGroup = root.isGroup(id)
+    const rec = BarIpc.recordFor(id, root._ipcMeta, isGroup)
+    if (!rec || rec.prettyName === "") return BarIpc.groupMetadata(id)
+    return rec
+  }
 
   // Claim a slot. spec: { id, zone, component, draggable }. Registers the
   // component once (rejecting ids the static registry or another owner
@@ -380,6 +397,13 @@ Singleton {
     }])
     root._ownedComps = comps
     root._owned = next
+    // A dynamic owner may supply its own presentation and island capability;
+    // defaults keep late owners discoverable without inventing a name.
+    const meta = Object.assign({}, root._ipcMeta)
+    meta[id] = BarIpc.ownedMetadata(spec)
+    if (!meta[id].prettyName) meta[id].prettyName = id
+    if (Array.isArray(spec.options)) meta[id].options = spec.options.slice()
+    root._ipcMeta = meta
     root.markModuleFound(id)
     // The placement is attempted here and deferred to the ready pass when the
     // store has not landed: the ready pass gives a deferred id its gap.
@@ -512,7 +536,7 @@ Singleton {
 
   property var _gateLeases: ({})
 
-  // Gate resolver for on-demand services. archUpdates and printers are gated
+  // Gate resolver for on-demand services. systemUpdates and printers are gated
   // on their bar module (proposal 6.3): the service loads only when the module
   // is enabled. The drain skips them; the bar gate owner materializes them on
   // enable through UnitGate.
@@ -986,32 +1010,78 @@ Singleton {
 
   Component.onCompleted: {
     root.publishDesktopLayout()
+    const meta = {}
+    for (const id in BarIpc.metadata) meta[id] = BarIpc.metadata[id]
+    root._ipcMeta = meta
+    root._ipcRegistered = IpcRouter.register("bar", root, {
+      "bar.enable": function () { return root.ipcSetEnabled(true) },
+      "bar.disable": function () { return root.ipcSetEnabled(false) },
+      "bar.toggle": function () { return root.ipcSetEnabled(!root.enabled) },
+      "bar.show": function () { return root.ipcSetHidden(false) },
+      "bar.hide": function () { return root.ipcSetHidden(true) },
+      "bar.showToggle": function () { return root.ipcSetHidden(!root.hideToggle) },
+      "bar.position.get": function () { return BarIpc.ok(root.position) },
+      "bar.position.set": function (a) { return root.ipcSetPosition(a.POSITION) },
+      "bar.layout.get": function () { return BarIpc.ok(root.ipcLayout()) },
+      "bar.layout.set": function (a) { return root.ipcSetLayout(a.LAYOUT) },
+      "bar.module.list": function (a) { return root.ipcModuleList(a.FILTER) },
+      "bar.module.ID.status": function (a) { return root.ipcModuleStatus(a.MODULE) },
+      "bar.module.ID.enable": function (a) { return root.ipcSetModule(a.MODULE, true) },
+      "bar.module.ID.disable": function (a) { return root.ipcSetModule(a.MODULE, false) },
+      "bar.module.ID.toggle": function (a) {
+        return root.ipcSetModule(a.MODULE, !root.isEnabled(a.MODULE))
+      },
+      "bar.module.ID.island.open": function (a) {
+        return root.ipcIsland(a.MODULE, "open", a.OUTPUT)
+      },
+      "bar.module.ID.island.close": function (a) {
+        return root.ipcIsland(a.MODULE, "close", a.OUTPUT)
+      },
+      "bar.module.ID.island.toggle": function (a) {
+        return root.ipcIsland(a.MODULE, "toggle", a.OUTPUT)
+      },
+      "bar.module.ID.island.is-open": function (a) {
+        return root.ipcIsland(a.MODULE, "is-open", a.OUTPUT)
+      },
+      "bar.module.ID.opt.list": function (a) { return root.ipcOptList(a.MODULE) },
+      "bar.module.ID.opt.KEY.get": function (a) { return root.ipcOptGet(a.MODULE, a.KEY) },
+      "bar.module.ID.opt.KEY.set": function (a) {
+        return root.ipcOptSet(a.MODULE, a.KEY, a.JSON)
+      },
+      "bar.module.ID.trigger": function (a) {
+        return root.ipcTriggerModule(a.MODULE, a.NAME, a.OUTPUT)
+      },
+      // Injected status/ping use the router's text adapter, not the gateway
+      // frame path: a frame object here would stringify as [object Object].
+      "bar.status": function () {
+        return { v: 1, ok: true, data: root.ipcStatus(), format: { kind: "record" } }
+      },
+      "bar.ping": function () { return "pong" }
+    })
+    // Top-level alias for keybinds and scripts. The standalone `colorPicker`
+    // target shares these owner methods: no second picker seat, no duplicate
+    // state, no new service.
+    root._colorIpcRegistered = IpcRouter.register("colorPicker", root, {
+      "colorPicker.pick": function () { return root.ipcPickColor() },
+      "colorPicker.close": function () { return root.ipcCloseColorPick() },
+      "colorPicker.status": function () { return root.ipcColorStatus() },
+      "colorPicker.ping": function () { return "pong" }
+    })
     Registry.offer("bar", {
       title: "Bar",
-      description: "top bar layout + modules",
-      verbNames: [
-        "disable",
-        "dump",
-        "dumpAll",
-        "enable",
-        "hideToggle",
-        "set",
-        "status",
-        "toggle",
-        "help",
-        "ping",
-      ]
+      description: "Inspect and control the status bar",
+      verbNames: Catalog.topLevelVerbs("bar")
     })
     Registry.register(root.tag, root)
     Registry.register("lyrics", root)
     // Every registered id is a standalone layout slot; there are no group
     // members to expand, so the layout holds exactly the ids below.
-    root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, archUpdates: archUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, session: sessionComp, tray: trayComp, downloader: downloaderComp }
+    root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, systemUpdates: systemUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, session: sessionComp, tray: trayComp, downloader: downloaderComp }
     // Tray and session are independent slots. The tray owns its chevron
     // trigger and slides leftward from wherever the user puts it; the power
     // button is a plain module with no coupling to it.
     root._groups = ({})
-    root._zones = { workspaces: "left", privacy: "right", clock: "center", weather: "right", keyboardLayout: "right", bluetooth: "right", battery: "right", network: "right", printers: "right", powerProfile: "right", archUpdates: "right", colorPicker: "right", nightLight: "right", nowPlaying: "right", volume: "right", session: "right", tray: "right", downloader: "right" }
+    root._zones = { workspaces: "left", privacy: "right", clock: "center", weather: "right", keyboardLayout: "right", bluetooth: "right", battery: "right", network: "right", printers: "right", powerProfile: "right", systemUpdates: "right", colorPicker: "right", nightLight: "right", nowPlaying: "right", volume: "right", session: "right", tray: "right", downloader: "right" }
     // Right-zone default order: the keyboard layout indicator, bluetooth,
     // battery and the network module join the zone ahead of the session
     // button, in toggle order - bluetooth and battery slot in directly before
@@ -1019,7 +1089,7 @@ Singleton {
     // the shipped layout keeps it at the far left of the group. Privacy
     // is a right-zone launcher because the dots live on the overlay, and
     // anchors on `battery` to sit where the default layout puts it.
-    root._placeBefore = { tray: "keyboardLayout", privacy: "battery", weather: "session", keyboardLayout: "session", bluetooth: "network", battery: "network", network: "volume", printers: "session", downloader: "powerProfile", powerProfile: "session", archUpdates: "session", colorPicker: "session", nightLight: "session", nowPlaying: "session", volume: "session" }
+    root._placeBefore = { tray: "keyboardLayout", privacy: "battery", weather: "session", keyboardLayout: "session", bluetooth: "network", battery: "network", network: "volume", printers: "session", downloader: "powerProfile", powerProfile: "session", systemUpdates: "session", colorPicker: "session", nightLight: "session", nowPlaying: "session", volume: "session" }
     // Empty: every static slot is toggleable today. The map stays because
     // BarLib.normalizeLayout takes it as an input, and it is where a future
     // always-on slot (one the user may not switch off) is declared.
@@ -1058,6 +1128,8 @@ Singleton {
     root._registerMenuProviders()
   }
   Component.onDestruction: {
+    IpcRouter.unregister("colorPicker", root)
+    IpcRouter.unregister("bar", root)
     // Teardown releases every provider id: each surface closes over this
     // root, so a survivor would keep a dead toggle closure.
     root._releaseMenuProviders()
@@ -1135,9 +1207,9 @@ Singleton {
   }
 
   Component {
-    id: archUpdatesComp
+    id: systemUpdatesComp
 
-    ArchUpdates {}
+    SystemUpdates {}
   }
 
   Component {
@@ -1445,7 +1517,7 @@ Singleton {
   // with a consumer outside the bar has no business on the list. A slot that is
   // not gated still resolves normally - _gateResolve answers false and the
   // loader builds the module off _components either way.
-  readonly property var _gatedIds: ["archUpdates", "printers"]
+  readonly property var _gatedIds: ["systemUpdates", "printers"]
 
   function _isGated(id) {
     return root._gatedIds.indexOf(id) >= 0
@@ -1672,27 +1744,6 @@ Singleton {
     if (_pickerFallback === m) _pickerFallback = null
   }
 
-  IpcHandler {
-    target: "colorPicker"
-    function help(command: string): string {
-      return UnitIpc.help("colorPicker", "Color Picker", "screen color picker", [
-        { name: "pick", help: "start a color pick (result copied to clipboard)" },
-      ], command)
-    }
-    function ping(): string { return "pong" }
-    function status(): string {
-      return JSON.stringify({
-        unit: "colorPicker",
-        healthy: root._pickerOwner !== null || root._pickerFallback !== null
-      })
-    }
-    function pick(): string {
-      const picker = root._pickerOwner !== null ? root._pickerOwner : root._pickerFallback
-      if (picker === null) return "error: no picker available"
-      return picker.beginPick() ? "ok" : "error: no screen to pick on"
-    }
-  }
-
   // One bar window per real screen, plus a full-screen overlay mirroring
   // the bar-position gesture on its own screen.
   Variants {
@@ -1729,7 +1780,7 @@ Singleton {
   function stateSnapshot(): var {
     return {
       enabled: root.enabled,
-      hideToggle: root.hideToggle,
+      hidden: root.hideToggle,
       effectiveEnabled: root.effectiveEnabled,
       position: root.position,
       showBorder: root.showBorder,
@@ -1742,61 +1793,489 @@ Singleton {
     }
   }
 
-  IpcHandler {
-    target: "bar"
-    function help(command: string): string {
-      return UnitIpc.help("bar", "Bar", "top bar layout + modules", [
-        { name: "disable", help: "(id) disable a bar module" },
-        { name: "dump", help: "enabled module ids in display order" },
-        { name: "dumpAll", help: "full bar state dump" },
-        { name: "enable", help: "(id) enable a bar module" },
-        { name: "hideToggle", help: "toggle the transient bar hide (frees screen space, not persisted)" },
-        { name: "set", help: "(key, json) configure the bar (keys: enabled, position, showBorder, layout, hideToggle)" },
-        { name: "toggle", help: "toggle the bar itself (hide/show)" },
-      ], command)
-    }
-    function ping(): string { return "pong" }
+  // --- public gateway implementation ---------------------------------------
+  // The IpcRouter closures registered in onCompleted call only these owner
+  // methods. Nothing here selects a QML member from an argv name, and no
+  // status/help request constructs a delegate or opens a view.
 
-    function status(): string {
-      return JSON.stringify(root.stateSnapshot())
-    }
+  function ipcSetEnabled(desired) {
+    const want = desired === true
+    if (root.enabled !== want) root.setOption("enabled", want)
+    return BarIpc.silent()
+  }
 
-    function set(key: string, json: string): string {
-      let v
-      try {
-        v = JSON.parse(json)
-      } catch (e) {
-        return "error"
+  // The transient hide never reaches the store. A persistent disable is not
+  // overridden by `show`: it only clears the IPC-only override.
+  function ipcSetHidden(hidden) {
+    root.hideToggle = hidden === true
+    return BarIpc.silent()
+  }
+
+  function ipcSetPosition(value) {
+    if (value === "toggle") value = root.position === "top" ? "bottom" : "top"
+    if (value !== "top" && value !== "bottom")
+      return BarIpc.fail("invalid-argument", "position must be top, bottom or toggle")
+    if (root.position !== value) root.setOption("position", value)
+    return BarIpc.silent()
+  }
+
+  function ipcLayout() {
+    const s = root.storedLayout || {}
+    const out = { left: [], center: [], right: [], disabled: [] }
+    const zones = ["left", "center", "right"]
+    for (const zone of zones) {
+      const list = s[zone] || []
+      for (const id of list) {
+        out[zone].push((root.isEnabled(id) ? "- [*] " : "- [] ") + id)
       }
-      return root.setOption(key, v) ? "ok" : "error"
     }
+    for (const id of s.disabled || []) out.disabled.push("- [] " + id)
+    return out
+  }
 
-    function enable(id: string): string {
-      return root.enableModule(id) ? "ok" : "error"
+  function _ipcGroupMember(id) {
+    for (const gid in root._groups) {
+      if (root.groupMembers(gid).indexOf(id) >= 0) return gid
     }
+    return ""
+  }
 
-    function toggle(): string {
-      return root.toggleBar() ? "ok" : "error"
+  // Validate a caller's complete layout BEFORE handing it to the one write
+  // path. Every input is a fresh array, so the live positions are untouched.
+  function ipcSetLayout(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw))
+      return BarIpc.fail("invalid-argument", "layout must be an object")
+    const zones = root.zones
+    const next = { left: [], center: [], right: [], disabled: [] }
+    const seen = Object.create(null)
+    for (const zone of zones.concat(["disabled"])) {
+      const list = raw[zone]
+      if (!Array.isArray(list))
+        return BarIpc.fail("invalid-argument", "layout needs four arrays")
+      for (const id of list) {
+        if (typeof id !== "string" || id === "")
+          return BarIpc.fail("invalid-argument", "layout ids must be strings")
+        if (seen[id] === true)
+          return BarIpc.fail("invalid-argument", "duplicate layout placement")
+        seen[id] = true
+        if (zone === "disabled") {
+          // Disabled is the dumb off list for toggleable standalone slots
+          // only. Fixed, owned, permanent and workspaces slots cannot go
+          // there, and a group member has no slot of its own.
+          if (root.isOwned(id) || root.isGroup(id) || root._ipcGroupMember(id) !== ""
+            || id === "workspaces" || root._permanent[id] !== undefined
+            || !root._isStandaloneSlot(id)) {
+            return BarIpc.fail("invalid-argument", "slot cannot be disabled")
+          }
+        } else {
+          if (root._ipcGroupMember(id) !== "")
+            return BarIpc.fail("invalid-argument", "group member has no zone")
+          if (!root._isStandaloneSlot(id) && !root.isOwned(id))
+            return BarIpc.fail("invalid-argument", "unknown layout slot")
+        }
+        next[zone].push(id)
+      }
     }
+    // A pinned or non-draggable owned slot holds a fixed place: moving it to
+    // another index or zone is refused instead of silently rewritten.
+    const cur = root.storedLayout || {}
+    for (const zone of zones) {
+      const live = Array.isArray(cur[zone]) ? cur[zone] : []
+      for (let i = 0; i < live.length; i++) {
+        if (!root.isFixedSlot(live[i])) continue
+        if (next[zone].indexOf(live[i]) !== i)
+          return BarIpc.fail("invalid-argument", "fixed slot cannot move")
+      }
+    }
+    const norm = root._normalizeLayout(next)
+    if (norm === null) return BarIpc.fail("invalid-argument", "layout rejected")
+    if (!root.setOption("layout", norm)) return BarIpc.fail("refused", "layout write refused")
+    return BarIpc.silent()
+  }
 
-    function hideToggle(): string {
-      return root.toggleHide() ? "ok" : "error"
+  function ipcStatus() {
+    const snap = root.stateSnapshot()
+    const outputs = []
+    for (const s of root.screens) {
+      const name = String(s.name || "")
+      if (name !== "" && outputs.indexOf(name) < 0) outputs.push(name)
     }
+    outputs.sort()
+    const placed = (root.layout.left || []).concat(root.layout.center || [], root.layout.right || [])
+    return Object.assign(snap, { outputs: outputs, placedModules: placed })
+  }
 
-    function disable(id: string): string {
-      return root.disableModule(id) ? "ok" : "error"
-    }
+  function _ipcKnown(id) {
+    if (typeof id !== "string" || id === "") return false
+    return root.componentFor(id) !== null || root.isOwned(id)
+      || root.isGroup(id) || root._ipcGroupMember(id) !== ""
+  }
 
-    function dumpAll(): string {
-      return JSON.stringify(Object.assign(root.stateSnapshot(), {
-        modules: Object.keys(root._components),
-        owned: Object.keys(root._ownedComps)
-      }))
-    }
+  function _ipcKind(id) {
+    if (root.isGroup(id)) return "group"
+    if (root._ipcGroupMember(id) !== "") return "member"
+    if (root.isOwned(id)) return "owned"
+    return "slot"
+  }
 
-    function dump(): string {
-      // Enabled module ids in display order (zones left->right).
-      return JSON.stringify(root.layout.left.concat(root.layout.center, root.layout.right))
+  function _ipcEnabled(id) {
+    const kind = root._ipcKind(id)
+    if (kind === "owned") return true
+    if (kind === "member") return root.isEnabled(root._ipcGroupMember(id))
+    if (id === "workspaces" || root._permanent[id] !== undefined) return true
+    return root.isEnabled(id)
+  }
+
+  function _ipcViews() {
+    const out = []
+    const views = root._moveViews || {}
+    for (const key in views) {
+      const v = views[key]
+      if (v && v.screen && String(v.screen.name || "") !== "") out.push(v)
     }
+    out.sort((a, b) => String(a.screen.name) < String(b.screen.name) ? -1
+      : String(a.screen.name) > String(b.screen.name) ? 1 : 0)
+    return out
+  }
+
+  function _ipcItemOn(view, id) {
+    if (!view || typeof view.ipcModuleItems !== "function") return null
+    const items = view.ipcModuleItems(id)
+    let fallback = null
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      if (!it) continue
+      fallback = it
+      if (it.visible === true && Number(it.width) > 0) return it
+    }
+    return fallback
+  }
+
+  function _ipcVisibleOn(view, id) {
+    if (!view || !view.visible) return false
+    const items = typeof view.ipcModuleItems === "function" ? view.ipcModuleItems(id) : []
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      if (it && it.visible === true && Number(it.width) > 0) return true
+    }
+    return false
+  }
+
+  // Physical visibility: a live view, a visible window, effective layout
+  // membership, a loaded item and real painted width. The conditional
+  // module's own visible/width bindings stay authoritative.
+  function _ipcVisible(id) {
+    if (!root.effectiveEnabled || !root.isModuleVisible(id)) return false
+    if (root._ipcKind(id) === "group") {
+      const members = root.groupMembers(id)
+      for (let i = 0; i < members.length; i++) {
+        if (root._ipcVisible(members[i])) return true
+      }
+      return false
+    }
+    const views = root._ipcViews()
+    for (let i = 0; i < views.length; i++) {
+      if (root._ipcVisibleOn(views[i], id)) return true
+    }
+    return false
+  }
+
+  function _ipcAllIds() {
+    const seen = Object.create(null)
+    const ids = []
+    const add = id => {
+      if (typeof id !== "string" || id === "" || seen[id] === true) return
+      seen[id] = true
+      ids.push(id)
+    }
+    for (const id in root._components) add(id)
+    for (const id in root._groups) add(id)
+    for (const gid in root._groups) {
+      const members = root.groupMembers(gid)
+      for (let i = 0; i < members.length; i++) add(members[i])
+    }
+    for (const id in root._ownedComps) add(id)
+    ids.sort()
+    return ids
+  }
+
+  function ipcModuleList(filter) {
+    const want = filter === undefined || filter === null || filter === "" ? "all" : String(filter)
+    const ids = root._ipcAllIds()
+    const out = []
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]
+      const enabled = root._ipcEnabled(id)
+      const visible = enabled && root._ipcVisible(id)
+      if (want === "enabled" && !enabled) continue
+      if (want === "disabled" && enabled) continue
+      if (want === "hidden" && (!enabled || visible)) continue
+      if (want === "visible" && (!enabled || !visible)) continue
+      out.push(BarIpc.listRecord(id, root.ipcMetaFor(id), enabled, visible))
+    }
+    return BarIpc.ok(out)
+  }
+
+  function ipcOptionsFor(id) {
+    const own = root._ipcMeta[id]
+    const keys = own && Array.isArray(own.options) ? own.options.slice() : BarIpc.optionKeys(id, null)
+    const out = []
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i]
+      const full = BarIpc.settingKey(id, key)
+      const meta = Settings.byKey(full)
+      const value = Settings.value(full)
+      out.push({
+        key: key,
+        type: meta ? meta.type : null,
+        value: value === undefined ? null : value,
+        default: meta && meta.default !== undefined ? meta.default : null,
+        choices: meta && Array.isArray(meta.choices) ? meta.choices.slice() : null,
+        limits: meta && (meta.min !== undefined || meta.max !== undefined)
+          ? { min: meta.min === undefined ? null : meta.min,
+              max: meta.max === undefined ? null : meta.max } : null
+      })
+    }
+    return out
+  }
+
+  function ipcModuleStatus(id) {
+    if (!root._ipcKnown(id)) return BarIpc.fail("not-found", "no such module")
+    const meta = root.ipcMetaFor(id)
+    const kind = root._ipcKind(id)
+    const enabled = root._ipcEnabled(id)
+    const rec = BarIpc.listRecord(id, meta, enabled, root._ipcVisible(id))
+    rec.kind = kind
+    rec.toggleable = (kind === "slot" || kind === "group")
+      && root._toggleIds().indexOf(id) >= 0
+    rec.movable = (kind === "slot" || kind === "group" || root.ownedDraggable(id))
+      && !root.isFixedSlot(id) && !root.isPinned(id)
+    rec.hasIsland = meta.hasIsland === true
+    rec.options = root.ipcOptionsFor(id)
+    const screens = []
+    const views = root._ipcViews()
+    for (let i = 0; i < views.length; i++) {
+      const view = views[i]
+      const item = root._ipcItemOn(view, id)
+      const host = view.islandHost || null
+      screens.push({
+        name: String(view.screen.name),
+        loaded: item !== null,
+        visible: root._ipcVisibleOn(view, id),
+        islandOpen: !!(item && host && typeof host.isOpenFor === "function" && host.isOpenFor(item))
+      })
+    }
+    rec.screens = screens
+    return BarIpc.ok(rec)
+  }
+
+  function ipcSetModule(id, desired) {
+    if (!root._ipcKnown(id)) return BarIpc.fail("not-found", "no such module")
+    const kind = root._ipcKind(id)
+    if (kind === "member" || kind === "owned" || id === "workspaces"
+      || root._permanent[id] !== undefined || root._toggleIds().indexOf(id) < 0) {
+      return BarIpc.fail("unsupported", "module has no enable switch")
+    }
+    const want = desired === true
+    const cur = root.isEnabled(id) === true
+    if (cur === want) return BarIpc.silent()
+    const done = want ? root.enableModule(id) : root.disableModule(id)
+    if (!done) return BarIpc.fail("refused", "module write refused")
+    return BarIpc.silent()
+  }
+
+  function _ipcViewFor(output) {
+    const views = root._ipcViews()
+    if (views.length === 0) return null
+    let want = output
+    if (want === undefined || want === null || want === "") {
+      want = Ui.primaryScreen && Ui.primaryScreen.name ? String(Ui.primaryScreen.name) : ""
+    }
+    if (want === "") return null
+    for (let i = 0; i < views.length; i++) {
+      if (String(views[i].screen.name) === want) return views[i]
+    }
+    return null
+  }
+
+  function ipcIsland(id, verb, output) {
+    if (!root._ipcKnown(id)) return BarIpc.fail("not-found", "no such module")
+    if (root.ipcMetaFor(id).hasIsland !== true)
+      return BarIpc.fail("unsupported", "module has no island")
+    const view = root._ipcViewFor(output)
+    if (!view) return BarIpc.fail("not-found", "no such output")
+    const items = typeof view.ipcModuleItems === "function" ? view.ipcModuleItems(id) : []
+    let item = null
+    for (let i = 0; i < items.length; i++) {
+      if (items[i] && items[i].islandComponent) { item = items[i]; break }
+    }
+    const host = view.islandHost || null
+    const anchor = !!(item && host && typeof host.isOpenFor === "function" && host.isOpenFor(item))
+    if (verb === "is-open") return BarIpc.ok(anchor)
+    if (verb === "close") {
+      if (anchor) host.close()
+      return BarIpc.silent()
+    }
+    if (verb === "open" && anchor) return BarIpc.silent()
+    // An open/toggle needs the SAME available, visible item on this screen.
+    const available = item && root.effectiveEnabled && root.isModuleVisible(id)
+      && view.visible && item.visible === true && Number(item.width) > 0
+    if (!available) return BarIpc.fail("unavailable", "island item is not available")
+    host.show(item, item.islandComponent)
+    return BarIpc.silent()
+  }
+
+  function ipcOptList(id) {
+    if (!root._ipcKnown(id)) return BarIpc.fail("not-found", "no such module")
+    return BarIpc.ok(root.ipcOptionsFor(id))
+  }
+
+  function _ipcOptKey(id, key) {
+    const keys = root.ipcOptionsFor(id).map(o => o.key)
+    return keys.indexOf(key) >= 0
+  }
+
+  function ipcOptGet(id, key) {
+    if (!root._ipcKnown(id)) return BarIpc.fail("not-found", "no such module")
+    if (!root._ipcOptKey(id, key)) return BarIpc.fail("unsupported", "no such option")
+    const full = BarIpc.settingKey(id, key)
+    const v = Settings.value(full)
+    return BarIpc.ok({ key: key, value: v === undefined ? null : v })
+  }
+
+  function ipcOptSet(id, key, value) {
+    if (!root._ipcKnown(id)) return BarIpc.fail("not-found", "no such module")
+    if (!root._ipcOptKey(id, key)) return BarIpc.fail("unsupported", "no such option")
+    const full = BarIpc.settingKey(id, key)
+    const cur = Settings.value(full)
+    if (JSON.stringify(cur) === JSON.stringify(value)) return BarIpc.silent()
+    if (!Settings.setOption(full, value)) return BarIpc.fail("invalid-argument", "value refused")
+    return BarIpc.silent()
+  }
+
+  // Explicit triggers, one per supported module. Suppression is checked here
+  // against the same live item the module's own reveal reads; the module's
+  // ipcTrigger method never observes track/charge state or connects anything.
+  function ipcTriggerModule(id, name, output) {
+    if (!root._ipcKnown(id)) return BarIpc.fail("not-found", "no such module")
+    if (BarIpc.triggerNames(id).indexOf(name) < 0)
+      return BarIpc.fail("unsupported", "no such trigger")
+    if (!root.effectiveEnabled || !root._ipcEnabled(id) || !root.isModuleVisible(id))
+      return BarIpc.fail("unavailable", "module is not mounted")
+    const view = root._ipcViewFor(output)
+    if (!view) return BarIpc.fail("not-found", "no such output")
+    const item = root._ipcItemOn(view, id)
+    if (!item || typeof item.ipcTrigger !== "function")
+      return BarIpc.fail("unavailable", "module is not loaded")
+    const host = view.islandHost || null
+    const ownIsland = !!(host && typeof host.isOpenFor === "function" && host.isOpenFor(item))
+    const anyIsland = !!(host && host.open)
+    let reason = ""
+    switch (name) {
+      case "flashTrack":
+        if (!item.hasTrack) reason = "no track"
+        else if (!item.flashEnabled) reason = "flash disabled"
+        else if (item.showTitle) reason = "title shown"
+        else if (anyIsland) reason = "island open"
+        break
+      case "flashTemperature":
+        if (!Core.Weather.current) reason = "no weather data"
+        else if (!item.flashEnabled) reason = "flash disabled"
+        else if (Core.Weather.showTemp) reason = "temperature shown"
+        else if (ownIsland) reason = "island open"
+        break
+      case "flashConnection":
+        if (!item.ssid || String(item.ssid) === "") reason = "no named link"
+        else if (ownIsland) reason = "island open"
+        else if (item._flashPending) return BarIpc.ok({ state: "deferred", reason: "pending" })
+        else if (item.fullscreenActive) {
+          item.ipcTrigger(name)
+          return BarIpc.ok({ state: "deferred", reason: "fullscreen" })
+        }
+        break
+      case "flashDevice":
+        if (!item.deviceName || String(item.deviceName) === "") reason = "no named device"
+        else if (ownIsland) reason = "island open"
+        else if (item._flashPending) return BarIpc.ok({ state: "deferred", reason: "pending" })
+        else if (item.fullscreenActive) {
+          item.ipcTrigger(name)
+          return BarIpc.ok({ state: "deferred", reason: "fullscreen" })
+        }
+        break
+      case "flashCharge": {
+        const text = item.announceKind && String(item.announceKind) !== ""
+          ? String(item.announceKind) : String(item.percentageText || "")
+        if (!item.hasMainBattery || !item.shownRow) reason = "no battery"
+        else if (text === "") reason = "no announcement"
+        else if (ownIsland) reason = "island open"
+        else if (item.percentageVisible && String(item.percentageText) === text)
+          reason = "percentage shown"
+        else if (item.fullscreenActive) {
+          item.ipcTrigger(name)
+          return BarIpc.ok({ state: "deferred", reason: "fullscreen" })
+        }
+        break
+      }
+    }
+    if (reason !== "") return BarIpc.ok({ state: "suppressed", reason: reason })
+    if (!view.visible || item.visible !== true || Number(item.width) <= 0)
+      return BarIpc.fail("unavailable", "module is not visible")
+    item.ipcTrigger(name)
+    return BarIpc.ok({ state: "triggered", reason: null })
+  }
+
+  // --- color-picker seat ----------------------------------------------------
+  // `_activePicker` is independent of the primary/fallback owner: the owner
+  // answers "who starts a pick", the active picker answers "who must be
+  // cancelled". A module stamps itself on a successful beginPick and clears
+  // itself on teardown, so a retired callback cannot write a clipboard value.
+  property var _activePicker: null
+
+  function claimActivePicker(picker) {
+    if (!picker) return false
+    if (root._activePicker && root._activePicker !== picker
+      && typeof root._activePicker.cancelPick === "function") {
+      root._activePicker.cancelPick()
+    }
+    root._activePicker = picker
+    return true
+  }
+
+  function clearActivePicker(picker) {
+    if (root._activePicker === picker) root._activePicker = null
+  }
+
+  function ipcPickColor() {
+    if (root._activePicker) return BarIpc.silent()
+    const picker = root._pickerOwner !== null ? root._pickerOwner : root._pickerFallback
+    if (!picker || typeof picker.beginPick !== "function")
+      return BarIpc.fail("unavailable", "no picker available")
+    if (!picker.beginPick()) return BarIpc.fail("unavailable", "no screen to pick on")
+    const gen = picker._pickGen
+    if (typeof gen !== "number" || gen <= 0) {
+      return BarIpc.fail("unavailable", "pick did not start")
+    }
+    return BarIpc.silent()
+  }
+
+  function ipcCloseColorPick() {
+    const picker = root._activePicker
+    if (picker && typeof picker.cancelPick === "function") picker.cancelPick()
+    return BarIpc.silent()
+  }
+
+  function ipcColorStatus() {
+    const picker = root._pickerOwner !== null ? root._pickerOwner : root._pickerFallback
+    let screen = ""
+    if (picker) {
+      if (picker.pickScreen && picker.pickScreen.name) screen = String(picker.pickScreen.name)
+      else if (picker.barScreen && picker.barScreen.name) screen = String(picker.barScreen.name)
+      else if (Ui.primaryScreen && Ui.primaryScreen.name) screen = String(Ui.primaryScreen.name)
+    }
+    return BarIpc.ok({
+      available: picker !== null,
+      picking: root._activePicker !== null,
+      screen: screen
+    })
   }
 }

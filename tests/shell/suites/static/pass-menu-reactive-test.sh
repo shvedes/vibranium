@@ -136,8 +136,11 @@ t_contains "the reveal eye follows it" "revealable: root.sensitive" "$EDITOR_SRC
 t_contains "caps from the live keyboard" "capsActive: root.sensitive && Core.Keyboard.capsOn" "$EDITOR_SRC"
 t_contains "and the press is reported back" "onCapsToggled: if (root.sensitive) Core.Keyboard.toggleCaps()" "$EDITOR_SRC"
 t_contains "a flow stage declares sensitivity" "row.flowStep.sensitive === true" "$ENTRY_SRC"
-t_contains "list rows can route @forget" 'dc === "@forget"' "$ENTRY_SRC"
-t_contains "through the injected page api" "Menu.dynamicApi(Menu.frame.id)" "$ENTRY_SRC"
+t_contains "list rows delegate deletion to the shared owner" "Menu.rowDelete(itm" "$ENTRY_SRC"
+# Batch E moved the guarded delete path out of Entry into Menu._runDelete;
+# pin the owner rather than the old inline spelling so @forget stays routed.
+t_contains "list rows can route @forget" 'dc === "@forget"' "$MENU_SRC"
+t_contains "through the injected page api" "root.dynamicApi(root.frame.id)" "$MENU_SRC"
 t_contains "options carry icons" "icon: o.icon" "$MENUPAGE_SRC"
 t_contains "and glyphs" "glyph: o.glyph" "$MENUPAGE_SRC"
 t_contains "OptionRow paints the icon" "name: midCol.iconName" "$OPTROW_SRC"

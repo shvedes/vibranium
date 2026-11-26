@@ -8,9 +8,9 @@ import Quickshell.Io
 import qs.common
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/StringUtils.js" as SU
-import "ArchUpdatesLib.js" as ArchUpdatesLib
+import "SystemUpdatesLib.js" as SystemUpdatesLib
 
-// Arch updates service. Singleton that fetches official Arch repository
+// System updates service. Singleton that fetches official repository
 // updates via checkupdates (fakeroot pacman -Sy into a temp db, safe) and
 // AUR updates via yay -Qua in parallel, each wrapped in a `timeout` so a
 // dead mirror or an unreachable AUR RPC can never hang the shell. Parses
@@ -28,7 +28,7 @@ import "ArchUpdatesLib.js" as ArchUpdatesLib
 // (silence for three real days) and "Update Now" (opens the full-system
 // updater in a terminal). Closing or timing out without pressing a button
 // silences it for 24 hours. The window lives as a unix timestamp
-// ("nextNotify" in the "archUpdates" section of $VIBRANIUM_CACHE/shell.json
+// ("nextNotify" in the "systemUpdates" section of $VIBRANIUM_CACHE/shell.json
 // via ShellCache), so restarts compare against the same value and an ignored
 // notification never re-shows early. The notification itself stays up for
 // 5 minutes; a one-shot timer re-checks exactly when the window expires
@@ -36,7 +36,7 @@ import "ArchUpdatesLib.js" as ArchUpdatesLib
 Singleton {
   id: root
 
-  readonly property string tag: "archUpdates"
+  readonly property string tag: "systemUpdates"
 
   // Pending-update count a refresh must exceed before the update-available
   // notification fires. At or below it a refresh stays silent and writes
@@ -188,7 +188,7 @@ Singleton {
   // so a restart compares against the exact value the previous session
   // wrote and an ignored notification never re-shows early.
   function _notifyAllowed() {
-    return Date.now() / 1000 >= ShellCache.number("archUpdates", "nextNotify", 0)
+    return Date.now() / 1000 >= ShellCache.number("systemUpdates", "nextNotify", 0)
   }
 
   // Arm a one-shot refresh for the exact moment the suppression window
@@ -197,7 +197,7 @@ Singleton {
   // leaves the stale one-shot to fire harmlessly (a refresh that finds
   // nothing to say).
   function _scheduleNotifyCheck() {
-    const remaining = Math.round((ShellCache.number("archUpdates", "nextNotify", 0) - Date.now() / 1000) * 1000)
+    const remaining = Math.round((ShellCache.number("systemUpdates", "nextNotify", 0) - Date.now() / 1000) * 1000)
     if (remaining <= 0) return
     notifyWindowTimer.interval = remaining
     notifyWindowTimer.restart()
@@ -216,7 +216,7 @@ Singleton {
     // Silence window for the "closed without a button" outcome, written
     // at send time so a crash or restart mid-wait still counts as
     // ignored; the "ignore" action overwrites it with the 3-day window.
-    ShellCache.updateSection("archUpdates", { nextNotify: now + 24 * 3600 })
+    ShellCache.updateSection("systemUpdates", { nextNotify: now + 24 * 3600 })
     const n = root.packages.length
     const body = n === 1 ? "1 package has an update pending"
       : n + " packages have updates pending"
@@ -226,7 +226,7 @@ Singleton {
       "-t", "300000",
       "-A", "ignore=Ignore",
       "-A", "update=Update Now",
-      "Arch updates available",
+      "System updates available",
       body
     ]
     notifyProc.running = true
@@ -234,9 +234,9 @@ Singleton {
 
   // Parse `pkgname oldver -> newver` lines (checkupdates and yay -Qua use
   // the same shape; the bare 4-field pacman -Qu form is handled too).
-  // Canonicalized in ArchUpdatesLib.js (pinned format, unit-tested).
+  // Canonicalized in SystemUpdatesLib.js (pinned format, unit-tested).
   function _parse(text, source): var {
-    return ArchUpdatesLib.parseUpdates(text, source)
+    return SystemUpdatesLib.parseUpdates(text, source)
   }
 
   // Merge once both fetches have exited and decide the final state.
@@ -393,7 +393,7 @@ Singleton {
         // Button-ignored: three real days from the moment it was shown.
         // The one-shot is re-armed here immediately so the re-show lands
         // exactly on the 3-day mark, not on the next 30-minute refresh.
-        ShellCache.updateSection("archUpdates", { nextNotify: root._sentAt + 3 * 24 * 3600 })
+        ShellCache.updateSection("systemUpdates", { nextNotify: root._sentAt + 3 * 24 * 3600 })
         root._scheduleNotifyCheck()
       }
       // Empty output: closed or timed out without a button - the 24-hour
@@ -439,12 +439,24 @@ Singleton {
   }
 
   Component.onCompleted: {
-    Registry.offer("archUpdates", {
-      title: "Arch updates",
-      description: "system update polling + apply",
+    IpcRouter.register("systemUpdates", root, {
+      "systemUpdates.refresh": function () { return ipc.refresh() },
+      "systemUpdates.update": function (_a, c) { return ipc.update(c.tokens.mode, c.tokens.packages) },
+      "systemUpdates.dump": function () { return ipc.dump("all") },
+      "systemUpdates.dump.all": function () { return ipc.dump("all") },
+      "systemUpdates.dump.aur": function () { return ipc.dump("aur") },
+      "systemUpdates.status": function () { return ipc.status() },
+      "systemUpdates.ping": function () { return ipc.ping() }
+    })
+    // The offer id is the boot unit id, not the public CLI target: Boot owns
+    // the descriptor with this id and audits that it was drained.
+    Registry.offer("systemUpdates", {
+      title: "System updates",
+      description: "Check for and apply system updates",
       verbNames: [
         "refresh",
         "update",
+        "dump",
         "status",
         "help",
         "ping",
@@ -452,12 +464,16 @@ Singleton {
     })
   }
 
+  Component.onDestruction: IpcRouter.unregister("systemUpdates", root)
+
   IpcHandler {
-    target: "arch-updates"
+    id: ipc
+    target: "systemUpdates"
     function help(command: string): string {
-      return UnitIpc.help("arch-updates", "Arch updates", "system update polling + apply", [
+      return UnitIpc.help("systemUpdates", "System updates", "Check for and apply system updates", [
         { name: "refresh", help: "re-poll available updates" },
         { name: "update", help: "run the system update" },
+        { name: "dump", help: "read current update rows (all or aur)" },
       ], command)
     }
     function ping(): string { return "pong" }
@@ -478,6 +494,26 @@ Singleton {
       }
       root.triggerUpdate(aur === "aur", names)
       return "ok"
+    }
+
+    // Read-only projection of the last parsed rows. No refresh, controller
+    // demand or update: the catalog adapts this JSON token to a typed table.
+    function dump(source: string): string {
+      const rows = source === "aur" ? root._aurPkgs : root.packages
+      const out = []
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]
+        if (!r) continue
+        out.push({
+          name: String(r.name ?? ""),
+          current: String(r.current ?? ""),
+          candidate: String(r.candidate ?? ""),
+          repository: String(r.repository ?? ""),
+          size: String(r.size ?? ""),
+          source: String(r.source ?? "")
+        })
+      }
+      return JSON.stringify(out)
     }
 
     function status(): string {

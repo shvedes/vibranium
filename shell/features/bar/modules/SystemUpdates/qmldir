@@ -1,0 +1,4 @@
+module qs.features.bar.modules.SystemUpdates
+
+SystemUpdates 1.0 SystemUpdates.qml
+SystemUpdatesIsland 1.0 SystemUpdatesIsland.qml

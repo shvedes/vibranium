@@ -43,7 +43,11 @@ Item {
       model: root.memberIds
 
       delegate: Loader {
+        id: memberLoader
         required property string modelData
+        // Identity of the delegate last published to the bar window's IPC
+        // index. A member replaced by a later Loader drops only its own row.
+        property var _ipcMemberItem: null
 
         // Asynchronous only until the boot entrance latches (same reason as
         // Zone's slot loader): a membership change rebuilds every member,
@@ -72,8 +76,15 @@ Item {
           return comp
         }
         onLoaded: {
+          if (memberLoader._ipcMemberItem && memberLoader._ipcMemberItem !== item && root.barWindow)
+            root.barWindow.forgetIpcModule(modelData, memberLoader._ipcMemberItem)
+          memberLoader._ipcMemberItem = item
           if (item) root.forwardMember(item, modelData)
           Bar.reportModuleReady(modelData)
+        }
+        Component.onDestruction: {
+          if (root.barWindow && memberLoader._ipcMemberItem)
+            root.barWindow.forgetIpcModule(modelData, memberLoader._ipcMemberItem)
         }
       }
     }
@@ -90,6 +101,10 @@ Item {
       item.barWindow = root.barWindow
     }
     if (item.moduleId !== undefined) item.moduleId = id
+    // The bar window is the per-screen view that owns the IPC index; a group
+    // member is a separate view of the configured slot, not a new placement.
+    if (root.barWindow && typeof root.barWindow.noteIpcModule === "function")
+      root.barWindow.noteIpcModule(id, item)
   }
 
   // Members can finish loading before the window/screen contract lands;

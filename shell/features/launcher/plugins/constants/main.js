@@ -1141,6 +1141,24 @@ function isPotentialConstant(query) {
       const v = String(item && item.copyValue || "")
       if (v === "") return
       api.execDetached("printf %s " + api.shellQuote(v) + " | wl-copy")
+    },
+    ipc: {
+      lookup: function (query) {
+        const rows = tryConstants(String(query ?? ""))
+        if (!rows || rows.length === 0) return null
+        const out = []
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i]
+          if (r.ok !== true) continue
+          out.push({
+            label: r.label,
+            description: r.desc || "",
+            value: r.copy,
+            related: r.related === true
+          })
+        }
+        return out.length > 0 ? out : null
+      }
     }
   }
 })()

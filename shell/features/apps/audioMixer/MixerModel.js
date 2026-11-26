@@ -1,9 +1,9 @@
 .pragma library
 
 .import "../../../common/theme/DeviceIcons.js" as DeviceIcons
-.import "../../../common/math/Range.js" as Range
 .import "../../../common/collections/StoreGuards.js" as StoreGuards
 .import "../../../common/text/StringUtils.js" as SU
+.import "../../../common/audio/AudioNodeKind.js" as Kind
 .import "NodeKey.js" as NodeKey
 
 // Pure derivations for the audio mixer: what a node IS, what it is CALLED,
@@ -121,20 +121,7 @@ function propId(node, key) {
 // null is a real answer and not a failure: anything the four rows cannot
 // place is dropped rather than guessed into a row that would then write a
 // volume onto the wrong node.
-function classify(node) {
-  if (node === null || node === undefined) return null
-  let sink = null
-  let stream = null
-  try {
-    sink = node.isSink
-    stream = node.isStream
-  } catch (ignored) {
-    return null
-  }
-  if (typeof sink !== "boolean" || typeof stream !== "boolean") return null
-  if (sink === true) return stream === true ? "playbackStream" : "outputDevice"
-  return stream === true ? "captureStream" : "inputDevice"
-}
+function classify(node) { return Kind.classify(node) }
 
 // The two kinds the tabs are split by, and the two a device row can host.
 function isStreamKind(kind) {
@@ -227,7 +214,7 @@ function isMonitorLeg(sourceKind, targetKind) {
 // A source monitor is a Source whose name ends in `.monitor`: PipeWire makes
 // one node object per monitor, named after the device it watches.
 function isMonitorName(name) {
-  return text(name).slice(-8) === ".monitor"
+  return Kind.isMonitorName(name)
 }
 
 // --- the shell's own taps ---------------------------------------------
@@ -243,24 +230,6 @@ function isMonitorName(name) {
 // never listed is never given a handle, so no second tap is created and
 // nothing is left to oscillate. A longer debounce would not break the loop; it
 // would only slow it down while still drawing rows for the shell itself.
-
-var SHELL_OWN_NAME = "quickshell"
-var CAPTURE_CLASS = "Stream/Input/Audio"
-
-// Whether a node name is the shell's own. PipeWire names a monitor capture
-// stream after the process that opened it, so this is a fact about the NAME,
-// which is exactly why the name alone is never the test: it identifies the
-// shell as the owner of the stream and says nothing about what the stream is
-// for. A suffix is the same owner (a per-instance tag) and never a third-party
-// application, because no desktop application publishes this name.
-function isShellOwnName(name) {
-  const n = text(name).toLowerCase()
-  if (n === "") return false
-  if (n === SHELL_OWN_NAME) return true
-  return n.indexOf(SHELL_OWN_NAME + ".") === 0
-    || n.indexOf(SHELL_OWN_NAME + "-") === 0
-    || n.indexOf(SHELL_OWN_NAME + "_") === 0
-}
 
 // Is this node one of the shell's own peak taps? A pure function of the
 // node's properties, so it is unit-drivable with no graph behind it.
@@ -281,9 +250,7 @@ function isShellOwnName(name) {
 // The class is deliberately not the whole test: an application's own capture
 // stream is `Stream/Input/Audio` too, and it is kept.
 function isShellTap(node) {
-  if (!isShellOwnName(nodeName(node))) return false
-  if (propText(node, "application.name") === "") return true
-  return propText(node, "media.class") === CAPTURE_CLASS
+  return Kind.isShellTap(node)
 }
 
 // Is this node a stream a user can act on? The positive form the row lists
@@ -291,7 +258,7 @@ function isShellTap(node) {
 // `application.name`, or whose node name is not the shell's own, is one
 // whatever its media class says.
 function isApplicationStream(node) {
-  return !isShellTap(node)
+  return Kind.isApplicationStream(node)
 }
 
 // --- list identity ----------------------------------------------------
@@ -334,20 +301,7 @@ function stableList(current, next) {
 // back DOWN to it. The numeric PipeWire id is never a label: it is graph
 // state, not a name.
 function label(node) {
-  if (node === null || node === undefined) return ""
-  let nick = ""
-  let desc = ""
-  try {
-    nick = text(node.nickname)
-    desc = text(node.description)
-  } catch (ignored) {
-    return ""
-  }
-  if (nick !== "") return nick
-  if (desc !== "") return desc
-  const media = propText(node, "media.name")
-  if (media !== "") return media
-  return text(node.name)
+  return Kind.label(node)
 }
 
 // The application a stream belongs to, and the secondary line under it: what
@@ -439,10 +393,7 @@ function appIconName(node) {
 // non-zero value. A change-handler unmute would also fire on the hardware
 // side, silently starting audio the user had muted.
 function applyVolume(audio, value, maximum) {
-  if (audio === null || audio === undefined) return false
-  audio.volume = Range.clamp(Number(value), 0, Number(maximum))
-  if (Number(value) > 0 && audio.muted) audio.muted = false
-  return true
+  return Kind.applyVolume(audio, value, maximum)
 }
 
 // A channel slider's value goes through the controller, which owns the

@@ -12,7 +12,7 @@ import qs.common
 //
 // Callers own the box (width, height, anchors, and any parent opacity); this
 // primitive owns the color, the corner and the pulse. A site that fades the
-// block as a whole - the arch-updates handover - leaves `pulse` off and
+// block as a whole - the system-updates handover - leaves `pulse` off and
 // animates its wrapper, so the two never write one opacity.
 Rectangle {
   id: bar

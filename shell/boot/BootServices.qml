@@ -47,7 +47,7 @@ Item {
       // do. `qs.features.lock` imports `qs.services` already, so this shares
       // that compile rather than repeating it in a fourth half.
       case "lockscreen":    void Lockscreen.locked; break
-      // Timer, ArchUpdates and Connectivity are prefixed because qs.services
+      // Timer, SystemUpdates, Connectivity and Tools are qualified because qs.services
       // shares those names with the bar's own modules and with QtQuick's
       // Timer; the qualified name is the one that cannot resolve to the wrong
       // type.
@@ -61,12 +61,13 @@ Item {
       case "timer":         void Services.Timer.tag; break
       case "recording":     void Recording.tag; break
       case "update":        void Update.tag; break
-      case "archUpdates":   void Services.ArchUpdates.tag; break
+      case "systemUpdates": void Services.SystemUpdates.tag; break
       case "powerProfile":  void PowerProfile.tag; break
       case "printers":      void Printers.tag; break
       case "powerPolicy":   void PowerPolicy.tag; break
       case "batteryAlert":  void BatteryAlert.tag; break
       case "connectivity":  void Services.Connectivity.tag; break
+      case "tools":         void Services.Tools.tag; break
       case "screenshots":
         void Screenshots.tag
         late._observeScreenshots()

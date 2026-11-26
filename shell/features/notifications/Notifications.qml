@@ -1081,58 +1081,79 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("notifications", root, {
+      "notifications.dnd.enable": function () { return ipc.dnd("enable") },
+      "notifications.dnd.disable": function () { return ipc.dnd("disable") },
+      "notifications.dnd.toggle": function () { return ipc.dnd("toggle") },
+      "notifications.dnd.get": function () { return ipc.dnd("get") },
+      "notifications.history": function () { return ipc.history() },
+      "notifications.clear": function () { return ipc.clearHistory() },
+      "notifications.dismiss.visible": function () { return ipc.dismissAll() },
+      "notifications.dismiss.all": function () { return ipc.clear() },
+      "notifications.dismiss.id": function (a) {
+        if (root.dismiss(a.id)) return { v: 1, ok: true }
+        return { v: 1, ok: false, error: {
+          code: "not-found", message: "no notification with id " + a.id
+        } }
+      },
+      "notifications.status": function () { return ipc.status() },
+      "notifications.ping": function () { return ipc.ping() }
+    })
     Registry.offer("notifications", {
       title: "Notifications",
-      description: "desktop notification daemon and pile",
+      description: "Manage desktop notifications",
       verbNames: [
         "clear",
-        "clearHistory",
         "dismiss",
-        "dismissAll",
         "dnd",
         "help",
         "history",
         "ping",
-        "status",
-        "toggleDnd"
+        "status"
       ]
     })
     Registry.register(root.tag, root)
   }
-  Component.onDestruction: Registry.unregister(root.tag)
+  Component.onDestruction: {
+    IpcRouter.unregister("notifications", root)
+    Registry.unregister(root.tag)
+  }
 
   IpcHandler {
+    id: ipc
     target: "notifications"
     function help(command: string): string {
-      return UnitIpc.help("notifications", "Notifications", "desktop notification daemon and pile", [
+      return UnitIpc.help("notifications", "Notifications", "Manage desktop notifications", [
         { name: "clear", help: "dismiss everything, buffer included; answers the count" },
         { name: "clearHistory", help: "forget the daemon's own history" },
         { name: "dismiss", signature: "(id)", help: "dismiss one notification by id" },
         { name: "dismissAll", help: "dismiss everything in the pile" },
-        { name: "dnd", signature: "(on)", help: "on / off / toggle do-not-disturb; empty reads it" },
+        { name: "dnd", signature: "(verb)", help: "enable / disable / toggle / get do-not-disturb" },
         { name: "history", help: "own history as JSON, newest first" },
         { name: "toggleDnd", help: "flip do-not-disturb" },
       ], command)
     }
     function ping(): string { return "pong" }
 
-    // "on" / "off" / "toggle"; an empty or unrecognised word is a read, so
-    // `dnd ""` answers the state without changing it. The answer is the
-    // EFFECTIVE state, so a fullscreen-forced DND answers "on" even after
-    // "off" - the honest answer is the one the pile is acting on.
+    // "enable" / "disable" / "toggle" / "get"; any other word is an error.
+    // `get` answers the EFFECTIVE state, so a fullscreen-forced DND answers
+    // "on" even after "disable" - the honest answer is the one the pile is
+    // acting on.
     //
     // The argument is declared rather than optional because Quickshell 0.3.1
     // checks a verb's arity and refuses a mismatch: a default value is
     // rejected outright at load ("Type annotations are not supported (yet)")
     // and a rest parameter likewise, so `dnd` with no argument answers "Too
     // few arguments provided (1 required but 0 were provided.)" and changes
-    // nothing. `toggleDnd` is the zero-argument form.
-    function dnd(on: string): string {
-      const want = String(on ?? "").trim().toLowerCase()
-      if (want === "toggle") root.toggleDnd()
-      else if (want === "on" || want === "true" || want === "1") root.setDnd(true)
-      else if (want === "off" || want === "false" || want === "0") root.setDnd(false)
-      return root.dnd ? "on" : "off"
+    // nothing. `toggleDnd` remains the zero-argument form.
+    function dnd(verb: string): string {
+      const want = String(verb ?? "").trim().toLowerCase()
+      if (want === "get") return root.dnd ? "on" : "off"
+      if (want === "enable") root.setDnd(true)
+      else if (want === "disable") root.setDnd(false)
+      else if (want === "toggle") root.toggleDnd()
+      else return "error: invalid value"
+      return ""
     }
 
     // The zero-argument toggle, separate from `dnd` because a Quickshell 0.3.1
@@ -1141,7 +1162,7 @@ Singleton {
     // at all rather than one that has to be spelled with a placeholder.
     function toggleDnd(): string {
       root.toggleDnd()
-      return root.dnd ? "on" : "off"
+      return ""
     }
 
     function history(): string {

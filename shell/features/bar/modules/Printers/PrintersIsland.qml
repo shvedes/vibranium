@@ -7,7 +7,7 @@ import qs.services as Svc
 import "../../../../services/system/PrintersLib.js" as Model
 
 // Printers island. Header: the section-cap style (lib Title level 2,
-// the caps + leading glyph the ArchUpdates island uses for its own
+// the caps + leading glyph the SystemUpdates island uses for its own
 // header) with the muted subtitle underneath and the CUPS-settings and
 // reload affordances on the right. Sections use the same caps style:
 // KNOWN PRINTERS and JOBS (five rows visible at most, the rest scrolls).
@@ -138,7 +138,7 @@ Item {
         Svc.Printers.aliases, Svc.Printers.shownJobs, Svc.Printers.vmUnavailable)
 
       // Click-anywhere commit: sits beneath the content column so real
-      // controls and rows keep their own clicks (ArchUpdates pattern).
+      // controls and rows keep their own clicks (SystemUpdates pattern).
       // A press on an empty spot commits any open printer rename.
       MouseArea {
         z: -1
@@ -153,7 +153,7 @@ Item {
         spacing: Ui.m
 
         // Header: section-cap title (lib Title level 2, the caps style
-        // the ArchUpdates island uses for its own header) with the
+        // the SystemUpdates island uses for its own header) with the
         // leading printer glyph, the muted subtitle underneath, and the
         // two global affordances on the right. Settings opens the CUPS
         // app and closes the island behind it (the new window is the

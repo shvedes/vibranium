@@ -10,7 +10,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.common
 import qs.services
-import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/text/IpcCatalog.js" as IpcCatalog
 
 // Internal idle daemon. Config lives in the settings store under
 // shell.idle (validated and persisted by Settings); this singleton owns
@@ -89,42 +89,63 @@ Singleton {
   on_CfgSigChanged: root.rebuild()
 
   Component.onCompleted: {
-    Registry.offer("idleDaemon", {
-      title: "Idle daemon",
-      description: "idle timers + actions",
-      verbNames: [
-        "add",
-        "addFull",
-        "remove",
-        "set",
-        "setAction",
-        "setClass",
-        "setCommand",
-        "setEnabled",
-        "setMinutes",
-        "status",
-        "help",
-        "ping",
-      ]
+    Registry.offer("idle", {
+      title: "Idle",
+      description: "Manage idle timers and actions",
+      verbNames: IpcCatalog.topLevelVerbs("idle")
     })
     Registry.register(root.tag, root)
+    IpcRouter.register("idle", root, {
+      "idle.enable": function () { return root._enable(true) },
+      "idle.disable": function () { return root._enable(false) },
+      "idle.reload": function () { return root._reload() },
+      "idle.list": function () { return root._list() },
+      "idle.add": function (a) { return root._add(a.SECONDS, a.COMMAND) },
+      "idle.remove": function (a) { return root._remove(a.ID) },
+      "idle.class": function (a) { return root._setClassRow(a.ID, a.CLASS) },
+      "idle.status": function () { return root._status() },
+      "idle.ping": function () { return root._ok("pong", { kind: "text" }) }
+    })
     ProviderHost.registerProvider("idle-add", {
       runFlow: (item, values) => root.commitAddWizard(item, values)
     }, root)
     root.rebuild()
   }
   Component.onDestruction: {
+    IpcRouter.unregister("idle", root)
     ProviderHost.unregisterProvider("idle-add", root)
     Registry.unregister(root.tag)
   }
 
   // Rebuild monitors after a settings write: new epoch, cleared fired
-  // map, fresh row objects (destroys the old IdleMonitors).
+  // map, fresh row objects (destroys the old IdleMonitors). A pending
+  // compositor probe belongs to the retired arm and can no longer dispatch
+  // an action under the new epoch.
   function rebuild() {
     root.epoch += 1
     root.fired = {}
+    root._probePending = null
     root._setRows()
     root._injectPage()
+  }
+
+  // The compositor's `timeout` is seconds. A row that reaches here without a
+  // finite positive integer is never armed: an undefined/NaN/0 threshold makes
+  // an IdleMonitor report idle on the first event, which would run whatever
+  // action the row carries (including a suspend command) within a fraction of
+  // a second of boot or an unlock. Settings.idleTimers only publishes canonical
+  // rows, but this is the last gate before a destructive action, so refuse a
+  // malformed row rather than coerce it into a zero.
+  function _armTimeout(row) {
+    if (!row || typeof row !== "object") return -1
+    // Only the canonical field is admissible here. Settings.idleTimers owns
+    // the conversion of legacy minutes rows; a row with minutes or with both
+    // fields never reached that conversion and must not be armed in a hurry.
+    if (!Object.prototype.hasOwnProperty.call(row, "seconds")
+      || Object.prototype.hasOwnProperty.call(row, "minutes")) return -1
+    const s = row.seconds
+    if (typeof s !== "number" || !isFinite(s) || s < 1 || Math.floor(s) !== s) return -1
+    return s
   }
 
   function _setRows() {
@@ -143,11 +164,15 @@ Singleton {
     }
     const monitors = []
     for (let i = 0; i < root.timers.length; i++) {
-      const t = root.timers[i]
+      const timeout = root._armTimeout(root.timers[i])
+      if (timeout < 0) {
+        Log.at("idle").warn("refusing a timer without a positive integer seconds value")
+        continue
+      }
       const m = monitorComp.createObject(root, {
         rowIndex: i,
         rowEpoch: root.epoch,
-        timeout: t.minutes * 60
+        timeout: timeout
       })
       monitors.push(m)
     }
@@ -180,6 +205,10 @@ Singleton {
     const key = String(index)
     const row = root.timers[index]
     if (!row || root.fired[key] === capturedEpoch) return
+    // A row without a canonical seconds value cannot be armed (see
+    // _armTimeout); a callback that outlived a retired generation must not
+    // find a different row at the same index and run it either.
+    if (root._armTimeout(row) < 0) return
     const meta = root._actionMeta(row)
     if (root._blocked(meta)) {
       // Held, not spent: the row stays eligible, so the next activity edge
@@ -456,8 +485,8 @@ Singleton {
     id: monitorComp
 
     IdleMonitor {
-      // Quickshell IdleMonitor counts in seconds, so minutes convert
-      // once here at arm time; the UI and store stay minute-based.
+      // Quickshell IdleMonitor counts in seconds, the same unit the store
+      // and the UI use; the threshold is passed through unchanged.
       property int rowIndex: 0
       property int rowEpoch: 0
       respectInhibitors: true
@@ -492,7 +521,7 @@ Singleton {
   // index link and the enabled toggle, this injected page renders the
   // live timer list. Re-injected on every rebuild so an add/remove/edit
   // shows up (or disappears) while the menu is open. Rows are plain:
-  // toggle, one info-only reference row per timer (command with minutes
+  // toggle, one info-only reference row per timer (command with seconds
   // on the accent tail, Delete/Ctrl+D removes with confirmation), then
   // a separator and the Add timer row - no editable rows at all.
   //
@@ -512,7 +541,7 @@ Singleton {
     // calls rebuild() then _injectPage() back to back). A discarded page
     // table drops the signature, so the next attempt always rebuilds.
     const sig = root.capability + "|" + root.timers.map(t =>
-      t.minutes + ":" + t.action + ":" + (t.command || "") + ":" + (t.commandClass || "")
+      t.seconds + ":" + t.action + ":" + (t.command || "") + ":" + (t.commandClass || "")
     ).join(",")
     if (sig === root._lastInjectSig) return
     const items = []
@@ -542,8 +571,8 @@ Singleton {
     for (let i = 0; i < root.timers.length; i++) {
       const t = root.timers[i]
       // Reference rows, not controls: click/Enter never expands (infoOnly),
-      // ctrl+i shows the generic line. Titles carry the minutes beside them
-      // ("Timer 1 (in 15 minutes)"); the command rides the leading accent
+      // ctrl+i shows the generic line. Titles carry the seconds beside them
+      // ("Timer 1 (in 900 s)"); the command rides the leading accent
       // slot full-width, no faint copy. The base sub states what decides
       // the row: the inhibitor guard covers it, or the daemon is off and
       // nothing fires at all. A daemon that is off outranks the inhibitor
@@ -560,8 +589,8 @@ Singleton {
         : (gate === "" ? "not held back by inhibitors" : gate)
       items.push({
         type: "expandable",
-        id: "timer-" + t.minutes,
-        label: "Timer " + (i + 1) + " (in " + t.minutes + " minutes)",
+        id: "timer-" + t.seconds,
+        label: "Timer " + (i + 1) + " (in " + t.seconds + " s)",
         subLead: isCmd ? (cmd !== "" ? cmd : "Run command - not set")
           : t.action === "lock" ? "Lock session" : "Suspend",
         sub: sub,
@@ -569,14 +598,14 @@ Singleton {
         desc: (isCmd ? "Run command " + (cmd !== "" ? cmd : "- not set") : "")
           + (isCmd && sub !== "" ? " - " : "") + sub,
         infoOnly: true,
-        delCommand: "qs -p \"$VIBRANIUM/shell\" ipc call idle remove " + i
+        delCommand: "vb-shell idle remove " + i
       })
     }
     items.push({
       type: "separator",
       id: "idle-sep"
     })
-    // Staged Add wizard: minutes, then the command to run. Every timer is
+    // Staged Add wizard: seconds, then the command to run. Every timer is
     // a command - there is no action stage to pick from, so a new timer
     // cannot be a bare lock or suspend row and the command's own text is
     // the whole of what the timer does. The inhibitor guard reads the
@@ -584,30 +613,31 @@ Singleton {
     // runs declare themselves on read, anything else declares nothing and
     // is never held back. The final commit carries every stage at once; the
     // menu stays open so several timers can be added in a row.
-    let minMinutes = 1
+    let minSeconds = 1
     for (let u = 0; u < root.timers.length; u++) {
       // Timers are strictly increasing, so a new one must fire later than
-      // every existing entry - the picker cannot offer a sooner minute.
-      if (root.timers[u].minutes + 1 > minMinutes) minMinutes = root.timers[u].minutes + 1
+      // every existing entry - the picker cannot offer a sooner second.
+      if (root.timers[u].seconds + 1 > minSeconds) minSeconds = root.timers[u].seconds + 1
     }
-    // No valid minute left (a timer already sits at the 10080 cap): clamp
-    // so the picker never builds an inverted range; the commit validation
-    // still rejects anything that breaks the increasing order.
-    if (minMinutes > 10080) minMinutes = 10080
-    // With nothing configured the add row opens on a short 5-minute wait
-    // rather than the first legal minute; the picker floor stays at 1, so a
-    // shorter wait can still be typed. A non-empty list keeps opening on its
-    // own floor, which is the only minute that can be added. The stage
-    // carries the seed as well as the row: a row's state is seeded once per
-    // menu session, so deleting the last timers with the page open would
-    // otherwise keep suggesting the minute the row first rendered with.
-    const suggestedMinutes = root.timers.length === 0 ? 5 : minMinutes
+    // No valid second left inside the wizard's week-long limit: clamp so
+    // the picker never builds an inverted range. An imported longer timer
+    // is not moved, and the commit validation still refuses an append that
+    // would break the increasing order.
+    if (minSeconds > 604800) minSeconds = 604800
+    // With nothing configured the add row opens on a one-minute wait rather
+    // than the first legal second; the picker floor stays at 1, so a shorter
+    // wait can still be typed. A non-empty list keeps opening on its own
+    // floor, which is the only second that can be added. The stage carries
+    // the seed as well as the row: a row's state is seeded once per menu
+    // session, so deleting the last timers with the page open would
+    // otherwise keep suggesting the second the row first rendered with.
+    const suggestedSeconds = root.timers.length === 0 ? 60 : minSeconds
     items.push({
       type: "select",
       id: "idle-add",
       label: "Add timer",
       sub: "Add new idle timer",
-      value: suggestedMinutes,
+      value: suggestedSeconds,
       marker: false,
       keepOpen: true,
       hideValue: true,
@@ -621,7 +651,7 @@ Singleton {
         // fragile across the collapse transition (settled visible=false
         // with healthy text), while accent flips land every time - so the
         // narration rides the tail and the base never moves.
-        { kind: "number", min: minMinutes, max: 10080, step: 1, value: suggestedMinutes, unit: "min", sub: "Add new idle timer", subAccent: "Trigger in..." },
+        { kind: "number", min: minSeconds, max: 604800, step: 1, value: suggestedSeconds, unit: "s", sub: "Add new idle timer", subAccent: "Trigger in..." },
         { kind: "text", placeholder: "e.g. vb-shell session lock", sub: "Add new idle timer", subAccent: "Command to run on trigger..." }
       ],
       onCall: "idle addFull %v"
@@ -681,8 +711,9 @@ Singleton {
   //
   // Callable on the singleton root because the menu's onCall/editCall
   // route through the Registry hub (Registry.call resolves methods on
-  // the registered object, not on the IpcHandler below). The IpcHandler
-  // serves the external `qs ipc call` CLI and wraps these same methods.
+  // the registered object). The public terminal surface is the `idle`
+  // gateway below; these in-process methods keep the provider and any
+  // other resident caller on the same owner.
 
   function setAction(index, action) {
     const i = root._timerIndex(index)
@@ -700,7 +731,7 @@ Singleton {
     // keeps a declared class only while the text still is what it was
     // declared for, so the guard can never outlive its reason.
     const prev = root.timers[i]
-    const row = { minutes: prev.minutes, action: a }
+    const row = { seconds: prev.seconds, action: a }
     if (a === "command") {
       row.command = prev.command !== undefined ? prev.command : ""
       const declared = root._declaredClass(prev)
@@ -734,7 +765,7 @@ Singleton {
       return "error: command cannot be empty"
     }
     const prev = root.timers[i]
-    const row = { minutes: prev.minutes, action: "command", command: c }
+    const row = { seconds: prev.seconds, action: "command", command: c }
     const declared = root._declaredClass(prev)
     if (declared !== "") row.commandClass = declared
     return root._commitRow(i, row)
@@ -764,20 +795,19 @@ Singleton {
       return "error: '" + String(row.command).trim()
         + "' is one of Vibranium's own session verbs, so it stays declared"
     }
-    const written = { minutes: row.minutes, action: "command", command: row.command }
+    const written = { seconds: row.seconds, action: "command", command: row.command }
     if (value !== "") written.commandClass = value
     return root._commitRow(i, written)
   }
 
   // Registry-routed entry point for the Add wizard's onCall template:
   // Menu.runCall resolves methods on the registered singleton root, not
-  // on the IpcHandler below (same reason setAction/setCommand live up
-  // here). Without this, "idle addFull ..." logs "not callable" and the
-  // pick silently does nothing.
-  function addFull(minutes, action, command, cls) {
-    const m = Number(String(minutes).trim().split(/\s+/)[0])
-    if (!(Number.isInteger(m) && m >= 1 && m <= 10080)) {
-      return "error: minutes must be an integer 1..10080"
+  // on the gateway below. Without this, "idle addFull ..." logs "not
+  // callable" and the pick silently does nothing.
+  function addFull(seconds, action, command, cls) {
+    const m = Number(String(seconds).trim().split(/\s+/)[0])
+    if (!(Number.isInteger(m) && m >= 1 && m <= 604800)) {
+      return "error: seconds must be an integer 1..604800"
     }
     if (action !== "lock" && action !== "suspend" && action !== "command") {
       return "error: action must be lock, suspend or command"
@@ -795,31 +825,55 @@ Singleton {
       if (text === "") {
         return "error: command cannot be empty"
       }
-      const row = { minutes: m, action: action, command: text }
+      const row = { seconds: m, action: action, command: text }
       if (c !== "") row.commandClass = c
       next.push(row)
     } else {
-      next.push({ minutes: m, action: action })
+      next.push({ seconds: m, action: action })
     }
     const err = root._commitTimers(next)
     if (err !== "") return err
     return "ok"
   }
 
-  // Staged Add wizard commit. `values` maps stage index -> committed
-  // value: the minutes text first ("15 min" or "15"), then the command
-  // text. The text stage is located by kind so layout shifts stay safe,
-  // and a missing text value means the stage was skipped rather than left
-  // empty. Every timer is a command - the wizard has no action stage - so
-  // the row is always a command row, and the class its command declares
-  // is the one the read path fills. Returns true to swallow Entry's
-  // generic commit path. `item` arrives as the pristine page row so the
-  // stage layout is readable even though delegates may carry a converted
-  // copy.
+  // The one owner for appending a command timer, shared by the wizard and
+  // the `idle add` gateway. Both refuse blank commands and anything that
+  // would break strict seconds order or the distinct-action rule before a
+  // write. The returned row is the canonical view after the commit: a
+  // recognized session command has gained its automatic class.
+  function appendCommandTimer(seconds, command) {
+    const n = Number(seconds)
+    if (!(Number.isInteger(n) && n >= 1 && n <= 604800)) {
+      return { ok: false, code: "invalid-argument", error: "seconds must be an integer 1..604800" }
+    }
+    const text = String(command ?? "")
+    if (text.trim() === "") {
+      return { ok: false, code: "invalid-argument", error: "command cannot be empty" }
+    }
+    const row = { seconds: n, action: "command", command: text }
+    const next = root.timers.slice()
+    next.push(row)
+    const invalid = Settings.validateIdleTimers(next)
+    if (invalid !== "") return { ok: false, code: "invalid-argument", error: invalid }
+    const verdict = root._commitTimers(next)
+    if (verdict !== "ok") return { ok: false, code: "backend", error: "the settings store refused the timer" }
+    const committed = Settings.idleTimers
+    return { ok: true, row: root._timerRow(committed[committed.length - 1] || row, committed.length - 1) }
+  }
+
+  // Staged Add wizard commit. `values` maps stage index -> committed value:
+  // the seconds text first ("60 s" or "60"), then the command text. The text
+  // stage is located by kind so layout shifts stay safe, and a missing text
+  // value means the stage was skipped rather than left empty. Every timer is
+  // a command - the wizard has no action stage - so the row is always a
+  // command row, and the class its command declares is the one the read path
+  // fills. Returns true to swallow Entry's generic commit path. `item`
+  // arrives as the pristine page row so the stage layout is readable even
+  // though delegates may carry a converted copy.
   function commitAddWizard(item, values) {
-    const minutesRaw = String(values["0"] ?? "").trim().split(/\s+/)[0]
-    const m = Number(minutesRaw)
-    if (!(Number.isInteger(m) && m >= 1 && m <= 10080)) return true
+    const secondsRaw = String(values["0"] ?? "").trim().split(/\s+/)[0]
+    const seconds = Number(secondsRaw)
+    if (!(Number.isInteger(seconds) && seconds >= 1 && seconds <= 604800)) return true
     let textIdx = -1
     const stages = (item && Array.isArray(item.flow)) ? item.flow : []
     for (let s = 0; s < stages.length; s++) {
@@ -828,170 +882,123 @@ Singleton {
     }
     const command = textIdx >= 0 ? String(values[String(textIdx)] ?? "").trim() : ""
     if (command === "") return true
-    const next = root.timers.slice()
-    next.push({ minutes: m, action: "command", command: command })
-    // The picker offers a strictly increasing range, so a wizard add can
-    // still be rejected by the store - and this path returns true and shows
-    // nothing.
-    const err = Settings.validateIdleTimers(next)
-    if (err !== "") return true
-    const committed = root._commitTimers(next)
-    if (committed !== "ok") return true
+    root.appendCommandTimer(seconds, command)
     return true
   }
 
-  // --- ipc ----
+  // --- idle gateway --------------------------------------------------------
+  // Typed replies only: no native human prose is parsed anywhere on this
+  // surface. Every row here is registered by exact catalog id in
+  // Component.onCompleted and returns either an ok frame or a fixed error.
 
-  IpcHandler {
-    target: "idle"
-    function help(command: string): string {
-      return UnitIpc.help("idle", "Idle daemon", "idle timers + actions", [
-        { name: "add", help: "(minutes, action) add a timer" },
-        { name: "addFull", help: "(minutes, action, [command], [cls]) staged add" },
-        { name: "remove", help: "(index) remove a timer" },
-        { name: "set", help: "(json) replace the timer list" },
-        { name: "setAction", help: "(index, action) set an action" },
-        { name: "setClass", help: "(index, class) declare a command's effect: lock, suspend, none" },
-        { name: "setCommand", help: "(index, command) set a command" },
-        { name: "setEnabled", help: "(v) enable/disable the daemon" },
-        { name: "setMinutes", help: "(index, minutes) retime a timer" },
-      ], command)
-    }
-    function ping(): string { return "pong" }
+  function _ok(data, format) {
+    const frame = { v: 1, ok: true }
+    if (data !== undefined) frame.data = data
+    if (format) frame.format = format
+    return frame
+  }
+  function _error(code, message) {
+    return { v: 1, ok: false, error: { code: code, message: message } }
+  }
+  function _record() { return { kind: "record" } }
 
-    function status(): string {
-      return JSON.stringify({
-        enabled: root.enabled,
-        epoch: root.epoch,
-        capability: root.capability,
-        degraded: root.degraded,
-        timers: root.timers
-      })
+  // The projected row uses zero-based displayed ids and null for absent
+  // optional fields, in schedule order. It is a copy: no caller can mutate
+  // the live timer list through a reply.
+  function _timerRow(t, id) {
+    return {
+      id: id,
+      seconds: t.seconds,
+      action: t.action,
+      command: t.action === "command" && typeof t.command === "string" ? t.command : null,
+      commandClass: t.commandClass === undefined || t.commandClass === null ? null : t.commandClass
     }
+  }
+  function _rows() {
+    const out = []
+    for (let i = 0; i < root.timers.length; i++) out.push(root._timerRow(root.timers[i], i))
+    return out
+  }
+  function _table() {
+    return { kind: "table", columns: [
+      { key: "id", heading: "ID" }, { key: "seconds", heading: "Seconds" },
+      { key: "action", heading: "Action" }, { key: "command", heading: "Command" },
+      { key: "commandClass", heading: "Class" }
+    ] }
+  }
 
-    // Full config replace: {"enabled": true, "timers": [...]}. Validated
-    // atomically - a rejected value leaves the prior config unchanged.
-    function set(json: string): string {
-      let cfg
-      try {
-        cfg = JSON.parse(json)
-      } catch (e) {
-        return "error: invalid JSON"
-      }
-      if (typeof cfg !== "object" || cfg === null || Array.isArray(cfg)) {
-        return "error: config must be an object"
-      }
-      if (cfg.enabled !== true && cfg.enabled !== false) {
-        return "error: enabled must be true or false"
-      }
-      const list = Array.isArray(cfg.timers) ? cfg.timers : []
-      const err = Settings.validateIdleTimers(list)
-      if (err !== "") return "error: " + err
-      if (cfg.enabled) {
-        // Enabling with timers first, so the empty-while-enabled rule
-        // never has a window to reject the order.
-        const r1 = Settings.setIdleTimers(list)
-        if (r1 !== "") return "error: " + r1
-        const r2 = Settings.setIdleEnabled(true)
-        if (r2 !== "") return "error: " + r2
-      } else {
-        // Disable first - an empty timer list is legal only while off.
-        const r1 = Settings.setIdleEnabled(false)
-        if (r1 !== "") return "error: " + r1
-        const r2 = Settings.setIdleTimers(list)
-        if (r2 !== "") return "error: " + r2
-      }
-      return "ok"
-    }
+  // Strict decimal displayed id: no signs, no whitespace, no numeric-looking
+  // coercion. A written list is resolved once before a clone is spliced.
+  function _idOf(value) {
+    const text = String(value ?? "")
+    if (!/^[0-9]+$/.test(text)) return -1
+    const i = Number(text)
+    if (!Number.isSafeInteger(i) || i < 0 || i >= root.timers.length) return -1
+    return i
+  }
 
-    // An explicit enable or disable, from a caller that named it rather than
-    // arriving through the remove-a-timer QoL rule.
-    function setEnabled(v: string): string {
-      if (v !== "true" && v !== "false") {
-        return "error: enabled must be true or false"
-      }
-      const err = Settings.setIdleEnabled(v === "true")
-      if (err !== "") return "error: " + err
-      return "ok"
-    }
+  function _enable(want) {
+    if (root.enabled === want) return _ok()
+    const err = Settings.setIdleEnabled(want)
+    if (err !== "") return _error("backend", "the settings store refused the change")
+    return _ok()
+  }
 
-    // Append a timer strictly longer than the current last one. The
-    // menu's picker commits "N min" (unit suffix inside the field), so
-    // the leading integer is parsed; bare integers keep working.
-    function add(minutes: string, action: string): string {
-      const m = Number(String(minutes).trim().split(/\s+/)[0])
-      if (!(Number.isInteger(m) && m > 0)) {
-        return "error: minutes must be a positive integer"
-      }
-      const a = action === "lock" || action === "suspend" ? action : ""
-      if (a === "") {
-        return "error: action must be lock or suspend"
-      }
-      const next = root.timers.slice()
-      next.push({ minutes: m, action: a })
-      const err = root._commitTimers(next)
-      if (err !== "") return err
-      return "ok"
-    }
+  function _reload() {
+    // rebuild() retires the old epoch, monitors and pending probe before it
+    // rearms from the current canonical config. It never calls fire() and
+    // never changes enablement.
+    root.rebuild()
+    return _ok()
+  }
 
-    // Scripted twin of the Add wizard: addFull <minutes> <action>
-    // [command...] [class]. Command required (non-empty) for command
-    // timers, forbidden otherwise; the class declares a command timer's
-    // effect for the inhibitor guard. Same validation as the wizard
-    // commit.
-    function addFull(minutes: string, action: string, command: string, cls: string): string {
-      return root.addFull(minutes, action, command, cls)
-    }
+  function _list() { return _ok(_rows(), _table()) }
 
-    // Remove by index. Every timer can go, even the last one - an
-    // enabled daemon with an empty list simply arms nothing.
-    function remove(index: string): string {
-      const i = root._timerIndex(index)
-      if (i < 0) {
-        return "error: no timer at index " + index
-      }
-      const next = root.timers.slice()
-      next.splice(i, 1)
-      const err = root._commitTimers(next)
-      if (err !== "") return err
-      return "ok"
-    }
+  function _add(seconds, command) {
+    const result = root.appendCommandTimer(seconds, command)
+    if (!result.ok) return _error(result.code, result.error)
+    return _ok()
+  }
 
-    function setMinutes(index: string, minutes: string): string {
-      const i = Number(index)
-      const m = Number(minutes)
-      if (!(Number.isInteger(i) && i >= 0 && i < root.timers.length)) {
-        return "error: no timer at index " + index
-      }
-      if (!(Number.isInteger(m) && m > 0)) {
-        return "error: minutes must be a positive integer"
-      }
-      const next = root.timers.slice()
-      // Retiming must not change what the row does: the command and a
-      // declared class ride along, or a retimed timer would fire an empty
-      // command or lose its inhibitor guard.
-      const row = { minutes: m, action: next[i].action }
-      if (next[i].action === "command") {
-        row.command = next[i].command
-        const declared = String(next[i].commandClass ?? "")
-        if (declared === "lock" || declared === "suspend") row.commandClass = declared
-      }
-      next[i] = row
-      const err = root._commitTimers(next)
-      if (err !== "") return err
-      return "ok"
-    }
+  function _remove(id) {
+    const i = root._idOf(id)
+    if (i < 0) return _error("not-found", "no timer with that id")
+    const next = root.timers.slice()
+    next.splice(i, 1)
+    const verdict = root._commitTimers(next)
+    if (verdict !== "ok") return _error("backend", "the settings store refused the removal")
+    return _ok()
+  }
 
-    function setAction(index: string, action: string): string {
-      return root.setAction(index, action)
+  function _setClassRow(id, cls) {
+    const i = root._idOf(id)
+    if (i < 0) return _error("not-found", "no timer with that id")
+    const c = String(cls ?? "")
+    if (c !== "lock" && c !== "suspend" && c !== "none") {
+      return _error("invalid-argument", "class must be lock, suspend or none")
     }
+    const row = root.timers[i]
+    if (row.action !== "command") {
+      return _error("refused", "a " + row.action + " timer declares its action")
+    }
+    const want = c === "none" ? "" : c
+    const have = root._declaredClass(row)
+    if (want === have) return _ok()
+    if (want === "" && Settings.declaresOwnCommand(row.command)) {
+      return _error("refused", "this command declares its own class")
+    }
+    const verdict = root.setClass(String(i), c)
+    if (verdict !== "ok") return _error("refused", "the settings store refused the class")
+    return _ok()
+  }
 
-    function setCommand(index: string, command: string): string {
-      return root.setCommand(index, command)
-    }
-
-    function setClass(index: string, cls: string): string {
-      return root.setClass(index, cls)
-    }
+  function _status() {
+    return _ok({
+      enabled: root.enabled === true,
+      epoch: root.epoch,
+      capability: root.capability,
+      degraded: root.degraded,
+      timers: root._rows()
+    }, _record())
   }
 }

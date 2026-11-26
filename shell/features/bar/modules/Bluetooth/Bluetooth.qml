@@ -138,6 +138,14 @@ BarModule {
     }
     nameFlash.pulse()
   }
+
+  // IPC's explicit device announcement: stays on the current device and
+  // connects nothing. The fullscreen replay is the shared _fireConnectFlash.
+  function ipcTrigger(name) {
+    if (name !== "flashDevice") return false
+    root._fireConnectFlash()
+    return true
+  }
   onFullscreenActiveChanged: {
     if (root.fullscreenActive) {
       // Entering fullscreen with a flash up: park it and take it off

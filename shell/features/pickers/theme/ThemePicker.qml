@@ -182,9 +182,17 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("themePicker", root, {
+      "themePicker.open": function () { return ipc.open() },
+      "themePicker.close": function () { return ipc.close() },
+      "themePicker.refresh": function () { return ipc.refresh() },
+      "themePicker.toggle": function () { return ipc.toggle() },
+      "themePicker.status": function () { return ipc.status() },
+      "themePicker.ping": function () { return ipc.ping() }
+    })
     Registry.offer("themePicker", {
       title: "Theme picker",
-      description: "theme selection",
+      description: "Browse and apply themes",
       verbNames: [
         "close",
         "open",
@@ -208,6 +216,7 @@ Singleton {
     root.warm()
   }
   Component.onDestruction: {
+    IpcRouter.unregister("themePicker", root)
     Registry.unregister("themePicker")
     if (root._watchUnsub) root._watchUnsub()
   }
@@ -562,13 +571,14 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "themePicker"
     function help(command: string): string {
-      return UnitIpc.help("themePicker", "Theme picker", "theme selection", [
-        { name: "close", help: "hide the picker" },
-        { name: "open", help: "show the picker" },
-        { name: "refresh", help: "rescan themes (in-place file edits)" },
-        { name: "toggle", help: "show/hide" },
+      return UnitIpc.help("themePicker", "Theme picker", "Browse and apply themes", [
+        { name: "close", help: "close the picker overlay" },
+        { name: "open", help: "open the picker overlay" },
+        { name: "refresh", help: "rescan folders for new themes" },
+        { name: "toggle", help: "toggle the picker overlay" },
       ], command)
     }
     function ping(): string { return "pong" }

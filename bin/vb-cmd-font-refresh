@@ -89,7 +89,7 @@ else
 fi
 
 log Info "Rescanning the shell font list"
-if ! vb-shell fontPicker refresh > /dev/null 2>&1; then
+if ! vb-shell settings fonts reload > /dev/null 2>&1; then
   log Error "the shell rejected the rescan; is the Vibranium shell running?"
   exit 1
 fi

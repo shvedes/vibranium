@@ -647,6 +647,16 @@ Item {
     if (cached && (Date.now() - (cached.at || 0)) < root._timeTtlMs) {
       return
     }
+    // A settled failure for this zone is remembered for the SAME 15s TTL.
+    // The IPC projection turns a fresh failed stamp with no cached reading
+    // into `backend` instead of asking the date process again immediately.
+    const stamp = root._timeFailures[tz]
+    if (stamp && (Date.now() - stamp) < root._timeTtlMs) return
+    if (stamp) {
+      const next = Object.assign({}, root._timeFailures)
+      delete next[tz]
+      root._timeFailures = next
+    }
     if (timeProc.running) {
       if (timeProc.zone === tz) return
       if (root._timePendingZones.indexOf(tz) < 0) {
@@ -697,6 +707,11 @@ Item {
     if (AppLauncher.visible) root.recompute()
   }
 
+  // Zone -> stamp of the last UNSUCCESSFUL probe. Kept beside the good cache
+  // but never used as a reading: the IPC projection uses it to tell a known
+  // backend failure from a zone nobody has probed yet.
+  property var _timeFailures: Object.create(null)
+
   function _onTimeProbed() {
     const tz = timeProc.zone
     // Identical verdicts change nothing: skip the cache rewrite and the
@@ -704,6 +719,14 @@ Item {
     let changed = false
     if (tz !== "") {
       const v = LauncherLib.timeVerdict(timeProc.out, root.timeCache[tz])
+      const failures = Object.assign({}, root._timeFailures)
+      if (v === null) {
+        failures[tz] = Date.now()
+        root._timeFailures = failures
+      } else {
+        delete failures[tz]
+        root._timeFailures = failures
+      }
       if (v !== null && v.changed) {
         const next = Object.assign({}, root.timeCache)
         v.reading.at = Date.now()
@@ -1318,8 +1341,13 @@ Item {
   property int scanSeq: 0
   property bool _scanQueued: false
 
+  // Published for the launcher status projection: a discovery is separate
+  // from both reload commands and from the app-index rescan.
+  property string discoveryState: "ready"
+
   function discoverPlugins() {
     const g = ++root.scanSeq
+    root.discoveryState = "scanning"
     root.pluginsResolved = false
     if (scanProc.running) {
       root._scanQueued = true
@@ -1347,7 +1375,7 @@ Item {
     property int seq: 0
     property var dirs: []
 
-    onExited: {
+    onExited: function(code) {
       // A newer demand bumped scanSeq while this walk ran: its lines are not
       // this registry's. Requeue the newer scan off the exit handler (setting
       // `running` here is a reentrancy) and leave the collector for that scan
@@ -1356,7 +1384,12 @@ Item {
         if (root._scanQueued) root._later(() => root.discoverPlugins())
         return
       }
-      root._registerPlugins(scanProc.dirs)
+      if (code === 0) root.discoveryState = "ready"
+      else root.discoveryState = "failed"
+      // A failed scan leaves the last good registry standing: registration
+      // only happens on a successful walk.
+      if (code === 0) root._registerPlugins(scanProc.dirs)
+      else root.pluginsResolved = root.plugins.length > 0
       scanProc.dirs = []
     }
   }
@@ -1373,8 +1406,20 @@ Item {
     // enablement overlay. The one seam is the manifest read below, so the
     // scan, the FileView and the directory walk stay in this file.
     root.pluginsResolved = true
-    root.plugins = LauncherLib.buildPluginConfigs(dirs, root._persistedPlugins(),
+    const previous = root.plugins
+    const next = LauncherLib.buildPluginConfigs(dirs, root._persistedPlugins(),
       dir => root._readJsonFile(dir + "/plugin.json"))
+    // A rescan mints fresh cfg objects. Retire the ones it replaced instead
+    // of leaving their hosts and callbacks alive behind a dropped registry.
+    for (let i = 0; i < previous.length; i++) {
+      const oldCfg = previous[i]
+      let replaced = true
+      for (let j = 0; j < next.length; j++) {
+        if (next[j] === oldCfg) { replaced = false; break }
+      }
+      if (replaced) root._retirePluginRuntime(oldCfg)
+    }
+    root.plugins = next
     root._pluginsRev++
     root._rebuildPrefixes()
     // Rescans mint brand-new cfg objects. The mode owner is a facade-held
@@ -1445,16 +1490,26 @@ Item {
     for (let i = 0; i < root.plugins.length; i++) {
       const cfg = root.plugins[i]
       if (cfg.enabled) continue
-      if (cfg._host) {
-        try { cfg._host.destroy() } catch (e) {}
-      }
-      cfg._host = null
-      cfg._impl = null
-      cfg._view = null
-      cfg._denied = []
-      cfg.broken = false
-      cfg._implLoadTried = false
+      root._retirePluginRuntime(cfg)
     }
+  }
+
+  // The one teardown of a plugin's runtime, shared by a disable, a reload and
+  // a replacement by discovery. The per-cfg generation is invalidated FIRST:
+  // a callback bound to the old generation can no longer update results or
+  // a cache after this point, even if it runs before the host is destroyed.
+  function _retirePluginRuntime(cfg) {
+    if (!cfg) return
+    cfg._generation = (Number(cfg._generation) || 0) + 1
+    if (cfg._host) {
+      try { cfg._host.destroy() } catch (e) {}
+    }
+    cfg._host = null
+    cfg._impl = null
+    cfg._view = null
+    cfg._denied = []
+    cfg.broken = false
+    cfg._implLoadTried = false
   }
 
   // --- implementation loading ---
@@ -1494,6 +1549,9 @@ Item {
     if (cfg._impl !== null) return true
     if (cfg._implLoadTried === true) return false
     cfg._implLoadTried = true
+    // Bump before minting the API: a callback created during init captures
+    // this generation and must not be retired by its own load.
+    cfg._generation = (Number(cfg._generation) || 0) + 1
     cfg.broken = false
     cfg._impl = root._loadImpl(cfg)
     if (cfg._impl === null) {
@@ -1509,6 +1567,14 @@ Item {
       // work, and happen only here.
       if (typeof cfg._impl.init === "function") cfg._impl.init(AppLauncher._apiFor(cfg))
     } catch (e) {
+      // A half-initialized implementation is not an implementation. Drop it
+      // as well as the host, keeping the broken verdict and the load-attempt
+      // latch so a retry is an explicit reload, not a keystroke.
+      cfg._impl = null
+      if (cfg._host) {
+        try { cfg._host.destroy() } catch (e2) {}
+        cfg._host = null
+      }
       cfg.broken = true
       root._rebuildPrefixes()
       return false
@@ -1810,7 +1876,11 @@ Item {
   function setPluginEnabled(id, enabled) {
     const cfg = LauncherLib.pluginById(root.plugins, id)
     if (cfg !== null) {
-      cfg.enabled = enabled === true
+      const wanted = enabled === true
+      // A resolved entry already in the requested state writes nothing: no
+      // settings flush, no teardown and no rebuild of another plugin.
+      if (cfg.enabled === wanted) return true
+      cfg.enabled = wanted
       root._applyEnablement()
       root.persistPlugins()
       return true
@@ -1849,6 +1919,85 @@ Item {
   function persistPlugins() {
     Settings.setRawSection("appLauncher", "plugins",
       LauncherLib.pluginConfigsForPersist(root._persistedPlugins(), root.plugins))
+  }
+
+  // --- the owner APIs behind the appLauncher gateway ---
+  // Everything below works on registered cfg objects. No id from argv is
+  // used as a member name, and nothing here loads plugin code to answer a
+  // list or a status read.
+
+  // A fresh app index is a scan and one rebuild, never a controller reset
+  // and never plugin discovery. The rows are recomputed only if the panel
+  // is actually visible.
+  function rescanApps() {
+    root._scanTryExec()
+    root._rebuildAppIndex()
+    if (AppLauncher.visible) root.recompute()
+    return true
+  }
+
+  function pluginStatus(id) {
+    if (!root.pluginsResolved) return null
+    const cfg = LauncherLib.pluginById(root.plugins, id)
+    if (cfg === null) return null
+    const row = LauncherLib.pluginListRow(cfg)
+    row.loaded = cfg._impl !== null && cfg.broken !== true
+    row.broken = cfg.broken === true
+    row.granted = cfg._view ? cfg._view.grantedOperations() : []
+    row.denied = cfg._denied || []
+    row.generation = Number(cfg._generation) || 0
+    return row
+  }
+
+  // Select the cfgs up front, in ID order, then retire and load each one.
+  // A failure does not stop the remaining selected plugins. Prefixes and the
+  // row projection are rebuilt ONCE, after the whole set has been handled.
+  function reloadPlugins(ids) {
+    if (!root.pluginsResolved) return { ok: false, failed: [], ids: [] }
+    const selected = []
+    for (let i = 0; i < root.plugins.length; i++) {
+      const cfg = root.plugins[i]
+      if (ids === null && !cfg.enabled) continue
+      if (ids !== null && ids.indexOf(cfg.id) < 0) continue
+      selected.push(cfg)
+    }
+    selected.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0 })
+    const failed = []
+    for (let i = 0; i < selected.length; i++) {
+      const cfg = selected[i]
+      root._retirePluginRuntime(cfg)
+      if (!cfg.enabled) continue
+      if (root._loadOne(cfg) !== true) failed.push(cfg.id)
+    }
+    root._rebuildPrefixes()
+    if (AppLauncher.visible) root.recompute()
+    const reloaded = selected.filter(function (cfg) { return failed.indexOf(cfg.id) < 0 })
+      .map(function (cfg) { return cfg.id })
+    return { ok: failed.length === 0, failed: failed, ids: reloaded }
+  }
+
+  // A plugin-specific command is only reachable for a shipped built-in id,
+  // with the exact id/verb pair from the fixed table, at the built-in directory,
+  // enabled and loaded. A user override of the same id has no feature verbs.
+  function pluginIpc(id, verb, value) {
+    if (!root.pluginsResolved) return { error: "unavailable" }
+    const verbs = LauncherLib.builtinIpcVerbs(id)
+    if (verbs.indexOf(verb) < 0) return { error: "invalid-argument" }
+    const cfg = LauncherLib.pluginById(root.plugins, id)
+    if (cfg === null || !cfg.enabled) return { error: "not-found" }
+    if (cfg.dir !== root._builtinRoot + "/" + id) return { error: "not-found" }
+    if (cfg.broken === true) return { error: "backend" }
+    if (root._loadOne(cfg) !== true) return { error: "backend" }
+    const ipc = cfg._impl && cfg._impl.ipc
+    if (!ipc || typeof ipc[verb] !== "function") return { error: "backend" }
+    let result = null
+    try {
+      result = ipc[verb](value)
+    } catch (e) {
+      return { error: "backend" }
+    }
+    return result === null || result === undefined
+      ? { error: "invalid-argument" } : { result: result }
   }
 
   // --- staged rows and activation ---

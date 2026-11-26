@@ -570,6 +570,17 @@ function tryColor(q) {
       const v = String(item && item.copyValue || "")
       if (v === "") return
       api.execDetached("printf %s " + api.shellQuote(v) + " | wl-copy")
+    },
+    ipc: {
+      parse: function (value) {
+        const r = tryColor(String(value ?? ""))
+        if (!r || r.formats.length === 0) return null
+        const formats = []
+        for (let i = 0; i < r.formats.length; i++) {
+          formats.push({ fmt: r.formats[i].fmt, text: r.formats[i].text })
+        }
+        return { hex: r.hex, alpha: r.alpha, edge: r.edge, formats: formats }
+      }
     }
   }
 })()

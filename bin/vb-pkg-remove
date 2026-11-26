@@ -585,7 +585,7 @@ if term::ask_yes_no Y "Proceed with uninstallation?"; then
 	if _uninstall_packages; then
 		_remove_orphans
 		pkg_result success -- "Uninstallation complete"
-		vb-shell arch-updates refresh
+		vb-shell systemUpdates refresh
 	else
 		pkg_result error
 		exit 1

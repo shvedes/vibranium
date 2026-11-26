@@ -10,7 +10,7 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 
 // External session API - non-UI verbs for power management and session
 // control, callable from menu rows, keybinds and scripts via
-// `qs ipc call session <verb>`. Suspend locks first so wake always lands
+// `vb-shell session <verb>`. Suspend locks first so wake always lands
 // on the lockscreen; logout delegates to vb-core-stop-session; the rest
 // are one-shot systemctl verbs. Locking asks the neutral SessionActions
 // contract, and the resident lock surface owns the PAM release. Mechanics
@@ -60,9 +60,20 @@ Singleton {
   property bool _suspendPending: false
 
   Component.onCompleted: {
+    IpcRouter.register("session", root, {
+      "session.lock": function () { return ipc.lock() },
+      "session.lockForSleep": function () { return ipc.lockForSleep() },
+      "session.logout": function () { return ipc.logout() },
+      "session.suspend": function () { return ipc.suspend() },
+      "session.reboot": function () { return ipc.reboot() },
+      "session.reboot.firmware": function () { return ipc.uefiReboot() },
+      "session.poweroff": function () { return ipc.poweroff() },
+      "session.status": function () { return ipc.status() },
+      "session.ping": function () { return ipc.ping() }
+    })
     Registry.offer("session", {
       title: "Session",
-      description: "session power actions",
+      description: "Lock, log out, suspend, reboot or power off",
       verbNames: [
         "lock",
         "lockForSleep",
@@ -70,13 +81,14 @@ Singleton {
         "poweroff",
         "reboot",
         "suspend",
-        "uefi-reboot",
         "status",
         "help",
         "ping",
       ]
     })
   }
+
+  Component.onDestruction: IpcRouter.unregister("session", root)
 
   // Where a request came from. The three origins that exist are `ipc` (a
   // `qs ipc call`, or an external caller of the same verbs), `surface` (an
@@ -370,20 +382,27 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "session"
     function help(command: string): string {
-      return UnitIpc.help("session", "Session", "session power actions", [
+      return UnitIpc.help("session", "Session", "Lock, log out, suspend, reboot or power off", [
         { name: "lock", help: "lock the session" },
         { name: "lockForSleep", help: "lock for a sleep transition without requesting sleep" },
         { name: "logout", help: "end the session" },
         { name: "poweroff", help: "power off" },
-        { name: "reboot", help: "reboot" },
+        { name: "reboot", help: "reboot, or 'reboot firmware' for UEFI setup" },
         { name: "suspend", help: "suspend" },
-        { name: "uefi-reboot", help: "reboot into UEFI firmware setup" },
       ], command)
     }
     function status(): string {
-      return JSON.stringify({ unit: "session", healthy: true })
+      return JSON.stringify({
+        unit: "session",
+        healthy: true,
+        locked: Registry.get("lockscreen", "locked") === true,
+        lockPending: root._lockPending,
+        destructivePending: root._destructivePending,
+        suspendPending: root._suspendPending
+      })
     }
     function ping(): string { return "pong" }
 

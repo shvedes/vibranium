@@ -7,7 +7,6 @@ import Quickshell.Io
 import qs.common
 import "SettingsLib.js" as SL
 import "GtkSettings.js" as GtkSettings
-import "../text/UnitIpc.js" as UnitIpc
 
 // Cursor theme and cursor size - the two options the settings schema
 // declares under the General page, in catalog.jsonc.
@@ -35,18 +34,6 @@ Singleton {
     signal optionChanged(string key, var value)
 
     Component.onCompleted: {
-      Registry.offer("miscSettings", {
-        title: "Misc settings",
-        description: "misc user preferences",
-        verbNames: [
-          "dump",
-          "get",
-          "set",
-          "status",
-          "help",
-          "ping",
-        ]
-      })
         Registry.register("miscSettings", root)
         root._load()
     }
@@ -501,28 +488,4 @@ Singleton {
         }
     }
 
-
-    IpcHandler {
-        target: "miscSettings"
-        function help(command: string): string {
-          return UnitIpc.help("miscSettings", "Misc settings", "misc user preferences", [
-            { name: "dump", help: "all misc values" },
-            { name: "get", help: "(key) read one value" },
-            { name: "set", help: "(key, value) write one value" },
-          ], command)
-        }
-        function status(): string {
-          return JSON.stringify({ unit: "miscSettings", healthy: true })
-        }
-        function ping(): string { return "pong" }
-        function get(key: string): string {
-            const v = root.value(key)
-            return v !== undefined ? JSON.stringify({key: key, value: v}) : JSON.stringify({error: "unknown"})
-        }
-        function set(key: string, json: string): string {
-            let v; try { v = JSON.parse(json) } catch(e) { return "error" }
-            return root.setOption(key, v) ? "ok" : "error"
-        }
-        function dump(): string { return JSON.stringify(root.values) }
-    }
 }

@@ -4582,98 +4582,106 @@ Rectangle {
         ? it.childUids.slice()
         : ((it.childUid !== undefined && it.childUid !== null)
           ? [ String(it.childUid) ] : [])
-      // The restore after clearing the query can pull the cursor back to the
-      // frame's old index. Re-seat the target row on the settled edge, then
-      // walk the nested chain by uid. Each level waits for its own group row
-      // to arrive and settle instead of retrying a fixed number of turns - a
-      // slow install simply holds the waiter until the row is really there.
-      function groupUidMatches(row, uid) {
-        return !!row && row.isGroup === true && !!row.itm
-          && String(row.itm.uid) === uid
-      }
-
-      // Seat each level by uid, opening the nested group on the way down.
-      // Gated children drop out of the live dropdown, so resolve against
-      // what each level actually lists. `rows` holds the group rows already
-      // walked; a nested group is read from its parent's loader after the
-      // expansion has published its children.
-      const seatRows = []
-      function seatLevel(n, rows) {
-        const r2 = rows[n]
-        const expected = n === 0 ? targetUid : chain[n - 1]
-        Menu.trace("result.seat", {
-          n: n, want: chain[n], expected: expected,
-          row: r2 && r2.itm ? String(r2.itm.uid) : "",
-          isGroup: !!(r2 && r2.isGroup)
-        })
-        if (!groupUidMatches(r2, expected)) return
-        const kids = r2.groupChildren
-        let found = -1
-        for (let i = 0; i < kids.length; i++) {
-          if (kids[i] && String(kids[i].uid) === chain[n]) { found = i; break }
-        }
-        if (found < 0) return
-        r2.childIndex = found
-        if (n + 1 >= chain.length) return
-        const childRow = r2._focusedChildRow ? r2._focusedChildRow() : null
-        if (!childRow || !childRow.isGroup) return
-        childRow.setExpanded(true)
-        // A nested group row is hosted inside its parent's loader, never in
-        // the page list, so panel.currentRow() cannot name it. Walk the live
-        // delegate we just expanded instead of waiting for a page row that
-        // never arrives.
-        rows[n + 1] = childRow
-        seatLevel(n + 1, rows)
-      }
-      // The filter's fit can stay pending while the result's group is open,
-      // which would hold a settled waiter shut forever. The restored page
-      // rows are installed in this turn; resolve the target by index on the
-      // next one instead of waiting on a gate the new opening invalidates.
-      Qt.callLater(function() {
-        // The action-clear retired the filter's fit, but the page's resting
-        // size is only known once the restored rows are installed. Commit it
-        // before expanding: a claim latched against the one-row trim would
-        // size the card to the dropdown instead of to the page.
-        panel._recommitRestingH()
-        const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
-        if (idx >= 0 && list) {
-          if (list.currentIndex !== idx) list.seat(idx, "land")
-          list.forceLayout()
-        }
-        // A landing owns the whole page: a group left open by the row the
-        // user was on before the query has no reason to stay unfolded once
-        // the result puts the cursor on a different group.
-        panel._collapseOtherOpenRows(targetUid)
-        const row = idx >= 0 && list ? list.itemAtIndex(idx) : null
-        if (!groupUidMatches(row, targetUid)) return
-        seatRows[0] = row
-        if (list) list.suppressIndexFollow = false
-        row.setExpanded(true)
-        // The child delegates load in the group's own Loader. One turn after
-        // the expansion is enough for the focused child to exist; waiting on
-        // the fit here would inherit the filter's still-pending measurement.
-        Qt.callLater(function() {
-          seatRows[0] = row
-          seatLevel(0, seatRows)
-          // A programmatic landing has no gesture to arm the reveal claim.
-          // Do it on the settled edge: latching while the projection's fit is
-          // still being replaced reads its one-row base and grows the card to
-          // the dropdown instead of keeping the restored page's size.
-          if (list && idx >= 0) {
-            panel.whenSettled(function() {
-              panel._recommitRestingH()
-              list.autoRevealIndex = idx
-              panel._latchClaim()
-            })
-          }
-        })
-      })
+      panel.seatUidChain(it, targetUid, chain)
       return
     }
     // Input rows land focused like every other entry: the query selects the
     // row, not its editor or dropdown. Both were opened on arrival before,
     // which took focus off the row the hit named. A second Enter operates it.
   }
+
+  // The group-chain seating above, shared with model selection: walk the
+  // verified uid chain through live group delegates, each level waiting for
+  // its own group row to arrive. Kept here because the panel owns the live
+  // row tree; the caller only supplies the target and the chain.
+  function seatUidChain(it, targetUid, chain) {
+    // The restore after clearing the query can pull the cursor back to the
+    // frame's old index. Re-seat the target row on the settled edge, then
+    // walk the nested chain by uid. Each level waits for its own group row
+    // to arrive and settle instead of retrying a fixed number of turns - a
+    // slow install simply holds the waiter until the row is really there.
+    function groupUidMatches(row, uid) {
+      return !!row && row.isGroup === true && !!row.itm
+        && String(row.itm.uid) === uid
+    }
+
+    // Seat each level by uid, opening the nested group on the way down.
+    // Gated children drop out of the live dropdown, so resolve against
+    // what each level actually lists. `rows` holds the group rows already
+    // walked; a nested group is read from its parent's loader after the
+    // expansion has published its children.
+    const seatRows = []
+    function seatLevel(n, rows) {
+      const r2 = rows[n]
+      const expected = n === 0 ? targetUid : chain[n - 1]
+      Menu.trace("result.seat", {
+        n: n, want: chain[n], expected: expected,
+        row: r2 && r2.itm ? String(r2.itm.uid) : "",
+        isGroup: !!(r2 && r2.isGroup)
+      })
+      if (!groupUidMatches(r2, expected)) return
+      const kids = r2.groupChildren
+      let found = -1
+      for (let i = 0; i < kids.length; i++) {
+        if (kids[i] && String(kids[i].uid) === chain[n]) { found = i; break }
+      }
+      if (found < 0) return
+      r2.childIndex = found
+      if (n + 1 >= chain.length) return
+      const childRow = r2._focusedChildRow ? r2._focusedChildRow() : null
+      if (!childRow || !childRow.isGroup) return
+      childRow.setExpanded(true)
+      // A nested group row is hosted inside its parent's loader, never in
+      // the page list, so panel.currentRow() cannot name it. Walk the live
+      // delegate we just expanded instead of waiting for a page row that
+      // never arrives.
+      rows[n + 1] = childRow
+      seatLevel(n + 1, rows)
+    }
+    // The filter's fit can stay pending while the result's group is open,
+    // which would hold a settled waiter shut forever. The restored page
+    // rows are installed in this turn; resolve the target by index on the
+    // next one instead of waiting on a gate the new opening invalidates.
+    Qt.callLater(function() {
+      // The action-clear retired the filter's fit, but the page's resting
+      // size is only known once the restored rows are installed. Commit it
+      // before expanding: a claim latched against the one-row trim would
+      // size the card to the dropdown instead of to the page.
+      panel._recommitRestingH()
+      const idx = Menu.visibleIndexOfUid(it.pageId, targetUid)
+      if (idx >= 0 && list) {
+        if (list.currentIndex !== idx) list.seat(idx, "land")
+        list.forceLayout()
+      }
+      // A landing owns the whole page: a group left open by the row the
+      // user was on before the query has no reason to stay unfolded once
+      // the result puts the cursor on a different group.
+      panel._collapseOtherOpenRows(targetUid)
+      const row = idx >= 0 && list ? list.itemAtIndex(idx) : null
+      if (!groupUidMatches(row, targetUid)) return
+      seatRows[0] = row
+      if (list) list.suppressIndexFollow = false
+      row.setExpanded(true)
+      // The child delegates load in the group's own Loader. One turn after
+      // the expansion is enough for the focused child to exist; waiting on
+      // the fit here would inherit the filter's still-pending measurement.
+      Qt.callLater(function() {
+        seatRows[0] = row
+        seatLevel(0, seatRows)
+        // A programmatic landing has no gesture to arm the reveal claim.
+        // Do it on the settled edge: latching while the projection's fit is
+        // still being replaced reads its one-row base and grows the card to
+        // the dropdown instead of keeping the restored page's size.
+        if (list && idx >= 0) {
+          panel.whenSettled(function() {
+            panel._recommitRestingH()
+            list.autoRevealIndex = idx
+            panel._latchClaim()
+          })
+        }
+      })
+    })
+}
 
   function activateCurrent(shift) {
     // A debounced scoped query may still be pending: apply it now and
@@ -4742,32 +4750,12 @@ Rectangle {
   // so clipboard/paste still happens via the page's vb-emoji-insert.
   function activateItem(itm) {
     if (!itm || itm.type !== "action") return
-    // Grid cells and search hits never become an Entry delegate, so this is
-    // the decision point for the rows that bypass activate() above. `value`
-    // rides along because a grid cell paints exactly that string and no
-    // label, so the label alone would not say what the user picked.
-    // DEBUG, and gated for the reason the other two choice sites are: the
-    // question "why did the shell just do that" is a DEBUG question, and a
-    // menu row is not an answer to it on its own. `value` still rides along,
-    // because a grid cell paints exactly that string and no label.
-    const api = Menu.dynamicApi(panel.currentPageId)
-    if (api && typeof api.insert === "function") {
-      api.insert(String(itm.value ?? ""))
-    }
-    if (itm.call !== "") {
-      Menu.runCall(itm.call, itm.value !== undefined ? itm.value : "")
-      if (itm.keepOpen !== true) Menu.close()
-      return
-    }
-    let cmd = itm.command ?? ""
-    if (cmd === "") {
-      const pg = Menu.pageById(panel.currentPageId)
-      if (pg && typeof pg.command === "string") cmd = pg.command
-    }
-    if (cmd !== "") {
-      Menu.runCommand(cmd, itm.value !== undefined ? itm.value : "")
-    }
-    if (itm.keepOpen !== true) Menu.close()
+    // The semantic dispatch lives in the singleton so a grid cell and a
+    // public model action cannot disagree about insert/call/command order.
+    // The panel keeps only the view-specific page id.
+    Menu.rowRunAction(itm, {
+      pageId: panel.currentPageId, view: "grid", origin: "ui"
+    })
   }
 
   function toggleInfoCurrent() {
@@ -4992,6 +4980,36 @@ Rectangle {
     if (panel.gridMode) grid.currentIndex = index
     else list.seat(index, "click")
     return true
+  }
+
+  // Apply a model-side selection to the active primary panel. This seats the
+  // row and its verified ancestor chain; it never commits a value. The
+  // singleton owns the guard verdict and the expansion, the panel owns the
+  // view mechanics (list/grid seat, group chain, settle).
+  function applyModelSelection(item, page, ancestors) {
+    if (!Menu.open || !item) return false
+    const chain = (ancestors || []).map(a => String(a.uid)).filter(u => u !== "")
+    const pageId = page && page.id ? String(page.id) : Menu.pageId
+    if (panel.gridMode) {
+      const idx = panel.indexOfUid(item.uid)
+      if (idx < 0) return false
+      return panel.focusIndex(idx)
+    }
+    if (chain.length > 0 && Array.isArray(item.children) === false) {
+      // A nested child: use the same uid-chain walk a search result uses.
+      const proxy = {
+        pageId: pageId, uid: String(chain[0]),
+        groupUid: String(chain[0]),
+        childUid: String(item.uid),
+        childUids: chain.slice(1).concat([String(item.uid)]),
+        label: String(item.label ?? "")
+      }
+      panel.seatUidChain(proxy, String(chain[0]), proxy.childUids)
+      return true
+    }
+    const idx = Menu.visibleIndexOfUid(pageId, item.uid)
+    if (idx < 0) return false
+    return panel.focusIndex(idx)
   }
 
   // Key names the routing table understands, with their Qt codes. The

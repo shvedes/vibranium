@@ -4,18 +4,21 @@ pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Pipewire
 import qs.common
 import qs.services as Core
-import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/text/IpcCatalog.js" as Catalog
+import "../../common/audio/AudioNodeKind.js" as Kind
 import "../../common/audio/AudioLoopback.js" as Loopback
 import "../../common/theme/DeviceIcons.js" as DeviceIcons
 import "../../common/math/Range.js" as Range
+import "AudioIpc.js" as Ipc
 
 // Audio service: volume and microphone policy for the whole shell.
 // Binds Pipewire's default sink/source through the one PipeWire state owner
 // (audio/PipeWireState) - no wpctl, no bash shims, no child processes, and no
 // tracker of its own. Owns step/max/mute policy, the OSD triggers, and the
-// `qs ipc call audio ...` surface. The bar widgets and the island delegate
+// `vb-shell audio ...` gateway surface. The bar widgets and the island delegate
 // here; external callers go through IPC.
 //
 // Where the device state comes from: PipeWireState holds the two
@@ -656,115 +659,365 @@ Singleton {
       root.sourceMuted ? "mic-off" : "mic-on", root.sourceSilent)
   }
 
+  // --- the audio gateway --------------------------------------------------
+  // Every row below is a typed gateway command registered with IpcRouter.
+  // No human-readable reply is parsed, no PipeWire id or property dump is
+  // published, and no tracker, window or wpctl child is created by a read.
+
+  function _ok(data, format) {
+    const frame = { v: 1, ok: true }
+    if (data !== undefined) frame.data = data
+    if (format) frame.format = format
+    return frame
+  }
+  function _error(code, message) {
+    return { v: 1, ok: false, error: { code: code, message: message } }
+  }
+
+  // Opaque live references. A QML identity Map mints `n<incarnation>.<seq>`
+  // per object; the reverse index resolves only currently live objects. A
+  // ref from an earlier shell generation cannot match, and an object that
+  // left the graph is removed on the shared set's change.
+  property var _refs: new Map()
+  property var _byRef: Object.create(null)
+  property int _refSeq: 0
+  readonly property var nodes: Core.PipeWireState.nodes
+  readonly property bool graphReady: Core.PipeWireState.graphReady
+
+  function _reconcileRefs() {
+    const live = new Map()
+    const byRef = Object.create(null)
+    const list = root.nodes || []
+    for (let i = 0; i < list.length; i++) {
+      const node = list[i]
+      if (node === null || node === undefined) continue
+      let ref = root._refs.get(node)
+      if (typeof ref !== "string") {
+        root._refSeq++
+        ref = "n" + IpcRouter.incarnation + "." + root._refSeq
+      }
+      live.set(node, ref)
+      byRef[ref] = node
+    }
+    root._refs = live
+    root._byRef = byRef
+    // A route whose object just left the graph has no live destination.
+    if (root._routeSlot !== null && !live.has(root._routeSlot.node)) {
+      root._finishRoute(false, "not-found")
+    }
+  }
+
+  Connections {
+    target: Core.PipeWireState
+    function onNodesChanged() { root._reconcileRefs() }
+  }
+
+  function _refOf(node) {
+    const ref = root._refs.get(node)
+    return typeof ref === "string" ? ref : ""
+  }
+
+  // Resolve one ref against the live set. `kind` may be null for "any audio
+  // node"; `stream` restricts to application streams; `device` to devices.
+  function _resolve(ref, kind, stream, device) {
+    if (!root.graphReady) return { error: "unavailable" }
+    if (typeof ref !== "string" || ref === "") return { error: "invalid-argument" }
+    const node = root._byRef[ref]
+    if (node === null || node === undefined || !root._refs.has(node)) return { error: "not-found" }
+    const actual = Kind.classify(node)
+    if (actual === null || !Kind.isDeviceKind(actual) && !Kind.isStreamKind(actual)) {
+      return { error: "invalid-argument" }
+    }
+    if (kind !== null && actual !== kind) return { error: "invalid-argument" }
+    if (stream === true && (!Kind.isStreamKind(actual) || !Kind.isApplicationStream(node))) {
+      return { error: "invalid-argument" }
+    }
+    if (device === true && !Kind.isDeviceKind(actual)) return { error: "invalid-argument" }
+    let audio = null
+    try { audio = node.audio } catch (ignored) { audio = null }
+    if (!audio) return { error: "invalid-argument" }
+    return { node: node, kind: actual, audio: audio }
+  }
+
+  function _table(rows, columns) {
+    return _ok(rows, { kind: "table", columns: columns })
+  }
+
+  function _devicesTable(isSink) {
+    if (!root.graphReady) return _error("unavailable", "graph not ready")
+    root._reconcileRefs()
+    const rows = []
+    const wanted = isSink ? "outputDevice" : "inputDevice"
+    const effective = isSink ? root.sink : root.source
+    const configured = isSink ? Pipewire.preferredDefaultAudioSink : Pipewire.preferredDefaultAudioSource
+    const list = root.nodes || []
+    for (let i = 0; i < list.length; i++) {
+      const node = list[i]
+      if (!node || !node.audio) continue
+      const kind = Kind.classify(node)
+      if (kind !== wanted) continue
+      const row = Ipc.deviceRow(node, root._refOf(node), kind,
+        node === effective, node === configured)
+      if (row !== null) rows.push(row)
+    }
+    return _table(Ipc.sortRows(rows), [
+      { key: "id", heading: "ID" }, { key: "name", heading: "Name" },
+      { key: "direction", heading: "Direction" }, { key: "virtual", heading: "Virtual" },
+      { key: "monitor", heading: "Monitor" }, { key: "default", heading: "Default" },
+      { key: "configuredDefault", heading: "Configured" },
+      { key: "percent", heading: "Percent" }, { key: "muted", heading: "Muted" }
+    ])
+  }
+
+  function _appsTable() {
+    if (!root.graphReady) return _error("unavailable", "graph not ready")
+    root._reconcileRefs()
+    const rows = []
+    const list = root.nodes || []
+    for (let i = 0; i < list.length; i++) {
+      const node = list[i]
+      if (!node || !node.audio || !Kind.isApplicationStream(node)) continue
+      const kind = Kind.classify(node)
+      const row = Ipc.appRow(node, root._refOf(node), kind)
+      if (row !== null) rows.push(row)
+    }
+    return _table(Ipc.sortRows(rows), [
+      { key: "id", heading: "ID" }, { key: "name", heading: "Name" },
+      { key: "app", heading: "App" }, { key: "direction", heading: "Direction" },
+      { key: "percent", heading: "Percent" }, { key: "muted", heading: "Muted" }
+    ])
+  }
+
+  function _adjust(isSink, sign, stepArg) {
+    const frac = Ipc.stepFraction(stepArg, root.step)
+    if (frac === null) return _error("invalid-argument", "step must be 1-200")
+    const device = isSink ? root.sink : root.source
+    if (!device || !device.audio) return _error("unavailable", "device not ready")
+    const answer = root._ipcAdjust(isSink, sign, false, frac)
+    if (answer !== "ok") return _error("unavailable", "device not ready")
+    return _ok()
+  }
+
+  // Read-only level projection: the default device's own audio object is
+  // read through the existing level adapter. No write, no OSD and no
+  // controller demand.
+  function _getLevel(isSink) {
+    const device = isSink ? root.sink : root.source
+    if (!device || !device.audio) return _error("unavailable", "device not ready")
+    return _ok(Ipc.levelOf(device), { kind: "record" })
+  }
+
+  function _toggleMute(isSink) {
+    const device = isSink ? root.sink : root.source
+    if (!device || !device.audio) return _error("unavailable", "device not ready")
+    if (isSink) root.toggleSinkMute()
+    else root.toggleSourceMute()
+    return _ok()
+  }
+
+  // Absolute percent. The source branch mirrors setSinkPercent: its own cap,
+  // its own unmute-on-positive and its own OSD, and it never touches the sink.
+  function _setPercent(isSink, n) {
+    const p = Math.round(Number(n))
+    if (!isFinite(p) || p < 0 || p > 200) return _error("invalid-argument", "level must be 0-200")
+    const device = isSink ? root.sink : root.source
+    if (!device || !device.audio) return _error("unavailable", "device not ready")
+    if (isSink) {
+      root.setSinkVolume(Range.clamp(p / 100, 0, root.maxVolume))
+      if (p === 0) root.setSinkMuted(true)
+      else if (device.audio.muted) root.setSinkMuted(false)
+      root._showSinkOSD()
+    } else {
+      root.setSourceVolume(Range.clamp(p / 100, 0, root.maxSourceVolume))
+      if (p === 0) root.setSourceMuted(true)
+      else if (device.audio.muted) root.setSourceMuted(false)
+      root._showSourceOSD()
+    }
+    return _ok()
+  }
+
+  function _setDefault(isSink, ref) {
+    const found = _resolve(ref, isSink ? "outputDevice" : "inputDevice", false, true)
+    if (found.error) return _error(found.error, "device not usable")
+    const pref = isSink ? Pipewire.preferredDefaultAudioSink : Pipewire.preferredDefaultAudioSource
+    if (pref === found.node) return _ok()
+    const changed = isSink
+      ? Core.PipeWireState.setDefaultSink(found.node)
+      : Core.PipeWireState.setDefaultSource(found.node)
+    if (!changed) return _error("unavailable", "default device could not be set")
+    return _ok()
+  }
+
+  function _streamSet(ref, n, mute) {
+    const found = _resolve(ref, null, true, false)
+    if (found.error) return _error(found.error, "stream not usable")
+    if (mute === null) {
+      const p = Math.round(Number(n))
+      if (!isFinite(p) || p < 0 || p > 150) return _error("invalid-argument", "level must be 0-150")
+      // The slider's own rule: clamp to 150%, lift mute on a positive write,
+      // and keep an explicit mute at zero.
+      Kind.applyVolume(found.audio, p / 100, 1.5)
+    } else {
+      found.audio.muted = mute === true
+    }
+    return _ok()
+  }
+
+  // --- one outstanding route slot ---
+  property var _routeSlot: null
+  property var _routeHistory: []
+  property int _routeSeq: 0
+  readonly property int routeTerminalLimit: 8
+  readonly property int routeTerminalTtlMs: 60000
+  readonly property int routeDeadlineMs: 12000
+
+  Timer {
+    id: routeDeadline
+    interval: root.routeDeadlineMs
+    repeat: false
+    onTriggered: {
+      if (root._routeSlot !== null) root._finishRoute(false, "timeout")
+    }
+  }
+
+  function _finishRoute(ok, code) {
+    const slot = root._routeSlot
+    if (slot === null) return
+    root._routeSlot = null
+    routeDeadline.stop()
+    const now = Date.now()
+    const rows = root._routeHistory.filter(function (r) {
+      return now - r.at < root.routeTerminalTtlMs
+    })
+    rows.unshift({ id: slot.id, state: ok === true ? "done" : "failed",
+      code: ok === true ? null : (code || "backend"), at: now })
+    root._routeHistory = rows.slice(0, root.routeTerminalLimit)
+  }
+
+  function _streamRoute(ref, deviceRef, verbose) {
+    if (root._routeSlot !== null) return _error("busy", "a route is already pending")
+    const found = _resolve(ref, null, true, false)
+    if (found.error) return _error(found.error, "stream not usable")
+    const target = _resolve(deviceRef, null, false, true)
+    if (target.error) return _error(target.error, "device not usable")
+    const capture = found.kind === "captureStream"
+    const needed = capture ? "inputDevice" : "outputDevice"
+    if (target.kind !== needed) return _error("invalid-argument", "wrong device direction")
+    if (Kind.monitor(target.node)) return _error("invalid-argument", "monitor is not a route target")
+    // The UI's own move and a routing read in flight both mean the slot may
+    // not start yet. Ask the facade before accepting anything.
+    const busy = Registry.call("audioMixer", "routeBusy")
+    if (busy === true) return _error("busy", "mixer routing is busy")
+
+    root._routeSeq++
+    const id = "r" + IpcRouter.incarnation + "." + root._routeSeq
+    root._routeSlot = { id: id, node: found.node, device: target.node, at: Date.now() }
+    routeDeadline.restart()
+    let accepted = false
+    try {
+      // One fixed in-process call: the method name and the callback below are
+      // constants in this file; neither comes from client argv.
+      accepted = Registry.call("audioMixer", "routeFromIpc",
+        found.node, target.node, capture, function (ok) {
+          if (root._routeSlot === null || root._routeSlot.id !== id) return
+          root._finishRoute(ok === true, ok === true ? null : "backend")
+        }) === true
+    } catch (e) {
+      accepted = false
+    }
+    if (!accepted) {
+      root._finishRoute(false, "unavailable")
+      return _error("unavailable", "mixer refused the route")
+    }
+    // The request id used to be minted and dropped, leaving no way to poll the
+    // one outstanding slot. It is published only on request so the ordinary
+    // order stays silent.
+    return verbose === true
+      ? _ok({ state: "accepted", requestId: id }, { kind: "record" })
+      : _ok()
+  }
+
+  function _routeStatus(request) {
+    if (typeof request !== "string") return _error("invalid-argument", "request id required")
+    if (root._routeSlot !== null && root._routeSlot.id === request) {
+      return _ok({ state: "pending", code: null }, { kind: "record" })
+    }
+    for (let i = 0; i < root._routeHistory.length; i++) {
+      if (root._routeHistory[i].id === request) {
+        const r = root._routeHistory[i]
+        return _ok({ state: r.state, code: r.code }, { kind: "record" })
+      }
+    }
+    return _error("not-found", "unknown route request")
+  }
+
+  function _status() {
+    return _ok(Ipc.statusFields(root.sinkVolume, root.sinkMuted,
+      root.sourceVolume, root.sourceMuted, root.step, root.maxVolume,
+      root.maxSourceVolume, root.visualFeedback, root.loopbackEnabled,
+      root.loopbackError, root.graphReady,
+      root._refOf(root.sink), root._refOf(root.source)), { kind: "record" })
+  }
+
   Component.onCompleted: {
     root._loopbackOwned = Loopback.validPairs(ShellState.section("audio")?.loopbackPairs)
     root._loopbackSeeded = true
     Qt.callLater(() => root._scheduleLoopback())
+    // A shell reload has no live route requests; terminal history is memory.
+    root._routeHistory = []
+    root._routeSlot = null
+    root._reconcileRefs()
     Registry.offer("audio", {
       title: "Audio",
-      description: "volume + microphone with OSD feedback",
-      verbNames: [
-        "micdown",
-        "mictoggle",
-        "micup",
-        "set",
-        "voldown",
-        "voltoggle",
-        "volup",
-        "status",
-        "help",
-        "ping",
-      ]
+      description: "Control volume and microphone levels",
+      verbNames: Catalog.topLevelVerbs("audio")
     })
     Registry.register(root.tag, root)
+    IpcRouter.register("audio", root, {
+      "audio.volume.up": function (a) { return root._adjust(true, 1, a.N) },
+      "audio.volume.down": function (a) { return root._adjust(true, -1, a.N) },
+      "audio.volume.toggle": function () { return root._toggleMute(true) },
+      "audio.volume.get": function () { return root._getLevel(true) },
+      "audio.microphone.up": function (a) { return root._adjust(false, 1, a.N) },
+      "audio.microphone.down": function (a) { return root._adjust(false, -1, a.N) },
+      "audio.microphone.toggle": function () { return root._toggleMute(false) },
+      "audio.microphone.get": function () { return root._getLevel(false) },
+      "audio.volume.set": function (a) { return root._setPercent(true, a.N) },
+      "audio.microphone.set": function (a) { return root._setPercent(false, a.N) },
+      "audio.sink.list": function () { return root._devicesTable(true) },
+      "audio.source.list": function () { return root._devicesTable(false) },
+      "audio.sink.set": function (a) { return root._setDefault(true, a.ID) },
+      "audio.source.set": function (a) { return root._setDefault(false, a.ID) },
+      "audio.stream.list": function () { return root._appsTable() },
+      "audio.stream.set": function (a) { return root._streamSet(a.ID, a.N, null) },
+      "audio.stream.mute": function (a) { return root._streamSet(a.ID, null, a.BOOL) },
+      "audio.stream.route": function (a, c) {
+        return root._streamRoute(a.ID, a.DEVICE, c.words.indexOf("verbose") >= 0)
+      },
+      "audio.stream.route-status": function (a) { return root._routeStatus(a.REQUEST) },
+      "audio.status": function () { return root._status() },
+      "audio.ping": function () { return _ok("pong", { kind: "text" }) }
+    })
   }
   Component.onDestruction: {
+    IpcRouter.unregister("audio", root)
     ProcessRegistry.cancelOwner(root.loopbackOwner)
     Registry.unregister(root.tag)
   }
 
-  IpcHandler {
-    target: "audio"
-    function help(command: string): string {
-      return UnitIpc.help("audio", "Audio", "volume + microphone with OSD feedback", [
-        { name: "micdown", help: "lower mic volume" },
-        { name: "mictoggle", help: "mute/unmute mic" },
-        { name: "micup", help: "raise mic volume" },
-        { name: "set", help: "(value) set volume 0-100" },
-        { name: "voldown", help: "lower volume" },
-        { name: "voltoggle", help: "mute/unmute output" },
-        { name: "volup", help: "raise volume" },
-      ], command)
-    }
-    function ping(): string { return "pong" }
-
-    // Zero-arg verbs: the generic `vb-shell <target> <fn>` passthrough must
-    // pass every declared parameter, so external callers read
-    // `vb-shell audio volup` with no required args.
-    function volup(): string {
-      return root._ipcAdjust(true, 1, false)
-    }
-
-    function voldown(): string {
-      return root._ipcAdjust(true, -1, false)
-    }
-
-    function voltoggle(): string {
-      root.toggleSinkMute()
-      return "ok"
-    }
-
-    function micup(): string {
-      return root._ipcAdjust(false, 1, false)
-    }
-
-    function micdown(): string {
-      return root._ipcAdjust(false, -1, false)
-    }
-
-    function mictoggle(): string {
-      root.toggleSourceMute()
-      return "ok"
-    }
-
-    // Absolute sink volume in percent (0 also mutes, per bash parity).
-    function set(value: string): string {
-      const p = Math.round(Number(value))
-      if (isNaN(p) || p < 0 || p > 200) return "error: invalid volume"
-      root.setSinkPercent(p)
-      return "ok"
-    }
-
-    function status(): string {
-      return JSON.stringify({
-        sinkVolume: root.sinkVolume,
-        sinkMuted: root.sinkMuted,
-        sourceVolume: root.sourceVolume,
-        sourceMuted: root.sourceMuted,
-        step: root.step,
-        maxVolume: root.maxVolume,
-        maxSourceVolume: root.maxSourceVolume,
-        visualFeedback: root.visualFeedback,
-        loopbackEnabled: root.loopbackEnabled,
-        loopbackError: root.loopbackError
-      })
-    }
-  }
-
-  // Shared IPC adjust path. `quiet` suppresses the OSD for this call only.
-  //
-  // A missing device is a refusal and answers "error: no device" to the
-  // caller: this is the path a volume keypress and `qs ipc call audio volup`
-  // both take, and it is the only one in this file whose failure is a return
-  // value rather than a silent no-op.
+  // Shared adjust path. `quiet` suppresses the OSD for this call only, and an
+  // explicit step (a validated fraction) overrides the configured one without
+  // changing that setting. The gateway validates the `step` keyword before
+  // arriving here; a missing device is still a refusal.
   //
   // The rule belongs to adjustSink/adjustSource. This function only translates
   // the device check and the verb's verdict; even the quiet branch calls the
   // same primitive, without OSD, instead of restating clamp/mute/fade here.
-  function _ipcAdjust(isSink, sign, quiet) {
+  function _ipcAdjust(isSink, sign, quiet, explicitStep) {
     const device = isSink ? root.sink : root.source
     if (!device || !device.audio) return "error: no device"
-    const d = sign * root.step
+    const amount = explicitStep === undefined || explicitStep === null ? root.step : explicitStep
+    const d = sign * amount
     if (isSink) {
       if (quiet) root.setSinkVolume(root.sinkVolume + d)
       else root.adjustSink(d)

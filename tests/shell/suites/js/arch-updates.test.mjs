@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Suite: the Arch updates checkupdates parser (shell/services/system/).
+// Suite: the system updates checkupdates parser (shell/services/system/).
 //
-// ArchUpdatesLib.parseUpdates pins the fetcher output format: one package
+// SystemUpdatesLib.parseUpdates pins the fetcher output format: one package
 // per line, `pkgname oldver -> newver` (checkupdates and yay -Qua share
 // the shape; the bare pacman -Qu field form is handled too). Malformed
 // lines are skipped, never painted; overlong fields are capped. The
@@ -14,10 +14,10 @@ import {
 } from '../../lib/assert.mjs'
 
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
-const AL = loadLib(path.join(SHELL, 'services/system/ArchUpdatesLib.js'))
-const AM = loadLib(path.join(SHELL, 'features/bar/modules/ArchUpdates/Model.js'))
+const AL = loadLib(path.join(SHELL, 'services/system/SystemUpdatesLib.js'))
+const AM = loadLib(path.join(SHELL, 'features/bar/modules/SystemUpdates/Model.js'))
 
-suite('arch-updates', 'ArchUpdatesLib.parseUpdates')
+suite('system-updates-parser', 'SystemUpdatesLib.parseUpdates')
 
 // ---------------------------------------------------------------------------
 section('arrow form - checkupdates and yay -Qua')

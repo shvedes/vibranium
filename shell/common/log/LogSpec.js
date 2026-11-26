@@ -20,7 +20,7 @@
 //
 //   1. a `-<scope>` term matches the scope or any dot-descendant -> silent;
 //   2. otherwise the longest matching `<scope>=<level>` override wins, so
-//      `bar=warn,bar.archUpdates=trace` splits the subtree at the deeper key;
+//      `bar=warn,bar.systemUpdates=trace` splits the subtree at the deeper key;
 //   3. otherwise the global level set applies.
 //
 // Nothing here throws. A term the grammar does not recognise is collected in
@@ -280,7 +280,7 @@ function parseSpec(text) {
 // both be live with different levels and leave the winner to object-key
 // order. `labels` keeps the spelling the user actually wrote, because the
 // configuration is echoed back in `status` and in the startup line and
-// `bar.archupdates` is not what they typed.
+// `bar.systemupdates` is not what they typed.
 function resolve(parsed, baseLevel) {
   const spec = parsed && typeof parsed === "object" ? parsed : parseSpec(null)
   const base = normalizeLevel(baseLevel)
@@ -356,7 +356,7 @@ function levelsFor(resolved, scope) {
   // The whole covering chain applies, least specific first, because each term
   // builds on what it inherits. `off` still silences: it empties the set at
   // that point in the chain, so `bar=off` silences the subtree and a deeper
-  // `bar.archUpdates=debug` can still re-enable it - the same "a descendant
+  // `bar.systemUpdates=debug` can still re-enable it - the same "a descendant
   // may re-enable its parent" property the longest-wins rule gave.
   //
   // The cost, stated rather than hidden: a scope term cannot REMOVE a band

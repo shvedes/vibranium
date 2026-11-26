@@ -1152,9 +1152,13 @@ Singleton {
       root._solidColor)
 
   Component.onCompleted: {
+    IpcRouter.register("privacy", root, {
+      "privacy.status": function () { return ipc.status() },
+      "privacy.ping": function () { return ipc.ping() }
+    })
     Registry.offer("privacy", {
       title: "Privacy indicators",
-      description: "mic/camera/screenshare capture state",
+      description: "Check microphone, camera and screen sharing",
       verbNames: [
         "status",
         "help",
@@ -1164,14 +1168,16 @@ Singleton {
     Registry.register("privacy", root)
   }
   Component.onDestruction: {
+    IpcRouter.unregister("privacy", root)
     Registry.unregister("privacy")
     root._shutdown()
   }
 
   IpcHandler {
+    id: ipc
     target: "privacy"
     function help(command: string): string {
-      return UnitIpc.help("privacy", "Privacy indicators", "mic/camera/screenshare capture state", [
+      return UnitIpc.help("privacy", "Privacy indicators", "Check microphone, camera and screen sharing", [
         { name: "status", help: "mic/cam/share/active snapshot" },
       ], command)
     }

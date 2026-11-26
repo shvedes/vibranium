@@ -46,6 +46,17 @@ Item {
   // `Window` it holds is one level down from here.
   readonly property var window: windowLoader.item
 
+  // Idempotent focus for an already open viewer. The mapped path asks the
+  // live QuickWindow for activation; a window still waiting for a primary
+  // screen is handled by its existing on-visible activation.
+  function focusWindow() {
+    if (root.window === null || root.window === undefined) return false
+    const win = root.window.window
+    if (win === null || win === undefined) return false
+    win.requestActivate()
+    return true
+  }
+
   // The URL the facade's `openPath` verb asked for, published as live state
   // instead of handed to a window that may not exist yet.
   //

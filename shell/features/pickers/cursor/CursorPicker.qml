@@ -6,7 +6,6 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import qs.features.menu
-import "../../../common/text/UnitIpc.js" as UnitIpc
 import "../../../common/settings/GtkSettings.js" as GtkSettings
 
 // Efficient cursor theme/size picker – native, cached, no bash loop.
@@ -32,20 +31,6 @@ Singleton {
     property int _scanGen: 0
 
     Component.onCompleted: {
-      Registry.offer("cursorPicker", {
-        title: "Cursor picker",
-        description: "cursor theme selection",
-        verbNames: [
-          "close",
-          "open",
-          "setSize",
-          "setTheme",
-          "toggle",
-          "status",
-          "help",
-          "ping",
-        ]
-      })
         Registry.register("cursorPicker", root)
         root._readStateFile()
     }
@@ -297,23 +282,4 @@ Singleton {
         }
     }
 
-    IpcHandler {
-        target: "cursorPicker"
-        function help(command: string): string {
-          return UnitIpc.help("cursorPicker", "Cursor picker", "cursor theme selection", [
-            { name: "close", help: "hide the picker" },
-            { name: "open", help: "show the picker" },
-            { name: "setSize", help: "(value) set cursor size" },
-            { name: "setTheme", help: "(value) set cursor theme" },
-            { name: "toggle", help: "show/hide" },
-          ], command)
-        }
-        function ping(): string { return "pong" }
-        function open(): string { return root.open() }
-        function close(): string { return root.close() }
-        function toggle(): string { return root.toggle() }
-        function setTheme(theme: string): string { return root.setTheme(theme) }
-        function setSize(size: string): string { return root.setSize(size) }
-        function status(): string { return JSON.stringify({ theme: root._currentTheme, size: root._currentSize, themes: root._themes ? root._themes.length : 0 }) }
-    }
 }

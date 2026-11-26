@@ -1,10 +1,10 @@
-// Pure checkupdates / yay -Qua output parsing for the Arch updates
+// Pure checkupdates / yay -Qua output parsing for the system updates
 // service (qs.services). One line per package: `pkgname oldver ->
 // newver` (checkupdates and yay -Qua share the shape; the bare 4-field
 // pacman -Qu form is handled too). Canonical home of the parser that
-// lived inline in ArchUpdates.qml; the service delegates to it. Pure JS,
+// lived inline in SystemUpdates.qml; the service delegates to it. Pure JS,
 // pragma library, no Qt imports - unit-tested in
-// tests/shell/suites/js/arch-updates.test.mjs.
+// tests/shell/suites/js/system-updates.test.mjs.
 .pragma library
 
 // Parse one fetcher's stdout into package records

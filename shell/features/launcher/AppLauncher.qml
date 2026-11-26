@@ -12,6 +12,7 @@ import qs.common
 import qs.services as Core
 import "LauncherLib.js" as LauncherLib
 import "PluginPolicy.js" as PluginPolicy
+import "../../common/text/IpcCatalog.js" as Catalog
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/collections/BoundedCache.js" as BoundedCache
 import "../../common/process/PanelList.js" as PanelList
@@ -478,26 +479,253 @@ Singleton {
     return ctrl.clearUsageHistory()
   }
 
+  // --- the appLauncher gateway -------------------------------------------
+  // Public commands are explicit typed operations on this facade. No plugin
+  // export is treated as a verb, and help/list never load plugin code.
+  function _ok(data, format) {
+    const frame = { v: 1, ok: true }
+    if (data !== undefined) frame.data = data
+    if (format) frame.format = format
+    return frame
+  }
+  function _error(code, message) {
+    return { v: 1, ok: false, error: { code: code, message: message } }
+  }
+
+  function _knownPlugin(id) {
+    if (!root.pluginsKnown) return false
+    for (let i = 0; i < root.pluginRows.length; i++) {
+      if (root.pluginRows[i].id === id) return true
+    }
+    return false
+  }
+
+  function _openGateway() {
+    if (!root.visible && !root._openWaiting) {
+      root.open()
+      if (root.controllerState === "loading") return _error("busy", "controller is loading")
+      if (!root.visible && !root._openWaiting) return _error("unavailable", "launcher did not open")
+    }
+    return _ok()
+  }
+
+  function _closeGateway() {
+    root.close()
+    return _ok()
+  }
+
+  function _toggleGateway() {
+    root.toggle()
+    return _ok()
+  }
+
+  function _historyGateway() {
+    if (!root.usageKnown) return _error("unavailable", "usage not read yet")
+    return _ok(LauncherLib.usageHistoryEmpty(root.hasUsageHistory, root.usageMap),
+      { kind: "bool" })
+  }
+
+  function _showHistory() {
+    if (!root.usageKnown) return _error("unavailable", "usage not read yet")
+    const rows = []
+    for (const id in root.usageMap) {
+      if (!Object.prototype.hasOwnProperty.call(root.usageMap, id)) continue
+      rows.push({ id: id, count: Number(root.usageMap[id]) || 0 })
+    }
+    rows.sort(function (a, b) {
+      return b.count - a.count || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    })
+    return _ok(rows, { kind: "table", columns: [
+      { key: "id", heading: "ID" }, { key: "count", heading: "Count" }
+    ] })
+  }
+
+  function _clearHistory() {
+    if (!root.usageKnown) return _error("unavailable", "usage not read yet")
+    if (LauncherLib.usageHistoryEmpty(root.hasUsageHistory, root.usageMap)) return _ok()
+    const ctrl = root._demandTransient()
+    if (ctrl === null) return _error("unavailable", "controller unavailable")
+    if (ctrl.clearUsageHistory() !== true) return _error("unavailable", "history was not cleared")
+    return _ok()
+  }
+
+  // App-index rescanning and plugin discovery stay internal lifecycle work:
+  // neither has a public CLI verb any more.
+
+  function _pluginsList() {
+    if (!root.pluginsKnown) return _error("unavailable", "plugins not discovered yet")
+    const rows = []
+    for (let i = 0; i < root.pluginRows.length; i++) {
+      rows.push(LauncherLib.pluginListRow(root.pluginRows[i]))
+    }
+    rows.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0 })
+    return _ok(rows, { kind: "table", columns: [
+      { key: "id", heading: "ID" }, { key: "name", heading: "Name" },
+      { key: "description", heading: "Description" }, { key: "type", heading: "Type" },
+      { key: "keyword", heading: "Keyword" }, { key: "enabled", heading: "Enabled" }
+    ] })
+  }
+
+  function _pluginsStatus(id) {
+    if (!root.pluginsKnown) return _error("unavailable", "plugins not discovered yet")
+    const ctrl = lease.controller
+    const detailed = ctrl !== null && ctrl !== undefined ? ctrl.pluginStatus(id) : null
+    if (detailed === null) {
+      if (!root._knownPlugin(id)) return _error("not-found", "unknown plugin")
+      for (let i = 0; i < root.pluginRows.length; i++) {
+        if (root.pluginRows[i].id !== id) continue
+        const row = LauncherLib.pluginListRow(root.pluginRows[i])
+        row.loaded = false
+        row.broken = root.pluginRows[i].broken === true
+        row.granted = root.pluginRows[i].granted || []
+        row.denied = root.pluginRows[i].denied || []
+        row.generation = 0
+        return _ok(row, { kind: "record" })
+      }
+      return _error("not-found", "unknown plugin")
+    }
+    return _ok(detailed, { kind: "record" })
+  }
+
+  function _pluginEnable(id, enabled) {
+    // The id must be a real registered one BEFORE a demand or a write: the
+    // controller's unresolved-menu fallback must never be reachable from IPC.
+    if (!root._knownPlugin(id)) return _error("not-found", "unknown plugin")
+    const ctrl = root._demandTransient()
+    if (ctrl === null) return _error("unavailable", "controller unavailable")
+    if (ctrl.setPluginEnabled(id, enabled) !== true) return _error("unavailable", "enablement was refused")
+    return _ok()
+  }
+
+  function _pluginsReload(id) {
+    if (!root.pluginsKnown) return _error("unavailable", "plugins not discovered yet")
+    // A plugin id from argv must be a real registered id BEFORE a demand:
+    // discovery is separate from reload, and an unknown id must never build
+    // a controller just to be refused.
+    if (id !== null && !root._knownPlugin(id)) return _error("not-found", "unknown plugin")
+    const ctrl = root._demandTransient()
+    if (ctrl === null) return _error("unavailable", "controller unavailable")
+    if (id === null) {
+      const result = ctrl.reloadPlugins(null)
+      if (!result.ok) return _error("backend", "failed: " + result.failed.join(","))
+      return _ok()
+    }
+    const cfg = ctrl.pluginStatus(id)
+    if (cfg === null) return _error("not-found", "unknown plugin")
+    if (cfg.enabled !== true) return _ok()
+    const result = ctrl.reloadPlugins([id])
+    if (!result.ok) return _error("backend", "failed: " + result.failed.join(","))
+    return _ok()
+  }
+
+  function _pluginCommand(id, verb, value) {
+    if (!root.pluginsKnown) return _error("unavailable", "plugins not discovered yet")
+    if (LauncherLib.builtinIpcVerbs(id).indexOf(verb) < 0) {
+      return _error("unknown-command", "plugin has no such command")
+    }
+    if (!root._knownPlugin(id)) return _error("not-found", "unknown plugin")
+    let row = null
+    for (let i = 0; i < root.pluginRows.length; i++) {
+      if (root.pluginRows[i].id === id) row = root.pluginRows[i]
+    }
+    if (!row || row.enabled !== true) return _error("unavailable", "plugin is disabled")
+    const ctrl = root._demandTransient()
+    if (ctrl === null) return _error("unavailable", "controller unavailable")
+    const answer = ctrl.pluginIpc(id, verb, value)
+    if (answer.error === "not-found") return _error("not-found", "unknown plugin")
+    if (answer.error === "backend") return _error("backend", "plugin backend failed")
+    if (answer.error) return _error("invalid-argument", "no valid result")
+    const result = answer.result
+    if (result && result.error === "not-found") return _error("not-found", "unknown place")
+    if (result && result.state === "accepted") {
+      // A settled failed time probe with no good reading is a backend
+      // verdict, not another immediate request.
+      if (id === "time" && verb === "lookup") {
+        const stamp = ctrl._timeFailures[String(result.timezone)]
+        if (stamp && (Date.now() - stamp) < ctrl._timeTtlMs) {
+          return _error("backend", "time zone could not be read")
+        }
+      }
+      return _ok(result, { kind: "record" })
+    }
+    if (Array.isArray(result)) {
+      return _ok(result, { kind: "table", columns: [
+        { key: "label", heading: "Label" }, { key: "value", heading: "Value" }
+      ] })
+    }
+    if (typeof result === "string") return _ok(result, { kind: "text" })
+    return _ok(result, { kind: "record" })
+  }
+
+  // Describe-only seam for `appLauncher plugin command <ID> help`. It reads the static
+  // table in LauncherLib: no plugin code, no controller demand, no discovery
+  // state. An id outside the table answers null, so no page is fabricated.
+  function _describePlugin(rest) {
+    if (!rest || rest[0] !== "plugin") return null
+    const id = rest[1] === "command" ? rest[2]
+      : rest.length === 2 ? rest[1] : null
+    if (!id) return null
+    return LauncherLib.pluginHelpPage(id)
+  }
+
+  function _gatewayStatus() {
+    const ctrl = lease.controller
+    const reads = root._readStates()
+    return _ok({
+      visible: root.visible,
+      opening: root._openWaiting,
+      reads: reads,
+      discovery: ctrl !== null && ctrl !== undefined ? ctrl.discoveryState
+        : (root.pluginsKnown ? "ready" : "unavailable"),
+      controller: root.controllerState,
+      mode: root.mode
+    }, { kind: "record" })
+  }
+
   Component.onCompleted: {
     Registry.offer("appLauncher", {
       title: "App launcher",
-      description: "application search + usage-ranked results + plugins",
-      verbNames: [
-        "clearHistory",
-        "close",
-        "hasHistory",
-        "open",
-        "plugins",
-        "pluginSet",
-        "reload",
-        "toggle",
-        "usage",
-        "status",
-        "help",
-        "ping",
-      ]
+      description: "Search and launch applications",
+      verbNames: Catalog.topLevelVerbs("appLauncher")
     })
     Registry.register("appLauncher", root)
+    IpcRouter.register("appLauncher", root, {
+      "appLauncher.open": function () { return root._openGateway() },
+      "appLauncher.close": function () { return root._closeGateway() },
+      "appLauncher.toggle": function () { return root._toggleGateway() },
+      "appLauncher.history.is-empty": function () { return root._historyGateway() },
+      "appLauncher.history.show": function () { return root._showHistory() },
+      "appLauncher.history.clear": function () { return root._clearHistory() },
+      "appLauncher.plugin.list": function () { return root._pluginsList() },
+      "appLauncher.plugin.status": function (a) { return root._pluginsStatus(a.ID) },
+      "appLauncher.plugin.enable": function (a) { return root._pluginEnable(a.ID, true) },
+      "appLauncher.plugin.disable": function (a) { return root._pluginEnable(a.ID, false) },
+      "appLauncher.plugin.toggle": function (a) {
+        const ctrl = lease.controller
+        const live = ctrl !== null && ctrl !== undefined ? ctrl.pluginStatus(a.ID) : null
+        let enabled = false
+        if (live !== null && live !== undefined) enabled = live.enabled === true
+        else {
+          const row = root._knownPlugin(a.ID) ? root.pluginRows.filter(function (p) {
+            return p.id === a.ID
+          })[0] : null
+          enabled = !!(row && row.enabled === true)
+        }
+        return root._pluginEnable(a.ID, !enabled)
+      },
+      "appLauncher.plugin.reload": function () { return root._pluginsReload(null) },
+      "appLauncher.plugin.id.reload": function (a) { return root._pluginsReload(a.ID) },
+      "appLauncher.plugin.command.calc.eval": function (a) { return root._pluginCommand("calc", "eval", a.EXPR) },
+      "appLauncher.plugin.command.unit.convert": function (a) { return root._pluginCommand("unit", "convert", a.QUERY) },
+      "appLauncher.plugin.command.constants.lookup": function (a) { return root._pluginCommand("constants", "lookup", a.QUERY) },
+      "appLauncher.plugin.command.color.parse": function (a) { return root._pluginCommand("color", "parse", a.COLOR) },
+      "appLauncher.plugin.command.time.lookup": function (a) { return root._pluginCommand("time", "lookup", a.ZONE_OR_CITY) },
+      "appLauncher.plugin.command.time.convert": function (a) { return root._pluginCommand("time", "convert", a.QUERY) },
+      "appLauncher.plugin.command.fx.convert": function (a) { return root._pluginCommand("fx", "convert", a.QUERY) },
+      "appLauncher.plugin.command.websearch.url": function (a) { return root._pluginCommand("websearch", "url", a.QUERY) },
+      "appLauncher.status": function () { return root._gatewayStatus() },
+      "appLauncher.ping": function () { return _ok("pong", { kind: "text" }) }
+    }, root._describePlugin)
     // The provider claims are the only work this construction does
     // synchronously: six records the menu reads. The controller - usage
     // read, index build, plugin scan, no window - follows on its own
@@ -530,6 +758,7 @@ Singleton {
     // root, so a survivor would keep a dead confirm closure.
     root._releaseMenuProviders()
     SurfaceClaim.releaseOwner(root)
+    IpcRouter.unregister("appLauncher", root)
     Registry.unregister("appLauncher")
   }
 
@@ -756,7 +985,22 @@ Singleton {
   // The read and the clock probes forward to the controller, so the facade
   // holds no FileView and no Process for a plugin's sake.
 
+  // A callback bound to a cfg identity and generation may only update a
+  // currently loaded instance. Discovery mints new cfg objects, and a reload
+  // bumps the generation, so an old callback cannot republish into a
+  // replacement runtime. Shared passive caches are still readable; only
+  // writes and requests are gated here.
+  function _cfgLive(cfg, generation) {
+    const ctrl = lease.controller
+    if (ctrl === null || ctrl === undefined || !ctrl.pluginsResolved) return false
+    const current = LauncherLib.pluginById(ctrl.plugins, cfg.id)
+    return current === cfg && cfg.enabled === true
+      && (Number(cfg._generation) || 0) === generation
+  }
+
   function _pluginHostFor(cfg) {
+    const generation = Number(cfg._generation) || 0
+    const live = function () { return root._cfgLive(cfg, generation) }
     return {
       id: () => cfg.id,
       configDir: () => Paths.xdgConfigHome + "/vibranium",
@@ -764,14 +1008,14 @@ Singleton {
       setting: key => Settings.value(key),
       shellQuote: s => LauncherLib.shellQuote(String(s)),
       stripJsonc: raw => LauncherLib.stripJsonc(String(raw)),
-      requestTime: tz => root._requestTime(tz),
+      requestTime: tz => { if (live()) root._requestTime(tz) },
       cachedTime: tz => root.timeCache[tz],
       // The PATH pair, the same two-step shape as the clock pair and the
       // fetch pair: ask the controller to scan, then read what it cached. A
       // plugin holding both learns what is runnable and nothing about where
       // it lives - no directory list, no path to any one of them. A plugin
       // holding only the read half answers from whatever scan already landed.
-      requestBinaries: () => root._requestBinaries(),
+      requestBinaries: () => { if (live()) root._requestBinaries() },
       cachedBinaries: () => root.binariesCache,
       // The fetch pair is a two-step, exactly like the clock pair above:
       // ask the controller to fetch, then read what it cached. A plugin never
@@ -780,7 +1024,7 @@ Singleton {
       // row recompute that publishes the answer. `network` stays UNBOUND on
       // purpose: a raw fetch would hand a plugin the whole response stream,
       // and nothing shipped needs one. This pair is the narrow shape.
-      requestNet: (url, timeoutMs) => root._requestNet(url, timeoutMs),
+      requestNet: (url, timeoutMs) => { if (live()) root._requestNet(url, timeoutMs) },
       // LauncherLib.netBody, not the cache entry itself: what a plugin is
       // handed is a BODY STRING. Handing over the record instead reaches the
       // plugin as "[object Object]", which parses as no rates at all - so the
@@ -803,6 +1047,7 @@ Singleton {
         return s === "" ? null : ShellCache.section(s)
       },
       setCacheSection: (name, obj) => {
+        if (!live()) return false
         const s = _cacheSectionFor(cfg, name)
         return s === "" ? false : ShellCache.setSection(s, obj)
       },
@@ -812,11 +1057,13 @@ Singleton {
       // Arbitrary file read: the launcher needs it to load the manifest and
       // the source, but a plugin only gets it when its root's grant names
       // it, and even then only as a whole-file text read.
-      readFile: path => root._readFileText(path),
+      readFile: path => live() ? root._readFileText(path) : null,
       // A granted plugin still hands over shell source, so this capability
       // is a source surface by construction and is named as one in
       // PluginPolicy.js - not a data-only one.
-      execDetached: script => root.execDetached(["/bin/sh", "-c", script])
+      execDetached: script => {
+        if (live()) root.execDetached(["/bin/sh", "-c", script])
+      }
     }
   }
 
@@ -1153,22 +1400,48 @@ Singleton {
   // teardown. Every verb answers a string: "ok", a JSON payload, or one of
   // loading / unavailable / error:<code> while the controller is gone.
 
+  // These five in-process aliases are retained for diagnostic callers. Each
+  // delegates to the SAME owner action the gateway uses, never a second
+  // behavior. `usage`, `plugins`, `pluginSet` and `reload` stay retired; the
+  // probe and diagnostics remain for tests and boot liveness.
   IpcHandler {
     target: "appLauncher"
     function help(command: string): string {
-      return UnitIpc.help("appLauncher", "App launcher", "application search + usage-ranked results + plugins", [
-        { name: "clearHistory", help: "clear usage history" },
-        { name: "close", help: "hide the launcher" },
-        { name: "hasHistory", help: "any recorded usage?" },
-        { name: "open", help: "show the launcher" },
-        { name: "plugins", help: "list launcher plugins" },
-        { name: "pluginSet", help: "(id, json) update one plugin" },
-        { name: "reload", help: "rescan applications + plugins" },
-        { name: "toggle", help: "show/hide" },
-        { name: "usage", help: "dump usage counts" },
-      ], command)
+      return UnitIpc.help("appLauncher", "App launcher",
+        "Search and launch applications", [
+          { name: "clearHistory", help: "clear usage history" },
+          { name: "close", help: "hide the launcher" },
+          { name: "hasHistory", help: "any recorded usage?" },
+          { name: "open", help: "show the launcher" },
+          { name: "toggle", help: "show/hide" },
+        ], command)
     }
     function ping(): string { return "pong" }
+
+    function open(): string { return root._openVerb() }
+    function toggle(): string { return root._toggleVerb() }
+    function close(): string {
+      root.close()
+      return "ok"
+    }
+
+    // The published usage verdict, with the same gating as the gateway: an
+    // unread history is unavailable, never a false empty one.
+    function hasHistory(): string {
+      if (!root.usageKnown) return "unavailable"
+      return root.hasUsageHistory ? "true" : "false"
+    }
+
+    // Same writer as the gateway: a known empty map needs no demand, and a
+    // real clear goes through the controller's clearUsageHistory only after
+    // the usage read is known.
+    function clearHistory(): string {
+      if (!root.usageKnown) return "unavailable"
+      if (LauncherLib.usageHistoryEmpty(root.hasUsageHistory, root.usageMap)) return "ok"
+      const ctrl = root._demandTransient()
+      if (ctrl === null) return root._unavailableVerb()
+      return ctrl.clearUsageHistory() ? "ok" : "unavailable"
+    }
 
     function debugConfirmNavigation(): string {
       if (!root.visible) return "unavailable"
@@ -1176,15 +1449,6 @@ Singleton {
         if (panel.primarySurface) return panel.debugConfirmNavigation()
       }
       return "unavailable"
-    }
-
-    function toggle(): string { return root._toggleVerb() }
-
-    function open(): string { return root._openVerb() }
-
-    function close(): string {
-      root.close()
-      return "ok"
     }
 
     function status(): string {
@@ -1222,64 +1486,6 @@ Singleton {
       })
     }
 
-    function plugins(): string {
-      if (!root.pluginsKnown) return "unavailable"
-      const summary = root._pluginSummary()
-      const out = []
-      for (let i = 0; i < summary.length; i++) {
-        const p = summary[i]
-        out.push({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          keyword: p.keyword,
-          type: p.type,
-          enabled: p.enabled
-        })
-      }
-      return JSON.stringify(out)
-    }
-
-    // pluginSet "actions" true
-    function pluginSet(id: string, json: string): string {
-      let v
-      try {
-        v = JSON.parse(json)
-      } catch (e) {
-        return "error: invalid JSON value"
-      }
-      const ctrl = root._demandTransient()
-      if (ctrl === null) return root._unavailableVerb()
-      return ctrl.setPluginEnabled(id, v) ? "ok" : "error"
-    }
-
-    function reload(): string {
-      const ctrl = root._demandTransient()
-      if (ctrl === null) return root._unavailableVerb()
-      root.reset()
-      ctrl.discoverPlugins()
-      return "ok"
-    }
-
-    function clearHistory(): string {
-      const ctrl = root._demandTransient()
-      if (ctrl === null) return root._unavailableVerb()
-      return ctrl.clearUsageHistory() ? "ok" : "error: already empty"
-    }
-
-    // A read is a fact or the documented sentinel, never a default: before
-    // any controller has published the cache, the answer is "unavailable"
-    // and not "false", and afterwards it is the published one - which is
-    // the same value with the panel up and 200ms after it closed.
-    function hasHistory(): string {
-      if (!root.usageKnown) return "unavailable"
-      return root.hasUsageHistory ? "true" : "false"
-    }
-
-    function usage(): string {
-      if (!root.usageKnown) return "unavailable"
-      return JSON.stringify(root.usageMap)
-    }
   }
 
   // --- plugin summary for the read-only verbs ---

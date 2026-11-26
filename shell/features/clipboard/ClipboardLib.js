@@ -1976,3 +1976,84 @@ function projectFileInfo(entry, report) {
   return entry
 }
 
+// --- public IPC projection --------------------------------------------------
+// The clipboard gateway publishes ONLY {index,content} rows. These helpers
+// are pure so the no-leak rule is directly testable: no path, MIME, id,
+// secret handle or raw payload is read or returned here.
+
+// Strict, zero-based snapshot position. A nondecimal, negative or missing
+// token is indistinguishable from an out-of-range index to the caller.
+function ipcIndex(token) {
+  const s = String(token === undefined || token === null ? "" : token)
+  if (!/^[0-9]+$/.test(s)) return null
+  const n = Number(s)
+  if (!Number.isSafeInteger(n) || n < 0) return null
+  return n
+}
+
+// A row the public surface must never name, in either format or a log line.
+function isIpcProtected(entry) {
+  if (!entry) return true
+  if (entry.type === "secret") return true
+  if (String(entry.secretHandle || "") !== "") return true
+  return isCredentialMimeTypes([entry.mime]) === true
+}
+
+// Terminal-control characters have no place in a projected preview. Runs of
+// whitespace fold to one space; the cap counts UNICODE CODE POINTS, with the
+// final ellipsis included in the 80.
+function safePreview(text, cap) {
+  const limit = cap === undefined ? 80 : cap
+  const folded = String(text === undefined || text === null ? "" : text)
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+  const points = Array.from(folded)
+  if (points.length <= limit) return points.join("")
+  if (limit <= 1) return limit === 1 ? "." : ""
+  return points.slice(0, limit - 1).join("") + "…"
+}
+
+// Non-text entries get a fixed marker from the shell's own classification,
+// never a path or a MIME string. A network/URI row with no local file path is
+// safe to preview as text; one that represents a local file is a <file>.
+function ipcContent(entry) {
+  if (!entry) return null
+  const type = String(entry.type || "")
+  const paths = Array.isArray(entry.filePaths) ? entry.filePaths : []
+  const hasPath = paths.length > 0 || String(entry.imageFile || "") !== ""
+    || String(entry.imageDataFile || "") !== ""
+  switch (type) {
+    case "image": return "<image>"
+    case "file":
+    case "files": return "<file>"
+    case "folder":
+    case "folders": return "<folder>"
+    case "archive": return "<archive>"
+    case "binary": return "<binary>"
+    case "network":
+    case "url":
+      return hasPath ? "<file>" : safePreview(entry.preview !== undefined ? entry.preview : entry.raw)
+    case "text":
+      return safePreview(entry.preview !== undefined ? entry.preview : entry.raw)
+    default:
+      return hasPath ? "<file>" : safePreview(entry.preview !== undefined ? entry.preview : entry.raw)
+  }
+}
+
+// Project one source bucket. Protected rows are skipped entirely: their
+// positions still count so an index from a sibling row never shifts, but no
+// field of the row is read into the reply.
+function ipcProject(entries) {
+  const out = []
+  const src = Array.isArray(entries) ? entries : []
+  for (let i = 0; i < src.length; i++) {
+    const e = src[i]
+    if (isIpcProtected(e)) continue
+    const content = ipcContent(e)
+    if (content === null) continue
+    out.push({ index: i, content: content })
+  }
+  return out
+}
+

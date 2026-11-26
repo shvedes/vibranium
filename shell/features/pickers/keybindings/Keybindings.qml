@@ -32,9 +32,17 @@ Singleton {
   property int _landingGen: 0
 
   Component.onCompleted: {
+    IpcRouter.register("keybindings", root, {
+      "keybindings.open": function () { return ipc.open() },
+      "keybindings.close": function () { return ipc.close() },
+      "keybindings.toggle": function () { return ipc.toggle() },
+      "keybindings.refresh": function () { return ipc.refresh() },
+      "keybindings.status": function () { return ipc.status() },
+      "keybindings.ping": function () { return ipc.ping() }
+    })
     Registry.offer("keybindings", {
       title: "Keybindings",
-      description: "hyprland keybinding cheatsheet",
+      description: "View Hyprland keybindings",
       verbNames: [
         "close",
         "open",
@@ -51,6 +59,7 @@ Singleton {
     Hyprland.rawEvent.connect(root.onRawEvent)
   }
   Component.onDestruction: {
+    IpcRouter.unregister("keybindings", root)
     Hyprland.rawEvent.disconnect(root.onRawEvent)
     Registry.unregister("keybindings")
   }
@@ -301,9 +310,10 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "keybindings"
     function help(command: string): string {
-      return UnitIpc.help("keybindings", "Keybindings", "hyprland keybinding cheatsheet", [
+      return UnitIpc.help("keybindings", "Keybindings", "View Hyprland keybindings", [
         { name: "close", help: "hide the cheatsheet" },
         { name: "open", help: "show the cheatsheet" },
         { name: "refresh", help: "rescan hyprland binds" },

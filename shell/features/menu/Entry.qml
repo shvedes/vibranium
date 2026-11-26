@@ -58,10 +58,14 @@ Item {
     const uid = modelData && modelData.uid ? String(modelData.uid) : ""
     if (_rowUid !== "" && uid !== _rowUid) {
       Menu.slotCloseFinished({ uid: _rowUid })
+      // Modal state belongs to the old row in the model, not to this reused
+      // delegate: retire it there instead of assigning a read-only projection.
+      const old = Menu.itemByUid(_rowUid)
+      if (old) {
+        Menu.setPromptOpen(old, false)
+        Menu.rowConfirmCancel(old, null)
+      }
       expanded = false
-      confirmStage = 0
-      deleteArmed = false
-      promptOpen = false
       optionIndex = -1
       childIndex = -1
     }
@@ -287,7 +291,14 @@ Item {
   // the text editor (prefilled with editText) instead of closing the
   // menu. Enter commits through editCall and keeps the menu open;
   // Escape or any collapse clears the mode back to the dropdown.
-  property bool promptOpen: false
+  //
+  // The flag is now a read-only projection of the model-owned modal state, so
+  // an IPC operation and a click arm the same prompt even when this delegate
+  // is not mounted. Only Menu.setPromptOpen writes it.
+  readonly property bool promptOpen: {
+    const rev = Menu.rev
+    return rev >= 0 && !!itm && Menu.stateOf(itm).promptOpen === true
+  }
 
   // Staged-flow cursor (spec 39). Null-flow rows ignore it and keep the
   // promptOpen path. Flow rows read the current step kind from
@@ -398,13 +409,21 @@ Item {
   // gentle curve for the whole unfold the card is following.
   property bool _restoreUnfoldSoft: false
   // Generic staged confirmation (replaces per-service timerStage etc.)
-  property int confirmStage: 0
+  // Read-only projection: Menu.rowConfirm is the single writer, for rows with
+  // and without a live delegate.
+  readonly property int confirmStage: {
+    const rev = Menu.rev
+    return rev >= 0 && itm ? Menu.confirmStageOf(itm) : 0
+  }
   readonly property var confirm: Menu.confirmFor(itm)
   // Key-triggered deletion (Delete / Ctrl+D, routed from the panel):
   // reuses the confirm slot with a confirm object synthesized from
   // delCommand, so regular activation keeps its own behavior (select
   // dropdowns, editors, actions) and only Delete/Ctrl+D arms this path.
-  property bool deleteArmed: false
+  readonly property bool deleteArmed: {
+    const rev = Menu.rev
+    return rev >= 0 && !!itm && Menu.confirmKindOf(itm) === "delete"
+  }
   readonly property var deleteConfirm: itm && typeof itm.delCommand === "string" && itm.delCommand !== ""
     ? {
         stages: 2,
@@ -984,141 +1003,40 @@ Item {
   function activate() {
     if (!enabled_) return
     // An open editor owns activation: Enter commits its value. Falling
-    // through to the type switch would call openEditor() again and toggle
+    // through to the shared action would call openEditor() again and toggle
     // the slot shut, reading as an Escape the user never pressed.
     if (editorOpen && commitOpenEditor()) return
     // The host seats its cursor on the child whose row activated, so Enter
     // takes the same path through the group as through the page.
     row.activated()
-    const _wasFiltered = Menu.scopedActive
-    try {
-      // Generic staged confirmation (timer, recording, clearHistory and any
-      // future JSON-declared `confirm`).
-      const cf = row.confirm
-      if (cf) {
-        if (cf.action === "clearHistory") {
-          const has = Registry.get("appLauncher", "hasUsageHistory")
-          if (has === false) return
-        }
-        if (!row.expanded) {
-          row.setExpanded(true)
-          row.confirmStage = 1
-        } else if (row.confirmStage < cf.stages) {
-          row.confirmStage = cf.stages
-        } else {
-          Menu.handleConfirm(itm)
-          row.confirmStage = 0
-          row.collapse()
-          if (itm && itm.close === true) Menu.close()
-        }
-        return
-      }
-      switch (ptype) {
-        case "submenu": {
-          const pushPanel = Menu.probeSource
-          if (pushPanel && typeof pushPanel.pushPage === "function") pushPanel.pushPage(itm.page)
-          else Menu.push(itm.page)
-          break
-        }
-        case "toggle":
-          flip(!toggleOn)
-          if (itm && itm.close === true) Menu.close()
-          break
-        case "action":
-          if (itm && itm.id === "timer.stop") {
-            Menu.handleConfirm({ id: "timer" })
-            return
-          }
-          // Dismiss before dispatching: a command that restarts the shell
-          // (Reload Vibranium) would otherwise kill it mid close animation,
-          // leaving the transform visible until the new session maps.
-          // keepOpen: the row summons something in place (a picker page
-          // pushed onto this stack, a refresh) and the menu must survive
-          // so Esc can walk back - the classic close would kill the chain
-          // the summon was made from.
-          if (!(itm && itm.keepOpen === true)) Menu.close()
-          if (itm.call !== "")
-            Menu.runCall(itm.call, itm.value !== undefined ? itm.value : "")
-          else
-            Menu.runCommand(itm.command, itm.value !== undefined ? itm.value : "")
-          break
-        case "select":
-          setExpanded(!expanded)
-          break
-        case "option":
-          Menu.commitOption(itm)
-          break
-        case "range":
-        case "number":
-        case "text":
-          openEditor()
-          break
-        case "expandable":
-          if (!row.infoOnly && (bodyText !== "" || descText !== "")) setExpanded(!expanded)
-          break
-        case "group":
-          setExpanded(!expanded)
-          break
-        case "result":
-          if (itm) {
-            const panel = Menu.probeSource
-            if (panel && typeof panel.consumePendingResult === "function") {
-              panel.pendingResult = itm
-              Qt.callLater(panel.consumePendingResult)
-            } else {
-              Menu.jumpTo(itm.pageId, itm.row)
-            }
-          }
-          break
-      }
-    } finally {
-      // A flat scoped result leaves the filter ARMED: the handoff fades its
-      // rows out and clears the filter at the page-switch edge, then walks
-      // the chain. Clearing here would swap the filtered rows for the full
-      // page before the fade even starts.
-      if (_wasFiltered && Menu.scopedActive
-        && !(itm && itm.scopedResult === true)) {
-        if (Menu.panel) Menu.panel._scopedClearByAction = true
-        Menu.clearScoped()
-      }
+    const cf = row.confirm
+    if (cf && cf.action === "clearHistory") {
+      const has = Registry.get("appLauncher", "hasUsageHistory")
+      if (has === false) return
     }
+    Menu.rowActivate(itm, {
+      pageId: Menu.pageId, view: "list", origin: "ui",
+      emptyBody: ptype === "expandable" && bodyText === "" && descText === "",
+      collapse: () => row.collapse(),
+      focus: () => Qt.callLater(grabEditorFocus),
+      consumeResult: itm ? () => {
+        const panel = Menu.probeSource
+        if (panel && typeof panel.consumePendingResult === "function") {
+          panel.pendingResult = itm
+          Qt.callLater(panel.consumePendingResult)
+        } else Menu.jumpTo(itm.pageId, itm.row)
+      } : null
+    })
   }
 
   function flip(state) {
-    if (!itm) return
-    // Every route to a toggle lands here, so this is the only place that
-    // sees a flip and the only place that can report one exactly once.
-    // The same DEBUG line as a staged choice, for the same reason: a toggle
-    // flip is a state change, and the state change itself is already
-    // reported by whoever consumes it - a setting write prints
-    // "shell.wallpaper.enabled updated to false", and that is the line worth
-    // reading. "Show wallpaper chosen in General checked=true" restates it
-    // one step earlier and says less.
-    const _wasFiltered = Menu.scopedActive
-    try {
-      if (Menu.handleToggle(itm, state)) return
-      const guarded = typeof itm.checked === "string" && itm.checked !== ""
-      if (guarded) {
-        // Literal/mirror toggle: stamp the requested state so the pill
-        // flips instantly, then reconcile against reality via a guard
-        // re-evaluation (which overwrites guardChecked with the actual
-        // result of the action). No session/store write happens.
-        Menu.setGuardChecked(itm, state)
-        if (itm.onToggle) Menu.runCommand(itm.onToggle, state)
-        Menu.refreshGuards()
-      } else {
-        // var-bound toggles (settings) have no onToggle - they persist
-        // through the store. Literal toggles need an onToggle.
-        if (itm.var === "" && !itm.onToggle) return
-        Menu.setChecked(itm, state)
-        if (itm.onToggle) Menu.runCommand(itm.onToggle, state)
-      }
-    } finally {
-      if (_wasFiltered && Menu.scopedActive) {
-        if (Menu.panel) Menu.panel._scopedClearByAction = true
-        Menu.clearScoped()
-      }
-    }
+    // The model owns the precedence and the store write; this delegate only
+    // supplies the view context. Keep one entrance so a toggle reached from
+    // a click, a key or IPC cannot take a different route.
+    Menu.rowSetToggle(itm, state, {
+      pageId: Menu.pageId, view: "list", origin: "ui",
+      collapse: () => row.collapse()
+    })
   }
 
   function setExpanded(value) {
@@ -1143,14 +1061,11 @@ Item {
         if (item && item.liveRow && item.liveRow.expanded) item.liveRow.collapse()
       }
     }
-    Menu.clearDescendantState(itm)
-    setExpanded(false)
+    Menu.rowClose(itm, {
+      pageId: Menu.pageId, view: "list", origin: "ui"
+    })
     optionIndex = -1
     row.childIndex = -1
-    row.confirmStage = 0
-    row.deleteArmed = false
-    row.promptOpen = false
-    if (row.isFlow && itm) Menu.resetFlow(itm)
   }
 
   // Drive the select value swap. Called from selectText's own text
@@ -1185,32 +1100,10 @@ Item {
   // re-composes its page.
   function requestDelete() {
     if (!enabled_ || !itm || row.deleteConfirm === null) return
-    // Armed from the first key: even an already-expanded row (open
-    // dropdown) swaps its expansion to the deletion confirmation.
-    row.deleteArmed = true
-    if (!row.expanded) {
-      row.setExpanded(true)
-      row.confirmStage = 1
-    } else if (row.confirmStage < row.deleteConfirm.stages) {
-      row.confirmStage = row.deleteConfirm.stages
-    } else {
-      const dc = String(itm.delCommand ?? "")
-      row.confirmStage = 0
-      row.deleteArmed = false
-      row.collapse()
-      if (dc !== "") {
-        const value = itm.value !== undefined ? String(itm.value) : ""
-        // "@forget" routes to the owning page's api, the same contract the
-        // grid's forgetCurrent uses. A list row reaches it through this
-        // staged path instead of a shell command template.
-        if (dc === "@forget") {
-          const api = Menu.frame ? Menu.dynamicApi(Menu.frame.id) : null
-          if (api && typeof api.forget === "function") api.forget(value)
-        } else {
-          Menu.runCommand(dc, value)
-        }
-      }
-    }
+    Menu.rowDelete(itm, {
+      pageId: Menu.pageId, view: "list", origin: "ui",
+      collapse: () => row.collapse()
+    })
   }
 
   // Panel-driven dropdown navigation; returns true when consumed.
@@ -1279,7 +1172,7 @@ Item {
   function openEditPrompt() {
     if (!itm || !row.isSelect || !enabled_) return
     optionIndex = -1
-    row.promptOpen = true
+    Menu.setPromptOpen(itm, true)
     Menu.setExpanded(itm, true)
     // Focus must land without waiting for the watchdog tick, or early
     // keystrokes leak into the query instead of the field.
@@ -1306,18 +1199,17 @@ Item {
       collapse()
       return true
     }
-    Menu.setFlowValue(itm, row.flowIndex, value)
-    // One read of the stage map: the skip rule weighs every stored value,
-    // and the row must not re-read controller state per candidate stage.
-    const next = MenuLib.nextFlowIndex(src, row.flowIndex + 1,
-      Menu.flowValuesOf(itm))
-    if (next >= MenuLib.flowCount(src)) { return false }
-    Menu.setFlowIndex(itm, next)
-    const upcoming = MenuLib.flowStep(src, next)
-    // Option cursor re-seeds on dropdown entry (see onDropdownOpenChanged);
-    // editor focus lands via the same path as openEditor().
-    Qt.callLater(grabEditorFocus)
-    return true
+    const ctx = {
+      pageId: Menu.pageId, view: "list", origin: "ui", item: itm,
+      collapse: () => row.collapse(),
+      focus: () => Qt.callLater(grabEditorFocus)
+    }
+    const before = row.flowIndex
+    Menu.rowFlowAdvance(value, ctx)
+    // A staged choice re-seeds its option cursor on dropdown entry; the
+    // shared controller has already set the next stage and its draft. False
+    // means the flow reached its last stage and the caller must commit.
+    return Menu.flowIndexOf(itm) !== before
   }
 
   // Set while this delegate consumes an Escape as a stage step. The panel's
@@ -1329,12 +1221,11 @@ Item {
     if (!row.isFlow || row.flowIndex <= 0) return false
     flowBackConsumed = true
     Qt.callLater(() => { flowBackConsumed = false })
-    // The previous stage is an editor; keep the row's slot open so the field
-    // is on screen immediately instead of needing a second Enter to reopen.
-    if (!Menu.isExpanded(itm)) Menu.setExpanded(itm, true)
-    Menu.setFlowIndex(itm, row.flowIndex - 1)
-    Qt.callLater(grabEditorFocus)
-    return true
+    return Menu.rowFlowBack({
+      pageId: Menu.pageId, view: "list", origin: "ui", item: itm,
+      collapse: () => row.collapse(),
+      focus: () => Qt.callLater(grabEditorFocus)
+    })
   }
 
   // Seeded number for flow number/range stages: the stored stage value
@@ -1376,40 +1267,14 @@ Item {
         row.commitFlow()
         return
       }
-      // Prompt option (free text inside the dropdown): open the editor
-      // in place instead of committing + closing. The daemon only hears
-      // about it when the editor's Enter runs editCall.
-      if (itm && itm.editValue !== undefined
-          && String(value) === String(itm.editValue)) {
-        row.openEditPrompt()
-        return
-      }
-      const isAction = row.isActionSelect
-      collapse()
-      // Settings selects: no-op if same value to avoid redundant IO.
-      // Action-selects (recording) must always fire, even if picking the
-      // same label again (e.g. Screen when value already "screen").
-      if (!isAction && st && String(st.value) === String(value)) return
-      Menu.setValue(itm, value)
-      if (isAction) {
-        if (itm && itm.keepOpen) {
-          // keepOpen action-select (idle timers): the pick has no
-          // capture UI behind it, so only the dropdown collapses - the
-          // menu stays open and the call fires in place.
-          if (itm.onCall !== "") Menu.runCall(itm.onCall, value)
-          else Menu.runCommand(itm.onSelect, value)
-        } else {
-          // Action-select (recording): close menu first so capture UIs
-          // like `slurp` don't composite over the still-visible layer.
-          Menu.close()
-          Qt.callLater(() => itm.onCall !== ""
-            ? Menu.runCall(itm.onCall, value)
-            : Menu.runCommand(itm.onSelect, value))
-        }
-      } else {
-        if (itm.onCall !== "") Menu.runCall(itm.onCall, value)
-        else Menu.runCommand(itm.onSelect, value)
-      }
+      // A common controller handles the prompt option, the settings no-op,
+      // action-select close/defer and the scoped-filter hand-off. The delegate
+      // contributes only its collapse and focus callbacks.
+      Menu.rowChoose(itm, value, {
+        pageId: Menu.pageId, view: "list", origin: "ui",
+        collapse: () => row.collapse(),
+        focus: () => Qt.callLater(grabEditorFocus)
+      })
     } finally {
       if (_wasFiltered && Menu.scopedActive) {
         if (Menu.panel) Menu.panel._scopedClearByAction = true
@@ -1428,36 +1293,36 @@ Item {
       const desc = String(kid.desc ?? "")
       const warn = String(kid.warning ?? "")
       if (desc === "" && warn === "") return
-      Menu.setInfo(kid, !Menu.infoOpen(kid))
+      Menu.rowSetInfo(kid, !Menu.infoOpen(kid), {
+        pageId: Menu.pageId, view: "list", origin: "ui"
+      })
       return
     }
     if (descText === "" && warnText === "") return
     // An expanded row already renders its description in-shell; there
     // is nothing for ctrl+i to toggle without stacking a second copy.
     if (row.descInShell) return
-    Menu.setInfo(itm, !Menu.infoOpen(itm))
+    Menu.rowSetInfo(itm, !Menu.infoOpen(itm), {
+      pageId: Menu.pageId, view: "list", origin: "ui"
+    })
   }
 
   function stepBy(direction) {
     if (!hasStepper || !enabled_) return
-    if (Menu.isNumberActive(itm)) return
-    let next = MenuLib.clamp(numericValue + direction * stepSize,
-      minimum, maximum)
-    next = MenuLib.quantize(next)
-    if (next === numericValue) return
-    Menu.setValue(itm, next)
-    if (Menu.handleNumberChange(itm, next)) return
-    Menu.runCommand(itm.onChange, Format.fixed(next, decimals) + unitSuffix)
+    Menu.rowStep(itm, direction, {
+      pageId: Menu.pageId, view: "list", origin: "ui",
+      numeric: numericValue, minimum: minimum, maximum: maximum,
+      decimals: decimals, step: stepSize, unit: unitSuffix
+    })
   }
 
   function openEditor() {
     if (!hasEditor || !enabled_) return
-    Menu.setValue(itm, isText ? String(st.value ?? "") : numericValue)
-    setExpanded(true)
-    // Focus must land without waiting for the expansion to settle, or
-    // early keystrokes leak into the query instead of the field. The
-    // editor-open signal below completes what this fast path misses.
-    Qt.callLater(grabEditorFocus)
+    Menu.rowOpen(itm, {
+      pageId: Menu.pageId, view: "list", origin: "ui",
+      numeric: numericValue,
+      focus: () => Qt.callLater(grabEditorFocus)
+    })
   }
 
   function grabEditorFocus() {
@@ -1467,74 +1332,20 @@ Item {
   }
 
   function commitEditor(text) {
-    if (row.isFlow && (row.flowKind === "text" || row.flowKind === "number"
-        || row.flowKind === "range")) {
-      if (row.advanceFlow(String(text))) return
-      row.commitFlow()
-      return
+    const ctx = {
+      pageId: Menu.pageId, view: "list", origin: "ui", item: itm,
+      numeric: numericValue, minimum: minimum, maximum: maximum,
+      decimals: decimals, unit: unitSuffix,
+      collapse: () => row.collapse(),
+      focus: () => Qt.callLater(grabEditorFocus)
     }
-    // Prompt mode on a select row: the field holds free text for the
-    // editCall template. An empty commit quietly closes - the row keeps
-    // its prior action/command. The Registry hub passes multi-word
-    // values as one argument, so quotes and spaces stay intact.
-    if (row.promptOpen) {
-      const pt = String(text).trim()
-      row.promptOpen = false
-      collapse()
-      if (pt !== "" && itm && itm.editCall !== undefined && itm.editCall !== "")
-        Menu.runCall(itm.editCall, pt)
-      return
-    }
-    if (isText) {
-      const t = String(text).trim()
-      // Settings-backed text (var): persist directly, honoring allowEmpty
-      // (e.g. shell.statusbar.networkRightClick). Non-setting text (action)
-      // keeps the clear-then-run behavior.
-      if (itm && itm.var !== undefined && itm.var !== "") {
-        Menu.setValue(itm, t)
-        if (t !== "" && itm.onSubmit) Menu.runCommand(itm.onSubmit, t)
-        collapse()
-        return
-      }
-      // An action text row with no command has nothing to run: the typed text
-      // is the value, so keep it in state instead of clearing it on commit.
-      if (itm && itm.onSubmit) {
-        Menu.setValue(itm, "")
-        Menu.runCommand(itm.onSubmit, t)
-      } else {
-        Menu.setValue(itm, t)
-      }
-      collapse()
-      return
-    }
-    // Erased everything -> silent discard: close without applying.
-    if (String(text).trim() === "") {
-      collapse()
-      return
-    }
-    const typed = MenuLib.leadingNumber(text)
-    // Unsupported data silently restores the current actual value and
-    // keeps the editor open for another try.
-    if (typed === null) {
+    if (Menu.rowCommitEdit(itm, text, ctx)) return
+    // Unsupported numeric input restores the current value and keeps the
+    // editor open for another try, the same as before the extraction.
+    if (!isText && !row.promptOpen && !row.isFlow) {
       Menu.setValue(itm, numericValue)
       Qt.callLater(grabEditorFocus)
-      return
     }
-    let next = MenuLib.quantize(MenuLib.clamp(typed, minimum, maximum))
-    // Unchanged values close without firing onChange — unless the
-    // entry has an onChange command (e.g. timer start) that should
-    // fire on every commit.
-    if (next === numericValue) {
-      if (Menu.handleNumberChange(itm, next)) { collapse(); closeIfArmed(); return }
-      if (itm.onChange && itm.onChange !== "")
-        Menu.runCommand(itm.onChange, Format.fixed(next, decimals) + unitSuffix)
-      collapse()
-      return
-    }
-    Menu.setValue(itm, next)
-    if (Menu.handleNumberChange(itm, next)) { collapse(); closeIfArmed(); return }
-    Menu.runCommand(itm.onChange, Format.fixed(next, decimals) + unitSuffix)
-    collapse()
   }
 
   // Final flow commit: dispatches through the row's existing verbs so
@@ -1544,21 +1355,11 @@ Item {
   // stage map stays readable via Menu.flowValuesOf(itm) for services
   // that need every step (Idle add-wizard in spec 40).
   function commitFlow() {
-    const src = row.flowSrc
-    if (!itm || !src) { collapse(); return }
-    const vals = Menu.flowValuesOf(itm)
-    if (typeof Menu.handleFlow === "function"
-      && Menu.handleFlow(src, vals)) { collapse(); return }
-    const lastIdx = MenuLib.flowCount(src) - 1
-    const last = vals[String(lastIdx)]
-    const text = last !== undefined ? String(last) : ""
-    collapse()
-    if (itm.onCall !== "") Menu.runCall(itm.onCall, text)
-    else if (itm.onSelect !== "") Menu.runCommand(itm.onSelect, text)
-    else if (itm.onChange !== "") Menu.runCommand(itm.onChange, text)
-    else if (itm.editCall !== "") Menu.runCall(itm.editCall, text)
-    else if (itm.onSubmit !== "") Menu.runCommand(itm.onSubmit, text)
-    closeIfArmed()
+    if (!itm || !row.flowSrc) { collapse(); return }
+    Menu.rowFlowCommit({
+      pageId: Menu.pageId, view: "list", origin: "ui", item: row.flowSrc,
+      collapse: () => row.collapse()
+    })
   }
 
   // Provider/type rows that opt into `"close": true` dismiss the whole
@@ -2472,8 +2273,9 @@ Item {
         })
         view.autoRevealIndex = -1
       }
-      row.confirmStage = 0
-      row.promptOpen = false
+      // Modal flags live on the model now: clearing them here retires the
+      // staged confirmation/prompt for rows with no delegate too.
+      if (itm) Menu._setRowState(itm, { confirmKind: "", confirmStage: 0, promptOpen: false })
     }
   }
 

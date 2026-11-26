@@ -16,6 +16,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
 t_init "menu-nested-live" "reveal restore, layered Escape and staged swaps on the live shell"
 
+# Serialise against the other live menu suites: they all drive one shell.
+MENU_LIVE_LOCK="${TMPDIR:-/tmp}/vb-menu-live.lock"
+exec 9>"$MENU_LIVE_LOCK"
+flock -w 600 9 || t_block "could not acquire the menu live lock"
+
 if ! command -v qs >/dev/null 2>&1; then
   t_block "qs is not on PATH"
 fi
@@ -29,6 +34,39 @@ if [[ ! -f $FIXTURE ]]; then
 fi
 
 p() { qs -p "$VIBRANIUM_DIR/shell" ipc call menu "$@"; }
+
+# The resident panel's deep sampler records a frame every 16 ms in shell time.
+# Reading the finished array in one reply keeps consecutive-frame assertions
+# independent of how long an external `qs ipc call` round trip takes.
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/vb-menu-nested.XXXXXX")"
+
+collect_deep() {
+  local out="$1" off=0 take=8 chunk
+  : >"$out"
+  while :; do
+    chunk="$(p probeDeep "$off" "$take" 2>/dev/null)"
+    if ! printf '%s' "$chunk" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+      ((take > 1)) || return 1
+      take=$((take / 2))
+      continue
+    fi
+    [[ $chunk == '[]' ]] && break
+    printf '%s\n' "$chunk" >>"$out"
+    off=$((off + take))
+  done
+}
+
+deep_motion() {
+  python3 - "$@" <<'PY'
+import json, sys
+for path in sys.argv[1:]:
+    for line in open(path):
+        for f in json.loads(line):
+            b = f["base"]
+            print(b["contentY"], b["animRunning"], b["hlMoveMs"],
+                  b["seatsInstant"], b["followIdx"], b["index"])
+PY
+}
 
 # probe_field <python-expression over d>
 probe_field() {
@@ -46,7 +84,9 @@ open_fixture() {
 # a menu close; the trace gates are explicitly turned off either way.
 cleanup() {
   p debugTrace off >/dev/null 2>&1
+  p debugDeep off >/dev/null 2>&1
   p close >/dev/null 2>&1
+  rm -rf "$WORK"
 }
 trap cleanup EXIT
 
@@ -474,11 +514,15 @@ sleep 0.6
 t_eq "the jump starts at index one" "1" "$(probe_field 'd["index"]')"
 
 # The verb under test: one 1 -> 7 jump, sampled across consecutive frames.
+# Sampling now happens inside the resident panel, so a slow IPC round trip can
+# no longer swallow the 120 ms animation. The six values and every assertion
+# below are the same as before.
+p debugDeep on >/dev/null 2>&1
 p debugSetCurrentIdx 7 >/dev/null 2>&1
-prog_samples=""
-for _ in 1 2 3 4 5 6 7 8 9 10; do
-  prog_samples+="$(probe_motion)"$'\n'
-done
+sleep 0.4
+p debugDeep off >/dev/null 2>&1
+collect_deep "$WORK/programmatic.jsonl"
+prog_samples="$(deep_motion "$WORK/programmatic.jsonl")"
 read -r p_anim p_span p_hl p_inst p_follow p_cy p_idx \
   <<<"$(motion_metrics "$prog_samples")"
 

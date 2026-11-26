@@ -7,7 +7,7 @@ import qs.common
 import "Model.js" as Model
 import "../../../../common/collections/TableSort.js" as TableSort
 
-// Arch updates island: searchable package table for official and AUR
+// System updates island: searchable package table for official and AUR
 // updates with macOS-Finder-style checkboxes. Rows are selected with a
 // click; "Update Official" / "Update AUR" then update exactly the checked
 // packages of that type (all of them when nothing is checked).
@@ -277,8 +277,8 @@ Item {
   // tooltip). One condition feeds the warning box, the red total and the
   // window-height delta below, so the three cannot disagree about what
   // "heavy" means. The whole feature also gates on
-  // shell.statusbar.archUpdatesHeavyWarning (Settings).
-  readonly property bool heavyWarnEnabled: Settings.statusbarArchUpdatesHeavyWarning
+  // shell.statusbar.systemUpdatesHeavyWarning (Settings).
+  readonly property bool heavyWarnEnabled: Settings.statusbarSystemUpdatesHeavyWarning
   readonly property bool heavyQueue: Model.heavyQueue(root.packages, root.heavyWarnEnabled)
   // Height the heavy-updates warning adds on top of the fixed 310: the
   // box plus one actions-column gap (5). Read off the live content so a

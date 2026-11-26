@@ -380,7 +380,7 @@ Item {
       // shared ZebraRow (square, hoverable, keyboard cursor highlight).
       // All matches show: ~5 rows visible, the rest under the wheel.
       // The scrollbar rides a reserved 6px lane so it never covers text
-      // (the ArchUpdates lesson).
+      // (the SystemUpdates lesson).
       Item {
         width: parent.width
         height: visible ? suggList.height : 0

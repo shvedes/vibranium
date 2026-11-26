@@ -175,6 +175,10 @@ Item {
       '  property int scanSeq: 0',
       '  property bool _scanQueued: false',
       '  property bool pluginsResolved: true',
+      // Batch B publishes discovery state from the same exit handler. The
+      // stub carries it so the exact source block can still be evaluated.
+      '  property string discoveryState: "ready"',
+      '  property var plugins: []',
       '  property var registered: []',
       '  property var registerLog: []',
       '  property int registerCalls: 0',
@@ -192,7 +196,9 @@ Item {
       '  function drainLater() { const q = m.laterQueue.splice(0); for (const f of q) f() }',
       '  function _registerPlugins(dirs) { m.registerCalls++; m.registered = dirs.slice(); m.registerLog.push(dirs.join(",")) }',
       '  ' + d,
-      '  function fireExited() { m.proc.running = false; ' + e + ' }',
+      // The exit handler receives the process code as an argument; the stub
+      // fires the successful path so the directory collector is exercised.
+      '  function fireExited() { m.proc.running = false; (function (code) {' + e + '})(0) }',
       '}'
     ].join("\n"), root, "launcher_scan_slice.qml")
   }
@@ -297,6 +303,8 @@ Item {
       '  property bool visible: false',
       '  property var timeCache: ({})',
       '  property int _timeTtlMs: 1000',
+      // Batch B's failed-zone stamp must exist in the slice too.
+      '  property var _timeFailures: Object.create(null)',
       '  property string _timePendingZone: ""',
       '  property var _timePendingZones: []',
       '  property var started: []',

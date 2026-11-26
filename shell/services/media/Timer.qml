@@ -528,11 +528,11 @@ Singleton {
 
   // IPC ---------------------------------------------------------------------
   IpcHandler {
+    id: ipc
     target: "timer"
     function help(command: string): string {
-      return UnitIpc.help("timer", "Timer", "countdown timer", [
-        { name: "start", help: "(seconds) start a timer" },
-        { name: "startMinutes", help: "(minutes) start a timer" },
+      return UnitIpc.help("timer", "Timer", "Run a countdown timer", [
+        { name: "start", help: "(seconds) start a timer, or 'start minutes <N>'" },
         { name: "stop", help: "stop the timer" },
       ], command)
     }
@@ -545,11 +545,6 @@ Singleton {
       const v = root.parseDuration(seconds)
       if (!(v > 0)) return "error: invalid seconds"
       return root.start(Math.round(v)) ? "ok" : "error"
-    }
-    function startMinutes(mins: string): string {
-      const v = Number(mins)
-      if (!(v > 0)) return "error: invalid minutes"
-      return root.startMinutes(v) ? "ok" : "error"
     }
     function stop(): string { root.stop(); return "ok" }
     function status(): string {
@@ -599,15 +594,25 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("timer", root, {
+      "timer.start": function (a) { return ipc.start(a.N) },
+      "timer.start.minutes": function (a) {
+        const v = Number(a.N)
+        if (!(v > 0)) return "error: invalid minutes"
+        return root.startMinutes(v) ? "ok" : "error"
+      },
+      "timer.stop": function () { return ipc.stop() },
+      "timer.status": function () { return ipc.status() },
+      "timer.ping": function () { return ipc.ping() }
+    })
     Registry.register(root.tag, root)
     root._registerMenuProvider()
     root._publish()
     Registry.offer("timer", {
       title: "Timer",
-      description: "countdown timer",
+      description: "Run a countdown timer",
       verbNames: [
         "start",
-        "startMinutes",
         "stop",
         "status",
         "help",
@@ -617,6 +622,7 @@ Singleton {
   }
 
   Component.onDestruction: {
+    IpcRouter.unregister("timer", root)
     // Teardown releases the provider id: the surface closes over this
     // root, so a survivor would keep a dead confirm closure.
     ProviderHost.unregisterProvider("timer", root)

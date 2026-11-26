@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQml
 import QtQuick
 import QtQuick as QQ
+import Quickshell.Hyprland
 import Quickshell.Io
 import qs.common
 import qs.common as Common
@@ -23,6 +24,14 @@ import qs.boot
 
 Item {
   id: boot
+
+  Connections {
+    target: Hyprland
+
+    function onRawEvent(event) {
+      if (event.name === "custom") IpcRouter.invokeShortcut(event.data)
+    }
+  }
 
   readonly property var _catalog: [
     {
@@ -532,12 +541,12 @@ Item {
       retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
-      id: "archUpdates",
+      id: "systemUpdates",
       phase: "on_demand",
       criticality: "optional",
       activation: "gated_compat",
       dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("archUpdates") },
+      resolver: function() { return boot._resolveDescriptor("systemUpdates") },
       teardown: null,
       retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
@@ -643,6 +652,16 @@ Item {
       retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
+      id: "tools",
+      phase: "early",
+      criticality: "optional",
+      activation: "resident",
+      dependencies: ["settings", "paths"],
+      resolver: function() { return boot._resolveDescriptor("tools") },
+      teardown: null,
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
+    },
+    {
       id: "powerMenu",
       phase: "deferred",
       criticality: "optional",
@@ -719,6 +738,20 @@ Item {
   // recomputed on every unit event and printed only when it moves.
   property string _shellMilestone: ""
   Component.onCompleted: {
+    // The two transport targets are registered before anything can ask for
+    // help or status. These are constant closures over boot's own projections;
+    // the router owns parsing, validation and paging.
+    IpcRouter.register("shell", boot, {
+      "shell.status": function () { return boot._shellStatus() },
+      "shell.doctor": function () { return boot._shellDoctor() },
+      "shell.ping": function () { return "pong" }
+    })
+    IpcRouter.register("boot", boot, {
+      "boot.status": function () { return boot._shellStatus() },
+      "boot.state": function () { return boot._bootState() },
+      "boot.timeline": function () { return boot._bootTimeline() },
+      "boot.ping": function () { return "pong" }
+    })
     // Fired first so the late half compiles on a worker thread while the
     // floor and Phase 1 drain on this one. Nothing below waits for it:
     // _beginDrain runs when it lands.
@@ -737,6 +770,26 @@ Item {
     // resolving any late unit compiles, so the drain waits for them while
     // the floor and Phase 1 are already on screen.
   }
+
+  Component.onDestruction: {
+    IpcRouter.unregister("shell", boot)
+    IpcRouter.unregister("boot", boot)
+  }
+
+  // Shared projections. The native handlers below keep their signatures and
+  // replies; the router calls these same functions so there is one source.
+  function _shellStatus(): string {
+    boot._syncReport()
+    return JSON.stringify(boot._report)
+  }
+
+  function _shellDoctor(): string {
+    boot._syncReport()
+    return JSON.stringify(boot._audit())
+  }
+
+  function _bootState(): string { return JSON.stringify(boot._stateSnapshot()) }
+  function _bootTimeline(): string { return JSON.stringify(boot._timeline()) }
 
   // The late halves of boot: BootBar.qml (the bar surface), BootServices.qml
   // (the qs.services singletons) and BootLate.qml (feature modules). All three
@@ -1863,27 +1916,26 @@ Item {
   IpcHandler {
     target: "boot"
 
-    function status(): string {
-      boot._syncReport()
-      return JSON.stringify(boot._report)
+    function status(): string { return boot._shellStatus() }
+    function state(): string { return boot._bootState() }
+    function timeline(): string { return boot._bootTimeline() }
+    function help(): string {
+      return "Usage: vb-shell boot <command> [args...]\n"
+        + "\nBoot lifecycle and startup timeline.\n"
+        + "\nRun `vb-shell boot help` for the command list, or `vb-shell help boot`.\n"
     }
-    function state(): string {
-      return JSON.stringify(boot._stateSnapshot())
-    }
-    function timeline(): string {
-      return JSON.stringify(boot._timeline())
-    }
+    function ping(): string { return "pong" }
   }
 
   IpcHandler {
     target: "shell"
     function help(): string {
-      // Offer ids are boot-catalog names, not IPC target names: three units
+      // Offer ids are boot-catalog names, not IPC target names: two units
       // offer under one name and answer under another. The table lists what
       // `vb-shell` accepts. Targets without an offer (boot, shell,
       // colorPicker, screenshots) stay reachable through `vb-shell -l` and
       // their own `<unit> help`, but have no row here.
-      const rename = { archUpdates: "arch-updates", idleDaemon: "idle", powerMenu: "power" }
+      const rename = { idleDaemon: "idle", powerMenu: "power" }
       const ids = Registry.offers()
       const rows = []
       var width = 0
@@ -1908,6 +1960,7 @@ Item {
         + "\nVibranium shell IPC.\n"
         + "\nOptions:\n"
         + "  -l, --list      List available IPC targets and functions\n"
+        + "  -j, --json      Emit typed JSON instead of text\n"
         + "  -v, --verbose   Enable verbose output\n"
         + "  -h, --help      Display this help and exit\n"
         + "\nUnits:\n" + units
@@ -1917,14 +1970,15 @@ Item {
         + "  vb-shell audio status\n"
         + "\nRun `vb-shell <unit> help` for unit details.\n"
     }
-    function status(): string {
-      boot._syncReport()
-      return JSON.stringify(boot._report)
-    }
-    function doctor(): string {
-      boot._syncReport()
-      return JSON.stringify(boot._audit())
-    }
+    function status(): string { return boot._shellStatus() }
+    function doctor(): string { return boot._shellDoctor() }
+    function ping(): string { return "pong" }
+
+    // Reserved transport. The Python client sends one `v1:` envelope as a
+    // single argv word; Quickshell's fixed-arity string handlers carry it
+    // unchanged to the router. These are not public CLI verbs.
+    function describe(request: string): string { return IpcRouter.describe(request) }
+    function invoke(request: string): string { return IpcRouter.invoke(request) }
   }
 
   function _audit() {

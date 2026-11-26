@@ -8,6 +8,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import qs.common
+import qs.services as Services
 import "../../common/capture/ShotLib.js" as ShotLib
 import "../../common/process/ProcControl.js" as ProcControl
 import "../../common/capture/RectMath.js" as RectMath
@@ -53,8 +54,12 @@ Singleton {
   }
   // Auto-annotate owns the only write: its Save must produce a file, so the
   // stored choice is ignored while it is on (the settings row is disabled).
-  readonly property bool saveToDisk: root.autoAnnotate
-    || Settings.value("shell.screenshots.saveToDisk") !== false
+  // The stored save preference, independent of the annotator's forced save.
+  readonly property bool _saveSetting: {
+    const v = Settings.value("shell.screenshots.saveToDisk")
+    return Settings.rev >= 0 && v !== false
+  }
+  readonly property bool saveToDisk: root.autoAnnotate || root._saveSetting
   readonly property bool showNotification: Settings.value("shell.screenshots.showNotification") !== false
   readonly property bool autoAnnotate: Settings.value("shell.screenshots.autoAnnotate") === true
   readonly property bool captureCursor: Settings.value("shell.screenshots.captureCursor") === true
@@ -176,14 +181,14 @@ Singleton {
       root._pendingPick.screen = current
     }
     if (root._regionRequest !== 0) {
-      const request = AnnotationActions.spec(root._regionRequest)
+      const request = Services.Tools.regionSpec(root._regionRequest)
       const current = request !== null ? root._matchingScreen(request.screen) : null
       if (current === null) {
         root._regionOutcome(root._regionRequest, { code: "failed", reason: "screen disconnected" })
         return
       }
       if (current !== request.screen) {
-        AnnotationActions.retarget(root._regionRequest, current)
+        Services.Tools.retargetRegion(root._regionRequest, current)
       }
     }
     if (root._liveRegion !== null) {
@@ -673,7 +678,7 @@ Singleton {
     }
     root._destroyPicker()
     if (root._regionRequest !== 0) {
-      AnnotationActions.close(root._regionRequest)
+      Services.Tools.closeRegion(root._regionRequest)
       root._regionRequest = 0
     }
     root._liveRegion = null
@@ -817,11 +822,22 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("screenshots", root, {
+      "screenshots.capture": function (a) {
+        return ipc.capture(a.TARGET, (a.flags || []).join(" "))
+      },
+      "screenshots.picker": function () { return ipc.picker() },
+      "screenshots.annotate": function (a) { return ipc.annotate(a.path) },
+      "screenshots.last": function () { return ipc.last() },
+      "screenshots.status": function () { return ipc.status() },
+      "screenshots.ping": function () { return ipc.ping() }
+    })
     Registry.register("screenshots", { noteSaved: root.noteSaved, noteCancelled: root.noteCancelled })
     root._initRuntime()
   }
 
   Component.onDestruction: {
+    IpcRouter.unregister("screenshots", root)
     root._cancelActiveFlow("shutdown")
     SurfaceClaim.releaseOwner(root)
     if (root._startupProcess !== null) {
@@ -884,7 +900,7 @@ Singleton {
       frameW: job.frameW, frameH: job.frameH, screen: job.screen,
       config: job.config, flowId: job.flowId
     }
-    const opened = AnnotationActions.request("region", {
+    const opened = Services.Tools.requestRegion({
       screen: seed.screen, url: seed.url, frameW: seed.frameW, frameH: seed.frameH,
       immediate: false, jobId: seed.jobId, flowId: seed.flowId
     })
@@ -898,14 +914,31 @@ Singleton {
     root._regionRequest = opened.id
   }
 
+  // Resolve one capture's delivery choices. `plain` suppresses the annotator,
+  // `save` forces a disk file, and `copy` is accepted even though a capture is
+  // always published to the clipboard. Everything else follows the stored
+  // settings.
+  function _captureConfig(flags) {
+    const set = flags !== undefined && flags !== null ? flags : {}
+    const annotate = set.plain === true ? false : root.autoAnnotate
+    const saved = set.save === true ? true : (annotate ? true : root._saveSetting)
+    return {
+      fileType: root.fileType,
+      saveToDisk: saved,
+      autoAnnotate: annotate,
+      showNotification: root.showNotification,
+      copyToClipboard: true
+    }
+  }
+
   // The live branch: the selector grabs its own frame, so the service's
   // shot window is not involved at all and the frame has no size until the
   // selector reports one.
-  function _openLiveRegion(target) {
+  function _openLiveRegion(target, flags) {
     root._jobSeq++
     const jobId = root._jobSeq
     root._activeJob = jobId
-    const opened = AnnotationActions.request("region", {
+    const opened = Services.Tools.requestRegion({
       screen: target, url: "", frameW: 0, frameH: 0,
       immediate: true, jobId: jobId, flowId: root._activeFlow
     })
@@ -916,10 +949,7 @@ Singleton {
     }
     root._liveRegion = {
       jobId: jobId, flowId: root._activeFlow, screen: target,
-      config: {
-        fileType: root.fileType, saveToDisk: root.saveToDisk,
-        autoAnnotate: root.autoAnnotate, showNotification: root.showNotification
-      }
+      config: root._captureConfig(flags)
     }
     root._regionRequest = opened.id
     return true
@@ -1206,10 +1236,10 @@ Singleton {
   // `keepSurfaces` photographs the screen as it stands: no claim, so an open
   // menu stays in the frame. The live selector gates its dimming until the
   // frame lands, so it never paints itself into the frame it is selecting.
-  function openRegionSelect(screen, existingFlow, immediate, keepSurfaces) {
+  function openRegionSelect(screen, existingFlow, immediate, keepSurfaces, flags) {
     if (!root._runtimeReady) {
       if (root._runtimeFailed || Number(existingFlow) > 0) return false
-      return root._queueStart(() => root.openRegionSelect(screen, existingFlow, immediate, keepSurfaces))
+      return root._queueStart(() => root.openRegionSelect(screen, existingFlow, immediate, keepSurfaces, flags))
     }
     if (Number(existingFlow) > 0 && root._activeFlow !== Number(existingFlow)) return false
     if (!(Number(existingFlow) > 0)
@@ -1226,8 +1256,8 @@ Singleton {
       root._releaseFlow(flowId)
       return false
     }
-    if (immediate === true) return root._openLiveRegion(target)
-    root._armShot(target, "region-seed", false)
+    if (immediate === true) return root._openLiveRegion(target, flags)
+    root._armShot(target, "region-seed", false, flags)
     return true
   }
 
@@ -1322,7 +1352,7 @@ Singleton {
   // and flow identity, and the seed url the seeded branch matched on.
   function _regionIdentityValid(id, seed) {
     if (!ShotLib.requestLive(id, root._regionRequest)) return false
-    const request = AnnotationActions.spec(id)
+    const request = Services.Tools.regionSpec(id)
     if (request === null) return false
     if (seed === null) {
       return ShotLib.liveRegionIdentity(root._liveRegion, request, root._activeFlow)
@@ -1334,7 +1364,7 @@ Singleton {
   // terminal path ends here and none of them references a view.
   function _closeRegion(id) {
     if (!ShotLib.requestLive(id, id)) return
-    AnnotationActions.close(id)
+    Services.Tools.closeRegion(id)
     if (root._regionRequest === id) root._regionRequest = 0
   }
 
@@ -1351,7 +1381,7 @@ Singleton {
   // this flow already saved; both release the selector before the crop
   // runs, because nothing else in the flow needs it.
   function _regionAccepted(id, outcome) {
-    const request = AnnotationActions.spec(id)
+    const request = Services.Tools.regionSpec(id)
     const seed = root._regionSeed
     const x = Number(outcome.x) || 0
     const y = Number(outcome.y) || 0
@@ -1458,7 +1488,7 @@ Singleton {
     // A request with no record has no view: the controller that owned it
     // is gone, so nothing will settle it again and the flow is released
     // here instead of staying claimed for a surface that is not there.
-    if (AnnotationActions.spec(id) === null) {
+    if (Services.Tools.regionSpec(id) === null) {
       root._closeRegion(id)
       root._liveRegion = null
       root._activeJob = 0
@@ -1494,18 +1524,13 @@ Singleton {
   // window DPR that sizes the grab target. They are different numbers and
   // a capture cut to the wrong grid looks like a soft screenshot rather
   // than like a bug.
-  function _armShot(targetScreen, mode, immediate) {
+  function _armShot(targetScreen, mode, immediate, flags) {
     root._jobSeq++
     root._activeJob = root._jobSeq
     shotWin.targetScreen = targetScreen
     shotWin.mode = mode
     shotWin.jobId = root._activeJob
-    shotWin.config = {
-      fileType: root.fileType,
-      saveToDisk: root.saveToDisk,
-      autoAnnotate: root.autoAnnotate,
-      showNotification: root.showNotification
-    }
+    shotWin.config = root._captureConfig(flags)
     root._shotScreen = targetScreen
     root._activeShot = shotWin
     root._beginFrame(shotWin, immediate)
@@ -1518,10 +1543,10 @@ Singleton {
   // see _claimFlow. It is honoured only on a flow this call starts, so a
   // flow handed in from the picker handoff keeps the flag it was claimed
   // with rather than one passed to the wrong stage.
-  function capture(mode, screen, existingFlow, immediate, keepSurfaces) {
+  function capture(mode, screen, existingFlow, immediate, keepSurfaces, flags) {
     if (!root._runtimeReady) {
       if (root._runtimeFailed || Number(existingFlow) > 0) return false
-      return root._queueStart(() => root.capture(mode, screen, existingFlow, immediate, keepSurfaces))
+      return root._queueStart(() => root.capture(mode, screen, existingFlow, immediate, keepSurfaces, flags))
     }
     const supplied = Number(existingFlow) || 0
     if (supplied > 0 && root._activeFlow !== supplied) return false
@@ -1535,7 +1560,7 @@ Singleton {
       return false
     }
     root._pendingAnnotate = null
-    root._armShot(targetScreen, mode, immediate === true)
+    root._armShot(targetScreen, mode, immediate === true, flags)
     return true
   }
 
@@ -1791,10 +1816,8 @@ Singleton {
       || Number(win.jobId) !== jobId) return
     const mode = String(pending.mode)
     const screen = win.targetScreen
-    const currentConfig = win.config !== null && win.config !== undefined ? win.config : {
-      fileType: root.fileType, saveToDisk: root.saveToDisk,
-      autoAnnotate: root.autoAnnotate, showNotification: root.showNotification
-    }
+    const currentConfig = win.config !== null && win.config !== undefined ? win.config
+      : root._captureConfig(null)
     const config = {
       fileType: String(currentConfig.fileType), saveToDisk: currentConfig.saveToDisk === true,
       autoAnnotate: currentConfig.autoAnnotate === true,
@@ -2046,14 +2069,15 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "screenshots"
 
     function help(command: string): string {
-      return UnitIpc.help("screenshots", "Screenshots", "native capture + annotation", [
-        { name: "screen", help: "capture the active screen as it stands, open menus included" },
-        { name: "region", help: "pick a region, then capture it, open menus included" },
+      return UnitIpc.help("screenshots", "Screenshots", "Manage screenshots & annotations", [
+        { name: "capture", usage: " [plain] [copy] [save] screen|region", help: "capture the active screen or a picked region, open menus included" },
         { name: "picker", help: "choose region or screen" },
         { name: "annotate", help: "(path) open the annotation editor" },
+        { name: "last", help: "pathname of the last capture" },
       ], command)
     }
     function ping(): string { return "pong" }
@@ -2071,13 +2095,17 @@ Singleton {
     // asking "region or screen?" between the keypress and the frame is the
     // delay they are meant to skip. Both pass keepSurfaces so an open menu is
     // in the picture, which is the point when documenting a menu or an error.
-    function screen(): string {
-      const ok = root.capture("screen", undefined, 0, true, true)
+    function capture(target: string, flags: string): string {
+      const set = { plain: false, copy: false, save: false }
+      const list = String(flags || "").split(/\s+/).filter(v => v !== "")
+      for (let i = 0; i < list.length; i++) {
+        if (Object.prototype.hasOwnProperty.call(set, list[i])) set[list[i]] = true
+      }
+      let ok = false
+      if (target === "screen") ok = root.capture("screen", undefined, 0, true, true, set)
+      else if (target === "region") ok = root.openRegionSelect(undefined, 0, true, true, set)
+      else return "error: unknown capture target"
       return ok ? "ok" : "error: capture refused"
-    }
-    function region(): string {
-      const ok = root.openRegionSelect(undefined, 0, true, true)
-      return ok ? "ok" : "error: region select unavailable"
     }
     function picker(): string {
       const ok = root.openPicker()
@@ -2087,6 +2115,6 @@ Singleton {
       const ok = root.annotate(path)
       return ok ? "ok" : "error: nothing to annotate"
     }
-    function lastShot(): string { return root.lastPath }
+    function last(): string { return root.lastPath }
   }
 }

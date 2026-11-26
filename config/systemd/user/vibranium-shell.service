@@ -3,14 +3,11 @@ Description=Vibranium Shell
 PartOf=graphical-session.target
 BindsTo=graphical-session.target
 After=graphical-session.target
-ExecCondition=/bin/sh -c 'case "${XDG_CURRENT_DESKTOP:-}" in *Hyprland*) exit 0 ;; *) exit 1 ;; esac'
 
 [Service]
 Type=simple
 Environment=QS_CONFIG_PATH=%h/.local/share/vibranium/shell
-Environment=VIBRANIUM=%h/.local/share/vibranium
 Environment="MALLOC_CONF=thp:never,narenas:4,dirty_decay_ms:3000"
-Environment=VIBRANIUM_SHELL_WATCH=0
 ExecStart=/bin/sh -c 'export VIBRANIUM_SHELL_START_MS=$(date +%%s%%3N); exec qs'
 Restart=always
 RestartSec=1s

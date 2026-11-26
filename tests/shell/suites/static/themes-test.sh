@@ -5,7 +5,7 @@
 # Nothing in the tree tests this surface. The settings suites cover
 # shell/common/settings/catalog.jsonc, the assets suite covers shell/assets/, and the
 # theme surfaces are only probed with a synthetic /tmp tree, so the 44 real
-# themes, their 14-color palettes and their 247 wallpapers are untested data
+# themes, their 14-color palettes and their 249 wallpapers are untested data
 # that a single dropped `colors.list` key silently degrades.
 #
 # The required color set is DERIVED, not copied. Four independent sources in
@@ -735,7 +735,7 @@ for theme in "${THEMES[@]}"; do
   done < <(bg_files "$THEMES_DIR/$theme")
 done
 t_eq "every theme declares at least one background" "0" "$BG_THEME"
-t_count "the 44 themes ship 247 wallpapers" "247" "$BG_TOTAL"
+t_count "the 44 themes ship 249 wallpapers" "249" "$BG_TOTAL"
 t_eq "every background's extension is one ImageExts.ok() accepts" "" "$BG_BADEXT"
 t_eq "no background is a zero-byte file" "" "$BG_EMPTY_FILE"
 t_eq "the wallpapers are only jpg and png" "jpg png" \

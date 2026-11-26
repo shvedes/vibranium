@@ -252,12 +252,76 @@ Only bare `UPPER_SNAKE` options appear here. Shell-internal config
 Any of these routes land in the same store, validation and env swap:
 
 - the Settings menu (`qs.menu`, generated from the schema)
-- IPC: `vb-shell settings get|set|toggle|dump|reload <var> [json]`
+- IPC: `vb-shell settings get <KEY>`, `set <KEY> <JSON>`,
+  `toggle <KEY>`, `dump`, `reload`
 - hand edits to settings.json
 
 Invalid values are rejected at the boundary (out-of-range, enum violation,
 type mismatch) and never reach disk or scripts. Hooks declared on an option
 (`"hook": "..."`) run detached after the env swap completes.
+
+## Shell IPC migration
+
+`vb-shell` is now the supported scripting contract for the targets named in
+the shell IPC work order. Native debug handlers and in-process Registry calls
+for those targets are not discovery fallbacks, and retired spellings have no
+translation alias.
+
+### CLI contract for scripts
+
+`vb-shell --help` is a local guide: it needs no running shell and never starts
+one. `-h` is an alias for `--help` and prints that local guide; `-j`/`--json`
+emits typed JSON instead of the human table. `-l`/`--list` lists the public
+targets once;
+`-v`/`--verbose` adds only the transport path and duration. Global options are
+accepted only before the first path word, and a standalone `--` ends option
+parsing while a later `--` marks the remaining words literal.
+
+A JSON success is `{"v":1,"ok":true,"data":...,"format":...,"next":...}`. An
+operation with no result omits `data` entirely, which is different from
+`"data":null`; paged results carry `items` (and optional `meta`) plus a `next`
+cursor that must be used as returned. An error is
+`{"v":1,"ok":false,"error":{"code":"...","message":"..."}}`, emitted on stderr
+in JSON mode. In text mode errors are `vb-shell: CODE: message` on stderr.
+Exit status is 0 on success; `usage`, `unknown-target`, `unknown-command` and
+`invalid-argument` are 2; every other failure (including transport, backend,
+authentication and timeout) is 1. Never treat a zero exit alone as success -
+check the frame.
+
+- **Hyprland options:** flip a known boolean with
+  `vb-shell hyprlandSettings set <KEY> --toggle`. `--toggle` is grammar on
+  that leaf; the JSON string `"--toggle"` is still ordinary data for
+  `set <KEY> <JSON>`. An unknown key is `not-found`; a validator refusal is
+  `invalid-argument`. The old native `hyprlandSettings toggle <KEY>` is gone,
+  while the in-process `toggleOption` used by the Settings UI stays.
+- **Idle timers:** the persisted row is `{seconds, ...}`. Read the schedule
+  with `vb-shell idle list`, append with `vb-shell idle add <SECONDS> <COMMAND>`
+  (one command atom, decimal seconds only), and use `idle remove <ID>`,
+  `idle class <ID> lock|suspend|none`, `idle enable|disable|reload|status`.
+  Add-wizard and CLI IDs are the zero-based positions shown by `list`, so
+  refresh them after an edit. Legacy `minutes` rows are still read and
+  converted losslessly, but **older releases cannot read new seconds writes**:
+  do not downgrade the shell after editing timers. The command strings
+  `vb-shell session lock`, `vb-shell session suspend` and `systemctl suspend`
+  keep their automatic action class. Persisted rows that still name
+  `vb-shell lockscreen lock` are recognized as locks as well, but that spelling
+  is no longer a published command.
+- **Sleep inhibitor:** use `vb-shell inhibitor start <SECONDS>` (`0` is
+  infinite), `stop`, `cycle next`, `cycle back`, `remaining` and `status`.
+  The native `inhibitor toggle` is retired. Both cycle directions compute the
+  next step from the live `targetSec`, so a bar click and the CLI agree even
+  for a custom duration. `inhibitor status` reports whether the local inhibit
+  intent is active.
+- **Lockscreen:** lock from the terminal with `vb-shell session lock` and read
+  the requested-or-secure state with `vb-shell session status`. The former
+  `lockscreen` CLI target is gone; the resident lock surface stays reachable
+  in-process through the neutral Registry. Unlocking uses the lockscreen
+  prompt. The native effect toggles and `cycleBlurPower` are retired. Those
+  preferences remain in Settings, with animation reachable as
+  `vb-shell hyprlandSettings set hypr.animations.enabled --toggle`.
+
+External user scripts that used the retired native spellings must be migrated
+by hand; the shell deliberately does not accept them under a new alias.
 
 ## Legacy migration
 

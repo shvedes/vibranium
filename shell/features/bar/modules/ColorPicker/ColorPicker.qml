@@ -773,6 +773,10 @@ BarModule {
     // at. The island is closed above for the same reason.
     root._pickClaim = SurfaceClaim.claim("colorPicker", root.cancelPick, root)
     root.picking = true
+    // The bar tracks the ACTIVE picker independently of the primary/fallback
+    // owner. Stamping here (after admission, never before) is what lets a
+    // later `close` retire this exact instance and its captured generation.
+    Bar.claimActivePicker(root)
     return true
   }
 
@@ -785,6 +789,7 @@ BarModule {
   // The state teardown every close shares.
   function _teardownPick() {
     root._retirePick()
+    Bar.clearActivePicker(root)
     root.picking = false
     root.pickScreen = null
     root._grabResult = null
@@ -838,8 +843,6 @@ BarModule {
   function finishPick(r, g, b, a, gen) {
     if (!RequestGate.current(root._pickHandle(gen))) return
     root._grabResult = null
-    // Teardown, not cancelPick: this pick is committing.
-    root._teardownPick()
     const rec = {
       r: Color.clamp01(r / 255),
       g: Color.clamp01(g / 255),
@@ -863,6 +866,8 @@ BarModule {
     const alpha = rec.a
     root.addRecord(hex, alpha, { fmt: fmt, formats: Color.allFormats(rec, alpha) })
     const copyText = copyTextFor(rec, fmt)
+    // Teardown, not cancelPick: this pick is committing.
+    root._teardownPick()
     root._copyText(copyText, null)
     if (root.notifyOnPick) {
       Exec.notify("Color Picker", "Color copied to clipboard: " + copyText,
@@ -1186,6 +1191,7 @@ BarModule {
     // when the copies below cancel. A pick interrupted by the module going
     // away would otherwise leave the gate's entry live.
     root._retirePick()
+    Bar.clearActivePicker(root)
     root._releaseCopies()
     // The screen claim goes with the module: a claim whose owner is being
     // destroyed is dropped rather than fired, so nothing runs against a

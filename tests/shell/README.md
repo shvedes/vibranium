@@ -17,7 +17,7 @@ read back what the user sees (`menu-nested-live`) are left out. Pass `--ui` to
 include them; they block when `vibranium-shell.service` is not active. An
 explicit `--only <that-suite>` runs it even without `--ui`.
 
-Current state: **63 suites, 32,532 assertions**, in 12-15 seconds on a 16-core
+Current state: **166 suites, about 41,500 assertions**, in 12-15 seconds on a 16-core
 machine - the wall clock is set by the lint suite's whole-tree runs, and
 everything else finishes underneath them. `baseline.txt` is empty - nothing is
 waived, so any failure is a regression.
@@ -26,11 +26,11 @@ waived, so any failure is a regression.
 
 | Area | Suites | What it tests |
 | --- | --- | --- |
-| Pure JS libraries | 12 | every `.pragma library` file, every exported function, plus the seven drop-in launcher plugins |
-| QML components, live | 7 | 28 `common/ui` components driven across event-loop turns, plus `UnitGate`, `Registry`, `Bus`, `Paths`, `FilePresence` |
+| Pure JS libraries | 74 | every `.pragma library` file, every exported function, plus the seven drop-in launcher plugins |
+| QML components, live | 58 | 28 `common/ui` components driven across event-loop turns, plus `UnitGate`, `Registry`, `Bus`, `Paths`, `FilePresence` |
 | Architecture | 4 | the four-layer import contract, every import edge, module declarations, and the assertion kit itself |
-| Static data | 6 | the 45-unit boot catalog, the nine IPP templates, lint baseline, shipped assets, the settings catalog, the themes |
-| CLI | 1 | the node CLI over the Hyprland config editor, as a subprocess |
+| Static data | 20 | the 52-unit boot catalog, the nine IPP templates, lint baseline, shipped assets, the settings catalog, the themes |
+| CLI | 10 | the node CLI over the Hyprland config editor, as a subprocess |
 
 The pure-JS libraries are the bulk of the shell's logic — about 13,400 lines
 under `shell/`, all written to be unit-drivable. They are covered exhaustively
@@ -46,11 +46,11 @@ grepping the suites for a filename, which a single comment can fake.
 | Subject | Covered | How |
 | --- | --- | --- |
 | `.js` libraries | **98%** | every exported function, in a node `vm` |
-| `.qml` behaviorally exercised | **32/199 (16%)** | constructed in a live Quickshell, driven, result read back |
-| `.qml` statically analysed | **199/199 (100%)** | imports, module declarations, lint, construction |
-| Launcher plugins | **7/7** | through the real `PluginInstance.qml` host contract |
-| Settings catalog | 32 `.jsonc` | `suites/static/settings-catalog-test.sh` |
-| Themes | 30 | `suites/static/themes-test.sh` |
+| `.qml` behaviorally exercised | **32/272 (12%)** | constructed in a live Quickshell, driven, result read back |
+| `.qml` statically analysed | **272/272 (100%)** | imports, module declarations, lint, construction |
+| Launcher plugins | **8/8** | through the real `PluginInstance.qml` host contract |
+| Settings catalog | 32 config entries | `suites/static/settings-catalog-test.sh` |
+| Themes | 44 | `suites/static/themes-test.sh` |
 | JS engine load | 64/64 libraries | every `.pragma library` file imported by a live Quickshell, `suites/static/js-engine-test.sh` |
 
 **The honest headline is the QML line.** Every `.qml` file is checked for import

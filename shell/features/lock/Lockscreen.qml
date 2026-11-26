@@ -13,10 +13,8 @@ import qs.common
 import qs.services
 import qs.features.osd
 import qs.features.wallpaper
-import "../../common/text/UnitIpc.js" as UnitIpc
 
-// Session lock. The IPC handler answers "lockscreen" and
-// the session lock engages synchronously in that call - no stabilization
+// Session lock. A lock request engages synchronously - no stabilization
 // timers - while auth state lives here so every screen's surface stays in
 // sync. The lock is cleared either by a PAM completion reporting Success or
 // by input inside the optional grace window; no unlock verb is published and
@@ -224,28 +222,14 @@ Singleton {
   Component.onCompleted: {
     root._publishState()
     SessionActions.adopt(root.lockRequestHandler)
-    Registry.offer("lockscreen", {
-      title: "Lockscreen",
-      description: "session lock surface",
-      verbNames: [
-        "cycleBlurPower",
-        "isLocked",
-        "lock",
-        "toggleAnimations",
-        "toggleBlurBackground",
-        "toggleNowPlaying",
-        "togglePauseMusic",
-        "status",
-        "help",
-        "ping",
-      ]
-    })
+    Registry.register("lockscreen", root)
   }
 
   // PamContext documents no destruction cleanup, so an exchange still active
   // when this owner is torn down is aborted here; the guard keeps a context
   // that holds no session from being aborted.
   Component.onDestruction: {
+    Registry.unregister("lockscreen")
     SessionActions.release(root.lockRequestHandler)
     if (pam.active) pam.abort()
   }
@@ -262,6 +246,49 @@ Singleton {
     if (wasActive) pam.abort()
   }
 
+  // --- typed gateway --------------------------------------------------------
+
+  function _ok(data, format) {
+    const frame = { v: 1, ok: true }
+    if (data !== undefined) frame.data = data
+    if (format) frame.format = format
+    return frame
+  }
+  function _record() { return { kind: "record" } }
+
+  function _ipcLock() {
+    root.lock("verb")
+    // Distinguish the request from the compositor's actual hold.
+    return _ok({ requested: root.requested, secure: sessionLock.secure }, _record())
+  }
+
+  function _ipcIsLocked() {
+    return _ok(root.requested || sessionLock.secure, { kind: "bool" })
+  }
+
+  function _ipcStatus() {
+    return _ok({
+      locked: root.locked,
+      requested: root.requested,
+      secure: sessionLock.secure,
+      releasing: root.releasing,
+      authenticating: root.authenticating,
+      failedAttempts: root.failedAttempts,
+      capsLock: Keyboard.capsOn,
+      layout: Keyboard.layout,
+      animations: MotionPolicy.enabled,
+      backgroundMode: Settings.lockscreenBackgroundMode,
+      vignette: Settings.lockscreenVignette,
+      blurBackground: Settings.blurBackground,
+      dim: Settings.lockscreenDim,
+      nowPlaying: Settings.lockscreenNowPlaying,
+      blurPower: Settings.lockscreenBlurPower,
+      pauseMusic: Settings.lockscreenPauseMusic,
+      grace: Settings.lockscreenGraceSeconds,
+      graceArmed: root._graceDeadlineMs > 0 && Date.now() < root._graceDeadlineMs
+    }, _record())
+  }
+
   // Field text flows input -> here -> sibling inputs; guards break the loop.
   // The only function in the component that receives what the user typed, so
   // it stores the value and returns.
@@ -273,7 +300,7 @@ Singleton {
   // Auth is single-flight without an exchange counter: `authenticating` is the
   // one seat (set in tryUnlock, cleared only in finishAuth/resetAuth) and
   // `submitted` is one-shot (cleared immediately before pam.respond), so a
-  // terminal answer is consumed once per attempt and a second tryUnlock is
+  // submitted password is consumed once per attempt and a second tryUnlock is
   // refused until that attempt settles. PamContext's signals carry no
   // per-exchange identity that a generation could be checked against, so a
   // write-only counter would be a guard that only looks like one; the former
@@ -422,84 +449,4 @@ Singleton {
     }
   }
 
-  IpcHandler {
-    target: "lockscreen"
-    function help(command: string): string {
-      return UnitIpc.help("lockscreen", "Lockscreen", "session lock surface", [
-        { name: "cycleBlurPower", help: "cycle blur power state" },
-        { name: "isLocked", help: "locked?" },
-        { name: "lock", help: "lock the session" },
-        { name: "toggleAnimations", help: "toggle lock animations" },
-        { name: "toggleBlurBackground", help: "toggle blurred background" },
-        { name: "toggleNowPlaying", help: "toggle now-playing widget" },
-        { name: "togglePauseMusic", help: "pause music on lock" },
-      ], command)
-    }
-    function ping(): string { return "pong" }
-
-    function lock(): string {
-      root.lock("verb")
-      return "ok"
-    }
-
-    function isLocked(): string {
-      return root.locked ? "true" : "false"
-    }
-
-    function status(): string {
-      return JSON.stringify({
-        locked: root.locked,
-        requested: root.requested,
-        secure: sessionLock.secure,
-        authenticating: root.authenticating,
-        failedAttempts: root.failedAttempts,
-        capsLock: Keyboard.capsOn,
-        layout: Keyboard.layout,
-        // Entrance motion follows the global animation switch.
-        animations: MotionPolicy.enabled,
-        backgroundMode: Settings.lockscreenBackgroundMode,
-        vignette: Settings.lockscreenVignette,
-        blurBackground: Settings.blurBackground,
-        dim: Settings.lockscreenDim,
-        nowPlaying: Settings.lockscreenNowPlaying,
-        blurPower: Settings.lockscreenBlurPower,
-        pauseMusic: Settings.lockscreenPauseMusic,
-        grace: Settings.lockscreenGraceSeconds,
-        graceArmed: root._graceDeadlineMs > 0 && Date.now() < root._graceDeadlineMs
-      })
-    }
-
-    // A user toggling an effect while the session sits locked is changing a
-    // running effect: surfaces read Settings live and re-resolve on the next
-    // frame - dim, blur and vignette darkness alike. The vignette's entry
-    // fade is normalized, so a level change only changes darkness (intensity)
-    // and never re-runs the fade or shifts the shape's scale.
-    function toggleAnimations(): string {
-      // The lockscreen does not own an animation option; this toggle
-      // flips the global switch instead.
-      HyprlandSettings.toggleOption("hypr.animations.enabled")
-      const now = HyprlandSettings.value("hypr.animations.enabled")
-      return now ? "on" : "off"
-    }
-
-    function toggleNowPlaying(): string {
-      Settings.toggleLockscreenNowPlaying()
-      return Settings.lockscreenNowPlaying ? "on" : "off"
-    }
-
-    function togglePauseMusic(): string {
-      Settings.toggleLockscreenPauseMusic()
-      return Settings.lockscreenPauseMusic ? "on" : "off"
-    }
-
-    function toggleBlurBackground(): string {
-      Settings.toggleBlurBackground()
-      return Settings.blurBackground ? "on" : "off"
-    }
-
-    function cycleBlurPower(): string {
-      Settings.cycleLockscreenBlurPower()
-      return Settings.lockscreenBlurPower
-    }
-  }
 }

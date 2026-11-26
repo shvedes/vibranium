@@ -38,7 +38,7 @@ Item {
 
   readonly property real rowPad: 6
   // Vertical scrollbar gutter: the bar (3px + 1px margin) overlays the
-  // viewport's right edge (ArchUpdates/Battery pattern), so app rows end
+  // viewport's right edge (SystemUpdates/Battery pattern), so app rows end
   // at rowPad and never run underneath it. The list itself always spans
   // the full width - the scrollbar belongs to the list, drawn inside it.
   // Section readout reserve: every value the readout shows ("0%".."100%",
@@ -743,7 +743,7 @@ Item {
   // media-name line, the right-hand volume mock (mute-icon slot + pct
   // readout every real entry carries) and the 6px slider line. Painted
   // at the skeleton wash strength (specs 07/08: the no-apps state IS
-  // the skeleton, static, no shimmer). Chrome matches the ArchUpdates
+  // the skeleton, static, no shimmer). Chrome matches the SystemUpdates
   // skeleton: tint @0.14, 0.55 shared opacity, 2px corners.
   component SkeletonEntry: Column {
     id: skel
@@ -822,7 +822,7 @@ Item {
     // Island header: the card's own name, so "Audio" is the title and
     // Output/Input/Applications are the sections under it. The glyph
     // leads, the way every other island header leads (network, bluetooth,
-    // arch updates, printers, privacy) - a small foreground_1 mark at
+    // system updates, printers, privacy) - a small foreground_1 mark at
     // 70% before the title.
     Row {
       width: parent.width
@@ -1100,7 +1100,7 @@ Item {
         }
       }
 
-      // Overlaid inside the viewport edge (ArchUpdates/Battery pattern):
+      // Overlaid inside the viewport edge (SystemUpdates/Battery pattern):
       // app rows already end at rowPad, so nothing runs underneath.
       ScrollBar {
         flickable: appList

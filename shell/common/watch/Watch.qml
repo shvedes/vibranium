@@ -241,9 +241,10 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "watch"
     function help(command: string): string {
-      return UnitIpc.help("watch", "Watch", "file watch governor", [
+      return UnitIpc.help("watch", "Watch", "Watch files that drive the shell", [
         { name: "status", help: "paths, subs, events" },
       ], command)
     }
@@ -257,11 +258,18 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("watch", root, {
+      "watch.status": function () { return ipc.status() },
+      "watch.ping": function () { return ipc.ping() }
+    })
     Registry.offer("watch", {
       title: "Watch",
-      description: "file watch governor",
+      description: "Watch files that drive the shell",
       verbNames: ["status", "help", "ping"]
     })
   }
-  Component.onDestruction: Registry.unregister("watch")
+  Component.onDestruction: {
+    IpcRouter.unregister("watch", root)
+    Registry.unregister("watch")
+  }
 }

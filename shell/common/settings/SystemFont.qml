@@ -102,9 +102,16 @@ Singleton {
   }
 
   Component.onCompleted: {
+    // Public IPC surface: fixed closures over the resident native handler.
+    // The router selects by catalog row ID, never by an argv-named member.
+    IpcRouter.register("systemFont", root, {
+      "systemFont.dump": function () { return ipc.dump() },
+      "systemFont.status": function () { return ipc.status() },
+      "systemFont.ping": function () { return ipc.ping() }
+    })
     Registry.offer("systemFont", {
       title: "System font",
-      description: "system font config",
+      description: "Read the system font configuration",
       verbNames: [
         "dump",
         "status",
@@ -125,11 +132,14 @@ Singleton {
     })
   }
 
+  Component.onDestruction: IpcRouter.unregister("systemFont", root)
+
   // For debugging: allow `qs ipc call systemFont dump`
   IpcHandler {
+    id: ipc
     target: "systemFont"
     function help(command: string): string {
-      return UnitIpc.help("systemFont", "System font", "system font config", [
+      return UnitIpc.help("systemFont", "System font", "Read the system font configuration", [
         { name: "dump", help: "current font config" },
       ], command)
     }

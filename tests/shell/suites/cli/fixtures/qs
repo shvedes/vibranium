@@ -1,0 +1,561 @@
+#!/usr/bin/env python3
+"""Fake `qs` for the vb-shell CLI suite.
+
+It records every argv word exactly (as JSON) and answers the two transport
+verbs with canned `v1:` frames. The mode comes from FAKE_QS_MODE, so a test
+can exercise a failure without changing the client under test.
+"""
+import json
+import os
+import sys
+import time
+
+args = sys.argv[1:]
+log = os.environ.get("FAKE_QS_LOG", "")
+if log:
+    with open(log, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({
+            "argv": args,
+            "badenv": [k for k in ("QS_CONFIG_PATH", "QS_CONFIG_NAME", "QS_MANIFEST") if k in os.environ],
+        }, ensure_ascii=True, separators=(",", ":")) + "\n")
+
+mode = os.environ.get("FAKE_QS_MODE", "ok")
+try:
+    _early = json.loads(args[6][3:]) if len(args) > 6 and args[6].startswith("v1:") else {}
+except ValueError:
+    _early = {}
+argv = _early.get("argv", [])
+
+
+def emit(frame):
+    sys.stdout.write("v1:" + json.dumps(frame, ensure_ascii=True, separators=(",", ":")) + "\n")
+    return 0
+
+
+def err(code, message=None):
+    return emit({"v": 1, "ok": False, "error": {"code": code, "message": message or code}})
+
+
+def data(value, fmt=None):
+    return emit({"v": 1, "ok": True, "data": value, "format": fmt or {"kind": "text"}})
+
+
+def page(items, meta=None, cursor=None):
+    payload = {"items": items}
+    if meta is not None:
+        payload["meta"] = meta
+    frame = {"v": 1, "ok": True, "data": payload}
+    if cursor:
+        frame["next"] = {"cursor": cursor}
+    return emit(frame)
+
+
+if mode == "timeout":
+    time.sleep(5)
+    return_code = 0
+    sys.exit(return_code)
+
+if mode == "no-instance":
+    sys.stdout.write('No running instances for "/example/shell.qml"\n')
+    sys.exit(255)
+
+# Native log route: two fixed reads with no envelope.
+if len(args) >= 5 and args[2:5] == ["ipc", "call", "log"]:
+    verb = args[5]
+    if mode == "malformed":
+        sys.stdout.write("garbage\n")
+    elif verb == "help":
+        sys.stdout.write("vibranium log\n\na scope is derived from the file the call was written in.\n")
+    else:
+        sys.stdout.write('{"level":"info","scopes":[]}\n')
+    sys.exit(0)
+
+if mode == "sentinel":
+    sys.stdout.write("Function not found.\n")
+    sys.exit(0)
+if mode == "malformed":
+    sys.stdout.write("not-a-frame\n")
+    sys.exit(0)
+if mode == "invalid-utf8":
+    sys.stdout.buffer.write(b"v1:{\"v\":1,\"ok\":true,\"data\":\"\xff\"}\n")
+    sys.exit(0)
+if mode == "unknown-route":
+    sys.exit(err("unknown-command"))
+if mode == "validation":
+    sys.exit(err("invalid-argument"))
+if mode == "usage":
+    sys.exit(err("usage", "Use 'vb-shell app call audioMixer help' to see available options."))
+if mode == "usage-target":
+    sys.exit(err("usage", "Use 'vb-shell app help' to see available options."))
+if mode == "bad-enum":
+    sys.exit(err("invalid-argument", "unknown ID"))
+if mode == "data-none":
+    sys.exit(data({"glyph": "😀", "state": "accepted"}, {"kind": "none"}))
+if mode in ("audio-get-volume", "audio-get-microphone"):
+    sys.exit(data({"percent": 80 if mode.endswith("volume") else 60,
+                   "muted": False if mode.endswith("volume") else True},
+                  {"kind": "record"}))
+if mode in ("state-mixed", "state-only", "state-nested"):
+    bodies = {
+        "state-mixed": {"state": "accepted", "tab": "graph", "percent": 80},
+        "state-only": {"state": "accepted"},
+        "state-nested": {"rows": [{"state": "unchanged", "id": "n1.2"}]}
+    }
+    sys.exit(data(bodies[mode], {"kind": "record"}))
+if mode in ("output-value", "output-record", "output-table", "output-text",
+            "output-none", "output-bool", "output-number", "output-help"):
+    kind = mode.split("-")[1]
+    summaries = {
+        "value": "Stored value", "record": "Safe current snapshot",
+        "table": "Package rows", "text": "Action result",
+        "none": "", "bool": "`true` or `false`", "number": "Number dismissed",
+        "help": "Canonical per-app help descriptor"
+    }
+    sys.exit(data({
+        "path": ["audit", kind], "usage": "vb-shell audit " + kind,
+        "summary": "A help page with one output descriptor",
+        "arguments": [], "options": [], "commands": [],
+        "output": {"kind": kind, "summary": summaries[kind]},
+        "notes": [], "examples": ["vb-shell audit " + kind]
+    }, {"kind": "help"}))
+if mode == "app-close-noopen":
+    sys.exit(emit({"v": 1, "ok": True}))
+if mode == "app-close-unknown":
+    sys.exit(err("not-found", "unknown app"))
+if mode in ("app-open-help", "app-toggle-help"):
+    verb = mode.split("-")[1]
+    sys.exit(page([], {
+        "path": ["app", verb], "usage": "vb-shell app " + verb + " <ID>",
+        "summary": "", "arguments": [], "options": [], "commands": [],
+        "output": None, "notes": [],
+        "examples": ["vb-shell app " + verb + " audioMixer"]
+    }))
+if mode in ("app-open", "app-close", "app-toggle"):
+    verb = mode.split("-")[1]
+    sys.exit(data({
+        "path": ["app", verb], "usage": "vb-shell app " + verb + " <ID>",
+        "summary": "A leaf with no Notes, Arguments or Output sections",
+        "arguments": [], "options": [], "commands": [], "output": None,
+        "notes": [], "examples": ["vb-shell app " + verb + " audioMixer"]
+    }, {"kind": "help"}))
+if mode == "bar-status-record":
+    sys.exit(data({"unit": "bar", "enabled": True, "hidden": False,
+                   "effectiveEnabled": True, "position": "top", "showBorder": False},
+                  {"kind": "record"}))
+if mode == "bar-position-usage":
+    sys.exit(emit({"v": 1, "ok": True,
+                   "data": {"usage": "vb-shell bar position set top|bottom|toggle"},
+                   "format": {"kind": "usage"}}))
+if mode == "golden-app":
+    sys.exit(data({
+        "path": ["app"], "usage": "vb-shell app",
+        "summary": "Manage Vibranium's Quickshell apps",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "list", "summary": "List all known apps"},
+            {"usage": "open <ID>", "summary": "Open ID"},
+            {"usage": "close [<ID>...]", "summary": "Close ID"},
+            {"usage": "toggle <ID>", "summary": "Toggle ID window"},
+            {"usage": "call [<ID>]", "summary": "Manipulate ID with its IPC"},
+        ],
+        "output": None,
+        "notes": ["Use 'vb-shell app call help' to see available per-app calls"],
+        "examples": ["vb-shell app"]
+    }, {"kind": "help"}))
+if mode == "golden-app-call":
+    sys.exit(data({
+        "path": ["app", "call"], "usage": "vb-shell app call <ID>",
+        "summary": "Explicit per-app commands",
+        "arguments": [], "options": [],
+        "commands": [{"usage": "list <ID>", "summary": "List supported commands for ID"}],
+        "output": None,
+        "notes": ["Use 'vb-shell app list' to see available apps"],
+        "examples": ["vb-shell app call list audioMixer", "vb-shell app call audioMixer help"]
+    }, {"kind": "help"}))
+if mode == "golden-clip-window-open":
+    sys.exit(data({
+        "path": ["clipboard", "window", "open"],
+        "usage": "vb-shell clipboard window open [pinned]",
+        "summary": "Show the clipboard panel", "arguments": [], "options": [],
+        "commands": [], "output": None,
+        "notes": ["The optional 'pinned' literal opens the pinned view; it has no argument label"],
+        "examples": ["vb-shell clipboard window open", "vb-shell clipboard window open pinned"]
+    }, {"kind": "help"}))
+if mode == "golden-clipboard-copy":
+    desc = {
+        "path": ["clipboard", "copy"],
+        "usage": "vb-shell clipboard copy",
+        "summary": "Write new data to the system clipboard from the terminal",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "entry regular|pinned <INDEX>", "summary": "Put one bucket row back on the system clipboard"},
+            {"usage": "text <TEXT|->", "summary": "Copy UTF-8 text from one literal word or stdin"},
+            {"usage": "uri <URI>", "summary": "Copy one absolute URI as text/uri-list"},
+            {"usage": "file <PATH>", "summary": "Copy one file or directory URI, resolved from the caller's cwd"},
+            {"usage": "image <MIME> -", "summary": "Copy image bytes from stdin"},
+        ],
+        "output": None,
+        "notes": ["verbs are 'entry', 'text', 'uri', 'file' and 'image'",
+                  "No history entry is injected by a stream write; the shell's watcher captures it",
+                  "The shell is confirmed with 'clipboard ping' before a stream write runs"],
+        "examples": ["vb-shell clipboard copy entry regular 0", "vb-shell clipboard copy text 'hello'",
+                     "vb-shell clipboard copy uri 'https://example.org/a'",
+                     "vb-shell clipboard copy file ./notes.txt",
+                     "vb-shell clipboard copy image image/png - < shot.png"]
+    }
+    if _early.get("kind") == "help":
+        sys.exit(page([], desc))
+    sys.exit(data(desc, {"kind": "help"}))
+if mode == "golden-clipboard-root":
+    sys.exit(data({
+        "path": ["clipboard"], "usage": "vb-shell clipboard",
+        "summary": "clipboard history and system selection",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "window", "summary": "Control the clipboard panel"},
+            {"usage": "list", "summary": "List clipboard rows by bucket"},
+            {"usage": "pin <INDEX>", "summary": "Pin one normal-bucket row"},
+            {"usage": "unpin <INDEX>", "summary": "Unpin one pinned-bucket row"},
+            {"usage": "purge [<INDEX>]", "summary": "Delete one row by bucket"},
+            {"usage": "clear", "summary": "Clear one bucket"},
+            {"usage": "select <INDEX>", "summary": "Seat one row of the open panel's current filter"},
+            {"usage": "copy [<FORMAT>]",
+             "summary": "Write new data to the system clipboard from the terminal"},
+        ],
+        "output": None, "notes": [], "examples": ["vb-shell clipboard"]
+    }, {"kind": "help"}))
+if mode in ("golden-clipboard-window", "golden-clipboard-list"):
+    branch = mode.split("-")[2]
+    if branch == "window":
+        pages = [
+            {"usage": "open [pinned]", "summary": "Show the clipboard panel"},
+            {"usage": "close", "summary": "Hide the clipboard panel"},
+            {"usage": "toggle", "summary": "Show or hide the clipboard panel"},
+        ]
+        summary = "Clipboard panel visibility"
+        examples = ["vb-shell clipboard window open", "vb-shell clipboard window toggle"]
+    else:
+        pages = [
+            {"usage": "list", "summary": "List the regular bucket with safe previews"},
+            {"usage": "list pinned", "summary": "List the pinned bucket with safe previews"},
+            {"usage": "list current", "summary": "List the open panel's current filtered projection"},
+        ]
+        summary = "Clipboard buckets and the current filtered view"
+        examples = ["vb-shell clipboard list", "vb-shell clipboard list pinned"]
+    sys.exit(data({
+        "path": ["clipboard", branch], "usage": "vb-shell clipboard " + branch,
+        "summary": summary, "arguments": [], "options": [], "commands": pages,
+        "output": None, "notes": [], "examples": examples
+    }, {"kind": "help"}))
+if mode == "golden-bar-root":
+    sys.exit(data({
+        "path": ["bar"], "usage": "vb-shell bar",
+        "summary": "Query and manipulate Vibranium's status bar",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "enable", "summary": "Enable the statusbar"},
+            {"usage": "disable", "summary": "Disable the statusbar"},
+            {"usage": "toggle", "summary": "Toggle the statusbar"},
+            {"usage": "show", "summary": "Unhide the statusbar"},
+            {"usage": "hide", "summary": "Hide the statusbar"},
+            {"usage": "showToggle", "summary": "Show/Hide the statusbar temporarly"},
+            {"usage": "position", "summary": "Read or pin the bar edge"},
+            {"usage": "layout", "summary": "Read or validate the complete slot layout"},
+            {"usage": "module", "summary": "Inspect and operate configured bar modules"},
+        ],
+        "output": None, "notes": [], "examples": ["vb-shell bar"]
+    }, {"kind": "help"}))
+if mode == "golden-audio-volume":
+    sys.exit(data({
+        "path": ["audio", "volume"], "usage": "vb-shell audio volume",
+        "summary": "Default output level and mute",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "up [step <N>]", "summary": "Raise the default output volume"},
+            {"usage": "down [step <N>]", "summary": "Lower the default output volume"},
+            {"usage": "toggle", "summary": "Mute or unmute the default output"},
+            {"usage": "get", "summary": "Get current default output level"},
+            {"usage": "set <N>", "summary": "Set the output level, 0-200 percent"},
+        ],
+        "output": None, "notes": [], "examples": ["vb-shell audio volume up step 10"]
+    }, {"kind": "help"}))
+if mode == "golden-audio-stream":
+    sys.exit(data({
+        "path": ["audio", "stream"], "usage": "vb-shell audio stream <ID> [<ACTION>]",
+        "summary": "Per-application stream controls",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "list", "summary": "Live application playback and capture streams"},
+            {"usage": "<ID> set <N>", "summary": "Set an application stream's level, 0-150 percent"},
+            {"usage": "<ID> mute <BOOL>", "summary": "Set an application stream's explicit mute"},
+            {"usage": "<ID> route <DEVICE>", "summary": "Move an application stream to a matching device"},
+            {"usage": "route-status <REQUEST>", "summary": "Read the state of one stream route request"},
+        ],
+        "output": None,
+        "notes": ["Stream IDs come from 'vb-shell audio stream list'",
+                  "Device refs come from 'audio sink list' or 'audio source list'"],
+        "examples": ["vb-shell audio stream list", "vb-shell audio stream n1.2 set 50",
+                     "vb-shell audio stream route-status r1.1"]
+    }, {"kind": "help"}))
+if mode == "golden-app-mixer":
+    sys.exit(data({
+        "path": ["app", "call", "audioMixer"], "usage": "vb-shell app call audioMixer",
+        "summary": "Audio mixer: native Pavucontrol replacement, with Pipewire node graph included",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "openTab <TAB>", "summary": "Open audioMixer with <TAB> focused"},
+            {"usage": "selectTab <TAB>", "summary": "Select a <TAB> in existing window"},
+            {"usage": "status", "summary": "audioMixer status", "literalSummary": True},
+        ],
+        "output": None,
+        "notes": ["Valid tab ids are: apps, devices, recording, configuration, graph"],
+        "examples": ["vb-shell app call audioMixer openTab configuration",
+                     "vb-shell app call audioMixer selectTab devices",
+                     "vb-shell app call audioMixer status"]
+    }, {"kind": "help"}))
+if mode == "golden-app-viewer":
+    sys.exit(data({
+        "path": ["app", "call", "imageViewer"], "usage": "vb-shell app call imageViewer",
+        "summary": "A simple, Vibranium-native image viewer",
+        "arguments": [], "options": [],
+        "commands": [
+            {"usage": "openPath <PATH>", "summary": "Open an image in <PATH>"},
+            {"usage": "status", "summary": "ImageViewer status"},
+        ],
+        "output": None, "notes": [],
+        "examples": ["vb-shell app call imageViewer openPath /home/user/Pictures/my-image.png",
+                     "vb-shell app call imageViewer status"]
+    }, {"kind": "help"}))
+if mode == "instant-help":
+    desc = {
+        "path": ["app"], "usage": "vb-shell app",
+        "summary": "shell apps behind one `app` handle",
+        "arguments": [], "options": [],
+        "commands": [{"id": "app.list", "usage": "list", "summary": "The declared apps"}],
+        "output": None,
+        "notes": ["App ids are case-sensitive"],
+        "examples": ["vb-shell app list"]
+    }
+    sys.exit(data(desc, {"kind": "help"}))
+if mode == "app-help":
+    desc = {
+        "usage": "vb-shell app call audioMixer",
+        "summary": "Audio mixer: per-device and per-application volume with stream routing",
+        "arguments": [], "options": [],
+        "commands": [
+            {"id": "app.call.audioMixer.openTab", "usage": "openTab <TAB>",
+             "summary": "Open the mixer focused on a named tab",
+             "arguments": [{"name": "TAB", "type": "enum",
+                            "values": ["apps", "devices", "recording", "configuration", "graph"],
+                            "summary": "One tab id: apps, devices, recording, configuration or graph"}],
+             "examples": ["vb-shell app call audioMixer openTab apps"]},
+            {"id": "app.call.audioMixer.selectTab", "usage": "selectTab <TAB>",
+             "summary": "Select a tab in an already open mixer",
+             "arguments": [], "examples": ["vb-shell app call audioMixer selectTab devices"]}
+        ],
+        "notes": ["Valid tab ids are apps, devices, recording, configuration and graph"],
+        "examples": ["vb-shell app call audioMixer openTab apps",
+                     "vb-shell app call audioMixer selectTab devices"]
+    }
+    sys.exit(data(desc, {"kind": "help"}))
+if mode == "unavailable":
+    sys.exit(err("unavailable"))
+
+kind = args[5] if len(args) > 5 else ""
+raw = args[6] if len(args) > 6 else "v1:{}"
+try:
+    request = json.loads(raw[len("v1:"):]) if raw.startswith("v1:") else {}
+except ValueError:
+    request = {}
+rkind = request.get("kind", "")
+argv = request.get("argv", [])
+
+if mode == "tools-stop" and kind == "invoke":
+    sys.stdout.write("v1:" + json.dumps({"v": 1, "ok": True}, separators=(",", ":")) + "\n")
+    sys.exit(0)
+
+if mode in ("tools-picker", "tools-picker-cancel") and kind == "invoke":
+    if mode == "tools-picker-cancel":
+        sys.exit(err("cancelled", "the selection was discarded"))
+    counter = os.environ.get("FAKE_QS_COUNTER", "")
+    n = 0
+    if counter:
+        try:
+            with open(counter, encoding="utf-8") as fh:
+                n = int(fh.read().strip() or "0")
+        except (OSError, ValueError):
+            n = 0
+        with open(counter, "w", encoding="utf-8") as fh:
+            fh.write(str(n + 1))
+    if n == 0:
+        sys.exit(data({"pending": True}, {"kind": "record"}))
+    sys.exit(data({"x": 12, "y": 34, "w": 640, "h": 480}, {"kind": "record"}))
+
+if mode in ("time-lookup", "time-lookup-pending") and kind == "invoke":
+    if mode == "time-lookup-pending":
+        sys.exit(data({"state": "accepted", "timezone": "Europe/Moscow"},
+                      {"kind": "record"}))
+    counter = os.environ.get("FAKE_QS_COUNTER", "")
+    n = 0
+    if counter:
+        try:
+            with open(counter, encoding="utf-8") as fh:
+                n = int(fh.read().strip() or "0")
+        except (OSError, ValueError):
+            n = 0
+        with open(counter, "w", encoding="utf-8") as fh:
+            fh.write(str(n + 1))
+    if n == 0:
+        sys.exit(data({"state": "accepted", "timezone": "Europe/Moscow"},
+                      {"kind": "record"}))
+    sys.exit(data({"city": "Moscow", "timezone": "Europe/Moscow", "time": "00:49",
+                   "date": "Thu 26 Nov", "code": "MSK"}, {"kind": "record"}))
+
+if mode in ("stale-cursor", "expired-cursor", "wrong-instance", "partial-page") and rkind == "next":
+    sys.exit(err("stale", "cursor refused by fake transport"))
+
+if kind == "describe" and rkind == "index":
+    if mode == "wide":
+        sys.exit(page([{
+            "id": "widthProof", "title": "Width proof",
+            "summary": "width detection fixture",
+            "literals": ["longCommandNameWithManyLiteralWords first second third fourth"],
+            "summaries": ["This description is deliberately long so that the renderer must wrap it "
+                          "at word boundaries when the terminal is wide; it must not be split "
+                          "mid token under any terminal width"],
+        }]))
+    if mode == "partial-page":
+        sys.exit(page([{"id": "boot", "title": "Boot", "summary": "unit lifecycle"}],
+                      cursor="inc-1.1"))
+    sys.exit(page([
+        {"id": "systemUpdates", "title": "System updates",
+         "summary": "system update polling and apply",
+         "literals": ["refresh", "update", "dump", "dump all", "dump aur"],
+         "summaries": ["Re-poll available updates",
+                       "Run the system update with a package list",
+                       "Current merged update rows", "Merged official and AUR rows",
+                       "AUR-only update rows"]},
+        {"id": "boot", "title": "Boot", "summary": "unit lifecycle and startup timeline",
+         "literals": ["state", "timeline"],
+         "summaries": ["Current unit lifecycle state as JSON",
+                       "Startup event timeline as JSON"]},
+        {"id": "settings", "title": "Settings", "summary": "settings engine store",
+         "literals": ["get", "dump", "set", "toggle",
+                        "reload", "fonts reload", "reloadSchema", "showOverrides", "reset"],
+         "summaries": ["Read one stored value", "All stored values",
+                       "Write one JSON value", "Flip a boolean key",
+                       "Re-read the store", "Rescan installed system fonts",
+                       "Reload the option schema", "Show active overrides",
+                       "Reset one stored value"]},
+        {"id": "appLauncher", "title": "App launcher",
+         "summary": "application search, usage and plugins",
+         "literals": ["show", "hide", "config", "search"],
+         "summaries": ["open the launcher", "Already capitalized", "[preview] open palette",
+                       "Search installed applications by name, description and keywords, then show "
+                       "usage history and plugin state for the selected entry without launching it "
+                       "or changing the current workspace or focused surface in any way"]},
+        {"id": "printers", "title": "Printers", "summary": "CUPS queues",
+         "literals": ["hold", "release",
+                        "cancel", "config",
+                        "dismiss", "log", "refresh"],
+         "summaries": ["Hold a job", "Release a job", "Cancel a job",
+                       "Open print settings", "Clear a finished entry",
+                       "Follow logs by scope", "Re-read printers and jobs"]},
+    ], meta={"common": [{"id": "help"}, {"id": "status"}, {"id": "ping"}]}, cursor="inc-1.1"))
+
+if kind == "describe" and rkind == "help":
+    path = request.get("path", [])
+    if path == ["settings", "fonts"]:
+        sys.exit(page([{"id": "settings.fonts.reload", "usage": "fonts reload",
+                        "summary": "Rescan installed system fonts"}],
+                      meta={"path": path, "usage": "vb-shell settings fonts reload",
+                            "summary": "System font utilities", "arguments": [], "options": [],
+                            "output": None,
+                            "notes": ["Bridges to the resident font picker without changing the stored font"],
+                            "examples": ["vb-shell settings fonts reload"]}))
+    if path == ["settings", "get"]:
+        sys.exit(page([], meta={"path": path, "usage": "vb-shell settings get <KEY>",
+                                "summary": "Read one stored value",
+                                "arguments": [{"label": "a-very-long-argument-name",
+                                               "summary": "A long description that must wrap below the label"}],
+                                "options": [], "output": None, "notes": [],
+                                "examples": ["vb-shell settings get a.key"]}))
+    if path == ["proof", "capital"]:
+        sys.exit(page([
+            {"id": "show", "usage": "show", "summary": "open the launcher"},
+            {"id": "config", "usage": "config", "summary": "Already capitalized"},
+        ], meta={"path": path, "usage": "vb-shell appLauncher",
+                 "summary": "application search, usage and plugins",
+                 "arguments": [{"label": "name", "summary": "lowercase argument text"}],
+                 "options": [], "output": {"kind": "text", "summary": "plain result text"},
+                 "notes": ["usage and plugins stay lowercase after the first word"],
+                 "examples": ["vb-shell appLauncher show"]}))
+    if path == ["proof", "commands"]:
+        sys.exit(page([
+            {"id": "hold", "usage": "hold <printer> <jobid>", "summary": "Hold a job"},
+            {"id": "release", "usage": "release <printer> <jobid>", "summary": "Release a job"},
+            {"id": "cancel", "usage": "cancel <printer> <jobid>", "summary": "Cancel a job"},
+            {"id": "config", "usage": "config [<NAME>]", "summary": "Open print settings"},
+            {"id": "log", "usage": "log [<SCOPE>...]", "summary": "Follow logs by scope"},
+            {"id": "refresh", "usage": "refresh", "summary": "Re-read printers and jobs"},
+        ], meta={"path": path, "usage": "vb-shell printers", "summary": "CUPS queues",
+                 "arguments": [], "options": [], "output": None, "notes": [],
+                 "examples": ["vb-shell printers hold LP0 7"]}))
+    if path == ["proof", "cells"]:
+        sys.exit(page([
+            {"id": "ascii", "usage": "ascii", "summary": "ascii-summary"},
+            {"id": "cjk", "usage": "汉字", "summary": "cjk-summary"},
+            {"id": "combining", "usage": "e\u0301x", "summary": "combining-summary"},
+            {"id": "emoji", "usage": "🙂", "summary": "emoji-summary"},
+        ], meta={"path": path, "usage": "vb-shell proof cells", "summary": "Cell-width proof",
+                 "arguments": [], "options": [], "output": None, "notes": [],
+                 "examples": ["vb-shell proof cells"]}))
+    if path == ["app", "toggle"]:
+        sys.exit(page([], meta={"path": path, "usage": "vb-shell app toggle <ID>",
+                                "summary": "Toggle ID window",
+                                "arguments": [], "options": [], "output": None,
+                                "notes": [], "examples": ["vb-shell app toggle audioMixer"]}))
+    if path == ["audio", "volume", "toggle"]:
+        sys.exit(page([], meta={"path": path, "usage": "vb-shell audio volume toggle",
+                                "summary": "Mute or unmute the default output",
+                                "arguments": [], "options": [], "output": None,
+                                "notes": [], "examples": ["vb-shell audio volume toggle"]}))
+    if path == ["audio", "volume", "up"]:
+        sys.exit(page([], meta={"path": path, "usage": "vb-shell audio volume up [step <N>]",
+                                "summary": "Raise the default output volume",
+                                "arguments": [{"label": "step <N>", "optional": True,
+                                               "summary": "Increase by N percentage points (1-200)"}],
+                                "options": [], "output": None,
+                                "examples": ["vb-shell audio volume up", "vb-shell audio volume up step 10"]}))
+    sys.exit(page([{"id": "audio.volume.up", "usage": "volume up [step <N>]",
+                    "summary": "Raise the default output volume"}],
+                  meta={"path": path, "usage": "vb-shell " + " ".join(path),
+                        "summary": "Raise the default output volume",
+                        "arguments": [{"name": "step", "type": "int", "optional": True}],
+                        "options": [], "output": None, "notes": ["A note"],
+                        "examples": ["vb-shell " + " ".join(path)]}))
+
+if rkind == "next":
+    # The snapshot was frozen at the first call. A concurrent model addition
+    # (FAKE_QS_ADDED) is deliberately invisible to this page.
+    items = [{"id": "state", "title": "State", "summary": "persisted JSON slots",
+              "literals": ["get", "set", "dump"],
+              "summaries": ["Read one slot as JSON", "Write one JSON slot",
+                            "All slots as JSON"]}]
+    sys.exit(page(items, meta={"common": [{"id": "help"}, {"id": "status"}, {"id": "ping"}]}))
+
+if mode == "silent":
+    sys.exit(emit({"v": 1, "ok": True}))
+if mode == "json-false":
+    sys.exit(data(False, {"kind": "bool"}))
+if mode == "table":
+    sys.exit(data([{"name": "alpha", "n": 1, "tag": "a"},
+                   {"name": "汉字", "n": 2, "tag": "b"},
+                   {"name": "🙂", "n": 3, "tag": "c"},
+                   {"name": "e\u0301x", "n": 4, "tag": "d"}],
+                  {"kind": "table", "columns": [
+                      {"key": "name", "heading": "Name"},
+                      {"key": "n", "heading": "N"},
+                      {"key": "tag", "heading": "Tag"}]}))
+
+sys.exit(data("ok", {"kind": "text"}))

@@ -186,6 +186,9 @@ function launchSub(name) {
       const name = carried !== "" ? carried : binaryMatch(executables(), binaryQuery(query))
       if (name === "") return
       api.execDetached("vb-launch-cmd -- " + shellQuote(name) + "\n")
-    }
+    },
+    // Ordinary launcher behavior only: no redundant `plugin binary exec`
+    // command. The empty contract keeps the shipped plugin surface uniform.
+    ipc: {}
   }
 })()

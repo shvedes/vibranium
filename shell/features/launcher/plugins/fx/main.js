@@ -1342,6 +1342,36 @@ function tryAll(query, snapshot, history, cpi) {
       // After the copy, and only for a row that had a real number to copy: a
       // hint and a pending row carry no target and never reach here.
       recordUse(item && item.target)
+    },
+    ipc: {
+      convert: function (query) {
+        const q = String(query ?? "")
+        const results = tryAll(q, ratesFor(RATE_URL), usageCounts, cpiFor(CPI_URL))
+        if (!results || results.length === 0) return null
+        const url = results[0].year !== undefined ? CPI_URL : RATE_URL
+        const pending = results.some(function (r) { return r.ok === true && r.pending === true })
+        if (pending) {
+          // The same request and 8s boundary items() uses. Repeat the read to
+          // observe the landed body; no pick is recorded by a query.
+          api.requestNet(url, 8000)
+          return { state: "accepted" }
+        }
+        const out = []
+        for (let i = 0; i < results.length; i++) {
+          const r = results[i]
+          if (r.ok !== true) continue
+          out.push({
+            from: r.from === undefined ? null : r.from,
+            to: r.to === undefined ? null : r.to,
+            year: r.year === undefined ? null : r.year,
+            label: r.label,
+            value: r.copy
+          })
+        }
+        if (out.length > 0) return out
+        const failed = results.some(function (r) { return r.error === "unavailable" })
+        return failed ? { error: "backend" } : null
+      }
     }
   }
 })()

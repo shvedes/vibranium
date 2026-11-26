@@ -18,7 +18,7 @@
 # asserting here is only true on a later turn:
 #
 #   * Icon's boot scan (a Quickshell Process filling Icons._raw) is empty at
-#     Component.onCompleted and holds 178 assets on the first turn. A
+#     Component.onCompleted and holds 194 assets on the first turn. A
 #     snapshot taken at boot would "prove" that no icon name resolves.
 #   * Font metrics move too: the same label measures 187px wide at
 #     Component.onCompleted and 249px a few hundred milliseconds later, which
@@ -108,7 +108,7 @@ t_section "Icon: the boot scan is what makes a name resolvable at all"
 t_eq "the icon set is still empty at Component.onCompleted" "0" "$(qp_get icon.scan.bootIndexed)"
 t_eq "so the scan has not reported yet" "false" "$(qp_get icon.scan.bootReady)"
 t_eq "and a known name resolves to nothing yet" "0" "$(qp_get icon.url.bootLength)"
-t_eq "on the first turn the scan is in" "188" "$(qp_get icon.scan.indexed)"
+t_eq "on the first turn the scan is in" "194" "$(qp_get icon.scan.indexed)"
 t_eq "and reports ready" "true" "$(qp_get icon.scan.ready)"
 
 t_section "Icon: a known name resolves to a recolored data URL"

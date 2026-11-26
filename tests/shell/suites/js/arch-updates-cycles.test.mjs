@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Suite: ArchUpdates queued-cycle isolation (SVC-1).
+// Suite: SystemUpdates queued-cycle isolation (SVC-1).
 //
-//   shell/services/system/ArchUpdates.qml   refresh, _startFetches,
+//   shell/services/system/SystemUpdates.qml   refresh, _startFetches,
 //                                           _finishRefresh, and both fetch
 //                                           Process.onExited handlers
 //
-// Limitation: ArchUpdates is a Singleton that forks checkupdates and yay, waits
+// Limitation: SystemUpdates is a Singleton that forks checkupdates and yay, waits
 // on the boot gate, and can send a desktop notification. Offscreen Qt has no
 // mirror/RPC to query and no notification daemon, so the live two-cycle frame
 // cannot be observed here. This suite reads the real QML, lifts the four
@@ -21,7 +21,7 @@ import {
 } from '../../lib/assert.mjs'
 
 const SERVICE = fs.readFileSync(
-  path.join(SHELL_DIR, 'services', 'system', 'ArchUpdates.qml'), 'utf8')
+  path.join(SHELL_DIR, 'services', 'system', 'SystemUpdates.qml'), 'utf8')
 
 // Lift a block by brace matching so nested ifs and closures survive intact.
 // The shipped QML is the only source of truth: nothing is copied into this
@@ -42,15 +42,15 @@ function bracedBody(src, firstBrace, label) {
 function extractFunction(src, name) {
   const head = `function ${name}(`
   const at = src.indexOf(head)
-  if (at < 0) throw new Error(`ArchUpdates.qml has no ${head}`)
+  if (at < 0) throw new Error(`SystemUpdates.qml has no ${head}`)
   return bracedBody(src, src.indexOf('{', at), head)
 }
 
 function extractProcessHandler(src, id, handler) {
   const idAt = src.indexOf(`id: ${id}`)
-  if (idAt < 0) throw new Error(`ArchUpdates.qml has no id ${id}`)
+  if (idAt < 0) throw new Error(`SystemUpdates.qml has no id ${id}`)
   const procAt = src.lastIndexOf('Process {', idAt)
-  if (procAt < 0) throw new Error(`ArchUpdates.qml has no Process for ${id}`)
+  if (procAt < 0) throw new Error(`SystemUpdates.qml has no Process for ${id}`)
   const block = bracedBody(src, src.indexOf('{', procAt), `Process ${id}`)
   const at = block.indexOf(`${handler}:`)
   if (at < 0) throw new Error(`Process ${id} has no ${handler}`)
@@ -73,7 +73,7 @@ function makeSim(threshold = 2) {
   const sim = { publishes, notifies, logs, scheduled: 0 }
 
   const root = {
-    tag: 'archUpdates',
+    tag: 'systemUpdates',
     notifyThreshold: threshold,
     state: 'idle',
     errorText: '',
@@ -186,7 +186,7 @@ function driveOverlap(sim, aur1) {
 const C1 = ['o1', 'a1']
 const C2 = ['n1', 'n2', 'n3', 'm1']
 
-suite('arch-updates cycles', 'queued fetch generations and clean result slots')
+suite('system-updates cycles', 'queued fetch generations and clean result slots')
 
 // ---------------------------------------------------------------------------
 section('a queued follow-up never publishes a mixed result')

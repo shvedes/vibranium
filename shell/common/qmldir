@@ -15,6 +15,7 @@ singleton Ui 1.0 ui/Ui.qml
 singleton TimeFormat 1.0 TimeFormat.qml
 singleton Registry 1.0 bus/Registry.qml
 singleton Bus 1.0 bus/Bus.qml
+singleton IpcRouter 1.0 bus/IpcRouter.qml
 singleton SurfaceClaim 1.0 bus/SurfaceClaim.qml
 singleton AppState 1.0 state/State.qml
 singleton ShellState 1.0 state/ShellState.qml

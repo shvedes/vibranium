@@ -42,7 +42,7 @@ Item {
   readonly property real rowPad: 6
 
   // Right gutter for the overlaid scrollbar: the bar (3px + 1px
-  // margin) draws inside the viewport edge (ArchUpdates/Battery
+  // margin) draws inside the viewport edge (SystemUpdates/Battery
   // pattern) and rows already end at rowPad, so nothing runs under it.
 
   // --- bluetooth state ---
@@ -75,7 +75,7 @@ Item {
   // opening, never a poll tick.
   readonly property bool refreshing: root.adapter ? root.adapter.discovering : false
 
-  // AVAILABLE DEVICES rows: a four-row window, ArchUpdates-style. Live
+  // AVAILABLE DEVICES rows: a four-row window, SystemUpdates-style. Live
   // rows fill from the top and static skeleton rows pad the rest, so
   // discoveries land on laid-out rows instead of growing the section and
   // the window holds still while devices arrive. The skeletons pulse only
@@ -537,7 +537,7 @@ Item {
             delegate: deviceDelegate
           }
 
-          // Overlaid inside the viewport edge (ArchUpdates/Battery
+          // Overlaid inside the viewport edge (SystemUpdates/Battery
           // pattern): rows already end at rowPad.
           ScrollBar {
             flickable: pairedList
@@ -609,7 +609,7 @@ Item {
             delegate: deviceDelegate
           }
 
-          // Overlaid inside the viewport edge (ArchUpdates/Battery
+          // Overlaid inside the viewport edge (SystemUpdates/Battery
           // pattern): rows already end at rowPad.
           ScrollBar {
             flickable: availableList

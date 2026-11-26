@@ -732,10 +732,10 @@ group('validateLayout: four fixed zones, deduped, everything else ignored', () =
   eq('a timers value is copied out, not aliased', (() => {
     const list = []
     const out = SL.validateValue(bare({ type: 'timers' }), list)
-    out.value.push({ minutes: 1, action: 'lock' })
+    out.value.push({ seconds: 60, action: 'lock' })
     return list.length
   })(), 0)
-  eq('an invalid timer list is refused by validateValue too', SL.validateValue(bare({ type: 'timers' }), [{}]).error, 'timer 1 minutes must be a positive integer')
+  eq('an invalid timer list is refused by validateValue too', SL.validateValue(bare({ type: 'timers' }), [{}]).error, 'timer 1 needs one positive integer seconds or minutes field')
   eq('a non-array timers value', SL.validateValue(bare({ type: 'timers' }), {}).error, 'timers must be an array')
 })
 
@@ -753,12 +753,12 @@ group('declaredIdleClass never repairs an unknown value into an absent one', () 
 
 group('declaresOwnCommand matches whole argv words only', () => {
   eq('the session lock verb', SL.declaresOwnCommand('vb-shell session lock'), true)
-  eq('the lockscreen lock verb', SL.declaresOwnCommand('vb-shell lockscreen lock'), true)
+  eq('the legacy lockscreen lock spelling is still recognized', SL.declaresOwnCommand('vb-shell lockscreen lock'), true)
   eq('the session suspend verb', SL.declaresOwnCommand('vb-shell session suspend'), true)
   eq('the plain system suspend the shell itself runs', SL.declaresOwnCommand('systemctl suspend'), true)
   eq('surrounding whitespace is trimmed first', SL.declaresOwnCommand('  vb-shell session lock  '), true)
   eq('another tool\'s lock is not the project\'s verb', SL.declaresOwnCommand('loginctl lock-session'), false)
-  eq('a wrapped spelling is not a match', SL.declatesOwnCommand || SL.declaresOwnCommand('echo vb-shell session lock'), false)
+  eq('a wrapped spelling is not a match', SL.declaresOwnCommand('echo vb-shell session lock'), false)
   eq('a piped spelling is not a match', SL.declaresOwnCommand('vb-shell session lock | tee log'), false)
   eq('a wrapped system suspend is not a match', SL.declaresOwnCommand('echo systemctl suspend'), false)
   eq('a suffixed word is not a match', SL.declaresOwnCommand('vb-shell session lockx'), false)
@@ -768,47 +768,46 @@ group('declaresOwnCommand matches whole argv words only', () => {
   eq('undefined', SL.declaresOwnCommand(undefined), false)
 })
 
-group('normalizeIdleTimers fills only an absent class, and is idempotent', () => {
-  const list = [
+group('normalizeIdleTimers returns canonical seconds rows', () => {
+  const legacy = [
     { minutes: 1, action: 'command', command: 'vb-shell session lock' },
     { minutes: 2, action: 'command', command: 'echo hi' },
     { minutes: 3, action: 'lock' },
   ]
-  eq('a known verb gets its class', SL.normalizeIdleTimers(list), [
-    { minutes: 1, action: 'command', command: 'vb-shell session lock', commandClass: 'lock' },
-    { minutes: 2, action: 'command', command: 'echo hi' },
-    { minutes: 3, action: 'lock' },
-  ])
+  const canonical = [
+    { seconds: 60, action: 'command', command: 'vb-shell session lock', commandClass: 'lock' },
+    { seconds: 120, action: 'command', command: 'echo hi' },
+    { seconds: 180, action: 'lock' },
+  ]
+  eq('legacy minutes become seconds and a known verb gets its class', SL.normalizeIdleTimers(legacy), canonical)
+  eq('canonical seconds rows are unchanged', SL.normalizeIdleTimers(canonical), canonical)
   eq('the plain system suspend command gets the suspend class', SL.normalizeIdleTimers([
-    { minutes: 1, action: 'command', command: 'systemctl suspend' },
-  ]), [{ minutes: 1, action: 'command', command: 'systemctl suspend', commandClass: 'suspend' }])
+    { seconds: 60, action: 'command', command: 'systemctl suspend' },
+  ]), [{ seconds: 60, action: 'command', command: 'systemctl suspend', commandClass: 'suspend' }])
   eq('a declared class is kept, even against the verb', SL.normalizeIdleTimers([
-    { minutes: 1, action: 'command', command: 'vb-shell session lock', commandClass: 'suspend' },
-  ]), [{ minutes: 1, action: 'command', command: 'vb-shell session lock', commandClass: 'suspend' }])
-  eq('a non-command row is untouched', SL.normalizeIdleTimers([{ minutes: 1, action: 'lock' }]), [{ minutes: 1, action: 'lock' }])
-  eq('no change returns the same array', SL.normalizeIdleTimers([{ minutes: 1, action: 'lock' }]) !== null, true)
-  eq('idempotent', SL.normalizeIdleTimers(SL.normalizeIdleTimers(list)), SL.normalizeIdleTimers(list))
+    { seconds: 60, action: 'command', command: 'vb-shell session lock', commandClass: 'suspend' },
+  ]), [{ seconds: 60, action: 'command', command: 'vb-shell session lock', commandClass: 'suspend' }])
+  eq('a non-command row is canonicalized', SL.normalizeIdleTimers([{ minutes: 1, action: 'lock' }]), [{ seconds: 60, action: 'lock' }])
+  eq('idempotent', SL.normalizeIdleTimers(SL.normalizeIdleTimers(legacy)), canonical)
   eq('a non-array is returned as-is', SL.normalizeIdleTimers('x'), 'x')
   eq('null is returned as-is', SL.normalizeIdleTimers(null), null)
   eq('a malformed row makes the whole list come back unchanged', SL.normalizeIdleTimers([{ minutes: 1, action: 'lock' }, 5]),
     [{ minutes: 1, action: 'lock' }, 5])
   eq('a null row too', SL.normalizeIdleTimers([null]), [null])
-  // A matched row is rebuilt from the four fields the write path carries, so
-  // anything else the reader had on it is dropped. Pinned: the round trip
-  // through a write is a narrowing, not a merge.
-  eq('extra fields on a matched row do not survive', SL.normalizeIdleTimers([
+  // Canonical rows carry only known fields.
+  eq('extra fields do not survive', SL.normalizeIdleTimers([
     { minutes: 1, action: 'command', command: 'vb-shell session lock', note: 'x' },
-  ]), [{ minutes: 1, action: 'command', command: 'vb-shell session lock', commandClass: 'lock' }])
-  eq('extra fields on an unmatched row do survive', SL.normalizeIdleTimers([
-    { minutes: 1, action: 'lock', note: 'x' },
-  ]), [{ minutes: 1, action: 'lock', note: 'x' }])
+  ]), [{ seconds: 60, action: 'command', command: 'vb-shell session lock', commandClass: 'lock' }])
 })
 
 group('validateIdleTimers: every rejection reason, in order', () => {
   const ok = (l) => SL.validateIdleTimers(l)
   eq('an empty list is legal', ok([]), '')
   eq('lock then suspend then command', ok([
-    { minutes: 1, action: 'lock' }, { minutes: 2, action: 'suspend' }, { minutes: 3, action: 'command', command: 'c' },
+    { seconds: 60, action: 'lock' }, { seconds: 120, action: 'suspend' }, { seconds: 180, action: 'command', command: 'c' },
+  ]), '')
+  eq('legacy minutes are still accepted on read', ok([
+    { minutes: 1, action: 'lock' }, { minutes: 2, action: 'suspend' },
   ]), '')
   eq('a non-array', ok('x'), 'timers must be an array')
   eq('a null list', ok(null), 'timers must be an array')
@@ -816,54 +815,57 @@ group('validateIdleTimers: every rejection reason, in order', () => {
   eq('a null row', ok([null]), 'timer 1 must be an object')
   eq('an array row', ok([[]]), 'timer 1 must be an object')
   eq('a string row', ok(['x']), 'timer 1 must be an object')
-  eq('a fractional minute', ok([{ minutes: 1.5, action: 'lock' }]), 'timer 1 minutes must be a positive integer')
-  eq('a zero minute', ok([{ minutes: 0, action: 'lock' }]), 'timer 1 minutes must be a positive integer')
-  eq('a negative minute', ok([{ minutes: -1, action: 'lock' }]), 'timer 1 minutes must be a positive integer')
-  eq('a string minute', ok([{ minutes: '1', action: 'lock' }]), 'timer 1 minutes must be a positive integer')
-  eq('a missing minute', ok([{ action: 'lock' }]), 'timer 1 minutes must be a positive integer')
-  eq('an Infinity minute', ok([{ minutes: Infinity, action: 'lock' }]), 'timer 1 minutes must be a positive integer')
-  eq('an unknown action', ok([{ minutes: 1, action: 'nope' }]), 'timer 1 action must be lock, suspend or command')
-  eq('a missing action', ok([{ minutes: 1 }]), 'timer 1 action must be lock, suspend or command')
-  eq('a command row without a command', ok([{ minutes: 1, action: 'command' }]), 'timer 1 command action needs a command string')
-  eq('a command row with a non-string command', ok([{ minutes: 1, action: 'command', command: 5 }]), 'timer 1 command action needs a command string')
-  eq('an unknown declared class', ok([{ minutes: 1, action: 'command', command: 'x', commandClass: 'bogus' }]),
+  const fieldError = 'timer 1 needs one positive integer seconds or minutes field'
+  eq('a fractional second', ok([{ seconds: 1.5, action: 'lock' }]), fieldError)
+  eq('a zero second', ok([{ seconds: 0, action: 'lock' }]), fieldError)
+  eq('a negative second', ok([{ seconds: -1, action: 'lock' }]), fieldError)
+  eq('a string second', ok([{ seconds: '1', action: 'lock' }]), fieldError)
+  eq('a missing field', ok([{ action: 'lock' }]), fieldError)
+  eq('both fields', ok([{ seconds: 60, minutes: 1, action: 'lock' }]), fieldError)
+  eq('an Infinity second', ok([{ seconds: Infinity, action: 'lock' }]), fieldError)
+  eq('an out-of-range second', ok([{ seconds: 2147483648, action: 'lock' }]), fieldError)
+  eq('an unknown action', ok([{ seconds: 60, action: 'nope' }]), 'timer 1 action must be lock, suspend or command')
+  eq('a missing action', ok([{ seconds: 60 }]), 'timer 1 action must be lock, suspend or command')
+  eq('a command row without a command', ok([{ seconds: 60, action: 'command' }]), 'timer 1 command action needs a command string')
+  eq('a command row with a non-string command', ok([{ seconds: 60, action: 'command', command: 5 }]), 'timer 1 command action needs a command string')
+  eq('an unknown declared class', ok([{ seconds: 60, action: 'command', command: 'x', commandClass: 'bogus' }]),
     'timer 1 commandClass must be lock, suspend or empty')
-  eq('an empty declared class is legal', ok([{ minutes: 1, action: 'command', command: 'x', commandClass: '' }]), '')
-  eq('a duplicate minute', ok([{ minutes: 1, action: 'lock' }, { minutes: 1, action: 'suspend' }]), 'duplicate timer minutes: 1')
-  eq('decreasing minutes', ok([{ minutes: 2, action: 'lock' }, { minutes: 1, action: 'suspend' }]), 'timers must be strictly increasing by minutes')
-  eq('equal minutes on a legal pair is caught as a duplicate first', ok([{ minutes: 1, action: 'lock' }, { minutes: 1, action: 'suspend' }]), 'duplicate timer minutes: 1')
-  eq('two locks', ok([{ minutes: 1, action: 'lock' }, { minutes: 2, action: 'lock' }]), 'timer 2 duplicates the action of timer 1')
-  eq('two suspends', ok([{ minutes: 1, action: 'suspend' }, { minutes: 2, action: 'suspend' }]), 'timer 2 duplicates the action of timer 1')
+  eq('an empty declared class is legal', ok([{ seconds: 60, action: 'command', command: 'x', commandClass: '' }]), '')
+  eq('a duplicate second', ok([{ seconds: 60, action: 'lock' }, { seconds: 60, action: 'suspend' }]), 'duplicate timer seconds: 60')
+  eq('decreasing seconds', ok([{ seconds: 120, action: 'lock' }, { seconds: 60, action: 'suspend' }]), 'timers must be strictly increasing by seconds')
+  eq('equal seconds on a legal pair is caught as a duplicate first', ok([{ seconds: 60, action: 'lock' }, { seconds: 60, action: 'suspend' }]), 'duplicate timer seconds: 60')
+  eq('two locks', ok([{ seconds: 60, action: 'lock' }, { seconds: 120, action: 'lock' }]), 'timer 2 duplicates the action of timer 1')
+  eq('two suspends', ok([{ seconds: 60, action: 'suspend' }, { seconds: 120, action: 'suspend' }]), 'timer 2 duplicates the action of timer 1')
   // Identity for a command row is the trimmed text PLUS the declared class.
   eq('two different commands are distinct actions', ok([
-    { minutes: 1, action: 'command', command: 'a' }, { minutes: 2, action: 'command', command: 'b' },
+    { seconds: 60, action: 'command', command: 'a' }, { seconds: 120, action: 'command', command: 'b' },
   ]), '')
   eq('the same command twice is a duplicate', ok([
-    { minutes: 1, action: 'command', command: 'a' }, { minutes: 2, action: 'command', command: 'a' },
+    { seconds: 60, action: 'command', command: 'a' }, { seconds: 120, action: 'command', command: 'a' },
   ]), 'timer 2 duplicates the action of timer 1')
   eq('the same command declared as a lock and a suspend is two timers', ok([
-    { minutes: 1, action: 'command', command: 'a', commandClass: 'lock' },
-    { minutes: 2, action: 'command', command: 'a', commandClass: 'suspend' },
+    { seconds: 60, action: 'command', command: 'a', commandClass: 'lock' },
+    { seconds: 120, action: 'command', command: 'a', commandClass: 'suspend' },
   ]), '')
   eq('command identity is the trimmed text', ok([
-    { minutes: 1, action: 'command', command: ' a ' }, { minutes: 2, action: 'command', command: 'a' },
+    { seconds: 60, action: 'command', command: ' a ' }, { seconds: 120, action: 'command', command: 'a' },
   ]), 'timer 2 duplicates the action of timer 1')
   eq('a lock and a command are different actions', ok([
-    { minutes: 1, action: 'lock' }, { minutes: 2, action: 'command', command: 'lock' },
+    { seconds: 60, action: 'lock' }, { seconds: 120, action: 'command', command: 'lock' },
   ]), '')
   eq('the duplicate names the first timer', ok([
-    { minutes: 1, action: 'lock' }, { minutes: 2, action: 'suspend' }, { minutes: 3, action: 'lock' },
+    { seconds: 60, action: 'lock' }, { seconds: 120, action: 'suspend' }, { seconds: 180, action: 'lock' },
   ]), 'timer 3 duplicates the action of timer 1')
 })
 
 group('buildIdleTimerRows carries the class through the write', () => {
-  eq('a lock row is minutes + action', SL.buildIdleTimerRows([{ minutes: 1, action: 'lock', note: 'x' }]), [{ minutes: 1, action: 'lock' }])
-  eq('a command row always carries a class, even an empty one', SL.buildIdleTimerRows([{ minutes: 2, action: 'command', command: 'c' }]),
-    [{ minutes: 2, action: 'command', command: 'c', commandClass: '' }])
-  eq('a declared class is carried, not rebuilt away', SL.buildIdleTimerRows([{ minutes: 3, action: 'command', command: 'd', commandClass: 'suspend' }]),
-    [{ minutes: 3, action: 'command', command: 'd', commandClass: 'suspend' }])
+  eq('a lock row is seconds + action', SL.buildIdleTimerRows([{ minutes: 1, action: 'lock', note: 'x' }]), [{ seconds: 60, action: 'lock' }])
+  eq('a command row with no declared class keeps no class', SL.buildIdleTimerRows([{ minutes: 2, action: 'command', command: 'c' }]),
+    [{ seconds: 120, action: 'command', command: 'c' }])
+  eq('a declared class is carried, not rebuilt away', SL.buildIdleTimerRows([{ seconds: 180, action: 'command', command: 'd', commandClass: 'suspend' }]),
+    [{ seconds: 180, action: 'command', command: 'd', commandClass: 'suspend' }])
   eq('an empty list builds an empty list', SL.buildIdleTimerRows([]), [])
-  eq('the row order is the input order', SL.buildIdleTimerRows([{ minutes: 3, action: 'lock' }, { minutes: 1, action: 'lock' }]).map((r) => r.minutes), [3, 1])
+  eq('the row order is the input order', SL.buildIdleTimerRows([{ minutes: 3, action: 'lock' }, { minutes: 1, action: 'lock' }]).map((r) => r.seconds), [180, 60])
 })
 
 // ===========================================================================

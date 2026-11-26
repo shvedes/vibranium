@@ -4,8 +4,8 @@
 // than passed so that no call site has to name its own owner. `features/` and
 // `common/` are stripped - so are `services/` and `boot/`, because a scope
 // that keeps its layer for two of the four and drops it for the other two is
-// a scope nobody can guess the spelling of. `features/bar/modules/ArchUpdates/
-// ArchUpdates.qml` reads as `bar.archUpdates`; `features/clipboard/
+// a scope nobody can guess the spelling of. `features/bar/modules/SystemUpdates/
+// SystemUpdates.qml` reads as `bar.systemUpdates`; `features/clipboard/
 // Clipboard.qml` as `clipboard`.
 //
 // Three rules produce that, and each is load-bearing:
@@ -26,8 +26,8 @@
 // one uniform rule is worth more than one shorter scope name.
 //
 // Scope identity is case-insensitive and hierarchical: `bar` matches `bar`
-// and `bar.archUpdates`, and not `barn`. `mostSpecificMatch` resolves the
-// overlap, which is what makes `bar=warn,bar.archUpdates=trace` split one
+// and `bar.systemUpdates`, and not `barn`. `mostSpecificMatch` resolves the
+// overlap, which is what makes `bar=warn,bar.systemUpdates=trace` split one
 // subtree at the deeper key.
 .pragma library
 
@@ -156,7 +156,7 @@ function stripExtension(name) {
 // A leading run of capitals is an acronym in a mixed-case name and a
 // lowercased word otherwise, and the two want opposite treatment:
 //
-//   ArchUpdates -> archUpdates   (one capital: just a word starting capitalised)
+//   SystemUpdates -> systemUpdates   (one capital: just a word starting capitalised)
 //   OSDView     -> osdView       (a capital run followed by lower case: two words)
 //   IPC         -> ipc           (a capital run with nothing after it: one word)
 //   ColorPicker -> colorPicker
@@ -192,7 +192,7 @@ function matchesKey(scope, key) {
 // covers `scope`, or null when none does.
 //
 // Longest wins because that is the only ordering that makes nesting
-// expressible: with `bar` and `bar.archUpdates` both present, the deeper key
+// expressible: with `bar` and `bar.systemUpdates` both present, the deeper key
 // has to be the one that decides, or a parent could never be set without
 // silently overruling its own child.
 function mostSpecificMatch(map, scope) {

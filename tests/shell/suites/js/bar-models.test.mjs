@@ -2,7 +2,7 @@
 // Suite: the bar's pure JS layer.
 //
 //   shell/features/bar/BarLib.js                        the layout algebra
-//   shell/features/bar/modules/ArchUpdates/Model.js      search + selection
+//   shell/features/bar/modules/SystemUpdates/Model.js      search + selection
 //   shell/features/bar/modules/Volume/Model.js           stream classification
 //   shell/features/bar/modules/Workspaces/Model.js       number-strip geometry
 //   shell/features/bar/modules/ColorPicker/PreviewPlacement.js  floating readout
@@ -38,7 +38,7 @@ const fsExists = (p) => fs.existsSync(p)
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const BAR = path.join(SHELL, 'features', 'bar')
 const B = loadLib(path.join(BAR, 'BarLib.js'))
-const AU = loadLib(path.join(BAR, 'modules', 'ArchUpdates', 'Model.js'))
+const AU = loadLib(path.join(BAR, 'modules', 'SystemUpdates', 'Model.js'))
 const VO = loadLib(path.join(BAR, 'modules', 'Volume', 'Model.js'))
 const WSM = loadLib(path.join(BAR, 'modules', 'Workspaces', 'Model.js'))
 const PP = loadLib(path.join(BAR, 'modules', 'ColorPicker', 'PreviewPlacement.js'))
@@ -101,11 +101,11 @@ suite('bar/models', 'BarLib + the bar module models + common/NowPlaying')
 
 section('the harness contract')
 group('the five libraries load and publish a function surface', () => {
-  for (const [label, lib] of [['BarLib', B], ['ArchUpdates/Model', AU], ['Volume/Model', VO], ['Workspaces/Model', WSM], ['common/NowPlaying', CN]]) {
+  for (const [label, lib] of [['BarLib', B], ['SystemUpdates/Model', AU], ['Volume/Model', VO], ['Workspaces/Model', WSM], ['common/NowPlaying', CN]]) {
     is(`${label} loaded`, lib, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
   }
   eq('BarLib publishes the twenty layout helpers plus the shared insert rule', Object.keys(B).length, 21)
-  eq('ArchUpdates/Model publishes the eighteen model functions plus four table vars', Object.keys(AU).length, 22)
+  eq('SystemUpdates/Model publishes the eighteen model functions plus four table vars', Object.keys(AU).length, 22)
   eq('Volume/Model publishes thirteen functions', Object.keys(VO).length, 13)
   eq('Workspaces/Model publishes the number-strip helpers', Object.keys(WSM).length, 3)
 })
@@ -904,7 +904,7 @@ group('the band is absolute, so a short screen makes the hysteresis wider', () =
 })
 
 // ======================================================================
-section('ArchUpdates/Model - the AUR tag and the selection keys')
+section('SystemUpdates/Model - the AUR tag and the selection keys')
 group('the three tag constants are the published values', () => {
   eq('AUR', AU.AUR, 'aur')
   eq('AUR_PREFIX', AU.AUR_PREFIX, 'aur:')
@@ -985,7 +985,7 @@ group('heavyQueue is the shared threshold, gated on its toggle', () => {
   eq('a non-array reads as empty', AU.heavyQueue('vim', true), false)
 })
 
-section('ArchUpdates/Model.filterPackages - the case-insensitive search')
+section('SystemUpdates/Model.filterPackages - the case-insensitive search')
 const SEARCH = [npk('Firefox', { repository: 'extra' }), npk('vim', { repository: 'core' }), npk('yay-bin', { repository: 'aur', source: 'aur' })]
 group('the name and the repository are both searched', () => {
   eq('a name fragment', AU.filterPackages(SEARCH, 'fire').map((p) => p.name), ['Firefox'])
@@ -1031,7 +1031,7 @@ group('a non-object entry is skipped, like every neighbour', () => {
   noThrow('an empty query short-circuits before the walk', () => AU.filterPackages([null], ''))
 })
 
-section('ArchUpdates/Model - the selection algebra')
+section('SystemUpdates/Model - the selection algebra')
 group('selectedCount counts keys, whatever their values', () => {
   eq('two keys', AU.selectedCount({ 'official:vim': true, 'aur:yay': true }), 2)
   eq('a false value is still a key', AU.selectedCount({ 'official:vim': false }), 1)
@@ -1124,7 +1124,7 @@ group('pruneKeys drops keys for packages that are gone', () => {
   eq('a non-object entry contributes no live key', AU.pruneKeys({ 'official:': true }, [null]), {})
 })
 
-section('ArchUpdates/Model - the row projection and the window')
+section('SystemUpdates/Model - the row projection and the window')
 group('rowWindow pads the live rows up to the window', () => {
   eq('one row in a four-row window', AU.rowWindow([OFFICIAL], 4), [OFFICIAL, { _filler: true }, { _filler: true }, { _filler: true }])
   eq('the live entry is the same object', AU.rowWindow([OFFICIAL], 4)[0] === OFFICIAL, true)
@@ -1220,7 +1220,7 @@ group('a real row stringifies its two text fields', () => {
   eq('a name that is an array stringifies', AU.rowView({ name: ['a', 'b'] }, {}).name, 'a,b')
 })
 
-section('ArchUpdates/Model.columnWidths - the capped table columns')
+section('SystemUpdates/Model.columnWidths - the capped table columns')
 // The island's own chrome policy, passed in: 16px version padding, a 40px
 // floor and a 120px cap on the version, an 80px floor on the name.
 const CAPS = { verPad: 16, minVer: 40, verCap: 120, minName: 80 }

@@ -220,7 +220,7 @@ t_eq "PrepareForSleep(false) parses as false" "true" "${C[parserFalse]}"
 t_eq "an unrelated login1 signal is ignored" "true" "${C[parserIgnoresOtherSignal]}"
 t_eq "a foreign path is ignored" "true" "${C[parserIgnoresForeignPath]}"
 t_eq "input after a short sleep does not release" "0" "${C[shortSleepReleased]}"
-t_eq "the monitor publishes the boundary and coalesces once" \
+t_eq "the monitor publishes the authoritative boundary and coalesces once" \
   "alive,publish:session.sleep:true,coalesce" "${C[monitorPath]}"
 
 t_section "the wall clock and the setting still bound the window"

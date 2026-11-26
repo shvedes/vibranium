@@ -9,8 +9,18 @@
 
 // The state an unseated or unknown row reads as. A fresh object every call:
 // stateOf hands out a copy so dependents always see a change.
+//
+// `promptOpen`, `confirmKind` and `confirmStage` are the shared half of what
+// used to live only on a delegate. They are keyed by the same normalized uid
+// as `expanded`/`info` so an IPC operation and a UI gesture drive one state
+// machine even when the delegate is not mounted (or has just been recycled).
+// The delegate keeps its own cursor/editor state; only the three modal flags
+// that a model operation can arm are here.
 function blankState() {
-  return { checked: false, value: "", expanded: false, info: false }
+  return {
+    checked: false, value: "", expanded: false, info: false,
+    promptOpen: false, confirmKind: "", confirmStage: 0
+  }
 }
 
 // The record an item starts with. `live(varName)` answers the store value for
@@ -25,7 +35,34 @@ function initialState(item, live) {
     if (item.type === "toggle") checked = seen === true
     else if (seen !== undefined) value = seen
   }
-  return { checked: checked, value: value, expanded: false, info: false }
+  return {
+    checked: checked, value: value, expanded: false, info: false,
+    promptOpen: false, confirmKind: "", confirmStage: 0
+  }
+}
+
+// The staged-flow record. `visited` is the ordered sequence of stage indexes
+// actually walked (so Back can step over a skipUnless stage); `ready` means
+// the last stage was reached with all required values; `draft` carries a
+// presence bit and value for the step currently being edited, never a
+// committed stage value. One record per flow uid, beside `_states`.
+function blankFlow() {
+  return { index: 0, values: {}, visited: [0], ready: false, draft: { set: false, value: null } }
+}
+
+function withFlow(flow) {
+  const base = blankFlow()
+  if (!flow || typeof flow !== "object") return base
+  return {
+    index: Number(flow.index) || 0,
+    values: flow.values && typeof flow.values === "object" ? flow.values : {},
+    visited: Array.isArray(flow.visited) && flow.visited.length > 0
+      ? flow.visited.slice() : [Number(flow.index) || 0],
+    ready: flow.ready === true,
+    draft: flow.draft && typeof flow.draft === "object"
+      ? { set: flow.draft.set === true, value: flow.draft.value }
+      : base.draft
+  }
 }
 
 // Copy-on-write close latch. The map is replaced, not mutated, so a binding

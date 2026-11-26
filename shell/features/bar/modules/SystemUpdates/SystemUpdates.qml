@@ -4,11 +4,11 @@ import QtQuick
 import qs.common
 import qs.services as Svc
 import qs.features.bar
-import qs.features.bar.modules.ArchUpdates
+import qs.features.bar.modules.SystemUpdates
 import "Model.js" as Model
 
-// Arch updates indicator. Static right-zone module that visualises
-// the ArchUpdates service (official Arch packages and AUR,
+// System updates indicator. Static right-zone module that visualises
+// the SystemUpdates service (official repository packages and AUR,
 // fetched in parallel with timeouts). Left opens the searchable island
 // with per-source update buttons, middle refreshes, right launches the
 // official TUI updater. The tooltip counts by source - the total first,
@@ -17,15 +17,15 @@ import "Model.js" as Model
 BarModule {
   id: root
 
-  readonly property string displayState: Svc.ArchUpdates.state
-  readonly property var displayPackages: Svc.ArchUpdates.packages
-  readonly property string displayError: Svc.ArchUpdates.errorText
-  readonly property bool displayUpdating: Svc.ArchUpdates.updating
+  readonly property string displayState: Svc.SystemUpdates.state
+  readonly property var displayPackages: Svc.SystemUpdates.packages
+  readonly property string displayError: Svc.SystemUpdates.errorText
+  readonly property bool displayUpdating: Svc.SystemUpdates.updating
 
   // Same threshold, same toggle as the island's warning box: the tooltip's
   // red total and the island's alarm are one condition.
   readonly property bool heavyQueue: Model.heavyQueue(root.displayPackages,
-    Settings.statusbarArchUpdatesHeavyWarning)
+    Settings.statusbarSystemUpdatesHeavyWarning)
 
   // Status text for the two states that carry no counts. A pending or
   // up-to-date list is a row set instead (tipLines below).
@@ -81,9 +81,9 @@ BarModule {
     if (mouse.button === Qt.LeftButton) {
       root.openIsland()
     } else if (mouse.button === Qt.MiddleButton) {
-      Svc.ArchUpdates.refresh()
+      Svc.SystemUpdates.refresh()
     } else if (mouse.button === Qt.RightButton) {
-      Svc.ArchUpdates.triggerUpdate(false, [])
+      Svc.SystemUpdates.triggerUpdate(false, [])
     }
   }
 
@@ -93,7 +93,7 @@ BarModule {
   Component {
     id: islandComp
 
-    ArchUpdatesIsland {
+    SystemUpdatesIsland {
       packages: root.displayPackages
       islandState: root.displayState
       errorText: root.displayError
@@ -104,14 +104,14 @@ BarModule {
         // and the module repopulates from there.
         const host = root.barWindow.islandHost
         if (host.isOpenFor(root)) host.close()
-        Svc.ArchUpdates.triggerUpdate(aur, names)
+        Svc.SystemUpdates.triggerUpdate(aur, names)
       }
       onUpdateSystemRequested: {
         const host = root.barWindow.islandHost
         if (host.isOpenFor(root)) host.close()
-        Svc.ArchUpdates.triggerUpdateBoth([])
+        Svc.SystemUpdates.triggerUpdateBoth([])
       }
-      onRefreshRequested: Svc.ArchUpdates.refresh()
+      onRefreshRequested: Svc.SystemUpdates.refresh()
     }
   }
 

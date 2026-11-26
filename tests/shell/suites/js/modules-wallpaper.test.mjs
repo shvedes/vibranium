@@ -147,9 +147,9 @@ group('the full block is Usage, Description, Commands, Examples, Run-line', () =
       + '\nCommands:\n'
       + '  dump            enabled module ids in display order\n'
       + '  enable <id>     enable a bar module\n'
-      + '  status          health + unit payload\n'
-      + '  ping            liveness\n'
-      + '  help [command]  show help for one command\n'
+      + "  status          show the target's status\n"
+      + '  ping            check that the target responds\n'
+      + '  help [command]  show help for this target or one command\n'
       + '\nExamples:\n  vb-shell wallpaper help status\n'
       + '\nRun `vb-shell help` to list all units.\n',
   )
@@ -162,9 +162,9 @@ group('the full block is Usage, Description, Commands, Examples, Run-line', () =
     'Usage: vb-shell OSD <command> [args...]\n'
       + '\nOn-screen display overlays.\n'
       + '\nCommands:\n'
-      + '  status          health + unit payload\n'
-      + '  ping            liveness\n'
-      + '  help [command]  show help for one command\n'
+      + "  status          show the target's status\n"
+      + '  ping            check that the target responds\n'
+      + '  help [command]  show help for this target or one command\n'
       + '\nExamples:\n  vb-shell OSD help status\n'
       + '\nRun `vb-shell help` to list all units.\n',
   )
@@ -231,8 +231,8 @@ group('every row is indented by exactly two spaces, with no trailing space', () 
 group('the three standard rows are always last, and only once', () => {
   const out = UI.help('t', 'T', 'd', []).split('\n')
   const cmds = out.slice(out.indexOf('Commands:') + 1, out.indexOf('Examples:') - 1)
-  eq('the last command row', cmds[cmds.length - 1], '  help [command]  show help for one command')
-  eq('status then ping before it', cmds.slice(cmds.length - 3, cmds.length - 1), ['  status          health + unit payload', '  ping            liveness'])
+  eq('the last command row', cmds[cmds.length - 1], '  help [command]  show help for this target or one command')
+  eq('status then ping before it', cmds.slice(cmds.length - 3, cmds.length - 1), ["  status          show the target's status", '  ping            check that the target responds'])
   // A unit that spells its own `status` verb does not displace the appended
   // one - the suffix is positional, not a lookup. Privacy.qml is the live
   // case: its snapshot line rides first and the standard line follows.
@@ -245,9 +245,9 @@ group('the three standard rows are always last, and only once', () => {
       + '\nMic/camera/screenshare capture state.\n'
       + '\nCommands:\n'
       + '  status          mic/cam/share/active snapshot\n'
-      + '  status          health + unit payload\n'
-      + '  ping            liveness\n'
-      + '  help [command]  show help for one command\n'
+      + "  status          show the target's status\n"
+      + '  ping            check that the target responds\n'
+      + '  help [command]  show help for this target or one command\n'
       + '\nExamples:\n  vb-shell privacy help status\n'
       + '\nRun `vb-shell help` to list all units.\n',
   )

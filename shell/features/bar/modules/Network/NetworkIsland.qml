@@ -217,7 +217,7 @@ Item {
       otherList.delegate = networkDelegate
     }
   }
-  // Skeleton for OTHER NETWORKS -> same flashing style as ArchUpdates.
+  // Skeleton for OTHER NETWORKS -> same flashing style as SystemUpdates.
   readonly property var _otherSkeletonRows: {
     const out = []
     for (let i = 0; i < 4; i++) out.push({})

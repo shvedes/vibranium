@@ -125,7 +125,17 @@ Singleton {
   // The three verbs the `app` host dispatches. Each answers whether the window
   // is up afterwards rather than a bare true, so a caller that reached an
   // unavailable unit learns it from the verb and not only from `status()`.
-  function open() { return root.toggle() }
+  // `present` is the idempotent operation the app host calls: an already
+  // open viewer is focused, never toggled shut.
+  function present() {
+    if (root.visible) {
+      if (lease.controller !== null) lease.controller.focusWindow()
+      return true
+    }
+    return root.show()
+  }
+  // Wrapper kept for the in-process Registry callers.
+  function open() { return root.present() }
   function close() { root.hide(); return !root.visible }
   function toggle() {
     if (root.visible) {
@@ -146,32 +156,30 @@ Singleton {
   // no unit lease, no controller and no window: a refusal is not an open that
   // went badly, and leaving a controller built behind one would hand the next
   // caller a tree this one never used.
+  // Typed URL resolution for the host. Blank is tested with trim, but the
+  // original nonblank string is passed to `_asUrl` so leading/trailing spaces
+  // in a filename survive as encoded path characters. No controller is
+  // demanded here: validation costs no lease and constructs no window.
+  function asUrl(path) {
+    const raw = path === undefined || path === null ? "" : String(path)
+    if (raw.trim() === "") return ""
+    return root._asUrl(raw)
+  }
+
+  // The typed result behind `app call imageViewer openPath`. A refused path
+  // or an unavailable unit is reported as a record by the host; no human
+  // string is parsed to decide the reply.
   function openPath(path) {
-    const asked = path === undefined || path === null ? "" : String(path).trim()
-    if (asked === "") return "refused: no path given"
-    const url = root._asUrl(asked)
-    if (url === "") {
-      // The refusal names the reason rather than reporting a bare false,
-      // because the caller's next move follows from it: this is fixed by
-      // naming the file absolutely, which the `app` host cannot do on the
-      // caller's behalf.
-      return "refused: a relative path has no base - pass an absolute path or a file: URL"
-    }
-    if (lease.demand() === null) return "unavailable: " + root._refusal()
-    // The show arms the controller's screen gate: it sets the facade's
-    // `visible`, but on a cold shell `Ui.primaryScreen` may still be null, so
-    // there is no window to hand to yet. APP-1: that is no longer a dropped
-    // request. The controller publishes the URL as live state (`requestedPath`)
-    // before it looks for a window, and the window derives its initial content
-    // from it when the screen gate finally lets it build.
-    if (!root.show()) return "unavailable: " + root._refusal()
-    // The controller answers whether the request was accepted. A false is the
-    // window's own refusal - an unreadable file, a decode it would not start -
-    // and it is not the facade's to second-guess. A true from a controller that
-    // is still waiting for a screen is honest in this model: the open is
-    // committed to live state and will converge when the window builds.
-    if (lease.controller.openPath(url) !== true) return "refused: " + url
-    return "opened: " + url
+    const url = root.asUrl(path)
+    if (url === "") return { error: "invalid-argument" }
+    if (lease.demand() === null) return { error: "unavailable" }
+    // The show arms the controller's screen gate. The controller publishes
+    // the URL as live state (`requestedPath`) before it looks for a window,
+    // and the window derives its initial content from it when the screen gate
+    // finally lets it build. An already open window is focused by present.
+    if (root.present() !== true) return { error: "unavailable" }
+    if (lease.controller.openPath(url) !== true) return { error: "refused" }
+    return { state: "accepted", url: url }
   }
 
   // The URL a named absolute path or `file:` URL becomes, or "" when the input

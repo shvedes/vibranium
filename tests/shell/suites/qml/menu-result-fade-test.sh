@@ -18,6 +18,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
 t_init "menu-result-fade" "one handoff progress behind four result presentations"
 
+# Serialise against the other live menu suites: they all drive one shell.
+MENU_LIVE_LOCK="${TMPDIR:-/tmp}/vb-menu-live.lock"
+exec 9>"$MENU_LIVE_LOCK"
+flock -w 600 9 || t_block "could not acquire the menu live lock"
+
 if ! command -v qs >/dev/null 2>&1; then
   t_block "qs is not on PATH"
 fi
@@ -41,9 +46,46 @@ probe_frame() {
   p probe | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['handoff'], d['pageOpacity'], d['textOpacity'], d['fieldHandoff'], d['ghostOpacity'], d['page'])" 2>/dev/null
 }
 
+# The deep frame sampler lives in the resident panel: a 16 ms timer records
+# each animation frame locally, so the suite reads a finished array after the
+# animation instead of missing frames to process-per-round-trip polling. The
+# six values below are the exact same six `menu probe` fields the suite has
+# always asserted on; only the measurement moved into the shell.
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/vb-menu-result-fade.XXXXXX")"
+
+collect_deep() {
+  local out="$1" off=0 take=8 chunk
+  : >"$out"
+  while :; do
+    chunk="$(p probeDeep "$off" "$take" 2>/dev/null)"
+    if ! printf '%s' "$chunk" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+      ((take > 1)) || return 1
+      take=$((take / 2))
+      continue
+    fi
+    [[ $chunk == '[]' ]] && break
+    printf '%s\n' "$chunk" >>"$out"
+    off=$((off + take))
+  done
+}
+
+deep_frames() {
+  python3 - "$@" <<'PY'
+import json, sys
+for path in sys.argv[1:]:
+    for line in open(path):
+        for f in json.loads(line):
+            b = f["base"]
+            print(b["handoff"], b["pageOpacity"], b["textOpacity"],
+                  b["fieldHandoff"], b["ghostOpacity"], b["page"])
+PY
+}
+
 cleanup() {
   p debugTrace off >/dev/null 2>&1
+  p debugDeep off >/dev/null 2>&1
   p close >/dev/null 2>&1
+  rm -rf "$WORK"
 }
 trap cleanup EXIT
 
@@ -59,14 +101,16 @@ t_eq "the query is live before the handoff" "time format" \
 t_eq "the driver rests at zero" "0" "$(probe_field 'd["handoff"]')"
 t_eq "the results are still on screen" "main" "$(probe_field 'd["page"]')"
 
-# The verb under test: Enter on a search hit. Sample immediately and without
-# sleeps between probes, the way menu-nested-live-test.sh section 13 samples
-# a scroll. A 120 ms phase is roughly four probe frames here.
+# The verb under test: Enter on a search hit. Arm the resident frame sampler,
+# fire the handoff, then read the whole consecutive frame array in one reply.
+# No external polling and no animation change: the assertions below are
+# unchanged and still compare all four presentations to the one source value.
+p debugDeep on >/dev/null 2>&1
 p debugActivatePanel >/dev/null 2>&1
-frames=""
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18; do
-  frames+="$(probe_frame)"$'\n'
-done
+sleep 0.5
+p debugDeep off >/dev/null 2>&1
+collect_deep "$WORK/deep.jsonl"
+frames="$(deep_frames "$WORK/deep.jsonl")"
 
 # frame_metrics <frames> -> mid minPos maxH badPage badText badField
 #   earlyGhost lateGhost lateMono wrongBefore wrongAfter finalPage

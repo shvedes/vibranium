@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "MixerModel.js" as Model
+import "MixerTabs.js" as Tabs
 import "../../../common/math/Range.js" as Range
 import "../../../common/ui/ScrollMath.js" as ScrollMath
 
@@ -86,7 +87,13 @@ QtObject {
   required property var controller
 
   // --- tab state ---
-  property string tab: "apps"
+  // The facade's pending tab is published on the controller before this
+  // holder is built, so an IPC openTab survives a cold window map: the first
+  // read of `tab` is the requested one, not a default that is then written
+  // over. Once mapped, the chips own the property as before.
+  property string tab: mixer.controller.initialTab !== ""
+    && Tabs.isValid(mixer.controller.initialTab)
+    ? mixer.controller.initialTab : "apps"
   // Device keys whose stream list is unfolded. A set rather than a single
   // key so folding one row does not have to fold every other one.
   property var expandedDevices: []
@@ -97,13 +104,7 @@ QtObject {
   // reads the same with rows and without. Recording is the one deliberate
   // exception: its empty state uses "recording", which is a video camera,
   // while the tab lists audio capture streams and gets the microphone.
-  readonly property var tabs: [
-    { key: "apps", label: "Apps", icon: "music" },
-    { key: "devices", label: "Devices", icon: "speaker" },
-    { key: "recording", label: "Recording", icon: "mic-on" },
-    { key: "configuration", label: "Configuration", icon: "settings-general" },
-    { key: "graph", label: "Graph", icon: "link" }
-  ]
+  readonly property var tabs: Tabs.tabs
 
   // Left/Right walk the set rather than naming two tabs, so the arrow keys and
   // the chips cannot disagree about what the neighbours are. The keys are

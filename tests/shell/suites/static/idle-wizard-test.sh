@@ -1,9 +1,9 @@
 #!/bin/bash
-# Suite: idle-wizard - the Add timer wizard asks for minutes and a command.
+# Suite: idle-wizard - the Add timer wizard asks for seconds and a command.
 #
 # The wizard is the only way the menu creates a timer, and its shape is a
 # product decision rather than an implementation detail: a timer is a
-# COMMAND, so the wizard asks for the minutes to wait and then for the
+# COMMAND, so the wizard asks for the seconds to wait and then for the
 # command to run. There is no action stage, because a stage offering
 # "Lock session", "Suspend" or "Run command" would put the choice back in
 # front of the user for a decision the command text already makes - and
@@ -13,7 +13,7 @@
 #
 #   1. The flow is two stages, a number and a text. A select stage in the
 #      middle is the defect this suite exists to catch: it would put the
-#      action dropdown between the minutes and the command field, which is
+#      action dropdown between the seconds and the command field, which is
 #      exactly the "one more click before the field" shape the wizard was
 #      changed to remove.
 #   2. The commit writes a command row and only a command row. A wizard
@@ -24,9 +24,9 @@
 # surface cannot be constructed headlessly (no PanelWindow backend under
 # QT_QPA_PLATFORM=offscreen), so the flow literal is lifted out of the
 # daemon and evaluated - the same way boot-catalog-test.sh lifts
-# Boot.qml's catalog. The names the literal closes over (the minute floor,
-# the opening minute the Add row suggests, and the daemon's own action
-# list) are stubbed: both minutes are numbers, and the action list is
+# Boot.qml's catalog. The names the literal closes over (the second floor,
+# the opening second the Add row suggests, and the daemon's own action
+# list) are stubbed: both are numbers, and the action list is
 # empty, so a flow that reached for it would evaluate to a select stage
 # with no options rather than a crash - which is the shape the "no action
 # stage" assertion then fails.
@@ -34,7 +34,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
-t_init "idle-wizard" "the Add timer wizard: minutes, then the command to run, and never an action picker"
+t_init "idle-wizard" "the Add timer wizard: seconds, then the command to run, and never an action picker"
 
 require_tools node sed
 
@@ -103,8 +103,8 @@ if (end < 0) {
 
 let flow = null
 try {
-  flow = new Function("minMinutes", "suggestedMinutes", "root",
-    "return (" + src.slice(start, end + 1) + ")")(1, 5, { _actionOptions: () => [] })
+  flow = new Function("minSeconds", "suggestedSeconds", "root",
+    "return (" + src.slice(start, end + 1) + ")")(1, 60, { _actionOptions: () => [] })
 } catch (e) {
   process.stdout.write("error=the flow literal does not evaluate: " + String(e.message) + "\n")
   process.exit(0)
@@ -135,16 +135,16 @@ flow_fact() {
   printf '%s\n' "$FLOW_RECORDS" | grep -m1 "^$1=" | cut -d= -f2-
 }
 
-t_section "the wizard asks for the minutes, then for the command"
+t_section "the wizard asks for the seconds, then for the command"
 
 t_eq "the flow literal evaluates" "" "$(printf '%s\n' "$FLOW_RECORDS" | grep -m1 '^error=' | cut -d= -f2-)"
 t_eq "the flow is two stages" "2" "$(flow_fact count)"
 t_eq "a number stage and a text stage, in that order" "number,text" "$(flow_fact kinds)"
-t_eq "the number stage is the minutes" "1" "$(flow_fact numberMin)"
-t_eq "capped at a week" "10080" "$(flow_fact numberMax)"
-t_eq "and carries its unit" "min" "$(flow_fact numberUnit)"
-t_eq "and carries the minute it opens on" "5" "$(flow_fact numberSeed)"
-t_contains "an empty list opens on five minutes" 'root.timers.length === 0 ? 5 : minMinutes' "$DAEMON_SRC"
+t_eq "the number stage is seconds" "1" "$(flow_fact numberMin)"
+t_eq "capped at a week" "604800" "$(flow_fact numberMax)"
+t_eq "and carries its unit" "s" "$(flow_fact numberUnit)"
+t_eq "and carries the second it opens on" "60" "$(flow_fact numberSeed)"
+t_contains "an empty list opens on one minute" 'root.timers.length === 0 ? 60 : minSeconds' "$DAEMON_SRC"
 t_eq "the text stage names the hint it shows" "e.g. vb-shell session lock" "$(flow_fact textPlaceholder)"
 
 t_section "no stage offers a choice"
@@ -160,7 +160,7 @@ t_not_contains "and no option is spelled out for the picker" 'label: "Run comman
 t_section "the commit writes a command row, and only a command row"
 
 COMMIT_SRC="$(sed -n '/^  function commitAddWizard/,/^  }$/p' "$DAEMON")"
-t_contains "the wizard's commit writes a command row" 'action: "command"' "$COMMIT_SRC"
+t_contains "the wizard's commit writes a command row" 'appendCommandTimer(seconds, command)' "$COMMIT_SRC"
 t_not_contains "and never a bare lock action" 'action: "lock"' "$COMMIT_SRC"
 t_not_contains "nor a bare suspend action" 'action: "suspend"' "$COMMIT_SRC"
 # The stage it reads the command from is found by KIND, so the commit
@@ -169,5 +169,5 @@ t_not_contains "nor a bare suspend action" 'action: "suspend"' "$COMMIT_SRC"
 t_contains "the command stage is located by kind" 'stages[s].kind === "text"' "$COMMIT_SRC"
 t_contains "and an empty command is refused" 'if (command === "") return true' "$COMMIT_SRC"
 
-t_note "the wizard's two stages are the whole flow: the minutes to wait, then the command to run - the action a timer performs is what its command says, so a stage that offered 'Lock session' or 'Suspend' would only ask the user to say it twice"
+t_note "the wizard's two stages are the whole flow: the seconds to wait, then the command to run - the action a timer performs is what its command says, so a stage that offered 'Lock session' or 'Suspend' would only ask the user to say it twice"
 t_summary

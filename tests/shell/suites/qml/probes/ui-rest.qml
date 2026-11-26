@@ -859,6 +859,38 @@ Item {
     return { cols: c, side: side, slack: innerW - c * side }
   }
 
+  // Notice is an Item hosting a shadow and a surface box. The box is what
+  // carries color and border; the root carries only the public layout.
+  function noticeBox(notice) {
+    for (let i = 0; i < notice.children.length; i++)
+      if (notice.children[i] && notice.children[i].border !== undefined) return notice.children[i]
+    return notice
+  }
+
+  // DropdownSlot hosts a background rectangle before the content host; find
+  // the host by the children it actually contains.
+  function slotHost(slot) {
+    for (let i = 0; i < slot.children.length; i++) {
+      const c = slot.children[i]
+      if (c && c.children !== undefined && c.children.length > 0) return c
+    }
+    return slot.children[0]
+  }
+
+  // Toggle's thumb lives inside the pill; find the 12px thumb rather than
+  // assuming the pill is the root's first child (the shared shadow is).
+  function toggleThumb(toggle) {
+    for (let i = 0; i < toggle.children.length; i++) {
+      const pill = toggle.children[i]
+      if (!pill || !pill.children) continue
+      for (let j = 0; j < pill.children.length; j++) {
+        const thumb = pill.children[j]
+        if (thumb && thumb.width === 12 && thumb.height === 12) return thumb
+      }
+    }
+    return toggle.children[0]
+  }
+
   // ---- turn 0: what needs no layout pass and no scan ------------------
 
   function reportAtBoot() {
@@ -925,7 +957,7 @@ Item {
     kv("confirm.hintText.default", confirm.hintText)
     kv("confirm.armedText.default", confirm.armedText)
     kv("confirm.height", confirm.height)
-    kv("confirm.contentHeight", confirm.children[0].height)
+    kv("confirm.contentHeight", slotHost(confirm).height)
     kv("confirm.gap", confirm.gap)
     kv("confirm.buttonHits", confirmHits)
     kv("confirm.cancelHits", cancelHits)
@@ -999,20 +1031,20 @@ Item {
     kv("title.cap.mixed", title3.font.capitalization === Font.MixedCase)
 
     // Notice: the fill/border tints and the empty-message collapse.
-    kv("notice.warn.color", noticeWarn.color)
-    kv("notice.warn.fillAlpha", alphaOf(noticeWarn.color))
-    kv("notice.warn.borderAlpha", alphaOf(noticeWarn.border.color))
-    kv("notice.warn.borderW", noticeWarn.border.width)
-    kv("notice.warn.radius", noticeWarn.radius)
+    kv("notice.warn.color", noticeBox(noticeWarn).color)
+    kv("notice.warn.fillAlpha", alphaOf(noticeBox(noticeWarn).color))
+    kv("notice.warn.borderAlpha", alphaOf(noticeBox(noticeWarn).border.color))
+    kv("notice.warn.borderW", noticeBox(noticeWarn).border.width)
+    kv("notice.warn.radius", noticeBox(noticeWarn).radius)
     kv("notice.warn.iw", noticeWarn.implicitWidth)
     kv("notice.warn.height", noticeWarn.height)
     kv("notice.warn.visible", noticeWarn.visible)
-    kv("notice.danger.alpha", alphaOf(noticeDanger.color))
-    kv("notice.danger.differsFromWarn", noticeDanger.color === noticeWarn.color ? "same" : "different")
+    kv("notice.danger.alpha", alphaOf(noticeBox(noticeDanger).color))
+    kv("notice.danger.differsFromWarn", noticeBox(noticeDanger).color === noticeBox(noticeWarn).color ? "same" : "different")
     kv("notice.empty.visible", noticeEmpty.visible)
     kv("notice.empty.height", noticeEmpty.height)
-    kv("notice.markup.format", noticeMarkup.children[0].textFormat === Text.StyledText)
-    kv("notice.plain.format", noticeWarn.children[0].textFormat === Text.PlainText)
+    kv("notice.markup.format", noticeBox(noticeMarkup).children[0].textFormat === Text.StyledText)
+    kv("notice.plain.format", noticeBox(noticeWarn).children[0].textFormat === Text.PlainText)
 
     // CheckBox: the box as layout, and the mark that only paints when
     // checked.
@@ -1037,15 +1069,15 @@ Item {
     kv("toggle.on.ih", togOn.implicitHeight)
     kv("toggle.on.radius", togOn.radius)
     kv("toggle.on.color", togOn.color)
-    kv("toggle.on.thumbW", firstRect(togOn).width)
-    kv("toggle.on.thumbH", firstRect(togOn).height)
-    kv("toggle.on.thumbX", firstRect(togOn).x)
-    kv("toggle.on.thumbX.expected", togOn.width - firstRect(togOn).width - 2)
-    kv("toggle.on.thumbColor", firstRect(togOn).color)
-    kv("toggle.off.thumbX", firstRect(togOff).x)
+    kv("toggle.on.thumbW", toggleThumb(togOn).width)
+    kv("toggle.on.thumbH", toggleThumb(togOn).height)
+    kv("toggle.on.thumbX", toggleThumb(togOn).x)
+    kv("toggle.on.thumbX.expected", togOn.width - toggleThumb(togOn).width - 2)
+    kv("toggle.on.thumbColor", toggleThumb(togOn).color)
+    kv("toggle.off.thumbX", toggleThumb(togOff).x)
     kv("toggle.off.color", togOff.color)
     kv("toggle.dimmed.opacity", togDim.opacity)
-    kv("toggle.dimmed.thumbX", firstRect(togDim).x)
+    kv("toggle.dimmed.thumbX", toggleThumb(togDim).x)
     // The area stays enabled on an inert toggle so hover still reaches it and
     // the pointer can read as a refusal; the press gate is toggle() itself.
     kv("toggle.dimmed.areaEnabled", areaOf(togDim).enabled)
@@ -1443,21 +1475,21 @@ Item {
     // DropdownSlot at rest: the velocity-paced duration and the per-instance
     // states that must not share anything.
     kv("slotShort.gap", slotShort.gap)
-    kv("slotShort.contentHeight", slotShort.children[0].height)
+    kv("slotShort.contentHeight", slotHost(slotShort).height)
     kv("slotShort.slotMs", slotShort.slotMs)
     kv("slotShort.slotMsExpected",
       Math.max(Ui.fastMs, Math.min(Ui.slowMs,
-        Math.round((slotShort.children[0].height + slotShort.gap) / Ui.slotVpx * 1000))))
+        Math.round((slotHost(slotShort).height + slotShort.gap) / Ui.slotVpx * 1000))))
     kv("slotShort.height", slotShort.height)
     kv("slotShort.opacity", slotShort.opacity)
     kv("slotShort.closing", slotShort.closing)
     kv("slotShort.nested", slotShort.nestedItem === null ? "null" : "obj")
     kv("slotTall.gap", slotTall.gap)
-    kv("slotTall.contentHeight", slotTall.children[0].height)
+    kv("slotTall.contentHeight", slotHost(slotTall).height)
     kv("slotTall.slotMs", slotTall.slotMs)
     kv("slotTall.slotMsExpected",
       Math.max(Ui.fastMs, Math.min(Ui.slowMs,
-        Math.round((slotTall.children[0].height + slotTall.gap) / Ui.slotVpx * 1000))))
+        Math.round((slotHost(slotTall).height + slotTall.gap) / Ui.slotVpx * 1000))))
     kv("slotShort.slotMs.differsFromTall", slotShort.slotMs !== slotTall.slotMs)
     kv("slotTall.slotMs.isSlowCap", slotTall.slotMs === Ui.slowMs)
     kv("slotShort.slotMs.isFastFloor", slotShort.slotMs === Ui.fastMs)
@@ -1783,11 +1815,11 @@ Item {
     kv("sweep.neverOvershoots", sweepGrid.contentY <= sweepGrid.sweepTo)
     kv("cancel.contentY", cancelGrid.contentY)
     kv("slotShort.height.s1", slotShort.height)
-    kv("slotShort.heightTarget", slotShort.children[0].height + slotShort.gap)
+    kv("slotShort.heightTarget", slotHost(slotShort).height + slotShort.gap)
     kv("slotShort.opacity.s1", slotShort.opacity)
     kv("slotShort.nestedTurn2", slotShort.nestedItem === null ? "null" : "obj")
     kv("slotTall.height.s1", slotTall.height)
-    kv("slotTall.heightTarget", slotTall.children[0].height + slotTall.gap)
+    kv("slotTall.heightTarget", slotHost(slotTall).height + slotTall.gap)
     kv("slotTall.nestedTurn2b", slotTall.nestedItem === null ? "null" : "obj")
     kv("slotShort.closingTurn2", slotShort.closing)
     kv("slotIdle.closingTurn2", slotIdle.closing)
@@ -1818,7 +1850,7 @@ Item {
     confirm.stage = 2
     kv("confirm.stageText.after", textsIn(confirm)[0].text)
     kv("confirm.stageText.isArmed", textsIn(confirm)[0].text === confirm.armedText)
-    kv("confirm.stageKeepsHeight", feq(confirm.height, confirm.children[0].height + confirm.gap))
+    kv("confirm.stageKeepsHeight", feq(confirm.height, slotHost(confirm).height + confirm.gap))
   }
 
   function turn4() {
@@ -1880,7 +1912,7 @@ Item {
     kv("sweep.contentY.s5", sweepGrid.contentY)
     kv("slotShort.height.s5", slotShort.height)
     kv("slotShort.height.shortOfTarget",
-      slotShort.height < slotShort.children[0].height + slotShort.gap)
+      slotShort.height < slotHost(slotShort).height + slotShort.gap)
     kv("slotShort.opacity.s5", slotShort.opacity)
     // The two tweens have independent durations: the height rides slotMs
     // (floored at Ui.fastMs) and the opacity the fixed Ui.normalMs. So on a
@@ -1888,16 +1920,16 @@ Item {
     // slotMs is at the slowMs cap and therefore past normalMs - the fade runs
     // ahead of the unfold. That inversion is what the close grace window's
     // max(slotMs, normalMs) exists for.
-    kv("slotShort.heightFraction.s5", slotShort.height / (slotShort.children[0].height + slotShort.gap))
-    kv("slotTall.heightFraction.s5", slotTall.height / (slotTall.children[0].height + slotTall.gap))
+    kv("slotShort.heightFraction.s5", slotShort.height / (slotHost(slotShort).height + slotShort.gap))
+    kv("slotTall.heightFraction.s5", slotTall.height / (slotHost(slotTall).height + slotTall.gap))
     kv("slotShort.unfoldAheadOfFade",
-      slotShort.height / (slotShort.children[0].height + slotShort.gap) > slotShort.opacity)
+      slotShort.height / (slotHost(slotShort).height + slotShort.gap) > slotShort.opacity)
     kv("slotTall.fadeAheadOfUnfold",
-      slotTall.height / (slotTall.children[0].height + slotTall.gap) < slotTall.opacity)
+      slotTall.height / (slotHost(slotTall).height + slotTall.gap) < slotTall.opacity)
     kv("slotShort.bothInFlight",
-      between(slotShort.height / (slotShort.children[0].height + slotShort.gap), 0, 1)
+      between(slotShort.height / (slotHost(slotShort).height + slotShort.gap), 0, 1)
       && between(slotShort.opacity, 0, 1))
-    kv("slotShort.nestedParent.isContentHost", slotShort.nestedItem.parent === slotShort.children[0])
+    kv("slotShort.nestedParent.isContentHost", slotShort.nestedItem.parent === slotHost(slotShort))
     kv("slotShort.nestedX", slotShort.nestedItem.x)
     kv("slotShort.nestedW", slotShort.nestedItem.width)
     kv("slotTall.nestedW", slotTall.nestedItem.width)
@@ -1957,15 +1989,15 @@ Item {
     kv("sweep.contentY.s7", sweepGrid.contentY)
     kv("slotTall.height.s7", slotTall.height)
     kv("slotTall.opacity.s7", slotTall.opacity)
-    kv("slotTall.heightFraction.s7", slotTall.height / (slotTall.children[0].height + slotTall.gap))
+    kv("slotTall.heightFraction.s7", slotTall.height / (slotHost(slotTall).height + slotTall.gap))
     kv("slotTall.fadeAheadOfUnfold.s7",
-      slotTall.height / (slotTall.children[0].height + slotTall.gap) < slotTall.opacity)
+      slotTall.height / (slotHost(slotTall).height + slotTall.gap) < slotTall.opacity)
     kv("slotTall.bothInFlight.s7",
-      between(slotTall.height / (slotTall.children[0].height + slotTall.gap), 0, 1)
+      between(slotTall.height / (slotHost(slotTall).height + slotTall.gap), 0, 1)
       && between(slotTall.opacity, 0, 1))
     kv("slotShort.height.s7", slotShort.height)
     kv("slotShort.opacity.s7", slotShort.opacity)
-    kv("slotShort.heightFraction.s7", slotShort.height / (slotShort.children[0].height + slotShort.gap))
+    kv("slotShort.heightFraction.s7", slotShort.height / (slotHost(slotShort).height + slotShort.gap))
   }
 
   function turn12() {
@@ -1973,7 +2005,7 @@ Item {
     kv("glide.landedOnTarget", glideTarget.v === 100)
     kv("glide.targetWhileSettled", glide.target === null ? "null" : "held")
     kv("slotShort.height.landed", slotShort.height)
-    kv("slotShort.height.matchesTarget", feq(slotShort.height, slotShort.children[0].height + slotShort.gap))
+    kv("slotShort.height.matchesTarget", feq(slotShort.height, slotHost(slotShort).height + slotShort.gap))
     kv("slotShort.opacity.midFade", slotShort.opacity)
     // The fade's value on this turn is a frame-clock value - how far the
     // tween has run depends on when the turn landed - so the claim is the
@@ -2094,7 +2126,7 @@ Item {
     kv("pc.rows.heightMatchesCardHeight", feq(cardRows.height, cardRows.cardHeight))
     kv("bar.fill.s23", barEmpty.children[0].width)
     kv("slotTall.height.s23", slotTall.height)
-    kv("slotTall.height.matchesTarget", feq(slotTall.height, slotTall.children[0].height + slotTall.gap))
+    kv("slotTall.height.matchesTarget", feq(slotTall.height, slotHost(slotTall).height + slotTall.gap))
 
     // CrossfadeIcon: the staged layer has long since decoded, so the front
     // has traded and the fade (120ms when motion is on) has finished. Then

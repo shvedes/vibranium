@@ -9,6 +9,7 @@ import Qt.labs.folderlistmodel
 import qs.common
 import "SettingsLib.js" as SL
 import "HyprlandEditor.js" as HE
+import "../text/IpcCatalog.js" as IpcCatalog
 import "../text/UnitIpc.js" as UnitIpc
 import "../text/StringUtils.js" as SU
 
@@ -158,23 +159,98 @@ Singleton {
     Component.onCompleted: {
       Registry.offer("hyprlandSettings", {
         title: "Hyprland settings",
-        description: "Hyprland config editor",
-        verbNames: [
-          "dump",
-          "get",
-          "reload",
-          "set",
-          "toggle",
-          "status",
-          "help",
-          "ping",
-        ]
+        description: "View and edit live Hyprland settings",
+        verbNames: IpcCatalog.topLevelVerbs("hyprlandSettings")
       })
-        root._loadSchema()
-        Hyprland.rawEvent.connect(root.onRawEvent)
+      IpcRouter.register("hyprlandSettings", root, {
+        "hyprlandSettings.get": function (a) { return root._ipcGet(a.KEY) },
+        "hyprlandSettings.set.value": function (a, c) {
+          return root._ipcSet(a.KEY, c.tokens.JSON, c.words.indexOf("verbose") >= 0)
+        },
+        "hyprlandSettings.set.toggle": function (a, c) {
+          return root._ipcToggle(a.KEY, c.words.indexOf("verbose") >= 0)
+        },
+        "hyprlandSettings.dump": function () { return root._ok(root.values, { kind: "value" }) },
+        "hyprlandSettings.reload": function () { return root._ipcReload() },
+        "hyprlandSettings.status": function () { return root._ipcStatus() },
+        "hyprlandSettings.ping": function () { return root._ok("pong", { kind: "text" }) }
+      })
+      root._loadSchema()
+      Hyprland.rawEvent.connect(root.onRawEvent)
     }
     Component.onDestruction: {
+        IpcRouter.unregister("hyprlandSettings", root)
         Hyprland.rawEvent.disconnect(root.onRawEvent)
+    }
+
+    // --- gateway -----------------------------------------------------------
+    // The native `toggle` spelling is retired. The only toggle path is
+    // `set <KEY> --toggle`, a second grammar leaf beside `set <KEY> <JSON>`;
+    // a JSON string "--toggle" is still data on the other leaf.
+
+    function _ok(data, format) {
+        const frame = { v: 1, ok: true }
+        if (data !== undefined) frame.data = data
+        if (format) frame.format = format
+        return frame
+    }
+    function _error(code, message) {
+        return { v: 1, ok: false, error: { code: code, message: message } }
+    }
+    function _record() { return { kind: "record" } }
+
+    function _ipcGet(key) {
+        const opt = root.byKey(key)
+        if (opt === null) return root._error("not-found", "unknown option")
+        return root._ok(root.value(key), { kind: "value" })
+    }
+
+    function _verboseRecord(key, verbose) {
+        return verbose === true
+            ? root._ok({ key: key, value: root.value(key) }, root._record())
+            : root._ok()
+    }
+
+    function _ipcSet(key, token, verbose) {
+        const opt = root.byKey(key)
+        if (opt === null) return root._error("not-found", "unknown option")
+        let value
+        try { value = JSON.parse(String(token)) } catch (e) {
+            return root._error("invalid-argument", "invalid JSON")
+        }
+        // A set of the same typed value is unchanged success, not a write.
+        // The file editor rejects an identical rewrite, so treating that as a
+        // refusal made a harmless no-op look like an invalid argument.
+        if (JSON.stringify(root.value(key)) === JSON.stringify(value))
+            return root._verboseRecord(key, verbose)
+        // Preserve the validator's own verdict; setOption reports rejection
+        // through optionError and returns false.
+        if (!root.setOption(key, value)) return root._error("invalid-argument", "the option refused the value")
+        return root._verboseRecord(key, verbose)
+    }
+
+    function _ipcToggle(key, verbose) {
+        const opt = root.byKey(key)
+        if (opt === null) return root._error("not-found", "unknown option")
+        if (opt.type !== "bool" || typeof root.value(key) !== "boolean") {
+            return root._error("invalid-argument", "the option is not a boolean")
+        }
+        if (!root.toggleOption(key)) return root._error("invalid-argument", "the option refused the value")
+        return root._verboseRecord(key, verbose)
+    }
+
+    function _ipcReload() {
+        root._fetchLive()
+        return root._ok()
+    }
+
+    function _ipcStatus() {
+        return root._ok({
+            unit: "hyprlandSettings",
+            healthy: true,
+            ready: root.ready === true,
+            managed: Object.keys(root.values).length
+        }, _record())
     }
 
     // Live config changes (including our own writes echoing back) invalidate
@@ -1079,12 +1155,11 @@ Singleton {
     IpcHandler {
         target: "hyprlandSettings"
         function help(command: string): string {
-          return UnitIpc.help("hyprlandSettings", "Hyprland settings", "Hyprland config editor", [
+          return UnitIpc.help("hyprlandSettings", "Hyprland settings", "View and edit live Hyprland settings", [
             { name: "dump", help: "edited config values" },
             { name: "get", help: "(key) read one value" },
             { name: "reload", help: "re-read the config" },
             { name: "set", help: "(key, value) write one value" },
-            { name: "toggle", help: "flip a boolean key" },
           ], command)
         }
         function status(): string {
@@ -1099,7 +1174,6 @@ Singleton {
             let v; try { v = JSON.parse(json) } catch(e) { return "error: invalid JSON" }
             return root.setOption(key, v) ? "ok" : "error"
         }
-        function toggle(key: string): string { return root.toggleOption(key) ? "ok" : "error" }
         function dump(): string { return JSON.stringify(root.values) }
         function reload(): string { root._fetchLive(); return "ok" }
     }

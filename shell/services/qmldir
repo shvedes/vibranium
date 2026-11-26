@@ -13,7 +13,7 @@ singleton Session 1.0 session/Session.qml
 singleton IdleDaemon 1.0 session/IdleDaemon.qml
 singleton Inhibitor 1.0 power/Inhibitor.qml
 singleton Update 1.0 system/Update.qml
-singleton ArchUpdates 1.0 system/ArchUpdates.qml
+singleton SystemUpdates 1.0 system/SystemUpdates.qml
 singleton PowerProfile 1.0 power/PowerProfile.qml
 singleton PowerPolicy 1.0 power/PowerPolicy.qml
 singleton BatteryAlert 1.0 power/BatteryAlert.qml
@@ -22,3 +22,4 @@ singleton Keyboard 1.0 system/Keyboard.qml
 singleton Printers 1.0 system/Printers.qml
 singleton Privacy 1.0 privacy/Privacy.qml
 singleton Weather 1.0 weather/Weather.qml
+singleton Tools 1.0 tools/Tools.qml

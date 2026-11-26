@@ -298,7 +298,7 @@ filterPackages([null], "x")   // TypeError: Cannot read properties of null (read
 filterPackages(pkgs, undefined) // silently filters for the string "undefined"
 ```
 
-`ArchUpdates/Model.js:58` has no nullish guard on `query` at all, so
+`SystemUpdates/Model.js` has no nullish guard on `query` at all, so
 `filterPackages(pkgs, undefined)` returns `[]` as if the user had typed
 `"undefined"`.
 

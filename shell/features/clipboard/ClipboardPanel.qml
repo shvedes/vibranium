@@ -223,6 +223,21 @@ PanelCard {
   function reassertFocus() { focusCtrl.reassert() }
   function focusSearch() { focusCtrl.grabFilter() }
 
+  // IPC seating uses the same verified row the renderer shows. The caller's
+  // position comes from `listCurrent`; a model swap that is still in flight
+  // is `busy` rather than a seat on stale geometry. A delete confirm armed on
+  // a DIFFERENT row is closed, so the seat cannot confirm someone else's
+  // deletion.
+  function seatIpcEntry(index, entry) {
+    if (panel._deleteInFlight === true || list._inSwap === true) return "busy"
+    if (!Number.isInteger(index) || index < 0 || index >= panel.rows.length) return "invalid-index"
+    const row = panel.rows[index]
+    if (!row || !entry || row.id !== entry.id) return "invalid-index"
+    if (confirmStage.open && confirmStage.key !== index) panel.closeDelete()
+    list.seat(index, "click")
+    return "ok"
+  }
+
   function currentRow() { return list.currentItem }
   function moveSelection(dir) {
     if (!list.move(dir)) return
@@ -1043,7 +1058,7 @@ PanelCard {
         }
 
         // Fully empty: dim veil over the full-window skeletons, the
-        // EmptyState icon + copy above it (ArchUpdates up-to-date pattern).
+        // EmptyState icon + copy above it (SystemUpdates up-to-date pattern).
         Rectangle {
           anchors.fill: parent
           visible: list.count === 0 && Clipboard.visible

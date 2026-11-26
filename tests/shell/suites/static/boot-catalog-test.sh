@@ -15,7 +15,7 @@
 #
 # The rules under test, quoted:
 #
-#   shell/boot/README.md:12   "51 descriptors, 14 `essential` and 37 optional."
+#   tests/shell/README.md:32 "52 descriptors, 14 `essential` and 38 optional."
 #   shell/boot/README.md:30   "`id` | unique; the dependency graph is keyed on it"
 #   shell/boot/README.md:31   "`criticality` | `essential` or `optional`"
 #   shell/boot/README.md:32   "`activation` | `eager`, `resident`,
@@ -54,17 +54,17 @@ LEGAL_ACT_RE='^(eager|resident|settings|first_use|gated_compat|facade)$'
 
 # The numbers both READMEs publish. A count that has drifted is reported, not
 # asserted stale: `expect_count` notes the difference and pins the real value.
-DOC_TOTAL=51
+DOC_TOTAL=52
 DOC_ESSENTIAL=14
-DOC_OPTIONAL=37
+DOC_OPTIONAL=38
 DOC_EAGER=12
-DOC_RESIDENT=32
+DOC_RESIDENT=33
 DOC_GATED=2
 DOC_FACADE=4
 DOC_FIRST_USE=1
 
 DOC_ESSENTIAL_CSV='log,paths,watch,settings,hyprlandSettings,miscSettings,systemFont,theme,ui,icons,exec,state,session,lockscreen'
-DOC_GATED_CSV='archUpdates,printers'
+DOC_GATED_CSV='systemUpdates,printers'
 DOC_FACADE_CSV='appLauncher,pass,audioMixer,imageViewer'
 
 DESC_KEYS='activation,criticality,dependencies,id,phase,ready,resolver,retry,teardown'
@@ -513,7 +513,7 @@ t_eq "the phases partition the catalog" "$U_N" \
 t_eq "the floor is exactly the eager 12" "12" "$(count_field PHASE floor)"
 t_eq "the visual pair is wallpaper and bar" "wallpaper,bar" "$(units_with PHASE visual)"
 t_eq "the early tier is every facade plus the daemons behind them" \
-  "idleDaemon,inhibitor,session,lockscreen,clipboard,privacy,notifications,audio,keyboard,app,appLauncher,polkit,keybindings,pass,audioMixer,imageViewer,powerProfile,powerPolicy,batteryAlert,connectivity,screenshots" \
+  "idleDaemon,inhibitor,session,lockscreen,clipboard,privacy,notifications,audio,keyboard,app,appLauncher,polkit,keybindings,pass,audioMixer,imageViewer,powerProfile,powerPolicy,batteryAlert,connectivity,screenshots,tools" \
   "$(units_with PHASE early)"
 t_eq "the deferred tier is the page-building, scanning units" \
   "menu,mediaArt,emojiPicker,themePicker,themeRemover,cursorPicker,wallpaperPicker,fontPicker,powerMenu" \
@@ -551,7 +551,7 @@ expect_count "first_use" "$DOC_FIRST_USE" "$(count_field ACT first_use)"
 t_eq "the five documented modes account for every unit" "$U_N" \
   "$(( $(count_field ACT eager) + $(count_field ACT resident) \
      + $(count_field ACT gated_compat) + $(count_field ACT facade) + $(count_field ACT first_use) ))"
-t_eq "gated_compat is archUpdates, printers" \
+t_eq "gated_compat is systemUpdates, printers" \
   "$DOC_GATED_CSV" "$(units_with ACT gated_compat)"
 t_eq "facade is appLauncher, pass, audioMixer, imageViewer" "$DOC_FACADE_CSV" \
   "$(units_with ACT facade)"
@@ -697,7 +697,7 @@ t_contains "the late half releases the appLauncher controller" "AppLauncher.tear
 t_contains "the late half releases the pass controller" "Pass.teardownController()" \
   "$(latelate_body)"
 t_eq "exactly seven units sit outside the eager/resident floor" \
-  "annotations,appLauncher,archUpdates,audioMixer,imageViewer,pass,printers" \
+  "annotations,appLauncher,audioMixer,imageViewer,pass,printers,systemUpdates" \
   "$(printf '%s\n' "${U_ID[@]}" |
     while read -r unit; do
       case "$(unit_field "$unit" ACT)" in
@@ -728,7 +728,7 @@ t_contains "and that teardown is the one that releases the loader" \
   "$(awk '/^  function _teardownAnnotations\(\) \{$/,/^  \}$/' "$BOOT_QML")"
 
 t_section "isolation: the gated_compat pair are optional, so a failure cannot degrade the shell"
-for unit in archUpdates printers; do
+for unit in systemUpdates printers; do
   t_eq "$unit is gated_compat" "gated_compat" "$(unit_field "$unit" ACT)"
   t_eq "$unit is optional" "optional" "$(unit_field "$unit" CRIT)"
 done

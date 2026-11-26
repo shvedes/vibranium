@@ -5,6 +5,12 @@
 -- instead of spawning a new one each time.
 WIN_NOTIF = 33
 
+-- Bind an action from the running shell's shortcut table (IpcRouter.qml).
+function Hypr.Helpers.BindShell(keys, action, options)
+  assert(type(action) == "string" and action:match("^[%w.]+$"), "Invalid Vibranium shell action")
+  return hl.bind(keys, hl.dsp.event("vibranium:shortcut:" .. action), options)
+end
+
 -- Returns true if the file at path exists and is readable.
 local function file_exists(path)
   local f = io.open(path, "r")

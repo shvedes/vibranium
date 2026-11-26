@@ -53,19 +53,19 @@ Singleton {
     const stateData = AppState.value("shell")
     if (stateData === null || typeof stateData !== "object" || Array.isArray(stateData)) return
     const hasAudio = stateData.audio !== undefined
-    const hasArch = stateData.archUpdates !== undefined
-    if (!hasAudio && !hasArch) return
+    const hasSystemUpdates = stateData.systemUpdates !== undefined
+    if (!hasAudio && !hasSystemUpdates) return
     const cur = AppState.value(root.slotKey)
     const base = StoreGuards.isPlainObject(cur) ? cur : {}
     const next = Object.assign({}, base)
     if (hasAudio && next.audio === undefined) next.audio = stateData.audio
-    if (hasArch && next.archUpdates === undefined) next.archUpdates = stateData.archUpdates
+    if (hasSystemUpdates && next.systemUpdates === undefined) next.systemUpdates = stateData.systemUpdates
     if (!AppState.set(root.slotKey, next)) return
     const sCur = AppState.value("shell")
     const sBase = StoreGuards.isPlainObject(sCur) ? sCur : {}
     const sNext = Object.assign({}, sBase)
     delete sNext.audio
-    delete sNext.archUpdates
+    delete sNext.systemUpdates
     AppState.set("shell", sNext)
   }
 

@@ -5,7 +5,7 @@
 .import "../../../../common/text/StringUtils.js" as SU
 .import "../../../../common/collections/TableSort.js" as TableSort
 
-// Pure model behind the arch updates island: the package search, the
+// Pure model behind the system updates island: the package search, the
 // official/AUR split, the selection algebra, the per-row projection the
 // delegates render, the padded row window and the capped column widths.
 //
@@ -13,7 +13,7 @@
 // needs and returns a value, and the island reassigns the property that
 // holds it, which is what re-evaluates the bindings. The island keeps
 // the module's own constants (the 7-row window, the 14px checkbox, the
-// 120px version cap) and passes them in, so this module never owns arch
+// 120px version cap) and passes them in, so this module never owns updates
 // chrome policy and never decides what a row looks like.
 //
 // The AUR tag lives here and only here: the service stamps it, the

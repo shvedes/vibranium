@@ -500,8 +500,8 @@ group('the QML wiring cannot fall back to the clipboard or the island', () => {
     s => /NumberAnimation on x[\s\S]*?running: root\.downloading/.test(s),
     'pole running')
   const arch = fs.readFileSync(path.join(SHELL,
-    'features/bar/modules/ArchUpdates/ArchUpdatesIsland.qml'), 'utf8')
-  eq('the ArchUpdates spinner ignores the global motion switch', spinnerRun(arch),
+    'features/bar/modules/SystemUpdates/SystemUpdatesIsland.qml'), 'utf8')
+  eq('the SystemUpdates spinner ignores the global motion switch', spinnerRun(arch),
     'root.skeleton')
   is('a playlist page uses the default Best selector', playlist,
     s => s.includes('DL.qualitySelector("best")'), 'Best selector')

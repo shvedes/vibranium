@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Suite: features/launcher/ - the launcher engine's pure-JS half.
 //
-// Five libraries and seven drop-in plugins. LauncherLib.js holds what a
+// Five libraries and eight drop-in plugins. LauncherLib.js holds what a
 // verdict *means* (index, usage, plugin model, argv, verdicts, path and URI
 // handling); PluginPolicy.js is the capability gate every drop-in plugin is
 // handed an object by; TimeLib.js is the pure-JS city/timezone table.
@@ -198,7 +198,7 @@ function recordingHost(opts = {}) {
   }
 }
 
-suite('features/launcher', 'LauncherLib, PluginPolicy, TimeLib, FxLib, seven drop-in plugins')
+suite('features/launcher', 'LauncherLib, PluginPolicy, TimeLib, FxLib, eight drop-in plugins')
 
 // =========================================================================
 section('PluginPolicy - the closed capability vocabulary')
@@ -3934,7 +3934,8 @@ group('tier 2 picks the first matching tail, in the zone list order', () => {
 group('an unknown city is null, so the caller can render an error', () => {
   // "Unknown cities return ok:false so the caller can render an error
   // entry" - and resolveTimezone is the null that drives it.
-  for (const c of ['NotARealPlace', 'zzzz', 'atlantis', 'foo bar', 'mad rid', 'europe/madrid',
+  eq('a full IANA zone resolves', TL.resolveTimezone('Europe/Madrid'), 'Europe/Madrid')
+  for (const c of ['NotARealPlace', 'zzzz', 'atlantis', 'foo bar', 'mad rid',
     'Europe/Nowhere', '/etc/passwd', '../../etc', 'a'.repeat(500)]) {
     eq(`${JSON.stringify(c)} is unknown`, TL.resolveTimezone(c), null)
   }
@@ -4410,7 +4411,7 @@ group('the host accepts a well-formed plugin and rejects a malformed one', () =>
   eq('an empty object is rejected', hostEvaluate('VibraniumPlugin = {}', 'empty.js').error, HOST_BAD_SHAPE)
   eq('a plugin with an init as well is accepted',
     hostEvaluate('VibraniumPlugin = { init: function(){}, items: function(){}, activate: function(){} }', 'three.js').error, null)
-  // And the seven shipped plugins all pass the same three checks, through the
+  // And the eight shipped plugins all pass the same three checks, through the
   // loader, which is the authority.
   for (const dir of PLUGIN_DIRS) {
     noThrow(`${path.basename(dir)} passes the loader`, () => loadPlugin(path.join(dir, 'main.js'), {}))
@@ -4419,7 +4420,7 @@ group('the host accepts a well-formed plugin and rejects a malformed one', () =>
 })
 
 // =========================================================================
-section('The seven shipped plugins - manifests and shape')
+section('The eight shipped plugins - manifests and shape')
 // =========================================================================
 
 group('every plugin directory is discoverable and carries a usable manifest', () => {
@@ -4497,12 +4498,17 @@ group('the public surface of a plugin is exactly the VibraniumPlugin object', ()
     const { impl } = pluginInternals(path.join(dir, 'main.js'))
     const name = path.basename(dir)
     const keys = Object.keys(impl)
-    eq(`${name} own keys`, keys, ['init', 'items', 'activate'])
+    // Batch B adds the fixed IPC contract object; a shipped plugin's public
+    // surface is the three lifecycle members plus those named closures, and
+    // nothing else may leak out of the wrapper.
+    eq(`${name} own keys`, keys, ['init', 'items', 'activate', 'ipc'])
     eq(`${name} init is a function`, typeof impl.init, 'function')
     eq(`${name} items is a function`, typeof impl.items, 'function')
     eq(`${name} activate is a function`, typeof impl.activate, 'function')
+    eq(`${name} ipc is an object`, typeof impl.ipc, 'object')
     // The loadLoader - the authority on acceptance - agrees.
-    eq(`${name} loadPlugin sees the same three`, Object.keys(loadPlugin(path.join(dir, 'main.js'), {})), ['init', 'items', 'activate'])
+    eq(`${name} loadPlugin sees the same surface`,
+      Object.keys(loadPlugin(path.join(dir, 'main.js'), {})), ['init', 'items', 'activate', 'ipc'])
   }
 })
 
@@ -4541,7 +4547,7 @@ group('two plugins do not share engine state', () => {
 })
 
 // =========================================================================
-section('The seven shipped plugins - rows through a real policy')
+section('The eight shipped plugins - rows through a real policy')
 // =========================================================================
 
 // Every plugin is driven through a PluginPolicy instance built the way
@@ -7561,6 +7567,20 @@ group('a spot value through the parity harness, compared with a tolerance', () =
   eq('unit: and the list is longer than one row', unit.libFns.tryAll('5 mb').length > 1, true)
   eq('unit: an explicit target is still one row on both copies',
     [unit.plugFns.tryAll('5 mb in gb').length, unit.libFns.tryAll('5 mb in gb').length], [1, 1])
+})
+
+// Batch B's two new LauncherLib exports belong to the same coverage rule as
+// the rest: a name nobody calls is a name this suite does not cover.
+group('the fixed built-in IPC allowlist is exercised', () => {
+  eq('a shipped id names its verbs', LL.builtinIpcVerbs('calc'), ['eval'])
+  eq('an unknown id has none', LL.builtinIpcVerbs('nope'), [])
+  eq('a plugin row keeps to need-to-know fields', Object.keys(LL.pluginListRow({
+    id: 'calc', name: 'Calculator', description: 'd', keyword: '', type: 'engine', enabled: true,
+    broken: false, granted: [], denied: []
+  })), ['id', 'name', 'description', 'type', 'keyword', 'enabled'])
+  eq('a built-in id has a presentation-only help page', LL.pluginHelpPage('calc').usage,
+    'vb-shell appLauncher plugin command calc')
+  eq('an unknown id has no help page', LL.pluginHelpPage('nope'), null)
 })
 
 group('every exported function in the four libraries was exercised by this run', () => {

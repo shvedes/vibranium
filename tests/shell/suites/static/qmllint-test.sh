@@ -142,10 +142,14 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # The downloader island's format table used to read its delegate's injected
 # `model` unqualified, which cost 11 `unqualified` warnings and 12 info notes.
 # The delegate now declares `required property var modelData` and reads it
-# through its own id, matching the ArchUpdates table, so both figures fell.
-RECORDED_FILE_COUNT=270
+# through its own id, matching the SystemUpdates table, so both figures fell.
+# Batch A's IpcRouter.qml is one more .qml file than the recorded baseline and
+# contributes two Info diagnostics; the warning set is unchanged.
+# The Lockscreen gateway's IpcRouter.unregister adds one unqualified warning;
+# retiring the native effect toggles removes one Info diagnostic.
+RECORDED_FILE_COUNT=272
 RECORDED_WARNING_COUNT=112
-RECORDED_INFO_COUNT=17
+RECORDED_INFO_COUNT=18
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see

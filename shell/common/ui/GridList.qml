@@ -107,6 +107,7 @@ GridView {
 
     target: root
     property: "contentY"
+    to: root.sweepTo
     // The wrap tween's travel is derived from its own live endpoints, not
     // handed in as a copied scalar. List's highlight binds to its content
     // tween the same way: one clock per engine, no duration passed between
@@ -165,6 +166,10 @@ GridView {
     root.sweepY0 = y0
     root.sweepTo = target
     root.sweeping = true
+    // The first contentY write is the edge that releases this pending wrap;
+    // without a running tween there is no first write and the sweep would
+    // stay latched forever.
+    sweep.restart()
   }
 
   // The wrap gesture seats the cursor at the far end; the view's contentY

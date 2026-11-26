@@ -16,7 +16,7 @@ import "../../common/text/UnitIpc.js" as UnitIpc
 // and written by it (writes call SetActiveProfile on the daemon), and
 // profile changes arrive through profileChanged. Nothing shells out - no
 // powerprofilesctl, no state files. The singleton feeds
-// the per-monitor PowerProfile widgets, the `qs ipc call powerProfile`
+// the per-monitor PowerProfile widgets, the `vb-shell powerProfile`
 // verbs (next/prev/set/get/list) and `apply()` - the public write entry point
 // `power/PowerPolicy` drives the AC policy through. A single instance means
 // one observer and one IPC target regardless of how many monitors render the
@@ -186,9 +186,18 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("powerProfile", root, {
+      "powerProfile.next": function () { return ipc.next() },
+      "powerProfile.prev": function () { return ipc.prev() },
+      "powerProfile.set": function (a) { return ipc.set(a.profile) },
+      "powerProfile.get": function () { return ipc.get() },
+      "powerProfile.list": function () { return ipc.list() },
+      "powerProfile.status": function () { return ipc.status() },
+      "powerProfile.ping": function () { return ipc.ping() }
+    })
     Registry.offer("powerProfile", {
       title: "Power profile",
-      description: "power profile switching",
+      description: "Choose the system power profile",
       verbNames: [
         "get",
         "list",
@@ -212,6 +221,8 @@ Singleton {
     }
     root._knownDevices = seen
   }
+
+  Component.onDestruction: IpcRouter.unregister("powerProfile", root)
 
   // --- switching (D-Bus set) ---
 
@@ -364,11 +375,12 @@ Singleton {
   // --- IPC ---
 
   IpcHandler {
+    id: ipc
     target: "powerProfile"
     function help(command: string): string {
-      return UnitIpc.help("powerProfile", "Power profile", "power profile switching", [
-        { name: "get", help: "current profile" },
-        { name: "list", help: "available profiles" },
+      return UnitIpc.help("powerProfile", "Power profile", "Choose the system power profile", [
+        { name: "get", help: "show current power profile" },
+        { name: "list", help: "list available power profiles" },
         { name: "next", help: "cycle to the next profile" },
         { name: "prev", help: "cycle to the previous profile" },
         { name: "set", help: "(profile) switch profile" },

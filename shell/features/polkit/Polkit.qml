@@ -340,9 +340,14 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("polkit", root, {
+      "polkit.cancel": function () { return ipc.cancel() },
+      "polkit.status": function () { return ipc.status() },
+      "polkit.ping": function () { return ipc.ping() }
+    })
     Registry.offer("polkit", {
       title: "Polkit",
-      description: "authentication agent",
+      description: "Handle authentication prompts",
       verbNames: [
         "cancel",
         "status",
@@ -354,6 +359,8 @@ Singleton {
     // registration: `PolkitAgent.componentComplete` calls
     // `polkit_agent_listener_register` for the shell's own process session.
   }
+
+  Component.onDestruction: IpcRouter.unregister("polkit", root)
 
   PolkitView {}
 
@@ -411,9 +418,10 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "polkit"
     function help(command: string): string {
-      return UnitIpc.help("polkit", "Polkit", "authentication agent", [
+      return UnitIpc.help("polkit", "Polkit", "Handle authentication prompts", [
         { name: "cancel", help: "cancel the current auth prompt" },
       ], command)
     }

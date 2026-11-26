@@ -305,7 +305,7 @@ Singleton {
   function _fields(kind) {
     if (kind === "picker") return []
     if (kind === "region") {
-      return ["url", "frameW", "frameH", "immediate", "jobId", "flowId"]
+      return ["url", "frameW", "frameH", "immediate", "jobId", "flowId", "silent"]
     }
     return ["shotPath", "savePath", "saveToDisk", "fileType", "runtimeDir",
       "directSource", "flowId", "showNotification"]

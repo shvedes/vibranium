@@ -190,15 +190,17 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 127 of the 269 declared types, and every one of them
-# through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
+# EXPECTED_NEEDS_ENVIRONMENT is 128 of the 271 declared types, and every one of them
+# fails through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
 # constructed - cannot be built at all. That is one environmental
-# fact with a long reach, not 127 separate problems, and the reason string each
+# fact with a long reach, not 128 separate problems, and the reason string each
 # type carries says so. The two types that left this set are the feature-local
 # ScrollLabel and SectionLabel: the shared common/ui versions that replaced
 # them carry no window and build cleanly.
+# EmojiPicker imports the Menu singleton for bundle identity; Menu reaches a
+# PanelWindow through MenuView, so that picker now needs the same backend.
 EXPECTED_UNCREATABLE="qs.common.LayerSurface
 qs.features.clipboard.ClipboardView
 qs.features.launcher.AppLauncherView
@@ -245,7 +247,6 @@ qs.features.bar.RevealFlash
 qs.features.bar.ToolTipBind
 qs.features.bar.ToolTipHost
 qs.features.bar.Zone
-qs.features.bar.modules.ArchUpdates.ArchUpdates
 qs.features.bar.modules.ColorPicker.ColorPicker
 qs.features.bar.modules.ColorPicker.ColorPickerOverlay
 qs.features.bar.modules.KeyboardLayout.KeyboardLayout
@@ -260,6 +261,7 @@ qs.features.bar.modules.Printers.Printers
 qs.features.bar.modules.Printers.PrintersIsland
 qs.features.bar.modules.Privacy.Privacy
 qs.features.bar.modules.Session.Session
+qs.features.bar.modules.SystemUpdates.SystemUpdates
 qs.features.bar.modules.Tray.Tray
 qs.features.bar.modules.Tray.TrayMenu
 qs.features.bar.modules.Volume.Volume
@@ -299,6 +301,7 @@ qs.features.osd.OSDView
 qs.features.pass.Pass
 qs.features.pass.PassController
 qs.features.pickers.cursor.CursorPicker
+qs.features.pickers.emoji.EmojiPicker
 qs.features.pickers.font.FontPicker
 qs.features.pickers.keybindings.Keybindings
 qs.features.pickers.theme.ThemePicker
@@ -314,7 +317,6 @@ qs.features.wallpaper.WallpaperView
 qs.features.wallpaperPicker.WallpaperEntry
 qs.features.wallpaperPicker.WallpaperPicker
 qs.features.wallpaperPicker.WallpaperPickerPanel
-qs.services.ArchUpdates
 qs.services.Audio
 qs.services.BatteryAlert
 qs.services.Connectivity
@@ -333,7 +335,9 @@ qs.services.Privacy
 qs.services.Recording
 qs.services.Screenshots
 qs.services.Session
+qs.services.SystemUpdates
 qs.services.Timer
+qs.services.Tools
 qs.services.Update
 qs.services.Weather"
 
@@ -368,7 +372,9 @@ supplied.qs.common.LyricsPane=player: null"
 # qs.common.BusySpinner, qs.common.DismissNet, qs.common.GlassPill and
 # qs.common.ConfirmStage replace the two feature-local declarations, all clean
 # headless builds over Text/Item/QtObject.)
-EXPECTED_DECLARED_COUNT=269
+# Batch A declared qs.common.IpcRouter in common/qmldir, so the tree now
+# publishes 271 entries rather than 270.
+EXPECTED_DECLARED_COUNT=271
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -397,8 +403,9 @@ EXPECTED_DECLARED_COUNT=269
 # SectionLabel are plain Text/Item wrappers, BusySpinner an Icon over a
 # RotationAnimation, DismissNet a QtObject, GlassPill an Item over a Rectangle
 # and ConfirmStage a QtObject state machine - none reaches a window.
+# qs.common.IpcRouter (Batch A) is a clean singleton over plain JS libraries.
 EXPECTED_CLEAN_COUNT=132
-EXPECTED_NEEDS_COUNT=127
+EXPECTED_NEEDS_COUNT=129
 EXPECTED_UNCREATABLE_COUNT=9
 
 # --------------------------------------------------------------------------
@@ -595,7 +602,7 @@ $(wc -l <"$UNCREATABLE" | tr -d ' ') declared-but-uncreatable, $(wc -l <"$BROKEN
 # that reaches a window can be constructed at all. The widest door is the
 # Screenshots singleton, which builds a PanelWindow while it is being
 # constructed, and everything that touches it - which is all of qs.services -
-# goes with it. One environmental fact, not 127 problems.
+# goes with it. One environmental fact, not 128 problems.
 t_note "every needs-environment type failed for one reason: the offscreen platform has no \
 PanelWindow backend, so a type that reaches a window cannot be built. That includes types that reach \
 one transitively, through the Screenshots singleton that builds a PanelWindow at construction."

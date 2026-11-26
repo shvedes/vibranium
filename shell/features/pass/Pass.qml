@@ -846,9 +846,17 @@ Singleton {
 
   // --- boot / registry / ipc -----------------------------------------------
   Component.onCompleted: {
+    IpcRouter.register("pass", root, {
+      "pass.open": function () { return ipc.open() },
+      "pass.close": function () { return ipc.close() },
+      "pass.toggle": function () { return ipc.toggle() },
+      "pass.copy": function (a) { return ipc.copy(a.path) },
+      "pass.status": function () { return ipc.status() },
+      "pass.ping": function () { return ipc.ping() }
+    })
     Registry.offer("pass", {
       title: "Password manager",
-      description: "native pass frontend",
+      description: "Manage password-store entries",
       verbNames: ["open", "copy", "close", "toggle", "status", "help", "ping"]
     })
     Registry.register("pass", root)
@@ -871,6 +879,7 @@ Singleton {
   }
 
   Component.onDestruction: {
+    IpcRouter.unregister("pass", root)
     idleRelease.stop()
     root.teardownController()
     root._releaseSecrets()
@@ -881,13 +890,14 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "pass"
     function help(command: string): string {
-      return UnitIpc.help("pass", "Password manager", "native pass frontend", [
-        { name: "open", help: "toggle the Password manager menu page" },
+      return UnitIpc.help("pass", "Password manager", "Manage password-store entries", [
+        { name: "open", help: "open the Password manager menu page" },
         { name: "copy", help: "(path) copy line 1 to the clipboard" },
         { name: "close", help: "close the Pass page" },
-        { name: "toggle", help: "open/close the Pass page" }
+        { name: "toggle", help: "toggle the Pass page" }
       ], command)
     }
     function ping(): string { return "pong" }

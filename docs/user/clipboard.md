@@ -105,60 +105,80 @@ once into memory if the key is present and dropped on the next write. A row
 whose credential cannot be recovered reports itself as unavailable instead of
 silently doing nothing when you press ++enter++.
 
-## IPC
+## CLI
 
-The service registers a `clipboard` IPC target, so scripts can drive it:
+The public scripting surface is `vb-shell clipboard`; the old native
+`qs ipc call clipboard ...` verbs are retired.
 
 ```sh
-vb-shell clipboard toggle           # open/close (what super+v runs)
-vb-shell clipboard status           # JSON counters
-qs -p "$VIBRANIUM/shell" ipc call clipboard list              # history metadata JSON
-qs -p "$VIBRANIUM/shell" ipc call clipboard view 0            # entry at filtered index
-qs -p "$VIBRANIUM/shell" ipc call clipboard copy 2            # copy filtered index to system clipboard
-qs -p "$VIBRANIUM/shell" ipc call clipboard remove 1          # delete filtered index
-qs -p "$VIBRANIUM/shell" ipc call clipboard pin 0             # toggle pin
-qs -p "$VIBRANIUM/shell" ipc call clipboard clear
+vb-shell clipboard window toggle     # show/hide (what super+v runs)
+vb-shell clipboard window open pinned  # open in the pinned view
+vb-shell clipboard status            # counters plus copyBusy; no content
+vb-shell clipboard list              # normal bucket
+vb-shell clipboard list pinned       # pinned bucket
+vb-shell clipboard list current      # open panel's current filter
+vb-shell clipboard pin 0             # pin a normal-bucket row
+vb-shell clipboard unpin 0           # unpin a pinned-bucket row
+vb-shell clipboard purge 1           # delete a normal-bucket row
+vb-shell clipboard purge pinned 0    # delete a pinned-bucket row
+vb-shell clipboard clear             # clear normal; pinned rows survive
+vb-shell clipboard clear pinned      # clear pinned; normal rows survive
+vb-shell clipboard select 2          # seat a row of the open panel
+vb-shell clipboard copy entry regular 2
 ```
 
-### `list` returns metadata, not history
+`vb-shell --help` is the local CLI guide; it does not contact the shell.
+`-j`/`--json` selects typed JSON, where a success is
+`{"v":1,"ok":true,"data":...,"format":...,"next":...}` and a failure is
+`{"v":1,"ok":false,"error":{"code":"...","message":"..."}}` on stderr. A
+silent operation omits `data` (it is not the same as `"data":null`), and paged
+lists arrive as `items` with an optional `next` cursor. Exit status is 0 for
+success, 2 for `usage`/`unknown-target`/`unknown-command`/`invalid-argument`,
+and 1 for every other failure. `copy` stream formats are the client-owned exception
+that take data on stdin or a private client route; no payload is ever placed
+in argv, a socket frame sent to the shell, a log, or a reply. Protected rows
+and invalid indices fail with `invalid-index` and never leak content in either
+output format.
 
-This is a deliberate break: `list` used to return the raw history array, and
-anything that parsed it has to be updated.
+### Lists project content, not metadata
 
-The old payload was the history itself - every internal field, including the
-entry's raw content. `list` now returns a wrapper object and, per entry, only
-metadata plus a preview where a preview is safe:
+`list`, `list pinned` and `list current` return **only** `{index,content}` rows:
 
 ```json
-{
-  "version": 2,
-  "total": 12,
-  "count": 11,
-  "secrets": 1,
-  "entries": [
-    { "id": 7, "type": "text", "title": "notes", "subLeft": "2 words - 11 chars",
-      "timeStr": "14:32", "pinned": false, "mime": "text/plain",
-      "filePaths": [], "preview": "notes" }
-  ]
-}
+[ { "index": 0, "content": "notes" }, { "index": 1, "content": "<image>" } ]
 ```
 
-What changed:
+Text content is a bounded safe preview (whitespace folded, terminal controls
+removed, at most 80 Unicode code points). Non-text rows use the fixed markers
+`<image>`, `<file>`, `<folder>`, `<archive>` and `<binary>`. Paths, MIME types,
+entry ids and raw payloads are never published. Protected rows (secrets,
+credential MIME types and rows holding a secret handle) are omitted from
+lists; an indexed read or action on one fails with `invalid-index`, exactly
+like an out-of-range or nondecimal index.
 
-- `entries` is an array of objects, not the raw history array. `total` is the
-  history length, `count` the number of listed entries, and `secrets` how many
-  credential rows were withheld.
-- Credential entries are never listed. `secrets` reports that they exist, but
-  the rows themselves are absent, so there is no path from `list` to a
-  credential.
-- A `preview` is present for `text`, `url`, and `network` entries only, cut to
-  200 characters. Image, file, folder, archive, and multi-select entries have
-  no `preview` field at all.
-- `raw`, `hay`, `words`, `icon`, `pathLike`, `imageFile`, `imageDataFile`,
-  `imageSha`, and the derived counters are gone. `fileSize` appears when it is
-  known; `filePaths` remains for path-backed entries.
+Indices are ephemeral positions in the bucket or current filter. Resolve one
+with `list`, `list pinned` or `list current` immediately before using it; it is
+not a long-lived id. `select` addresses the open panel's current filter only.
+Unpinning a row is not a delete; purging uses the same staged deletion path as
+the UI.
 
-`view` uses the same per-entry shape, so a script can read one entry from
-`view` and the matching element of `list` without a second code path. Index
-verbs (`copy`, `view`, `pin`, `remove`) still address the filtered list, not
-the projected one, so a withheld credential does not shift an index.
+### Writing new data
+
+`vb-shell clipboard copy` writes directly to the system clipboard with
+`wl-copy --type <mime>`. The shell's own watcher captures the write as a normal
+history entry; no special entry is injected. The payload never appears in a
+command envelope, temporary file, log or reply.
+
+```sh
+vb-shell clipboard copy text 'hello world'
+printf 'from stdin' | vb-shell clipboard copy text -
+vb-shell clipboard copy text -- -        # a literal dash, not stdin
+vb-shell clipboard copy uri 'https://example.org/a'
+vb-shell clipboard copy file ./notes.txt
+vb-shell clipboard copy image image/png - < shot.png
+```
+
+Text from stdin is strict UTF-8 and capped at 32 MiB. Image bytes must match
+the declared PNG/JPEG/GIF/WebP/BMP/TIFF magic and are also capped at 32 MiB;
+they are written unchanged. The command confirms `clipboard ping` before
+writing and uses a five-second writer deadline.

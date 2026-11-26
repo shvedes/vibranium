@@ -4,7 +4,7 @@ import QtQuick
 import qs.common
 
 // Selectable list row with Finder-style zebra striping: the shared row
-// behind table-like lists (ArchUpdates packages, weather suggestions,
+// behind table-like lists (SystemUpdates packages, weather suggestions,
 // weather forecast days).
 //
 // Library idiom, square and click-only unless opted in: even rows carry

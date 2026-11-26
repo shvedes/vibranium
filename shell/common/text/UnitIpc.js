@@ -88,9 +88,9 @@ function help(target, title, description, verbs, query) {
       let v = verbs[i]
       rows.push({ name: v.name, usage: usageOf(v), desc: descOf(v) })
     }
-    rows.push({ name: "status", usage: "", desc: "health + unit payload" })
-    rows.push({ name: "ping", usage: "", desc: "liveness" })
-    rows.push({ name: "help", usage: " [command]", desc: "show help for one command" })
+    rows.push({ name: "status", usage: "", desc: "show the target's status" })
+    rows.push({ name: "ping", usage: "", desc: "check that the target responds" })
+    rows.push({ name: "help", usage: " [command]", desc: "show help for this target or one command" })
     return rows
   }
 

@@ -28,9 +28,16 @@ Singleton {
   property int rev: 0
 
   Component.onCompleted: {
+    IpcRouter.register("state", root, {
+      "state.get": function (a) { return ipc.get(a.slot) },
+      "state.set": function (_a, c) { return ipc.set(c.tokens.slot, c.tokens.json) },
+      "state.dump": function () { return ipc.dump() },
+      "state.status": function () { return ipc.status() },
+      "state.ping": function () { return ipc.ping() }
+    })
     Registry.offer("state", {
       title: "State",
-      description: "persisted JSON slots",
+      description: "Vibranium shell state & runtime queries",
       verbNames: ["get", "set", "dump", "status", "help", "ping"]
     })
     // K1: ensure core slots exist at boot even if their consumers are
@@ -40,12 +47,16 @@ Singleton {
     root.slot("shell", {}, "state", "shell.jsonc")
   }
 
-  Component.onDestruction: Registry.unregister("state")
+  Component.onDestruction: {
+    IpcRouter.unregister("state", root)
+    Registry.unregister("state")
+  }
 
   IpcHandler {
+    id: ipc
     target: "state"
     function help(command: string): string {
-      return UnitIpc.help("state", "State", "persisted JSON slots", [
+      return UnitIpc.help("state", "State", "Vibranium shell state & runtime queries", [
         { name: "get", help: "(key) read slot as JSON" },
         { name: "set", help: "(key, json) write slot" },
         { name: "dump", help: "all slots as JSON" },

@@ -1,398 +1,1919 @@
-#!/bin/bash
+#!/usr/bin/env -S python3 -S -c 'import sys;exec("with open(sys.argv[1], \"rb\") as f:\n s = f.read()");exec(s.rsplit(b"\n# --- vb-shell bytecode bootstrap ---\n",1)[1],{"_vb_boot":(sys.argv[1],s)})'
 
-source vb-lib-cli
+from __future__ import annotations
 
-VERBOSE=${VERBOSE:-false}
-SELF="${0##*/}"
-QS_ARGS=(-p "$VIBRANIUM/shell")
-# Array expansion keeps the project path as one argv element even when it
-# contains whitespace; every qs invocation reuses this option ordering.
+import time
 
-usage() {
-  shcat << EOF
-Usage: $SELF [OPTIONS] <target> [function] [args...]
-       $SELF help [unit]
-       $SELF <target> help [command]
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from typing import NoReturn
 
-Call Vibranium shell IPC handlers through quickshell.
+PREFIX = "v1:"
+VERSION = 1
+# Fixed prose budget for the description column itself. Rendering never
+# consults terminal width, COLUMNS or /dev/tty.
+DESCRIPTION_WIDTH = 80
+_JSON_MODE = False
+TRIP_TIMEOUT = 3.0
+TOTAL_TIMEOUT = 10.0
+# A cold time lookup only warms the controller's clock probe. Poll briefly so
+# the command returns the reading, not just the resolved zone.
+TIME_LOOKUP_WAIT = 0.75
+TIME_LOOKUP_POLL = 0.05
+PICKER_WAIT = 300.0
+PICKER_POLL = 0.05
+RC = {
+    "usage": 2,
+    "unknown-target": 2,
+    "unknown-command": 2,
+    "invalid-argument": 2,
+}
+DEFAULT_RC = 1
+NO_QUICKSHELL = "couldn't find Quickshell PID. Is Quickshell running?"
+SENTINELS = (
+    "Function not found.",
+    "Target not found.",
+    "Not ready to accept queries yet.",
+)
+QS_CALL_ERRORS = {
+    b"\x01": SENTINELS[2],  # NoCurrentGeneration
+    b"\x02": SENTINELS[1],  # TargetNotFound
+    b"\x03": SENTINELS[0],  # EntryNotFound
+}
+STRIP_ENV = ("QS_CONFIG_PATH", "QS_CONFIG_NAME", "QS_MANIFEST")
 
-Examples:
-  $SELF wallpaper set image.jpg
-  $SELF session lock
-  $SELF state ping
-  $SELF help wallpaper
-  $SELF wallpaper help set
+# Quickshell v0.3.2 wire layout: src/ipc/ipccommand.hpp, src/io/ipccomm.cpp.
+QS_VERSION = b"0.3.2"
+QS_CALL = b"\x03"
+QS_COMPLETED = b"\x05"
+QS_MAX_REPLY = 1024 * 1024
 
-Options:
-  -l, --list      List available IPC targets and functions
-  -v, --verbose   Enable verbose output
-  -h, --help      Display this help and exit
-EOF
+# Client-owned clipboard writer. Payload bytes are written directly to
+# wl-copy's stdin; they never enter a v1 envelope, a temp file, a log or a
+# reply. The 5 s deadline and the 32 MiB cap are owned here, not by the shell.
+COPY_STDIN_MAX = 32 * 1024 * 1024
+COPY_DEADLINE = 5.0
+COPY_IMAGE_MIMES = {
+    "image/png": lambda b: b.startswith(b"\x89PNG\r\n\x1a\n"),
+    "image/jpeg": lambda b: b.startswith(b"\xff\xd8\xff"),
+    "image/gif": lambda b: b.startswith((b"GIF87a", b"GIF89a")),
+    "image/webp": lambda b: len(b) >= 12 and b[:4] == b"RIFF" and b[8:12] == b"WEBP",
+    "image/bmp": lambda b: b.startswith(b"BM"),
+    "image/tiff": lambda b: b.startswith((b"II*\x00", b"MM\x00*")),
 }
 
-SEEN_DASHDASH=false
 
-# Grouped index over the live IPC surface: one section per target, one
-# function per line, sharing the help notation (`<arg>` required,
-# `[command]` the optional help filter).
-#
-# `qs ipc show` gives the target set and every signature. Descriptions come
-# from `shell help` (targets) and each unit's own `help` block (functions,
-# fanned out in parallel), so a full listing costs two sequential calls plus
-# one parallel wave. Anything unparseable or failing
-# degrades to a description-less row rather than dropped, and a failing
-# `qs ipc show` (no live shell) is reported as-is.
-_vb_shell_list() {
-  local show rc target block
-  local -a targets
-  local -A tdesc
-  # Row field separator. A tab cannot serve: tab is IFS whitespace, so
-  # consecutive tabs collapse and an empty middle field (a function without
-  # usage) is lost. The unit separator never occurs in help text.
-  local SEP
-  printf -v SEP '\037'
-  local LC_ALL=C
-  local line content uname urest tname i j tmp
+class IpcError(Exception):
+    def __init__(self, code: str, message: str = ""):
+        super().__init__(message or code)
+        self.code = code
+        self.message = message or code
 
-  show="$(qs "${QS_ARGS[@]}" ipc show 2>&1)"
-  rc=$?
-  if ((rc != 0)); then
-    printf '%s\n' "$show"
-    return "$rc"
-  fi
 
-  # Target set from `qs ipc show`, deduplicated and sorted in bash.
-  targets=()
-  local -A _tseen=()
-  while IFS= read -r line || [[ -n $line ]]; do
-    [[ $line == 'target '* ]] || continue
-    tname=${line#target }
-    tname=${tname%%[[:space:]]*}
-    [[ -n $tname && $line == "target $tname" ]] || continue
-    if [[ -z ${_tseen[$tname]+x} ]]; then
-      _tseen[$tname]=1
-      targets+=("$tname")
-    fi
-  done <<< "$show"
-  for ((i = 1; i < ${#targets[@]}; i++)); do
-    tmp=${targets[i]}
-    j=$((i - 1))
-    while ((j >= 0)) && [[ ${targets[j]} > $tmp ]]; do
-      targets[j + 1]=${targets[j]}
-      j=$((j - 1))
-    done
-    targets[j + 1]=$tmp
-  done
+def fail(code: str, message: str = "") -> NoReturn:
+    raise IpcError(code, message or code)
 
-  # Target descriptions from the units table. Best effort: without them the
-  # headers render as bare names.
-  if block="$(qs "${QS_ARGS[@]}" ipc call shell help 2>/dev/null)"; then
-    local in_units=false
-    while IFS= read -r line || [[ -n $line ]]; do
-      if [[ $in_units == false ]]; then
-        [[ $line == Units: ]] && in_units=true
-        continue
-      fi
-      [[ -z $line ]] && break
-      [[ $line == '  '* ]] || continue
-      content=${line#'  '}
-      [[ -n $content && $content != ' '* ]] || continue
-      uname=${content%%[[:space:]]*}
-      [[ -n $uname ]] || continue
-      urest=${content:${#uname}}
-      urest=${urest#"${urest%%[![:space:]]*}"}
-      [[ -n $urest ]] || continue
-      tdesc[$uname]=$urest
-    done <<< "$block"
-  fi
 
-  # One "name<SEP>usage" row per function of one target, from `qs ipc show`.
-  # The fallback listing when a unit help call fails or is prose.
-  _list_fallback_funcs() {
-    local want=$1
-    local fline tfield active=false
-    local fline_rest fn inside entry p trimmed
-    local -a parts
-    while IFS= read -r fline || [[ -n $fline ]]; do
-      if [[ $fline == 'target '* ]]; then
-        tfield=${fline#target }
-        tfield=${tfield%%[[:space:]]*}
-        if [[ $tfield == "$want" ]]; then active=true; else active=false; fi
-        continue
-      fi
-      $active || continue
-      [[ $fline == '  function '* ]] || continue
-      fline_rest=${fline#'  function '}
-      [[ $fline_rest == *'('* ]] || continue
-      fn=${fline_rest%%'('*}
-      inside=${fline_rest#*'('}
-      inside=${inside%%')'*}
-      if [[ $fn == help ]]; then
-        # Every unit help block spells its filter `[command]`; shell,
-        # boot and log keep a parameterless help, as reflection shows.
-        if [[ $want == shell || $want == boot || $want == log ]]; then
-          printf '%s%s\n' "$fn" "$SEP"
-        else
-          printf 'help%s[command]\n' "$SEP"
-        fi
-        continue
-      fi
-      trimmed=${inside//[[:space:]]/}
-      if [[ -z $trimmed ]]; then
-        printf '%s%s\n' "$fn" "$SEP"
-        continue
-      fi
-      entry=""
-      IFS=',' read -ra parts <<< "$inside"
-      for p in "${parts[@]}"; do
-        p=${p#"${p%%[![:space:]]*}"}
-        p=${p%"${p##*[![:space:]]}"}
-        p=${p%%:*}
-        p=${p#"${p%%[![:space:]]*}"}
-        p=${p%"${p##*[![:space:]]}"}
-        [[ -n $p ]] || continue
-        if [[ -z $entry ]]; then entry="<$p>"
-        else entry+=" <$p>"
-        fi
-      done
-      printf '%s%s%s\n' "$fn" "$SEP" "$entry"
-    done <<< "$show"
-  }
+def _wire_json():
+    # Use the same C encoder and scanner as json without importing its Python
+    # wrappers on the common path. Keep the stdlib fallback for other runtimes.
+    try:
+        from _json import encode_basestring_ascii, make_encoder, make_scanner
 
-  # One "name<SEP>usage<SEP>desc" row per command plus the unit Description,
-  # parsed out of a unit help block. The Commands head is single-spaced
-  # internally, so the description starts at the first run of two spaces.
-  _list_unit_rows() {
-    local input=$1
-    local uline desc="" in_cmds=false
-    local ucontent uname2 urest usage fdesc
-    local nr=0 k split_idx
-    while IFS= read -r uline || [[ -n $uline ]]; do
-      nr=$((nr + 1))
-      if ((nr == 3)) && [[ -n $uline ]]; then desc=$uline; fi
-      if [[ $uline == Commands: ]]; then in_cmds=true; continue; fi
-      $in_cmds || continue
-      [[ -z $uline ]] && break
-      [[ $uline == '  '* ]] || continue
-      ucontent=${uline#'  '}
-      [[ -n $ucontent && $ucontent != ' '* ]] || continue
-      uname2=${ucontent%%[[:space:]]*}
-      [[ -n $uname2 ]] || continue
-      urest=${ucontent:${#uname2}}
-      split_idx=-1
-      k=0
-      while ((k < ${#urest} - 1)); do
-        if [[ ${urest:k:1} == ' ' && ${urest:k+1:1} == ' ' ]]; then split_idx=$k; break; fi
-        k=$((k + 1))
-      done
-      if ((split_idx >= 0)); then
-        usage=${urest:0:split_idx}
-        fdesc=${urest:split_idx}
-      else
-        usage=$urest
-        fdesc=""
-      fi
-      usage=${usage#"${usage%%[![:space:]]*}"}
-      usage=${usage%"${usage##*[![:space:]]}"}
-      fdesc=${fdesc#"${fdesc%%[![:space:]]*}"}
-      printf 'F%s%s%s%s%s%s\n' "$SEP" "$uname2" "$SEP" "$usage" "$SEP" "$fdesc"
-    done <<< "$input"
-    if [[ -n $desc ]]; then printf 'D%s%s\n' "$SEP" "$desc"; fi
-  }
+        class Decoder:
+            strict = True
+            object_hook = object_pairs_hook = None
+            parse_int = int
+            parse_float = parse_constant = float
 
-  printf 'Available IPC targets and functions:\n'
+        return (
+            make_encoder(
+                None,
+                None,  # pyright: ignore[reportArgumentType]
+                encode_basestring_ascii,
+                None,
+                ":",
+                ",",
+                False,
+                False,
+                False,
+            ),
+            make_scanner(Decoder()),  # pyright: ignore[reportArgumentType]
+        )
+    except (ImportError, TypeError, AttributeError):
+        return None, None
 
-  # One `help` call per unit, fanned out: sequential round trips cost a
-  # second, parallel ones a fraction of it. Each job owns one file, so
-  # concurrent writes cannot interleave; the render loop below rejoins in
-  # sorted order. A failed job leaves no file and its target falls back to
-  # reflection rows, exactly like a failed sequential call would.
-  tmpdir="$(mktemp -d)" || return 1
-  trap 'rm -rf "$tmpdir"' RETURN
-  utargets=()
-  for target in "${targets[@]}"; do
-    [[ -n "$target" ]] || continue
-    case "$target" in
-      shell | boot | log) continue ;;
-      *) utargets+=("$target") ;;
-    esac
-  done
-  if ((${#utargets[@]} > 0)); then
-    export VIBRANIUM
-    export _VB_LIST_TMP="$tmpdir"
-    # shellcheck disable=SC2016 # the $vars expand in the xargs child, not here
-    printf '%s\n' "${utargets[@]}" \
-      | xargs -r -P 16 -n 1 bash -c '
-        t="$1"
-        if out="$(qs -p "$VIBRANIUM/shell" ipc call "$t" help "" 2>/dev/null)"; then
-          printf "%s\n" "$out" > "$_VB_LIST_TMP/$t"
-        fi
-      ' _
-    unset _VB_LIST_TMP
-  fi
 
-  for target in "${targets[@]}"; do
-    [[ -n "$target" ]] || continue
-    rows=()
-    udesc=""
-    # shell, boot and log keep a prose or parameterless help: their
-    # functions come from reflection, without descriptions.
-    if [[ -f "$tmpdir/$target" ]]; then
-      block=""
-      while IFS= read -r line || [[ -n $line ]]; do
-        if [[ -z $block ]]; then block=$line
-        else block+=$'\n'$line
-        fi
-      done < "$tmpdir/$target"
-      while IFS="$SEP" read -r kind a b c; do
-        if [[ "$kind" == D ]]; then
-          udesc="$a"
-        elif [[ -n "$a" ]]; then
-          rows+=("$a$SEP$b$SEP$c")
-        fi
-      done < <(_list_unit_rows "$block")
-    fi
-    if ((${#rows[@]} == 0)); then
-      # Fallback rows deduplicated and sorted in bash. SEP (0x1F) sorts
-      # below printables, so whole-line byte order matches the old
-      # `sort -t SEP -k1,1 -k2,2 -u` field order.
-      mapfile -t _func_rows < <(_list_fallback_funcs "$target")
-      local -A _fr_seen=()
-      local -a _func_uniq=()
-      local _fr _m _n _key
-      for _fr in "${_func_rows[@]}"; do
-        if [[ -z ${_fr_seen[$_fr]+x} ]]; then
-          _fr_seen[$_fr]=1
-          _func_uniq+=("$_fr")
-        fi
-      done
-      for ((_m = 1; _m < ${#_func_uniq[@]}; _m++)); do
-        _key=${_func_uniq[_m]}
-        _n=$((_m - 1))
-        while ((_n >= 0)) && [[ ${_func_uniq[_n]} > $_key ]]; do
-          _func_uniq[_n + 1]=${_func_uniq[_n]}
-          _n=$((_n - 1))
-        done
-        _func_uniq[_n + 1]=$_key
-      done
-      for _fr in "${_func_uniq[@]}"; do
-        IFS="$SEP" read -r name usage <<< "$_fr"
-        [[ -n $name ]] && rows+=("$name$SEP$usage$SEP")
-      done
-    fi
-    ((${#rows[@]} > 0)) || continue
-    # Target header: the units-table description wins; otherwise the unit
-    # Description sentence parsed above.
-    header_desc="${tdesc[$target]:-}"
-    # Without a units-table row the header falls back to the unit Description
-    # sentence; un-sentence it back to the table fragment style (lowercase,
-    # no closing period) so both sources read the same.
-    if [[ -z "$header_desc" && -n "$udesc" ]]; then
-      header_desc="${udesc,}"
-      header_desc="${header_desc%.}"
-    fi
-    printf '\n'
-    if [[ -n "$header_desc" ]]; then
-      printf '  %s: %s\n' "$target" "$header_desc"
-    else
-      printf '  %s\n' "$target"
-    fi
-    width=0
-    for row in "${rows[@]}"; do
-      IFS="$SEP" read -r name usage _ <<< "$row"
-      head="$name"
-      [[ -n "$usage" ]] && head+=" $usage"
-      ((${#head} > width)) && width=${#head}
-    done
-    for row in "${rows[@]}"; do
-      IFS="$SEP" read -r name usage fdesc <<< "$row"
-      head="$name"
-      [[ -n "$usage" ]] && head+=" $usage"
-      if [[ -n "$fdesc" ]]; then
-        padded="$head:"
-        while ((${#padded} < width + 1)); do padded+=" "; done
-        printf '    %s  %s\n' "$padded" "$fdesc"
-      else
-        printf '    %s\n' "$head"
-      fi
-    done
-  done
-  printf '\nRun "vb-shell <unit> help" for a unit block, "vb-shell help" for the units guide.\n'
+_WIRE_CODEC = None
+
+
+def wire_codec():
+    global _WIRE_CODEC
+    if _WIRE_CODEC is None:
+        _WIRE_CODEC = _wire_json()
+    return _WIRE_CODEC
+
+
+def compact_ascii(value: object) -> str:
+    """Compact, finite, ensure_ascii=True JSON. One UTF-16 code unit at a time."""
+
+    encode, _ = wire_codec()
+    try:
+        if encode is not None:
+            return "".join(encode(value, 0))
+        import json
+
+        return json.dumps(
+            value, ensure_ascii=True, allow_nan=False, separators=(",", ":")
+        )
+    except ValueError:
+        fail("invalid-argument", "non-finite number")
+
+
+def envelope(request: dict) -> str:
+    return PREFIX + compact_ascii(request)
+
+
+def decode_json(text: str) -> object:
+    _, scan = wire_codec()
+    if scan is None:
+        import json
+
+        return json.loads(text)
+    text = text.strip(" \t\n\r")
+    try:
+        value, end = scan(text, 0)
+    except StopIteration:
+        raise ValueError("missing JSON value") from None
+    if end != len(text):
+        raise ValueError("extra JSON data")
+    return value
+
+
+def decode_reply(text: str) -> dict:
+    if text in SENTINELS:
+        fail("internal", "transport sentinel")
+    if not text.startswith(PREFIX):
+        fail("internal", "invalid reply framing")
+    body = text[len(PREFIX) :]
+    if not body.startswith("{") or not body.endswith("}"):
+        fail("internal", "invalid reply object")
+    try:
+        reply = decode_json(body)
+    except ValueError:
+        fail("internal", "malformed reply")
+    if not isinstance(reply, dict) or reply.get("v") != VERSION:
+        fail("internal", "wire version mismatch")
+    if "ok" not in reply or not isinstance(reply["ok"], bool):
+        fail("internal", "reply has no verdict")
+    if reply["ok"]:
+        return reply
+    err = reply.get("error")
+    if not isinstance(err, dict) or not isinstance(err.get("code"), str):
+        fail("internal", "malformed error")
+    fail(err["code"], str(err.get("message", err["code"])))
+
+
+def validate_words(words: list[str]) -> None:
+    for word in words:
+        if "\x00" in word:
+            fail("invalid-argument", "NUL in argument")
+        if word.isascii():
+            continue
+        # Python decodes argv with surrogateescape; a surrogate means the
+        # original bytes were not valid UTF-8.
+        if any(0xD800 <= ord(ch) <= 0xDFFF for ch in word):
+            fail("invalid-argument", "invalid UTF-8 in argument")
+
+
+def qs_environment() -> dict[str, str] | None:
+    if not any(key in os.environ for key in STRIP_ENV):
+        return None
+    env = os.environ.copy()
+    for key in STRIP_ENV:
+        env.pop(key, None)
+    return env
+
+
+def qs_instance(record: bytes) -> tuple[str, str, int, str]:
+    import _struct as struct
+    from _codecs import utf_16_be_decode
+
+    # InstanceInfo contains four QStrings, a QDateTime, a PID and a QString.
+    def read_string(offset: int) -> tuple[str, int]:
+        (size,) = struct.unpack_from(">I", record, offset)
+        start = offset + 4
+        if size == 0xFFFFFFFF:  # null QString
+            return "", start
+        end = start + size
+        if size % 2 or end > len(record):
+            raise ValueError("invalid QString")
+        return utf_16_be_decode(record[start:end], "strict", True)[0], end
+
+    instance, offset = read_string(0)
+    config, offset = read_string(offset)
+    _, offset = read_string(offset)  # shell ID
+    _, offset = read_string(offset)  # application ID
+    _, _, time_spec, pid = struct.unpack_from(">qIBi", record, offset)
+    if time_spec not in (0, 1):  # local time or UTC, without an extra timezone field
+        raise ValueError("unsupported QDateTime")
+    display, end = read_string(offset + struct.calcsize(">qIBi"))
+    if end != len(record):
+        raise ValueError("unexpected instance metadata")
+    return instance, config, pid, display
+
+
+def qs_path_id(config: str) -> str:
+    # Quickshell's path ID is a lookup hash. The built-in implementation
+    # avoids loading OpenSSL just to reproduce it.
+    config_bytes = config.encode("utf-8")
+    try:
+        from _md5 import md5  # pyright: ignore[reportMissingImports]
+    except ImportError:
+        from hashlib import md5
+
+        return md5(config_bytes, usedforsecurity=False).hexdigest()
+    return md5(config_bytes).hexdigest()
+
+
+def qs_display() -> str:
+    wayland = os.environ.get("WAYLAND_DISPLAY")
+    x11 = os.environ.get("DISPLAY")
+    return "wayland/" + wayland if wayland else "x11/" + x11 if x11 else "unk"
+
+
+def qs_cache_read(path: str | None) -> dict:
+    if path is None:
+        return {}
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            info = os.fstat(fd)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_uid != os.geteuid()
+                or info.st_mode & 0o077
+                or info.st_size > 4096
+            ):
+                return {}
+            raw = os.read(fd, 4096)
+        finally:
+            os.close(fd)
+        record = decode_json(raw.decode("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return record if isinstance(record, dict) and record.get("v") == 1 else {}
+
+
+def qs_cached_endpoint(runtime: str, config: str, record: dict) -> tuple[str, int] | None:
+    """Reuse an endpoint only while its PID, socket and instance still agree."""
+    pid = record.get("pid")
+    sock = record.get("socket")
+    instance = record.get("instance")
+    if (
+        not isinstance(pid, int)
+        or isinstance(pid, bool)
+        or pid <= 0
+        or pid > 0x7fffffff
+        or not isinstance(sock, str)
+        or not os.path.isabs(sock)
+        or not isinstance(instance, str)
+        or record.get("config") != config
+        or record.get("display") != qs_display()
+    ):
+        return None
+    base = os.path.join(runtime, "quickshell")
+    try:
+        os.kill(pid, 0)
+        if not stat.S_ISSOCK(os.stat(sock).st_mode):
+            return None
+        if os.readlink(os.path.join(base, "by-pid", str(pid))) != os.path.join(base, "by-id", instance):
+            return None
+    except (OSError, ValueError):
+        return None
+    return sock, pid
+
+
+def qs_cache_write(path: str | None, previous: dict, record: dict) -> None:
+    if path is None or record == previous:
+        return
+    import fcntl
+
+    directory = os.path.dirname(path)
+    temporary = os.path.join(directory, ".tmp-" + os.urandom(8).hex())
+    try:
+        lock = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            # Lock only writers. Readers see a full snapshot via atomic replace.
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if qs_cache_read(path) != previous:
+                return
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                with os.fdopen(fd, "wb") as output:
+                    output.write(compact_ascii(record).encode("ascii"))
+                os.replace(temporary, path)
+            finally:
+                try:
+                    os.unlink(temporary)
+                except FileNotFoundError:
+                    pass
+        finally:
+            os.close(lock)
+    except OSError:
+        pass
+
+
+def qs_cache_invalidate(path: str | None, record: dict) -> None:
+    # A stale endpoint says nothing about the verified Quickshell binary.
+    qs_cache_write(path, record, {"v": 1, "qs": record.get("qs")})
+
+
+def qs_endpoint(runtime: str, config: str, record: dict) -> tuple[str, int, bool] | None:
+    cached = qs_cached_endpoint(runtime, config, record)
+    if cached is not None:
+        return cached[0], cached[1], True
+
+    import _struct as struct
+    import fcntl
+
+    # Linux struct flock on x86-64 and AArch64. The query takes no lock.
+    flock = struct.Struct("@hhqqi4x")
+    query = flock.pack(fcntl.F_WRLCK, os.SEEK_SET, 0, 0, 0)
+    base = os.path.join(runtime, "quickshell")
+    display = qs_display()
+    path_id = qs_path_id(config)
+    endpoint = None
+    with os.scandir(os.path.join(base, "by-path", path_id)) as instances:
+        for entry in instances:
+            try:
+                fd = os.open(
+                    os.path.join(entry.path, "instance.lock"),
+                    os.O_RDONLY | os.O_NONBLOCK,
+                )
+            except (FileNotFoundError, NotADirectoryError):
+                continue
+            try:
+                lock = fcntl.fcntl(fd, fcntl.F_GETLK, query)
+                lock_type, _, _, _, owner = flock.unpack(lock)
+                if lock_type == fcntl.F_UNLCK:
+                    continue
+                instance, path, pid, connection = qs_instance(os.read(fd, 16384))
+            finally:
+                os.close(fd)
+            if connection != display:
+                continue
+            # Let qs select the oldest instance when more than one matches.
+            if (
+                endpoint is not None
+                or path != config
+                or pid != owner
+                or instance != entry.name
+            ):
+                return None
+            if (
+                not instance.isascii()
+                or not instance.isalnum()
+                or instance != instance.lower()
+            ):
+                return None
+            if pid <= 0:
+                return None
+            directory = os.path.join(base, "by-id", instance)
+            if not os.path.samefile(directory, entry.path):
+                return None
+            endpoint = (os.path.join(directory, "ipc.sock"), pid, False)
+    return endpoint
+
+
+def qs_binary_key(executable: os.stat_result) -> str:
+    identity = (
+        QS_VERSION.decode(),
+        executable.st_dev,
+        executable.st_ino,
+        executable.st_size,
+        executable.st_mtime_ns,
+        executable.st_ctime_ns,
+    )
+    return "-".join(map(str, identity))
+
+
+def qs_supports_direct(qs: str, executable: os.stat_result, deadline: float) -> bool | None:
+    import subprocess
+
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return None
+    try:
+        proc = subprocess.run(
+            [qs, "--version"],
+            env=qs_environment(),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=remaining,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    if proc.returncode != 0 or qs_binary_key(executable) != qs_binary_key(os.stat(qs)):
+        return None
+    return proc.stdout.split(maxsplit=2)[:2] == [b"Quickshell", QS_VERSION]
+
+
+def qs_cache_context(
+    qs: str, root: str
+) -> tuple[os.stat_result, str, str, str | None] | None:
+    if sys.platform != "linux" or sys.maxsize <= 0x7fffffff:
+        return None
+    if os.uname().machine not in ("x86_64", "aarch64"):
+        return None
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    if not os.path.isabs(runtime):
+        return None
+    config = os.path.abspath(os.path.join(root, "shell.qml"))
+    executable = os.stat(qs)
+    runtime = os.path.realpath(runtime)
+    for project in (
+        os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+        os.path.dirname(os.path.realpath(root)),
+    ):
+        if os.path.commonpath((runtime, project)) == project:
+            return None
+    info = os.stat(runtime)
+    if (
+        info.st_uid != os.geteuid()
+        or info.st_mode & 0o077
+        or not stat.S_ISDIR(info.st_mode)
+    ):
+        return None
+    if not os.path.isfile(config):
+        return None
+    directory = _cache_dir(runtime)
+    cache_path = os.path.join(directory, qs_path_id(config) + ".json") if directory else None
+    return executable, runtime, config, cache_path
+
+
+def qs_cached_verdict(key: str, record: dict) -> dict | None:
+    verdict = record.get("qs")
+    if (
+        isinstance(verdict, dict)
+        and verdict.get("key") == key
+        and isinstance(verdict.get("supported"), bool)
+    ):
+        return verdict
+    return None
+
+
+def qs_is_elf(qs: str, key: str) -> bool:
+    # Keep PATH wrappers on their normal entry point. Check the opened file
+    # against the stat identity used for the verdict.
+    fd = os.open(qs, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        return (
+            stat.S_ISREG(info.st_mode)
+            and qs_binary_key(info) == key
+            and os.read(fd, 4) == b"\x7fELF"
+        )
+    finally:
+        os.close(fd)
+
+
+def qs_probe_verdict(qs: str, executable: os.stat_result, deadline: float, key: str) -> dict | None:
+    supported = qs_supports_direct(qs, executable, deadline)
+    return None if supported is None else {"key": key, "supported": supported}
+
+
+def qs_direct(
+    qs: str, root: str, target: str, verb: str, args: tuple[str, ...], deadline: float
+) -> str | None:
+    """Return None only if it is safe to fall back to the qs CLI."""
+    # Preserve the native client's single-argument limit.
+    if args and len(args[0]) >= os.sysconf("SC_PAGE_SIZE") * 32:
+        return None
+    import struct
+
+    try:
+        context = qs_cache_context(qs, root)
+        if context is None:
+            return None
+        executable, runtime, config, cache_path = context
+        previous = qs_cache_read(cache_path)
+        key = qs_binary_key(executable)
+        verdict = qs_cached_verdict(key, previous)
+        if verdict is not None:
+            if not verdict["supported"]:
+                return None
+        elif not qs_is_elf(qs, key):
+            return None
+        endpoint = qs_endpoint(runtime, config, previous)
+        if endpoint is None:
+            return None
+        path, pid, cached = endpoint
+        if not os.path.samestat(executable, os.stat(f"/proc/{pid}/exe")):
+            if cached:
+                qs_cache_invalidate(cache_path, previous)
+            return None
+        if verdict is None:
+            verdict = qs_probe_verdict(qs, executable, deadline, key)
+            if verdict is None:
+                return None
+        # A cache hit has already passed the binary, config and display checks.
+        record = previous if cached and verdict is previous.get("qs") else {
+            "v": 1,
+            "pid": pid,
+            "socket": path,
+            "instance": os.path.basename(os.path.dirname(path)),
+            "config": config,
+            "display": qs_display(),
+            "qs": verdict,
+        }
+        if not verdict["supported"]:
+            qs_cache_write(cache_path, previous, record)
+            return None
+    except (OSError, ValueError, struct.error):
+        return None
+
+    def remaining() -> float:
+        timeout = deadline - time.monotonic()
+        if timeout <= 0:
+            raise TimeoutError
+        return timeout
+
+    import _socket as socket
+    from _codecs import utf_16_be_decode, utf_16_be_encode
+
+    def read_exact(conn: socket.socket, size: int, first: bytes = b"") -> bytes:
+        data = first
+        if not data and size:
+            conn.settimeout(remaining())
+            data = conn.recv(min(size, QS_MAX_REPLY))
+            if not data:
+                fail("internal", "incomplete transport reply")
+        if len(data) == size:
+            return data
+        data = bytearray(data)
+        while len(data) < size:
+            conn.settimeout(remaining())
+            chunk = conn.recv(min(size - len(data), QS_MAX_REPLY))
+            if not chunk:
+                fail("internal", "incomplete transport reply")
+            data.extend(chunk)
+        return bytes(data)
+
+    def qstring(text: str) -> bytes:
+        data, _ = utf_16_be_encode(text)
+        return struct.pack(">I", len(data)) + data
+
+    # StringCallCommand = target, function, QVector<QString>.
+    frame = b"".join((
+        QS_CALL, qstring(target), qstring(verb), struct.pack(">I", len(args)),
+        *(qstring(arg) for arg in args),
+    ))
+    try:
+        conn = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    except OSError:
+        return None
+    try:
+        try:
+            conn.settimeout(remaining())
+            conn.connect(path)
+            creds = conn.getsockopt(
+                socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i")
+            )
+            peer, uid, _ = struct.unpack("3i", creds)
+            if peer != pid or uid != os.geteuid():
+                if cached:
+                    qs_cache_invalidate(cache_path, previous)
+                return None
+        except OSError:
+            if cached:
+                qs_cache_invalidate(cache_path, previous)
+            return None
+        qs_cache_write(cache_path, previous, record)
+        # A partial write or a lost reply can follow a successful side effect.
+        try:
+            conn.settimeout(remaining())
+            conn.sendall(frame)
+            # Small replies often arrive with their header in the same chunk.
+            conn.settimeout(remaining())
+            first = conn.recv(8192)
+            if not first:
+                fail("internal", "incomplete transport reply")
+            status = first[:1]
+            if status in QS_CALL_ERRORS:
+                return QS_CALL_ERRORS[status]
+            if status != QS_COMPLETED:
+                fail("internal", "invalid reply framing")
+            is_void, size = struct.unpack(">BI", read_exact(conn, 5, first[1:6]))
+            if is_void:
+                fail("internal", "invalid reply framing")
+            if size == 0xFFFFFFFF:  # null QString
+                return ""
+            if size % 2 or (target == "shell" and size > QS_MAX_REPLY):
+                fail("internal", "invalid reply framing")
+            data = read_exact(conn, size, first[6 : 6 + size])
+            return utf_16_be_decode(data, "strict", True)[0]
+        except TimeoutError:
+            qs_cache_invalidate(cache_path, record)
+            fail("timeout", "trip timed out")
+        except OSError:
+            qs_cache_invalidate(cache_path, record)
+            fail("internal", "transport failure")
+    finally:
+        conn.close()
+
+
+def find_program(name: str) -> str | None:
+    # Both callers pass a bare command name on POSIX. An empty PATH has no
+    # matches, while empty entries within a nonempty PATH denote cwd.
+    if os.environ.get("PATH") == "":
+        return None
+    search = os.get_exec_path()
+    if "PATH" not in os.environ:
+        try:
+            search = (os.confstr("CS_PATH") or os.defpath).split(os.pathsep)
+        except (AttributeError, ValueError):
+            pass
+    for directory in search:
+        path = os.path.join(directory, name)
+        if os.access(path, os.X_OK) and not os.path.isdir(path):
+            return path
+    return None
+
+
+class Client:
+    def __init__(self, root: str, verbose: bool, json_mode: bool):
+        self.root = root
+        self.verbose = verbose
+        self.json_mode = json_mode
+        self.qs = find_program("qs")
+        self.deadline = time.monotonic() + TOTAL_TIMEOUT
+
+    def _trace(self, path: str, started: float) -> None:
+        # Text mode reports only the path and duration: never inputs, wire
+        # messages or content. JSON mode has no non-diagnostic stderr output.
+        if self.verbose and not self.json_mode:
+            ms = int((time.monotonic() - started) * 1000)
+            print(f"vb-shell: {path} {ms}ms", file=sys.stderr)
+
+    def _exchange(
+        self, target: str, verb: str, args: tuple[str, ...], *, native: bool = False
+    ) -> str:
+        if self.qs is None:
+            fail("unavailable", "qs is not on PATH")
+        started = time.monotonic()
+        if started >= self.deadline:
+            fail("timeout", "overall deadline exceeded")
+        trip_deadline = min(self.deadline, started + TRIP_TIMEOUT)
+        text = qs_direct(self.qs, self.root, target, verb, args, trip_deadline)
+        if text is None:
+            import subprocess
+
+            remaining = trip_deadline - time.monotonic()
+            if remaining <= 0:
+                fail("timeout", "trip timed out")
+            try:
+                proc = subprocess.run(
+                    [self.qs, "-p", self.root, "ipc", "call", target, verb, *args],
+                    env=qs_environment(),
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    timeout=remaining,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired:
+                fail("timeout", "trip timed out")
+            self._trace(f"ipc call {target} {verb}", started)
+            text = proc.stdout.decode("utf-8", "strict").removesuffix("\n")
+            if proc.returncode != 0 and text.startswith('No running instances for "'):
+                fail("unavailable", NO_QUICKSHELL)
+            if native and proc.returncode != 0:
+                fail("internal", "native transport failure")
+        else:
+            self._trace(f"ipc call {target} {verb} (socket)", started)
+        return text
+
+    def native(self, verb: str) -> str:
+        """Read a fixed log method, which returns plain text outside the v1 envelope."""
+        text = self._exchange("log", verb, (), native=True)
+        if text in SENTINELS:
+            fail("internal", "native transport failure")
+        return text
+
+    def call(self, kind: str, request: dict) -> dict:
+        if self.qs is None:
+            fail("unavailable", "qs is not on PATH")
+        validate_words(request.get("argv") or request.get("path") or [])
+        return decode_reply(self._exchange("shell", kind, (envelope(request),)))
+
+    def collect(self, kind: str, request: dict) -> list[dict]:
+        """Collect every page before printing. No partial output on failure."""
+        reply = self.call(kind, request)
+        pages: list[dict] = []
+        seen: set[str] = set()
+        while True:
+            pages.append(reply)
+            nxt = reply.get("next")
+            if not isinstance(nxt, dict) or not nxt.get("cursor"):
+                break
+            cursor = nxt["cursor"]
+            if not isinstance(cursor, str) or cursor in seen:
+                fail("stale", "repeated cursor")
+            seen.add(cursor)
+            reply = self.call(kind, {"v": VERSION, "kind": "next", "cursor": cursor})
+        return pages
+
+
+# --- terminal cells ---------------------------------------------------------
+
+
+_CONTROL_ESCAPES = {code: f"\\x{code:02x}" for code in (*range(32), 127)}
+_CONTROL_ESCAPES.update({10: "\\n", 9: "\\t", 13: "\\r"})
+
+
+def display(text: str) -> str:
+    """Escape controls before any width measurement or output."""
+    return text if text.isprintable() else text.translate(_CONTROL_ESCAPES)
+
+
+def cells(text: str) -> int:
+    """Terminal cells for one already-escaped string, using only the stdlib.
+
+    Combining and format marks occupy no cell, East Asian W/F characters take
+    two, and everything else takes one. Width is measured after control
+    characters have been escaped by display().
+    """
+    text = display(text)
+    if text.isascii():
+        return len(text)
+
+    import unicodedata
+
+    total = 0
+    for ch in text:
+        category = unicodedata.category(ch)
+        if unicodedata.combining(ch) or category in ("Mn", "Me", "Cf"):
+            continue
+        total += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+    return total
+
+
+# --- vb-shell deferred help ---
+
+def wrap(
+    text: str,
+    budget: int = DESCRIPTION_WIDTH,
+    first: str = "",
+    later: str | None = None,
+) -> list[str]:
+    """Wrap prose to `budget` description cells, never splitting a token.
+
+    The prefix is a label column, not part of the budget: every rendered line
+    carries up to `budget` cells of description text after its prefix.
+    """
+    if later is None:
+        later = first
+    words = display(text).split()
+    if not words:
+        return []
+    lines: list[str] = []
+    current = first
+    used = 0
+    for word in words:
+        w = cells(word)
+        if used and used + 1 + w > budget:
+            lines.append(current.rstrip())
+            current = later + word
+            used = w
+            continue
+        if used:
+            if not current.endswith(" "):
+                current += " "
+                used += 1
+            current += word
+            used += w
+        else:
+            current += word
+            used = w
+    lines.append(current.rstrip())
+    return lines
+
+
+def section(out: list[str], heading: str, lines: list[str]) -> None:
+    if not lines:
+        return
+    if out:
+        out.append("")
+    if heading:
+        out.append(heading)
+    out.extend(lines)
+
+
+def align_placeholders(labels: list[str]) -> list[str]:
+    """Align the option column of a help command table.
+
+    Every label with literal words contributes to the widest prefix - including
+    a label with no placeholder, whose whole text is its prefix. Each such
+    label is padded to that width before its first `<...>`/`[...]` token (or,
+    for a bare command, at the end). A label that begins with a placeholder is
+    a standalone pattern, not an argument of the command above it, so it stays
+    at the left and does not set the column width. Tokens and their order are
+    untouched; only spaces are inserted.
+    """
+    split: list[tuple[str, str]] = []
+    for label in labels:
+        starts = [p for p in (label.find("<"), label.find("[")) if p >= 0]
+        if starts:
+            at = min(starts)
+            split.append((label[:at], label[at:]))
+        else:
+            split.append((label, ""))
+    if not split:
+        return labels
+    widest = max((cells(prefix) for prefix, _rest in split if prefix), default=0)
+    return [
+        prefix + " " * (widest - cells(prefix)) + rest if prefix else rest
+        for prefix, rest in split
+    ]
+
+
+def table_lines(rows: list[tuple[str, str]], desc_col: int | None = None) -> list[str]:
+    if not rows:
+        return []
+    labels = [(display(label), display(desc)) for label, desc in rows]
+    longest = max(cells(label) for label, _ in labels)
+    if desc_col is None:
+        desc_col = 2 + longest + 2
+    # Fixed condition: the label column must leave at least 24 cells of the
+    # 80-cell description budget, otherwise descriptions go below their labels.
+    if DESCRIPTION_WIDTH - desc_col < 24:
+        out: list[str] = []
+        for label, desc in labels:
+            out.append("  " + label)
+            out.extend(wrap(desc, DESCRIPTION_WIDTH, "    "))
+        return out
+    lines: list[str] = []
+    for label, desc in labels:
+        head = "  " + label
+        head += " " * (desc_col - cells(head))
+        if not desc:
+            lines.append(head.rstrip())
+            continue
+        wrapped = wrap(desc, DESCRIPTION_WIDTH, head, " " * desc_col)
+        lines.extend(x.rstrip() for x in wrapped)
+    return lines
+
+
+# --- help rendering ---------------------------------------------------------
+
+LOCAL_GUIDE = {
+    "usage": [
+        "Usage: vb-shell [OPTIONS] <target> [command] [args...]",
+        "       vb-shell help [path...]",
+    ],
+    "summary": "Discover and operate the Vibranium shell through its public IPC surface.",
+    "arguments": [],
+    "options": [
+        {"label": "-l, --list", "text": "List public targets once."},
+        {"label": "-j, --json", "text": "Emit typed JSON instead of text."},
+        {"label": "-v, --verbose", "text": "Report the transport path and duration."},
+        {"label": "-h, --help", "text": "Show this local guide."},
+        {"label": "--warm-cache", "text": "Prepare the bytecode and IPC caches. Use on its own."},
+    ],
+    "commands": [],
+    "notes": [
+        "Global options are accepted only before the first path word.",
+        "A standalone -- ends option recognition; after a path it marks the rest literal.",
+    ],
 }
 
-while (($# > 0)); do
-  case "$1" in
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -l | --list)
-      _vb_shell_list
-      exit "$?"
-      ;;
-    -v | --verbose)
-      export VERBOSE=true
-      shift
-      ;;
-    --)
-      # Treat every remaining token as IPC data rather than a vb-shell option.
-      SEEN_DASHDASH=true
-      shift
-      break
-      ;;
-    -*)
-      log Error "Unknown option: $1"
-      log Error "Try '$SELF --help' for more information"
-      exit 1
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
 
-# IPC targets are positional, so option parsing ends at the first target and
-# leaves all remaining tokens for quickshell.
-if (($# == 0)); then
-  usage
-  exit 1
-fi
+def descriptor_from_pages(pages: list[dict]) -> tuple[dict, list[dict]]:
+    meta = pages[0].get("data", {}).get("meta") or {}
+    items: list[dict] = []
+    for page in pages:
+        data = page.get("data")
+        if isinstance(data, dict):
+            items.extend(data.get("items") or [])
+    return meta, items
 
-# Bare `help` is the general listing, answered by the live shell. An explicit
-# `--` keeps it an IPC target name instead.
-#
-# shell and log keep a parameterless help (the units listing and the prose
-# doc), so they are called with no query; every other unit takes one.
-if ! $SEEN_DASHDASH && [[ "$1" == "help" ]]; then
-  shift
-  if (($# == 0)); then
-    set -- shell help
-  else
-    target="$1"
-    shift
-    if [[ "$target" == shell || "$target" == log ]]; then
-      set -- "$target" help "$@"
-    elif (($# == 0)); then
-      set -- "$target" help ""
-    else
-      set -- "$target" help "$@"
-    fi
-  fi
-fi
 
-# help() takes one command name. A bare `help` arrives with none, so the
-# empty query (the full block) is passed explicitly; anything longer is a
-# usage error rather than an IPC call.
-if ! $SEEN_DASHDASH && [[ "${2:-}" == "help" && $# -gt 3 ]]; then
-  log Error "Too many arguments for help: '$*'"
-  log Error "Try '$SELF --help' for more information"
-  exit 1
-fi
-if ! $SEEN_DASHDASH && [[ "${2:-}" == "help" && $# -eq 2 && "$1" != shell && "$1" != log ]]; then
-  set -- "$1" help ""
-fi
+def json_descriptor(meta: dict, commands: list[dict]) -> dict:
+    return {
+        "path": meta.get("path") or [],
+        "usage": meta.get("usage") or "",
+        "summary": meta.get("summary") or "",
+        "arguments": meta.get("arguments") or [],
+        "options": meta.get("options") or [],
+        "commands": commands,
+        "output": meta.get("output"),
+        "notes": meta.get("notes") or [],
+        "examples": meta.get("examples") or [],
+    }
 
-log Info "ipc call $*"
-# exec replaces this wrapper so quickshell's status, signals, and process
-# lifetime are the command's direct result.
-exec qs "${QS_ARGS[@]}" ipc call "$@"
+
+def words_usage(words: list[object]) -> str:
+    parts: list[str] = []
+    for word in words:
+        if isinstance(word, str):
+            parts.append(word)
+        elif isinstance(word, dict) and isinstance(word.get("optional"), list):
+            inner = []
+            for w in word["optional"]:
+                inner.append(
+                    "<" + w.get("name", "ARG") + ">" if isinstance(w, dict) else str(w)
+                )
+            parts.append("[" + " ".join(inner) + "]")
+        elif isinstance(word, dict):
+            atom = "<" + word.get("name", "ARG") + ">"
+            parts.append(
+                "[<" + word.get("name", "ARG") + ">...]" if word.get("repeat") else atom
+            )
+    return " ".join(parts)
+
+
+def literal_command_usage(usage: str) -> str:
+    """General pages name controllers/verbs only, never argument tokens."""
+    return " ".join(
+        token for token in str(usage).split()
+        if not token.startswith("<") and not token.startswith("[")
+    )
+
+
+def descriptor_with_options(desc: dict) -> dict:
+    """Append `[OPTS]` to a descriptor usage when it declares options."""
+    out = dict(desc)
+    args = out.get("arguments") or []
+    has_options = bool(out.get("options")) or any(
+        isinstance(a, dict) and a.get("optional") is True for a in args
+    )
+    usage = str(out.get("usage") or "")
+    if has_options and usage:
+        lines = usage.splitlines()
+        if lines and not lines[0].rstrip().endswith("[OPTS]"):
+            lines[0] = lines[0].rstrip() + " [OPTS]"
+            out["usage"] = "\n".join(lines)
+    return out
+
+
+def argument_usage(arg: dict) -> str:
+    if isinstance(arg, dict) and arg.get("label"):
+        return str(arg["label"])
+    atom = "<" + str(arg.get("name", "ARG")) + ">"
+    if arg.get("repeat"):
+        return "[<" + str(arg.get("name", "ARG")) + ">...]"
+    if arg.get("optional"):
+        return "[" + atom + "]"
+    return atom
+
+
+def render_descriptor(desc: dict, literal_notes: list[str] | None = None) -> str:
+    desc = descriptor_with_options(desc)
+    out: list[str] = []
+    usage = str(desc.get("usage") or "vb-shell")
+    # Alternate forms are already aligned by the server; keep them verbatim.
+    lines = str(usage).splitlines()
+    if lines and not lines[0].startswith("Usage:"):
+        lines[0] = "Usage: " + lines[0]
+    out.extend(lines)
+    section(
+        out,
+        "",
+        [display(str(desc.get("summary") or ""))]
+        if desc.get("summary")
+        else [],
+    )
+
+    args = desc.get("arguments") or []
+    arg_lines = table_lines(
+        [
+            (
+                argument_usage(a) if isinstance(a, dict) else str(a),
+                str(a.get("summary") or a.get("description") or "")
+                if isinstance(a, dict)
+                else "",
+            )
+            for a in args
+        ]
+    )
+    # `Usage:` already names every placeholder. Keep the block only when an
+    # argument has prose of its own; an undocumented <KEY> row adds nothing.
+    if any(
+        isinstance(a, dict) and str(a.get("summary") or a.get("description") or "").strip()
+        for a in args
+    ):
+        section(out, "Arguments:", arg_lines)
+
+    opts = desc.get("options") or []
+    opt_lines = table_lines(
+        [
+            (
+                str(o.get("label") or o.get("name") or "")
+                if isinstance(o, dict)
+                else str(o),
+                str(o.get("summary") or o.get("description") or o.get("text") or "")
+                if isinstance(o, dict)
+                else "",
+            )
+            for o in opts
+        ]
+    )
+    section(out, "Options:", opt_lines)
+
+    commands = desc.get("commands") or []
+    desc_path = desc.get("path")
+    if desc_path is None:
+        general_page = len(str(desc.get("usage") or "").split()) <= 2
+    else:
+        # ["help"] is a synthetic marker for help-kind data replies, not a
+        # target root; those pages keep their scoped/leaf placeholders.
+        general_page = len(desc_path) <= 1 and desc_path != ["help"]
+    cmd_usages = [
+        (
+            c.get("literal") or literal_command_usage(c.get("usage") or "")
+            if general_page
+            else str(c.get("usage") or "")
+        )
+        for c in commands
+    ]
+    cmd_labels = align_placeholders(cmd_usages)
+    cmd_lines = table_lines(
+        [
+            (
+                label,
+                str(c.get("summary") or ""),
+            )
+            for label, c in zip(cmd_labels, commands)
+        ]
+    )
+    section(out, "Commands:" if desc.get("path") else "Targets:", cmd_lines)
+
+    output = desc.get("output")
+    # `Output:` is prose for raw JSON payload queries only. Actions, scalars,
+    # text and help pages keep their structured metadata in JSON/catalog, but
+    # must not print a noisy text section.
+    if isinstance(output, dict) and output.get("kind") in ("value", "record", "table"):
+        text = output.get("summary") or ""
+        section(
+            out,
+            "Output:",
+            wrap(str(text), DESCRIPTION_WIDTH, "  "),
+        )
+
+    notes = desc.get("notes") or []
+    note_lines: list[str] = []
+    for note in notes:
+        note_lines.extend(
+            wrap(str(note), DESCRIPTION_WIDTH, "  ")
+        )
+    # Native prose appended verbatim (log help) is not a general description.
+    for note in literal_notes or []:
+        note_lines.extend(wrap(str(note), DESCRIPTION_WIDTH, "  "))
+    examples = desc.get("examples") or []
+    # A target root never prints an Examples section. The section is for a
+    # command's own authored samples, not for repeating the invocation.
+    desc_path = desc.get("path") or []
+    if len(desc_path) <= 1 and desc_path != ["help"]:
+        examples = []
+    example_lines = ["  " + str(e) for e in examples]
+    # The exact `app` snapshot puts Examples before Notes. Every other page
+    # keeps the shared layout order; this is a property of that one page,
+    # not a global renderer switch.
+    if desc.get("path") == ["app"]:
+        section(out, "Examples:", example_lines)
+        section(out, "Notes:", note_lines)
+    else:
+        section(out, "Notes:", note_lines)
+        section(out, "Examples:", example_lines)
+    text = "\n".join(x.rstrip() for x in out).strip("\n")
+    return text + "\n" if text else ""
+
+
+def render_local_guide(json_mode: bool) -> str:
+    if json_mode:
+        return compact_ascii(LOCAL_GUIDE) + "\n"
+    out: list[str] = list(LOCAL_GUIDE["usage"])
+    section(out, "", [LOCAL_GUIDE["summary"]])
+    section(
+        out,
+        "Options:",
+        table_lines([(o["label"], o["text"]) for o in LOCAL_GUIDE["options"]]),
+    )
+    section(
+        out,
+        "Notes:",
+        [
+            line
+            for n in LOCAL_GUIDE["notes"]
+            for line in wrap(n, DESCRIPTION_WIDTH, "  ")
+        ],
+    )
+    return "\n".join(x.rstrip() for x in out).strip("\n") + "\n"
+
+
+def render_index(pages: list[dict], json_mode: bool, root: bool) -> str:
+    meta, items = descriptor_from_pages(pages)
+    common = meta.get("common") or []
+    if json_mode:
+        targets = [
+            {"id": t.get("id"), "title": t.get("title"), "summary": t.get("summary")}
+            for t in items
+        ]
+        payload = {"common": common, "targets": targets}
+        if root:
+            payload = dict(
+                payload, usage=LOCAL_GUIDE["usage"], summary=LOCAL_GUIDE["summary"]
+            )
+        return compact_ascii(payload) + "\n"
+    out: list[str] = []
+    if root:
+        out.extend(LOCAL_GUIDE["usage"])
+        section(out, "", [LOCAL_GUIDE["summary"]])
+    else:
+        out.append("Usage: vb-shell [OPTIONS] <target> [command] [args...]")
+    preamble = ["Use status, ping and help [path...] on every target"]
+    section(out, "", [line for p in preamble for line in wrap(p, DESCRIPTION_WIDTH)])
+    # One global description column for the whole index: target rows and
+    # their child commands are measured together, then rendered per target so
+    # exactly one blank line separates the groups.
+    groups: list[list[tuple[str, str]]] = []
+    all_rows: list[tuple[str, str]] = []
+    for t in items:
+        group: list[tuple[str, str]] = []
+        rows = [
+            (
+                display(str(t.get("id"))),
+                str(t.get("summary") or ""),
+            )
+        ]
+        # The router projects literal signatures from catalog words. Render
+        # them verbatim: the index never scrubs generated usage strings.
+        literals = t.get("literals") or []
+        summaries = t.get("summaries") or []
+        child_labels = align_placeholders(
+            ["  " + display(sig) for sig in literals]
+        )
+        for index, label in enumerate(child_labels):
+            summary = summaries[index] if index < len(summaries) else ""
+            rows.append((label, str(summary)))
+        group.extend(rows)
+        all_rows.extend(rows)
+        groups.append(group)
+    desc_col = 2 + max((cells(label) for label, _ in all_rows), default=0) + 2
+    rendered = [table_lines(group, desc_col) for group in groups]
+    body = "\n\n".join("\n".join(block) for block in rendered if block)
+    section(out, "Targets:", body.splitlines())
+    return "\n".join(x.rstrip() for x in out).strip("\n") + "\n"
+
+
+# --- vb-shell core resumes ---
+
+def load_help_rendering() -> None:
+    loader = globals().pop("_help_loader", None)
+    if loader is not None:
+        loader()
+
+
+def render_scalar(value: object) -> str:
+    if value is None:
+        return "none"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return display(value)
+    if isinstance(value, float):
+        return repr(value)
+    return str(value)
+
+
+def render_nested(
+    value: object, indent: int, out: list[str], *, sort_keys: bool
+) -> None:
+    pad = " " * indent
+    if isinstance(value, dict):
+        keys = sorted(value.keys()) if sort_keys else list(value.keys())
+        if not keys:
+            out.append(pad + "(empty)")
+            return
+        for key in keys:
+            child = value[key]
+            if isinstance(child, (dict, list)) and child:
+                out.append(pad + display(str(key)) + ":")
+                render_nested(child, indent + 2, out, sort_keys=sort_keys)
+            else:
+                out.append(pad + display(str(key)) + ": " + render_scalar(child))
+        return
+    if isinstance(value, list):
+        if not value:
+            out.append(pad + "No entries.")
+            return
+        for child in value:
+            if isinstance(child, (dict, list)) and child:
+                out.append(pad + "-")
+                render_nested(child, indent + 2, out, sort_keys=sort_keys)
+            else:
+                out.append(pad + "- " + render_scalar(child))
+        return
+    out.append(pad + render_scalar(value))
+
+
+def render_table(items: list[object], columns: list[dict] | None) -> str:
+    if not items:
+        return "No entries.\n"
+    headings = [str(c.get("heading") or c.get("key")) for c in (columns or [])]
+    keys = [str(c.get("key")) for c in (columns or [])]
+    if not headings and isinstance(items[0], dict):
+        keys = list(items[0].keys())
+        headings = keys
+    rows = [
+        [
+            display(str(row.get(key))) if isinstance(row, dict) else display(str(row))
+            for key in keys
+        ]
+        for row in items
+    ]
+    widths = [
+        max(cells(h), *(cells(r[i]) for r in rows)) for i, h in enumerate(headings)
+    ]
+
+    def padded(text: str, width: int) -> str:
+        # ljust() counts code points; CJK, emoji and combining marks need the
+        # client's cell width so every separator lands in the same column.
+        return text + " " * max(0, width - cells(text))
+
+    header = " | ".join(padded(h, widths[i]) for i, h in enumerate(headings)).rstrip()
+    # One dashed line spanning the visible header, with '+' at the same
+    # column boundaries as ' | ' and '-' for every cell.
+    separator = "-+-".join("-" * cells(part) for part in header.split(" | "))
+    lines = [header, separator]
+    for row in rows:
+        lines.append(
+            " | ".join(padded(cell, widths[i]) for i, cell in enumerate(row)).rstrip()
+        )
+    return "\n".join(line.rstrip() for line in lines) + "\n"
+
+
+def _without_state(value: object) -> object:
+    """Drop `state` everywhere; exit status, not a label, is success."""
+    if isinstance(value, dict):
+        return {k: _without_state(v) for k, v in value.items() if k != "state"}
+    if isinstance(value, list):
+        return [_without_state(v) for v in value]
+    return value
+
+
+def render_data(payload: dict, fmt: dict | None, json_mode: bool) -> str:
+    fmt = fmt or {}
+    kind = fmt.get("kind")
+    if "data" not in payload or (kind == "none" and not json_mode):
+        return ""
+    data = _without_state(payload["data"])
+    if isinstance(data, dict) and not data:
+        return ""
+    if kind == "help" and isinstance(data, dict):
+        load_help_rendering()
+        data = descriptor_with_options(data)
+    if kind == "usage" and isinstance(data, dict):
+        usage = str(data.get("usage") or "")
+        if not usage.startswith("Usage:"):
+            usage = "Usage: " + usage
+        return usage + "\n"
+    # An empty text reply is silence in both modes, not a blank line or `""`.
+    # Action rows already drop their data; this keeps a query with nothing to
+    # say from printing anyway.
+    if kind == "text" and data == "":
+        return ""
+    if json_mode:
+        return compact_ascii(data) + "\n"
+    if kind == "help" and isinstance(data, dict):
+        # A help-kind result is the same canonical descriptor a `describe`
+        # reply pages, so it gets the same layout. Commands, not targets,
+        # are the table heading: the descriptor names its own `path`.
+        desc = dict(data)
+        if not desc.get("path"):
+            desc["path"] = ["help"]
+        return render_descriptor(desc)
+    if kind == "text":
+        return display(str(data)) + "\n"
+    if kind == "bool" or kind == "number":
+        return render_scalar(data) + "\n"
+    if kind == "lines" and isinstance(data, list):
+        return "\n".join(display(str(item)) for item in data) + "\n"
+    if kind == "table" and isinstance(data, list):
+        return render_table(data, fmt.get("columns"))
+    if kind == "record" and isinstance(data, dict):
+        out: list[str] = []
+        render_nested(data, 0, out, sort_keys=False)
+        return "\n".join(line.rstrip() for line in out) + "\n"
+    out: list[str] = []
+    render_nested(data, 0, out, sort_keys=True)
+    return "\n".join(line.rstrip() for line in out) + "\n"
+
+
+# --- client-owned stream routes --------------------------------------------
+
+
+def log_route(client: Client, words: list[str], json_mode: bool) -> str:
+    verb = words[1]
+    if verb == "help":
+        load_help_rendering()
+        pages = client.collect(
+            "describe", {"v": VERSION, "kind": "help", "path": ["log"]}
+        )
+        meta, commands = descriptor_from_pages(pages)
+        canonical = descriptor_with_options(json_descriptor(meta, commands))
+        prose = client.native("help")
+        prose_lines = [line for line in prose.splitlines() if line.strip()]
+        desc = dict(canonical)
+        desc["notes"] = list(canonical["notes"]) + prose_lines
+        if json_mode:
+            return compact_ascii(desc) + "\n"
+        return render_descriptor(canonical, literal_notes=prose_lines)
+    try:
+        data = decode_json(client.native("status"))
+    except ValueError:
+        fail("internal", "invalid status reply")
+    if verb == "ping":
+        if not isinstance(data, dict):
+            fail("internal", "invalid status reply")
+        payload = {"data": "pong", "format": {"kind": "text"}}
+    elif verb == "status":
+        if not isinstance(data, dict):
+            fail("internal", "invalid status reply")
+        payload = {"data": data, "format": {"kind": "value"}}
+    else:
+        fail("unknown-command", "no such log command")
+    return render_data(payload, payload["format"], json_mode)
+
+
+def _clipboard_ping(client: Client) -> None:
+    """Confirm the selected shell's clipboard service before writing."""
+    try:
+        client.collect(
+            "invoke",
+            {
+                "v": VERSION,
+                "kind": "call",
+                "argv": ["clipboard", "ping"],
+                "literalFrom": None,
+            },
+        )
+    except IpcError as err:
+        if err.code == "unavailable" and err.message == NO_QUICKSHELL:
+            raise
+        fail("unavailable", "clipboard service is unavailable")
+
+
+def _copy_stdin(limit: int = COPY_STDIN_MAX) -> bytes:
+    data = sys.stdin.buffer.read(limit + 1)
+    if len(data) > limit:
+        fail("oversize", "clipboard payload is too large")
+    return data
+
+
+def _wl_write(mime: str, payload: bytes) -> None:
+    import subprocess
+
+    writer = find_program("wl-copy")
+    if writer is None:
+        fail("unavailable", "clipboard writer is not installed")
+    try:
+        proc = subprocess.Popen(
+            [writer, "--type", mime],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=qs_environment(),
+        )
+    except OSError:
+        fail("backend", "clipboard writer could not start")
+    try:
+        # communicate covers the write AND the wait, so a child that never
+        # drains stdin cannot outlive the five-second deadline. Both streams
+        # are discarded: neither bytes nor diagnostics reach this client.
+        proc.communicate(input=payload, timeout=COPY_DEADLINE)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        fail("timeout", "clipboard writer timed out")
+    except (BrokenPipeError, OSError):
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        fail("backend", "clipboard writer refused the payload")
+    if proc.returncode != 0:
+        fail("backend", "clipboard write failed")
+
+
+def clipboard_copy(client: Client, words: list[str], literal_from: int | None) -> None:
+    """Exact `clipboard copy ...` client route. No payload on the wire."""
+    # Shape first: a malformed command fails locally without contacting the
+    # shell. Only accepted forms go on to confirm `clipboard ping`.
+    shape = (len(words) == 4 and words[2] in ("text", "uri", "file")) or (
+        len(words) == 5
+        and words[2] == "image"
+        and words[3] in COPY_IMAGE_MIMES
+        and words[4] == "-"
+    )
+    if not shape:
+        fail("usage", "no such clipboard copy form")
+    _clipboard_ping(client)
+    if len(words) == 4 and words[2] == "text":
+        token = words[3]
+        literal = literal_from is not None and 3 >= literal_from
+        if token == "-" and not literal:
+            try:
+                text = _copy_stdin().decode("utf-8", "strict")
+            except UnicodeError:
+                fail("invalid-argument", "stdin is not valid UTF-8")
+        else:
+            text = token
+        _wl_write("text/plain;charset=utf-8", text.encode("utf-8"))
+        return
+    if len(words) == 4 and words[2] == "uri":
+        import re
+
+        uri = words[3]
+        if (
+            not re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", uri)
+            or any(ch in uri for ch in "\r\n\x00 ")
+            or uri == ""
+        ):
+            fail("invalid-argument", "not an absolute URI")
+        _wl_write("text/uri-list", (uri + "\r\n").encode("utf-8"))
+        return
+    if len(words) == 4 and words[2] == "file":
+        from pathlib import Path
+
+        try:
+            resolved = Path(words[3]).resolve(strict=True)
+        except (OSError, RuntimeError):
+            fail("invalid-argument", "path does not exist")
+        if not resolved.is_file() and not resolved.is_dir():
+            fail("invalid-argument", "path is not a file or directory")
+        _wl_write("text/uri-list", (resolved.as_uri() + "\r\n").encode("utf-8"))
+        return
+    if (
+        len(words) == 5
+        and words[2] == "image"
+        and words[3] in COPY_IMAGE_MIMES
+        and words[4] == "-"
+    ):
+        payload = _copy_stdin()
+        if not payload or not COPY_IMAGE_MIMES[words[3]](payload):
+            fail("invalid-argument", "image bytes do not match the declared MIME")
+        _wl_write(words[3], payload)
+        return
+    fail("usage", "no such clipboard copy form")
+
+
+# --- argument parsing -------------------------------------------------------
+
+
+def parse_globals(
+    argv: list[str],
+) -> tuple[bool, bool, bool, bool, int | None, list[str]]:
+    json_mode = list_mode = verbose = help_local = False
+    literal_from: int | None = None
+    i = 0
+    while i < len(argv):
+        word = argv[i]
+        if word == "--":
+            # A leading -- only ends option recognition; it does not make the
+            # remaining words literal data for the server.
+            i += 1
+            break
+        if word in ("-l", "--list"):
+            list_mode = True
+        elif word in ("-j", "--json"):
+            json_mode = True
+        elif word in ("-v", "--verbose"):
+            verbose = True
+        elif word in ("-h", "--help"):
+            help_local = True
+        elif word.startswith("-") and word != "-":
+            fail("usage", f"unknown option: {word}")
+        else:
+            break
+        i += 1
+    return json_mode, list_mode, verbose, help_local, literal_from, argv[i:]
+
+
+def help_path(words: list[str], literal_from: int | None) -> list[str] | None:
+    if literal_from is not None:
+        return None
+    if words and words[0] == "help":
+        return words[1:]
+    if len(words) >= 2 and words[1] == "help":
+        return [words[0]] + words[2:]
+    if len(words) >= 2 and words[-1] == "help":
+        return words[:-1]
+    return None
+
+
+def write_error(err: IpcError, json_mode: bool) -> int:
+    if json_mode:
+        print(
+            compact_ascii(
+                {
+                    "v": VERSION,
+                    "ok": False,
+                    "error": {"code": err.code, "message": err.message},
+                }
+            ),
+            file=sys.stderr,
+        )
+    elif err.code == "unavailable" and err.message == NO_QUICKSHELL:
+        print(f"vb-shell: {err.message}", file=sys.stderr)
+    else:
+        print(f"vb-shell: {err.code}: {err.message}", file=sys.stderr)
+    return RC.get(err.code, DEFAULT_RC)
+
+
+def shell_root() -> str:
+    root = os.environ.get("VIBRANIUM", "").strip()
+    if not root:
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, "shell")
+
+
+def warm_qs_cache() -> None:
+    """Check the local binary without selecting or contacting a running shell."""
+    qs = find_program("qs")
+    if qs is None:
+        return
+    try:
+        context = qs_cache_context(qs, shell_root())
+        if context is None:
+            return
+        executable, _, _, path = context
+        if path is None:
+            return
+        previous = qs_cache_read(path)
+        key = qs_binary_key(executable)
+        if qs_cached_verdict(key, previous) is not None or not qs_is_elf(qs, key):
+            return
+        verdict = qs_probe_verdict(qs, executable, time.monotonic() + TRIP_TIMEOUT, key)
+        if verdict is not None:
+            qs_cache_write(path, previous, {**previous, "v": 1, "qs": verdict})
+    except (OSError, ValueError):
+        pass
+
+
+def await_picker(
+    client: Client, request: dict, payload: dict, words: list[str]
+) -> dict:
+    """Wait for a standalone region pick; Escape is a silent RC 1."""
+    if words[:3] != ["tools", "picker", "pick"]:
+        return payload
+    deadline = time.monotonic() + PICKER_WAIT
+    while True:
+        data = payload.get("data")
+        if not (isinstance(data, dict) and data.get("pending") is True):
+            return payload
+        if time.monotonic() >= deadline:
+            fail("timeout", "region picker timed out")
+        time.sleep(PICKER_POLL)
+        try:
+            payload = client.call("invoke", request)
+        except IpcError as err:
+            if err.code == "cancelled":
+                raise SystemExit(1)
+            raise
+
+
+def await_time_lookup(
+    client: Client, request: dict, payload: dict, words: list[str]
+) -> dict:
+    """Retry a cold clock read until the controller's probe lands."""
+    if words[:5] != ["appLauncher", "plugin", "command", "time", "lookup"]:
+        return payload
+    data = payload.get("data")
+    if not (
+        isinstance(data, dict)
+        and data.get("state") == "accepted"
+        and isinstance(data.get("timezone"), str)
+        and "time" not in data
+    ):
+        return payload
+    deadline = time.monotonic() + TIME_LOOKUP_WAIT
+    while time.monotonic() < deadline:
+        time.sleep(TIME_LOOKUP_POLL)
+        payload = client.collect("invoke", request)[0]
+        data = payload.get("data")
+        if not (isinstance(data, dict) and data.get("state") == "accepted"):
+            return payload
+        if isinstance(data.get("time"), str) and data["time"] != "":
+            return payload
+    # The probe is still pending (or failed without a diagnostic): make the
+    # state visible, because render_data drops the raw `state` label.
+    out = dict(payload)
+    if isinstance(data, dict):
+        out["data"] = dict(data, pending=True)
+    return out
+
+
+def run(argv: list[str]) -> int:
+    global _JSON_MODE
+    json_mode, list_mode, verbose, help_local, literal_from, words = parse_globals(argv)
+    _JSON_MODE = json_mode
+    if literal_from is None and "--" in words:
+        # After the first path word, -- is a marker, not data: remove it and
+        # send its index so the server knows which words are literal.
+        index = words.index("--")
+        words = words[:index] + words[index + 1 :]
+        literal_from = index
+    if help_local and (list_mode or words):
+        fail(
+            "usage",
+            "help takes no positional argument and cannot be combined with --list",
+        )
+    if list_mode and words:
+        fail("usage", "--list takes no positional argument")
+    if help_local or not (list_mode or words):
+        load_help_rendering()
+        sys.stdout.write(render_local_guide(json_mode))
+        return 0 if help_local else 1
+
+    client = Client(shell_root(), verbose, json_mode)
+    if list_mode:
+        load_help_rendering()
+        pages = client.collect("describe", {"v": VERSION, "kind": "index"})
+        sys.stdout.write(render_index(pages, json_mode, root=False))
+        return 0
+
+    # A missing id on these two app verbs is a teaching moment: one fixed
+    # line, a blank line, then that verb's help page (Usage + Examples only).
+    if words in (["app", "open"], ["app", "toggle"]):
+        load_help_rendering()
+        pages = client.collect(
+            "describe", {"v": VERSION, "kind": "help", "path": ["app", words[1]]}
+        )
+        meta, commands = descriptor_from_pages(pages)
+        desc = descriptor_with_options(json_descriptor(meta, commands))
+        if json_mode:
+            sys.stdout.write(compact_ascii(desc) + "\n")
+        else:
+            sys.stdout.write("Use 'app list' to see available apps\n\n")
+            sys.stdout.write(render_descriptor(desc))
+        return 0
+
+    # Exact data exceptions, matched by word positions (never by substring).
+    if (
+        words[:1] == ["log"]
+        and len(words) >= 2
+        and words[1] in ("status", "ping", "help")
+    ):
+        sys.stdout.write(log_route(client, words, json_mode))
+        return 0
+    # Only the four client-owned payload formats take the data route. Bare
+    # `copy`, `copy help`, `copy entry ...` and any unknown word are ordinary
+    # describe/invoke routes, so their help and errors come from the catalog.
+    if (
+        words[:2] == ["clipboard", "copy"]
+        and len(words) > 2
+        and words[2] in ("text", "uri", "file", "image")
+    ):
+        clipboard_copy(client, words, literal_from)
+        return 0
+
+    path = help_path(words, literal_from)
+    if path is not None:
+        load_help_rendering()
+        if not path:
+            pages = client.collect("describe", {"v": VERSION, "kind": "index"})
+            sys.stdout.write(render_index(pages, json_mode, root=True))
+            return 0
+        pages = client.collect("describe", {"v": VERSION, "kind": "help", "path": path})
+        meta, commands = descriptor_from_pages(pages)
+        desc = descriptor_with_options(json_descriptor(meta, commands))
+        if json_mode:
+            sys.stdout.write(compact_ascii(desc) + "\n")
+        else:
+            sys.stdout.write(render_descriptor(desc))
+        return 0
+
+    request = {
+        "v": VERSION,
+        "kind": "call",
+        "argv": words,
+        "literalFrom": literal_from,
+    }
+    pages = client.collect("invoke", request)
+    payload = await_time_lookup(client, request, pages[0], words)
+    payload = await_picker(client, request, payload, words)
+    fmt = payload.get("format")
+    sys.stdout.write(render_data(payload, fmt, json_mode))
+    return 0
+
+
+def main() -> int:
+    try:
+        return run(sys.argv[1:])
+    except IpcError as err:
+        return write_error(err, _JSON_MODE)
+    except KeyboardInterrupt:
+        return 130
+    except UnicodeError:
+        # A malformed reply is a transport failure, not a bad request. Bad
+        # UTF-8 on an input word is rejected earlier by validate_words.
+        return write_error(IpcError("internal", "invalid UTF-8 on reply"), _JSON_MODE)
+
+
+# --- vb-shell bytecode compiler ---
+
+def _compile_section(path: str, source: bytes, help_section: bool):
+    import __future__
+
+    # Pad each section to keep the line numbers of the original single file.
+    body = source.rsplit(b"\n# --- vb-shell bytecode compiler ---\n", 1)[0]
+    start, _, rest = body.partition(b"\n# --- vb-shell deferred help ---\n")
+    help_source, _, end = rest.partition(b"\n# --- vb-shell core resumes ---\n")
+    if help_section:
+        section = b"\n" * (start.count(b"\n") + 2) + help_source
+    else:
+        # The compiler flag supplies deferred annotations without a runtime
+        # import of __future__ on every direct invocation.
+        start = start.replace(b"from __future__ import annotations\n", b"\n", 1)
+        section = start + b"\n" * (help_source.count(b"\n") + 4) + end
+    return compile(section, path, "exec", flags=__future__.annotations.compiler_flag, dont_inherit=True)
+
+
+def _bytecode_write(directory: int, name: str, digest: bytes, code) -> None:
+    temporary = name + "." + os.urandom(8).hex()
+    try:
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory)
+        try:
+            with open(fd, "wb") as cached:
+                cached.write(digest)
+                marshal.dump(code, cached)
+            os.replace(temporary, name, src_dir_fd=directory, dst_dir_fd=directory)
+        finally:
+            try:
+                os.unlink(temporary, dir_fd=directory)
+            except FileNotFoundError:
+                pass
+    except OSError:
+        pass
+
+
+# --- vb-shell bytecode bootstrap ---
+
+# The env shebang loads this section first, before evaluating the CLI.
+import marshal
+import os
+import stat
+import sys
+
+
+def _cache_dir(runtime: str, create: bool = True) -> str | None:
+    path = runtime
+    for name, denied in (("vibranium", 0o022), ("vb-shell", 0o077)):
+        path = os.path.join(path, name)
+        try:
+            try:
+                info = os.stat(path, follow_symlinks=False)
+            except FileNotFoundError:
+                if not create:
+                    return None
+                try:
+                    os.mkdir(path, mode=0o700)
+                except FileExistsError:
+                    pass
+                info = os.stat(path, follow_symlinks=False)
+        except OSError:
+            return None
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & denied:
+            return None
+    return path
+
+
+def _bytecode_runtime(script: str) -> int | None:
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    if not os.path.isabs(runtime):
+        return None
+    runtime = os.path.realpath(runtime)
+    checkout = os.path.dirname(os.path.dirname(script))
+    configured = os.environ.get("VIBRANIUM", "").strip()
+    projects = (checkout, os.path.realpath(configured)) if configured else (checkout,)
+    if any(os.path.commonpath((runtime, project)) == project for project in projects):
+        return None
+    try:
+        info = os.stat(runtime, follow_symlinks=False)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+            return None
+        directory = _cache_dir(runtime)
+        if directory is None:
+            return None
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        return None
+    info = os.fstat(fd)
+    if info.st_uid == os.geteuid() and not info.st_mode & 0o077:
+        return fd
+    os.close(fd)
+    return None
+
+
+def _bytecode_read(directory: int, name: str, digest: bytes):
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+                return None
+            if os.read(fd, len(digest)) == digest:
+                code = marshal.loads(os.read(fd, info.st_size - len(digest)))
+                if isinstance(code, type(_bytecode_read.__code__)):
+                    return code
+        finally:
+            os.close(fd)
+    except (OSError, ValueError, EOFError, TypeError):
+        pass
+    return None
+
+
+def _cached_code(
+    directory: int | None, name: str, digest: bytes, path: str,
+    source: bytes, help_section: bool = False,
+):
+    if directory is not None:
+        code = _bytecode_read(directory, name, digest)
+        if code is not None:
+            return code
+
+    # Import the compiler from the same source snapshot only on a cache miss.
+    compiler = globals().get("_compile_section")
+    if compiler is None:
+        section = source.rsplit(b"\n# --- vb-shell bytecode bootstrap ---\n", 1)[0]
+        section = section.rsplit(b"\n# --- vb-shell bytecode compiler ---\n", 1)[1]
+        exec(section, globals())  # noqa: S102
+        compiler = globals()["_compile_section"]
+    code = compiler(path, source, help_section)
+    if directory is not None and not sys.dont_write_bytecode:
+        _bytecode_write(directory, name, digest, code)
+    return code
+
+
+def _start_cached(path: str, source: bytes, warming: bool) -> int:
+    script = os.path.realpath(path)
+    if not sys.flags.safe_path:
+        sys.path[0:1] = [os.path.dirname(script)]
+
+    directory = _bytecode_runtime(script)
+    try:
+        digest = b""
+        name = ""
+        if directory is not None:
+            try:
+                from _sha2 import sha256  # pyright: ignore[reportMissingImports]
+            except ImportError:
+                from hashlib import sha256
+
+            key = sha256(os.fsencode(script)).hexdigest()[:24]
+            name = f"vb-shell-{key}.{sys.implementation.cache_tag}"
+            mode = f"{sys.version}\0{sys.flags.optimize}\0".encode()
+            digest = sha256(mode + os.fsencode(path) + b"\0" + source).digest()
+
+        module = vars(sys.modules["__main__"])
+
+        def load_help() -> None:
+            code = _cached_code(directory, name + ".help.marshal", digest, path, source, True)
+            exec(code, module)  # noqa: S102
+
+        # The shebang evaluates this bootstrap and the core in separate namespaces.
+        module.update(
+            __file__=path,
+            __cached__=None,
+            os=os,
+            stat=stat,
+            sys=sys,
+            _cache_dir=_cache_dir,
+            _help_loader=load_help,
+        )
+        code = _cached_code(directory, name + ".marshal", digest, path, source)
+        exec(code, module)  # noqa: S102
+        if warming:
+            module["load_help_rendering"]()
+            module["warm_qs_cache"]()
+            return 0
+        return module["main"]()
+    finally:
+        if directory is not None:
+            os.close(directory)
+
+
+_boot = globals().get("_vb_boot")
+if _boot is not None:
+    path, source = _boot
+    sys.argv.pop(0)
+    sys.exit(_start_cached(path, source, sys.argv[1:] == ["--warm-cache"]))
+elif __name__ == "__main__":
+    if sys.argv[1:] == ["--warm-cache"]:
+        with open(__file__, "rb") as source:
+            sys.exit(_start_cached(__file__, source.read(), True))
+    else:
+        sys.exit(main())

@@ -176,10 +176,10 @@ t_contains "the lock surface accepts only the press that unlocked" \
 
 # --- every pre-sleep lock uses the suspend reason ---------------------------
 # Grace is keyed on the lock reason, so a lock taken just before logind sleeps
-# must carry the same reason as one Session.suspend() takes. The lid-switch
-# bind used the plain lockscreen verb, which armed grace: a wake inside the
-# window released the session without a password. A dedicated sleep-lock verb
-# gives both paths one authority that does not request the sleep itself.
+# must carry the same reason as one Session.suspend() takes. The plain lock
+# verb arms grace: a wake inside the window released the session without a
+# password. A dedicated sleep-lock verb gives both paths one authority that
+# does not request the sleep itself.
 
 BINDS="$VIBRANIUM_DIR/default/hypr/binds.lua"
 SESSION="$SHELL_DIR/services/session/Session.qml"
@@ -188,9 +188,11 @@ t_file "the sleep-lock verb lives in the session service" "$SESSION"
 
 LID_BIND="$(grep -F 'switch:on:Lid Switch' "$BINDS" || true)"
 t_contains "the lid bind locks through the session service" \
-  "vb-shell session lockForSleep" "$LID_BIND"
-t_not_contains "the lid bind does not use the plain lock verb" \
-  "vb-shell lockscreen lock" "$LID_BIND"
+  '"session.lockForSleep"' "$LID_BIND"
+# The plain lock action is `session.lock`; the closing quote keeps this
+# needle from matching the `lockForSleep` action on the same line.
+t_not_contains "the lid bind does not use the plain lock action" \
+  '"session.lock"' "$LID_BIND"
 
 SLEEP_LOCK="$(SESSION="$SESSION" node - <<'NODE'
 const fs = require("fs")

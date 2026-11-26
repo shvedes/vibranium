@@ -308,6 +308,15 @@ function tryEvaluate(query) {
       const v = String(item && item.copyValue || "")
       if (v === "") return
       api.execDetached("printf %s " + api.shellQuote(v) + " | wl-copy")
+    },
+    // Explicit IPC contract. No clipboard activation: a terminal call gets
+    // the value as typed data and decides for itself what to do with it.
+    ipc: {
+      eval: function (query) {
+        const r = tryEvaluate(String(query ?? ""))
+        if (!r || !isFinite(r.value)) return null
+        return { expression: r.expr, value: r.value, formatted: r.formatted }
+      }
     }
   }
 })()

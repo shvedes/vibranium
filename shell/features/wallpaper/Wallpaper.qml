@@ -1157,13 +1157,22 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("wallpaper", root, {
+      "wallpaper.refresh": function () { return ipc.refresh() },
+      "wallpaper.next": function () { return ipc.next() },
+      "wallpaper.prev": function () { return ipc.prev() },
+      "wallpaper.set": function (a) { return ipc.set(a.path) },
+      "wallpaper.get": function () { return ipc.get() },
+      "wallpaper.drop": function (a) { return ipc.drop(a.uri) },
+      "wallpaper.status": function () { return ipc.status() },
+      "wallpaper.ping": function () { return ipc.ping() }
+    })
     Registry.offer("wallpaper", {
       title: "Wallpaper",
-      description: "wallpaper service",
+      description: "Manage the desktop wallpaper",
       verbNames: [
         "drop",
         "get",
-        "isEnabled",
         "next",
         "prev",
         "refresh",
@@ -1182,6 +1191,7 @@ Singleton {
     })
   }
   Component.onDestruction: {
+    IpcRouter.unregister("wallpaper", root)
     if (root._themeWatchUnsub) root._themeWatchUnsub()
     Registry.unregister("wallpaper")
     root._shutdown()
@@ -1215,12 +1225,12 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "wallpaper"
     function help(command: string): string {
-      return UnitIpc.help("wallpaper", "Wallpaper", "wallpaper service", [
+      return UnitIpc.help("wallpaper", "Wallpaper", "Manage the desktop wallpaper", [
         { name: "drop", help: "(uri) set wallpaper from a drag URI" },
         { name: "get", help: "current wallpaper path" },
-        { name: "isEnabled", help: "wallpaper engine on?" },
         { name: "next", help: "next wallpaper" },
         { name: "prev", help: "previous wallpaper" },
         { name: "refresh", help: "re-scan" },
@@ -1228,7 +1238,14 @@ Singleton {
       ], command)
     }
     function status(): string {
-      return JSON.stringify({ unit: "wallpaper", healthy: true })
+      return JSON.stringify({
+        unit: "wallpaper",
+        healthy: true,
+        enabled: Settings.wallpaperEnabled,
+        ready: Settings.ready,
+        switching: root.switching,
+        path: root.current
+      })
     }
     function ping(): string { return "pong" }
 
@@ -1250,9 +1267,5 @@ Singleton {
     function set(path: string): string { return root.set(path) }
     function get(): string { return root.current }
     function drop(uri: string): string { root.handleDroppedUri(uri); return "ok" }
-
-    function isEnabled(): string {
-      return Settings.wallpaperEnabled ? "true" : "false"
-    }
   }
 }

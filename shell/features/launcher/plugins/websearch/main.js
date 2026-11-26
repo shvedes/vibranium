@@ -40,6 +40,13 @@
     return ENGINES[key] || ENGINES.google
   }
 
+  // One URL builder for the UI activation and the public `plugin command
+  // websearch url` command. The command returns the string; opening a browser stays in
+  // the activation path.
+  function searchUrl(query) {
+    return engine().url + encodeURIComponent(query)
+  }
+
   VibraniumPlugin = {
     init: function(context) {
       api = context
@@ -69,10 +76,16 @@
     },
 
     activate: function(item, query) {
-      const e = engine()
-      const url = e.url + encodeURIComponent(query)
+      const url = searchUrl(query)
       api.execDetached("app2unit -S both -s app-graphical.slice -- xdg-open "
         + shellQuote(url) + "\n")
+    },
+    ipc: {
+      url: function (query) {
+        const s = String(query ?? "")
+        if (s.trim() === "") return null
+        return searchUrl(s)
+      }
     }
   }
 })()

@@ -8,7 +8,7 @@ import Quickshell.Io
 import qs.common
 import "ClipboardLib.js" as CL
 import "../../common/text/StringUtils.js" as SU
-import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/text/IpcCatalog.js" as Catalog
 import "../../common/process/PanelList.js" as PanelList
 import "../../common/collections/EntryMap.js" as EntryMap
 
@@ -29,6 +29,9 @@ Singleton {
   id: root
 
   readonly property string tag: "clipboard"
+  // Declared before onCompleted: a Bound component throws on an assignment
+  // to an undeclared property, which would abort the rest of startup.
+  property bool _ipcRegistered: false
 
   // SPLIT MAP (one owner each, no behavior change): History (newest-first
   // entries, persistence, factory, activate/pin/delete), ImageCache
@@ -121,21 +124,33 @@ Singleton {
     orphanReap.running = true
     Registry.offer("clipboard", {
       title: "Clipboard",
-      description: "clipboard history manager",
-      verbNames: [
-        "clear",
-        "close",
-        "copy",
-        "list",
-        "open",
-        "pin",
-        "remove",
-        "toggle",
-        "view",
-        "status",
-        "help",
-        "ping",
-      ]
+      description: "Browse clipboard history and selections",
+      verbNames: Catalog.topLevelVerbs("clipboard")
+    })
+    // In-process bridge target for EmojiPicker's `writePublicText` copy.
+    Registry.register(root.tag, root)
+    root._ipcRegistered = IpcRouter.register("clipboard", root, {
+      "clipboard.window.open": function (a, ctx) {
+        return root.ipcWindow(ctx.words.indexOf("pinned") >= 0 ? "pinned" : "open")
+      },
+      "clipboard.window.close": function () { return root.ipcWindow("close") },
+      "clipboard.window.toggle": function () { return root.ipcWindow("toggle") },
+      "clipboard.list.regular": function () { return root.ipcBucketList(false) },
+      "clipboard.list.pinned": function () { return root.ipcBucketList(true) },
+      "clipboard.list.current": function () { return root.ipcCurrentList() },
+      "clipboard.pin": function (a) { return root.ipcPin(a.INDEX, false) },
+      "clipboard.unpin": function (a) { return root.ipcPin(a.INDEX, true) },
+      "clipboard.purge.regular": function (a) { return root.ipcPurge(a.INDEX, false) },
+      "clipboard.purge.pinned": function (a) { return root.ipcPurge(a.INDEX, true) },
+      "clipboard.clear.regular": function () { return root.clearBucket(false, true) },
+      "clipboard.clear.pinned": function () { return root.clearBucket(true, true) },
+      "clipboard.select": function (a) { return root.ipcSelect(a.INDEX) },
+      "clipboard.copy.entry": function (a) {
+        return root.ipcCopyEntry(a.BUCKET === "pinned", a.INDEX)
+      },
+      // Injected status/ping are text-adapted by the router, not frames.
+      "clipboard.status": function () { return root.ipcStatus() },
+      "clipboard.ping": function () { return "pong" }
     })
     root.home = Quickshell.env("HOME")
     CL.setHome(root.home)
@@ -166,6 +181,8 @@ Singleton {
   // row points at are all released here; the singleton dying takes its child
   // Process objects with it.
   Component.onDestruction: {
+    Registry.unregister(root.tag)
+    IpcRouter.unregister("clipboard", root)
     copyTimeout.stop()
     if (copyProc.running) copyProc.running = false
     copyProc._sink = null
@@ -552,7 +569,7 @@ Singleton {
     root.togglePin(list[index].id)
     return true
   }
-  function togglePin(id) {
+  function togglePin(id, ipc) {
     // A miss persists nothing: the panel and the IPC verb can both name a
     // row another path removed first, and that must not rewrite the file.
     const flipped = CL.togglePinned(root.history, id)
@@ -574,6 +591,9 @@ Singleton {
     if (slot >= 0) {
       if (wasPinned) {
         Log.info("unpinned entry " + slot + ", total pinned " + root.pinnedCount)
+      } else if (ipc === true) {
+        // An IPC caller must not turn a log line into a MIME side channel.
+        Log.info("pinned entry " + slot + ", total pinned " + root.pinnedCount)
       } else {
         Log.info("pinned entry " + slot + " (" + String(h[slot].mime) + "), total pinned " + root.pinnedCount)
       }
@@ -593,7 +613,7 @@ Singleton {
       // rides along because `total pinned` counts keeps rather than rows, so
       // the cap is the only thing that says how much room the ring has left.
       const d = Log.at()
-      if (d.allows("debug")) {
+      if (ipc !== true && d.allows("debug")) {
         d.debug("entry " + slot + ": type " + String(h[slot].type)
           + ", " + Log.summarize(String(h[slot].mime))
           + ", " + root.totalCount + " of " + root.maxHistory + " rows")
@@ -616,13 +636,20 @@ Singleton {
   function findById(id) {
     return CL.entryById(root.history, id)
   }
-  function requestDelete(id) {
+  function requestDelete(id, ipc) {
     if (root.optimistic.isPending(id)) return false
     const entry = root.findById(id)
     if (!entry) return false
     // Keep captured for stage 2 check - store in a separate map
     if (!root._captured) root._captured = ({})
     root._captured[id] = entry
+    // IPC deletes carry no per-row diagnostics: the caller must not turn a
+    // deletion log into a metadata side channel. Identity stays intact for
+    // the stage-2 captured-object check below.
+    if (ipc === true) {
+      if (!root._ipcDeletes) root._ipcDeletes = Object.create(null)
+      root._ipcDeletes[id] = true
+    }
     root.optimistic.mark(id)
     Idle.run(() => root.commitDelete(id), 2)
     return true
@@ -671,7 +698,7 @@ Singleton {
     // INFO above gives the after and nothing places it against the cap. The
     // gate wraps `_entryBytes` because a suppressed line must not ask.
     const d = Log.at()
-    if (d.allows("debug")) {
+    if (!(root._ipcDeletes && root._ipcDeletes[id]) && d.allows("debug")) {
       d.debug("cleared entry " + idx + ": type " + String(gone.type)
         + ", bytes " + (gone.type === "secret" ? "hidden" : String(root._entryBytes(gone)))
         + ", " + (root.totalCount + 1) + " -> " + root.totalCount
@@ -690,8 +717,16 @@ Singleton {
     Qt.callLater(() => root._maybeReserveCurrent())
   }
   property var _captured: ({})
+  // Ids whose staged deletion came from IPC: their commit emits counts only,
+  // never the row's type, MIME, path or bytes.
+  property var _ipcDeletes: null
   function finishDelete(id) {
     root.optimistic.confirm(id)
+    if (root._ipcDeletes) {
+      const next = Object.assign({}, root._ipcDeletes)
+      delete next[id]
+      root._ipcDeletes = next
+    }
     if (root._captured) {
       root._captured = EntryMap.withoutEntry(root._captured, id)
     }
@@ -717,14 +752,18 @@ Singleton {
     root._recompute()
     root._persist()
   }
-  // Pinned entries survive a clear - they are deliberate, not detritus.
-  function clearAll() {
+  // Pinned entries survive a normal clear - they are deliberate, not
+  // detritus. `clearBucket(pinned)` is the one implementation both buckets
+  // use: one purge pass, one model replacement, one recompute and one write.
+  function clearAll() { root.clearBucket(false) }
+  function clearBucket(pinned, quiet) {
     const removed = []
     const kept = []
     for (let i = 0; i < root.history.length; i++) {
-      if (root.history[i].pinned) kept.push(root.history[i])
+      if ((root.history[i].pinned === true) === (pinned === true)) kept.push(root.history[i])
       else removed.push(root.history[i])
     }
+    if (removed.length === 0) return
     root._purgeEntries(removed)
     root.history = kept
     root._recompute()
@@ -747,7 +786,7 @@ Singleton {
     // One pass builds both tallies and a second sums the sizes, so the gate is
     // not decoration - a suppressed line must not walk `removed` at all.
     const d = Log.at()
-    if (d.allows("debug")) {
+    if (quiet !== true && d.allows("debug")) {
       const tally = CL.clearTally(removed)
       d.debug("cleared clipboard: " + tally.count + " of "
         + (tally.count + kept.length) + " rows dropped (" + tally.shape + "), "
@@ -864,8 +903,10 @@ Singleton {
     }
   }
 
+  // Returns true only when the copy child was admitted. UI callers ignore the
+  // verdict; IPC uses it to decide whether to promote and answer `accepted`.
   function copyEntry(entry) {
-    if (!entry) return
+    if (!entry) return false
     // A credential is reached through its store handle and nothing else: the
     // value materialises inside the stdin write and the slot is gone by the
     // time this function returns, so no plan, argv, or DTO ever holds it.
@@ -874,7 +915,7 @@ Singleton {
       secretHandle = String(entry.secretHandle || "")
       if (secretHandle === "" || !SecretStore.has(secretHandle)) {
         root._notify("Clipboard", "Credential unavailable - copy it again from its source")
-        return
+        return false
       }
     }
     // Validate before mutating: a copy already in flight rejects here, with
@@ -882,11 +923,11 @@ Singleton {
     // exactly as it found it.
     if (copyProc.running) {
       root._notify("Clipboard", "Copy already in progress")
-      return
+      return false
     }
     // An image row with no file behind it has nothing to offer: reject
     // before the promote below moves it.
-    if (entry.type === "image" && !entry.imageDataFile && !entry.imageFile) return
+    if (entry.type === "image" && !entry.imageDataFile && !entry.imageFile) return false
     let cmdArr = null
     let sink = null
     if (entry.type === "secret") {
@@ -916,12 +957,14 @@ Singleton {
       const uris = (entry.filePaths || []).map(p => CL.toFileUri(p)).join("\n")
       cmdArr = CL.buildCopyUrisCmd(uris)
     } else if (entry.type === "image" && entry.imageFile) cmdArr = CL.buildCopyImageFileCmd(entry.imageFile)
-    else return
-    // Copying from the history is an implicit "use" - bring the row back
-    // to the most-recent slot and persist, so it sits at the top on the
-    // next launch even though our own echo suppression swallows the
-    // clipboard event that would otherwise do it.
-    root._promote(entry.id)
+    else return false
+    // Stage every side effect BEFORE admission and restore them on a refused
+    // start. Only an admitted copy is a "use" of the row.
+    const staged = {
+      hash: root._suppressHash,
+      secret: root._suppressSecret,
+      paths: root._pendingCopyPaths
+    }
     // Text- and URI-family re-copies are hash-predictable: suppress our
     // own echo exactly. A credential keeps only its handle here and is
     // matched in place inside the store, so the copied bytes never become a
@@ -943,12 +986,19 @@ Singleton {
     root._pendingCopyPaths = CL.entryPaths(entry)
     pendingCopyTimer.restart()
     if (!root._startCopy(cmdArr, sink)) {
-      // Raced start: the early running check above passed but the child
-      // started between the check and the start. The promote already ran,
-      // so this only notifies.
+      // Raced start or a refused child: nothing was promoted and the staged
+      // echo/pending state goes back exactly as it was.
+      root._suppressHash = staged.hash
+      root._suppressSecret = staged.secret
+      root._pendingCopyPaths = staged.paths
       root._notify("Clipboard", "Copy already in progress")
-      return
+      return false
     }
+    // Copying from history is an implicit "use" - promote only after the
+    // write was admitted, so a missing file or a refused start never moves
+    // the row or replaces the selection.
+    root._promote(entry.id)
+    return true
   }
 
   // Deleting the clipboard's current row leaves its content on the selection.
@@ -2291,126 +2341,143 @@ Singleton {
     return String(entry.raw == null ? "" : entry.raw).length
   }
 
-  // --- IPC ---
-  IpcHandler {
-    target: "clipboard"
-    function help(command: string): string {
-      return UnitIpc.help("clipboard", "Clipboard", "clipboard history manager", [
-        { name: "clear", help: "wipe history" },
-        { name: "close", help: "hide the panel" },
-        { name: "copy", help: "(index) re-copy an entry" },
-        { name: "list", help: "history metadata as JSON" },
-        { name: "open", help: "show the panel" },
-        { name: "pin", help: "(index) pin an entry" },
-        { name: "remove", help: "(index) drop an entry" },
-        { name: "toggle", help: "show/hide" },
-        { name: "view", help: "(index) preview an entry" },
-      ], command)
-    }
-    function ping(): string { return "pong" }
-    function open(): string { root.showPanel(); return "ok" }
-    function close(): string { root.hidePanel(); return "ok" }
-    function toggle(): string { root.toggle(); return "ok" }
-    function clear(): string { root.clearAll(); return "ok" }
-    function status(): string {
-      return JSON.stringify({
-        visible: root.visible,
-        total: root.history.length,
-        pinned: root.pinnedCount,
-        mode: root.mode,
-        query: root.query,
-        count: root.filtered.length
-      })
-    }
-    function list(): string { return JSON.stringify(root._listProjection()) }
+  // --- public gateway implementation ---------------------------------------
+  // Every projection goes through ClipboardLib's pure helpers, so the same
+  // `{index,content}` shape is used in text and JSON, and no path, MIME, id,
+  // secret handle or raw payload can reach a reply or a log line.
 
-    function view(index: string): string {
-      const e = root._filteredAt(root._ipcIndex(index))
-      if (!e) return "null"
-      return JSON.stringify(root._projectEntry(e))
+  function ipcWindow(verb) {
+    if (verb === "open") root.showPanel()
+    else if (verb === "close") root.hidePanel()
+    else if (verb === "toggle") root.visible ? root.hidePanel() : root.showPanel()
+    else if (verb === "pinned") {
+      root.showPanel()
+      if (!root.showPinned) root.enterPinned("")
     }
-    function copy(index: string): string {
-      const e = root._filteredAt(root._ipcIndex(index))
-      if (!e) return "error:index"
-      root.copyEntry(e)
-      return "ok"
-    }
-    function remove(index: string): string {
-      // Resolve the index to an id once, then go through the buffered
-      // requestDelete so IPC and UI share one deletion path.
-      const e = root._filteredAt(root._ipcIndex(index))
-      if (!e) return "error:index"
-      if (!root.requestDelete(e.id)) return "error:pending"
-      return "ok"
-    }
-    function pin(index: string): string {
-      const at = root._ipcIndex(index)
-      const e = root._filteredAt(at)
-      if (!e) return "error:index"
-      root.togglePinAt(at)
-      return "ok"
-    }
+    return { v: 1, ok: true }
   }
 
-  // Strict IPC index: optional sign with digits only. parseInt accepts
-  // trailing junk ("1abc" -> 1), so every index verb gates through here
-  // first; anything else is a miss. Null means miss.
-  function _ipcIndex(v) {
-    const s = String(v === undefined || v === null ? "-1" : v)
-    if (!/^-?\d+$/.test(s)) return null
-    return parseInt(s, 10)
-  }
-  // Entry at the current filtered-list position (what the UI/CLI index).
-  // A null index (strict gate miss) is always a miss.
-  function _filteredAt(index) {
-    if (index === null || index === undefined || index < 0 || index >= root.filtered.length) return null
-    return root.filtered[index]
+  function ipcBucketList(pinned) {
+    const bucket = CL.selectEntries(root.history, pinned ? "pinned" : "normal", "")
+    return { v: 1, ok: true, data: CL.ipcProject(bucket) }
   }
 
-  // --- read projection ---
-  // One shape for both read verbs. Fields are metadata plus a bounded
-  // preview; a raw payload is not among them, so nothing a credential row
-  // holds can reach a caller even indirectly. The preview policy is explicit:
-  // text-shaped content gets a truncated preview, everything else gets none,
-  // and a credential row gets none at all.
-  function _projectEntry(e) {
-    const o = {
-      id: e.id,
-      type: e.type,
-      title: e.title,
-      subLeft: e.subLeft,
-      timeStr: e.timeStr,
-      pinned: e.pinned === true,
-      mime: e.mime,
-      filePaths: (e.filePaths || []).slice()
-    }
-    if (e.fileSize !== undefined) o.fileSize = e.fileSize
-    if (e.type === "text" || e.type === "url" || e.type === "network")
-      o.preview = CL.truncateText(String(e.preview || ""), 200)
-    return o
+  function ipcCurrentList() {
+    if (!root.open) return { v: 1, ok: false,
+      error: { code: "unavailable", message: "panel is closed" } }
+    return { v: 1, ok: true, data: CL.ipcProject(root.filtered) }
   }
-  // Credential rows are counted but not listed: the list verb returns
-  // metadata only, so excluding them outright is what keeps a raw secret
-  // entry out of ordinary list output. The list honors the same filtered
-  // order the index verbs address, and each entry carries its filtered
-  // index so a withheld credential never shifts a position silently.
-  function _listProjection() {
-    const entries = []
-    let secrets = 0
-    for (let i = 0; i < root.filtered.length; i++) {
-      const e = root.filtered[i]
-      if (e.type === "secret") { secrets++; continue }
-      const o = root._projectEntry(e)
-      o.index = i
-      entries.push(o)
-    }
-    return {
-      version: 2,
+
+  // Resolve a strict snapshot position to a safe internal entry. A
+  // protected row and a bad/out-of-range index are the SAME miss, so a
+  // caller cannot probe which error it hit.
+  function _ipcResolve(bucket, token) {
+    const at = CL.ipcIndex(token)
+    if (at === null) return null
+    const list = CL.selectEntries(root.history, bucket ? "pinned" : "normal", "")
+    if (at >= list.length) return null
+    const entry = list[at]
+    if (CL.isIpcProtected(entry)) return null
+    return { index: at, entry: entry }
+  }
+
+  function _ipcMiss() {
+    return { v: 1, ok: false, error: { code: "invalid-index", message: "invalid index" } }
+  }
+
+  // An indexed operation against an empty bucket is a different verdict from
+  // a bad index in a populated one. The friendly message names the bucket
+  // without projecting any row content.
+  function _ipcEmpty(pinned) {
+    return { v: 1, ok: false, error: { code: "empty",
+      message: pinned ? "Pinned list is empty. Ignoring." : "Clipboard list is empty. Ignoring." } }
+  }
+
+  function _ipcBucketSize(pinned) {
+    return CL.selectEntries(root.history, pinned ? "pinned" : "normal", "").length
+  }
+
+  function ipcPin(token, pinned) {
+    if (root._ipcBucketSize(pinned) === 0) return root._ipcEmpty(pinned)
+    const row = root._ipcResolve(pinned, token)
+    if (!row) return root._ipcMiss()
+    root.togglePin(row.entry.id, true)
+    return { v: 1, ok: true }
+  }
+
+  function ipcPurge(token, pinned) {
+    if (root._ipcBucketSize(pinned) === 0) return root._ipcEmpty(pinned)
+    const row = root._ipcResolve(pinned, token)
+    if (!row) return root._ipcMiss()
+    if (root.optimistic.isPending(row.entry.id)) return { v: 1, ok: false,
+      error: { code: "busy", message: "entry is pending" } }
+    if (!root.requestDelete(row.entry.id, true)) return { v: 1, ok: false,
+      error: { code: "busy", message: "entry is pending" } }
+    return { v: 1, ok: true }
+  }
+
+  // `select` indices come only from the current filter, never a raw bucket.
+  function ipcSelect(token) {
+    if (!root.open) return { v: 1, ok: false,
+      error: { code: "unavailable", message: "panel is closed" } }
+    if (root.filtered.length === 0) return root._ipcEmpty(false)
+    const at = CL.ipcIndex(token)
+    if (at === null || at >= root.filtered.length) return root._ipcMiss()
+    const entry = root.filtered[at]
+    if (CL.isIpcProtected(entry)) return root._ipcMiss()
+    if (root._panels.length === 0) return { v: 1, ok: false,
+      error: { code: "unavailable", message: "no panel" } }
+    const verdict = root._panels[0].seatIpcEntry(at, entry)
+    if (verdict === "busy") return { v: 1, ok: false,
+      error: { code: "busy", message: "renderer is pending" } }
+    if (verdict !== "ok") return root._ipcMiss()
+    return { v: 1, ok: true }
+  }
+
+  function ipcCopyEntry(pinned, token) {
+    if (root._ipcBucketSize(pinned) === 0) return root._ipcEmpty(pinned)
+    const row = root._ipcResolve(pinned, token)
+    if (!row) return root._ipcMiss()
+    // A missing file or a refused admission never promotes the row.
+    if (entryHasMissingFile(row.entry)) return root._ipcMiss()
+    if (!root.copyEntry(row.entry)) return { v: 1, ok: false,
+      error: { code: "busy", message: "copy not admitted" } }
+    return { v: 1, ok: true }
+  }
+
+  // A locally file-backed row with no remaining path has nothing to copy.
+  // The service's own image/file checks below cover the other cases.
+  function entryHasMissingFile(entry) {
+    if (!entry || entry.unavailable === true) return true
+    if (String(entry.type) === "image" && !entry.imageDataFile && !entry.imageFile) return true
+    return false
+  }
+
+  function ipcStatus() {
+    // A typed frame, not a JSON string: the router used to pass the string
+    // through its text adapter, so `-j` printed a quoted blob.
+    return { v: 1, ok: true, data: {
+      visible: root.visible,
       total: root.history.length,
-      count: entries.length,
-      secrets: secrets,
-      entries: entries
-    }
+      pinned: root.pinnedCount,
+      mode: root.showPinned ? "pinned" : "regular",
+      count: root.filtered.length,
+      copyBusy: copyProc.running
+    }, format: { kind: "record" } }
+  }
+
+  // Fixed in-process bridge used by EmojiPicker. It writes public text with
+  // the same copy child but deliberately sets NO history echo suppression,
+  // so the watcher captures the new glyph as a normal external copy.
+  function writePublicText(text) {
+    const glyph = String(text === undefined || text === null ? "" : text)
+    if (copyProc.running) return { v: 1, ok: false,
+      error: { code: "busy", message: "copy in progress" } }
+    root._suppressHash = ""
+    root._suppressSecret = ""
+    if (!root._startCopy(CL.buildCopyTextCmd(), () => copyProc.write(glyph)))
+      return { v: 1, ok: false, error: { code: "busy", message: "copy not admitted" } }
+    return { v: 1, ok: true, data: { glyph: glyph, state: "accepted" } }
   }
 
   ClipboardView {}

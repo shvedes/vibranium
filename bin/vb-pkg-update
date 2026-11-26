@@ -238,11 +238,11 @@ if ((EXPLICIT_COUNT == 0)); then
     if [[ "$AUR_MODE" == true ]]; then
       printf '\r\033[K'
       update_result noop -- "AUR is up to date"
-      vb-shell arch-updates refresh > /dev/null
+      vb-shell systemUpdates refresh > /dev/null
     else
       printf '\r\033[K'
       update_result noop -- "You are up to date"
-      vb-shell arch-updates refresh > /dev/null
+      vb-shell systemUpdates refresh > /dev/null
     fi
     exit 0
   fi
@@ -302,21 +302,21 @@ if _check_important; then
     if [[ "$AUR_MODE" == true ]]; then
       printf '\r\033[K'
       update_result success -- "AUR update complete. Restart required"
-      vb-shell arch-updates refresh > /dev/null
+      vb-shell systemUpdates refresh > /dev/null
     else
       printf '\r\033[K'
       update_result success -- "System update complete. Restart required"
-      vb-shell arch-updates refresh > /dev/null
+      vb-shell systemUpdates refresh > /dev/null
     fi
   fi
 else
   if [[ "$AUR_MODE" == true ]]; then
     printf '\r\033[K'
     update_result success -- "AUR update complete"
-    vb-shell arch-updates refresh > /dev/null
+    vb-shell systemUpdates refresh > /dev/null
   else
     printf '\r\033[K'
     update_result success -- "System update complete"
-    vb-shell arch-updates refresh > /dev/null
+    vb-shell systemUpdates refresh > /dev/null
   fi
 fi

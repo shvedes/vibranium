@@ -298,7 +298,10 @@ LayerSurface {
   function refreshMoveRegistration() {
     const key = String(win.screen.name ?? "")
     if (key === win.moveRegistrationKey) return
-    if (win.moveRegistrationKey !== "") Bar.unregisterMoveView(win)
+    if (win.moveRegistrationKey !== "") {
+      win.clearIpcModules()
+      Bar.unregisterMoveView(win)
+    }
     win.moveRegistrationKey = key
     // Trace: the MoveWindow proxy finds its bar window through this key, so
     // a strip that stopped receiving presses is explained by the
@@ -319,6 +322,48 @@ LayerSurface {
     item.barScreen = win.screen
     item.barWindow = win
   }
+
+  // Per-view module projection for IPC. Zone/Group attach the real delegate
+  // after wiring; entries are removed by ITEM IDENTITY, so a leaving delegate
+  // can never delete a replacement's row. No per-frame subscription is added:
+  // physical visibility is derived at query time from the live item.
+  property var _ipcModules: Object.create(null)
+
+  function noteIpcModule(id, item) {
+    if (typeof id !== "string" || id === "" || !item) return
+    const list = win._ipcModules[id] || []
+    if (list.indexOf(item) >= 0) return
+    const next = Object.assign({}, win._ipcModules)
+    next[id] = list.concat([item])
+    win._ipcModules = next
+  }
+
+  function forgetIpcModule(id, item) {
+    if (typeof id !== "string" || id === "") return
+    const list = win._ipcModules[id]
+    if (!list) return
+    // A destroyed delegate is seen as null by QML, so a null request drops
+    // exactly the vacated slots; a live item is matched by identity only.
+    if (item !== null && list.indexOf(item) < 0) return
+    const kept = []
+    for (let i = 0; i < list.length; i++) {
+      if (item === null ? !!list[i] : (list[i] !== item && !!list[i])) kept.push(list[i])
+    }
+    const next = Object.assign({}, win._ipcModules)
+    if (kept.length === 0) delete next[id]
+    else next[id] = kept
+    win._ipcModules = next
+  }
+
+  function ipcModuleItems(id) {
+    const list = win._ipcModules[id]
+    if (!Array.isArray(list)) return []
+    const out = []
+    for (let i = 0; i < list.length; i++) if (list[i]) out.push(list[i])
+    return out
+  }
+
+  function clearIpcModules() { win._ipcModules = Object.create(null) }
 
   // Headless color-pick engine for the keybind. Disabling the statusbar slot
   // removes the icon, not the feature: this engine is a fallback owner for

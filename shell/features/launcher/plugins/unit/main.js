@@ -2084,6 +2084,24 @@ function tryAll(query) {
       const v = String(item && item.copyValue || "")
       if (v === "") return
       api.execDetached("printf %s " + api.shellQuote(v) + " | wl-copy")
+    },
+    ipc: {
+      convert: function (query) {
+        const rows = tryAll(String(query ?? ""))
+        if (!rows || rows.length === 0) return null
+        const out = []
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i]
+          if (r.ok !== true) continue
+          out.push({
+            from: r.from === undefined ? null : r.from,
+            to: r.to === undefined ? null : r.to,
+            label: r.label,
+            value: r.copy
+          })
+        }
+        return out.length > 0 ? out : null
+      }
     }
   }
 })()

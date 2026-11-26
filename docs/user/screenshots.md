@@ -8,9 +8,11 @@ Screenshots are basic by default, but somewhat powerful when needed. Don't sue m
 
 Pressing the shortcut opens a dimmed overlay with two icon-only buttons: region and entire screen. Buttons are clickable, or Tab / arrows + Enter. Region selection also supports a keyboard cursor with Space, arrows, Shift+arrows, and Enter.
 
-`vb-shell screenshots screen` and `vb-shell screenshots region` skip that overlay and capture immediately, with whatever is on screen left standing. Neither takes an exclusive surface claim, so an open menu is in the picture - which is the point when you are documenting a menu or an error. The region selector holds its dimming until the frame lands, so it cannot paint itself into the shot, and its exclusive keyboard focus cannot disturb the menu you are photographing.
+`vb-shell screenshots capture screen` and `vb-shell screenshots capture region` skip that overlay and capture immediately, with whatever is on screen left standing. Neither takes an exclusive surface claim, so an open menu is in the picture - which is the point when you are documenting a menu or an error. The region selector holds its dimming until the frame lands, so it cannot paint itself into the shot, and its exclusive keyboard focus cannot disturb the menu you are photographing.
 
-The picker overlay (`super+shift+s`) still takes an exclusive claim and dismisses open overlays before it appears. Use `screen` or `region` when you need them in the shot.
+`capture` also accepts `plain`, `copy` and `save` before `screen` or `region`, in any order: `plain` skips the annotator, `copy` always copies to the clipboard, and `save` always writes a file, each regardless of the stored setting. For example, `vb-shell screenshots capture plain save screen` takes a clean shot and writes it to disk.
+
+The picker overlay (`super+shift+s`) still takes an exclusive claim and dismisses open overlays before it appears. Use `capture screen` or `capture region` when you need them in the shot.
 
 Because nothing is dismissed, anything open is recorded. Leave the pass and clipboard panels closed when you use it.
 

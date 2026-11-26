@@ -9,6 +9,7 @@ import Qt.labs.folderlistmodel
 import qs.common
 import qs.features.menu
 import "../../../common/text/UnitIpc.js" as UnitIpc
+import "../../../common/text/IpcCatalog.js" as Catalog
 import "./ThemeScan.js" as ThemeScan
 import "../../../common/text/StringUtils.js" as SU
 
@@ -90,19 +91,18 @@ Singleton {
   }
 
   Component.onCompleted: {
+    IpcRouter.register("themeRemover", root, {
+      "themeRemover.open": function () { return ipc.open() },
+      "themeRemover.close": function () { return ipc.close() },
+      "themeRemover.refresh": function () { return ipc.refresh() },
+      "themeRemover.toggle": function () { return ipc.toggle() },
+      "themeRemover.status": function () { return ipc.status() },
+      "themeRemover.ping": function () { return ipc.ping() }
+    })
     Registry.offer("themeRemover", {
       title: "Theme remover",
-      description: "community theme uninstall",
-      verbNames: [
-        "close",
-        "open",
-        "refresh",
-        "summon",
-        "toggle",
-        "status",
-        "help",
-        "ping",
-      ]
+      description: "Uninstall community themes",
+      verbNames: Catalog.topLevelVerbs("themeRemover")
     })
     // Registry.call routes the menu row's runCall spec ("themeRemover
     // summon %v") here; offer() alone only feeds the IPC manifest.
@@ -110,6 +110,7 @@ Singleton {
   }
 
   Component.onDestruction: {
+    IpcRouter.unregister("themeRemover", root)
     // Teardown releases the whole per-row provider set: the surfaces close
     // over this root, so a survivor would keep a dead confirm closure on a
     // row that can no longer be uninstalled.
@@ -374,13 +375,14 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "themeRemover"
     function help(command: string): string {
-      return UnitIpc.help("themeRemover", "Theme remover", "community theme uninstall", [
+      return UnitIpc.help("themeRemover", "Theme remover", "Uninstall community themes", [
         { name: "close", help: "hide the remover" },
         { name: "open", help: "show the remover" },
-        { name: "refresh", help: "rescan themes (in-place file edits)" },
-        { name: "toggle", help: "show/hide" },
+        { name: "refresh", help: "rescan folders for new themes" },
+        { name: "toggle", help: "toggle the remover panel" },
       ], command)
     }
     function ping(): string { return "pong" }

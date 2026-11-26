@@ -390,6 +390,13 @@ A hex code needs its `#`. `face`, `cafe` and `facade` are all valid colors and
 all plausible app names, so a bare hex word stays an app search. The `rgb()`,
 `hsl()` and `hsv()` forms need no such guard.
 
+The picker has one public CLI target for keybinds and scripts:
+`vb-shell colorPicker pick`, `vb-shell colorPicker close` and
+`vb-shell colorPicker status`. It uses the bar-owned picker seat, so there is
+only one active capture and one clipboard callback. `vb-shell colorPicker
+help` prints the full page. The former `bar colorPicker` branch is gone; the
+standalone target is the only picker surface.
+
 ## Open from the clipboard
 
 When the launcher opens, the newest clipboard entry is checked. If it
@@ -447,8 +454,9 @@ Each plugin can be toggled independently, from the **Enabled plugins** row in
 Menu -> Settings -> App launcher, or from the CLI:
 
 ```bash
-vb-shell appLauncher plugins             # list plugin configs
-vb-shell appLauncher pluginSet websearch false
+vb-shell appLauncher plugin list        # list registered plugins
+vb-shell appLauncher plugin websearch disable
+vb-shell appLauncher plugin websearch enable
 ```
 
 Enable/disable state persists in `~/.config/vibranium/settings.json`
@@ -497,8 +505,83 @@ name is the plugin id and must contain:
 })()
 ```
 
-Reload plugins with `vb-shell appLauncher reload`. A broken plugin is
-skipped with a warning and never blocks the launcher.
+Reload plugin implementations with `vb-shell appLauncher plugin reload`.
+A broken plugin is skipped with a warning and never blocks the launcher.
+The application index is rebuilt internally when the desktop entries change;
+there is no public rescan verb.
+
+### Controllers, not a flat verb list
+
+Every target owns **controllers** (nouns), and each controller owns **verbs**
+(short lowercase actions with typed arguments). `audio` owns `volume`,
+`microphone`, `sink`, `source` and `stream`; `volume` owns `up`, `down`,
+`toggle` and `set`. `appLauncher` owns `history` (with `is-empty`, `show`,
+`clear`) and `plugin`. New names are lowercase and hyphenated,
+never camelCase. A target's help page lists its controllers; a controller's
+help page lists its verbs and examples. Legacy spellings named in the
+compatibility table stay as they are, but retired verbs have no aliases.
+
+### Discovering the CLI
+
+`vb-shell --list` (or `vb-shell help`) shows every target, but only its
+immediate verbs and **one bare literal per branch** - `plugin`,
+`history`, `module`, `item`; typed placeholders belong to scoped help. It never
+prints every installed plugin, menu row or bar module. A branch has its own
+columnized help page with arguments, options, commands, notes and examples:
+
+```bash
+vb-shell appLauncher help              # target page
+vb-shell appLauncher plugin help       # generic plugin branch
+vb-shell appLauncher plugin command calc help  # one built-in plugin's verbs
+vb-shell appLauncher plugin reload     # reload enabled plugins
+```
+
+A concrete page names only that instance's own commands: `plugin command calc help`
+documents `eval <EXPR>` and does not leak `unit convert` or `time lookup`.
+Describing a plugin reads a static table: it does not load plugin code,
+demand a controller or open a panel. A disabled or broken plugin is still
+discoverable. An unknown plugin id gets no fabricated page.
+
+If a command stops at a known target or branch, the shell prints that
+page immediately as a successful `help`-kind reply (exit 0) - `vb-shell app`
+and `vb-shell appLauncher plugin command calc` show their real Commands and Examples
+without a second `help` command. Genuinely unknown words still answer
+`unknown-command` (exit 2), and a bad typed token answers `invalid-argument`.
+
+The same layout is used by `app call list <APP>`: it returns a help page,
+not a bare table, so `vb-shell app call audioMixer openTab apps` and
+`vb-shell app call audioMixer selectTab devices` are taught with their real
+tab ids (`apps`, `devices`, `recording`, `configuration`, `graph`).
+`vb-shell app call audioMixer help` is the same page.
+
+### CLI migration
+
+The public scripting surface is `vb-shell appLauncher`; the old native
+handlers are not discovery fallbacks. Retired spellings have no alias:
+
+| Old spelling | Use instead |
+| --- | --- |
+| `plugins` (bare listing) | `plugin list` |
+| `pluginSet <ID> <bool>` | `plugin <ID> enable` / `plugin <ID> disable` |
+| `usage` | `history show` |
+| `reload` (ambiguous old verb) | `plugin reload` for plugin code; the application index rescan is internal |
+
+Usage history uses nested verbs: `vb-shell appLauncher history is-empty`,
+`history show` and `history clear`.
+`vb-shell --list` shows `history` as one branch; `vb-shell
+appLauncher history help` lists its three verbs.
+
+Plugin query verbs (`plugin <ID> <verb> ...`) take their arguments as typed
+words, and a query never activates a result. `vb-shell --help` prints the
+local CLI guide without contacting the shell, as does `-h`; `-j`/`--json`
+emits the same information as typed JSON. JSON replies use
+`{"v":1,"ok":true,"data":...,"format":...,"next":...}` for success and
+`{"v":1,"ok":false,"error":{"code":"...","message":"..."}}` for failure,
+with the error object on stderr in JSON mode. Exit status is 0 on success, 2
+for `usage`/`unknown-target`/`unknown-command`/`invalid-argument`, and 1 for
+every other failure (`unavailable`, `not-found`, `backend`, timeouts and so
+on). A paged reply carries `items` plus a `next` cursor; collect every page
+before interpreting the result.
 
 ## Settings
 

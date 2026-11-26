@@ -894,29 +894,49 @@ const IDLE_VERB_CLASS = {
   "systemctl suspend": "suspend"
 }
 
-// Fill an absent class for a row whose command is one of the project's own
-// session verbs. Pure and idempotent: a row that declares a class keeps it,
-// a row that matches nothing is returned undeclared, and nothing else about
-// the row is touched. A malformed list comes back unchanged so the caller
-// still sees the validation error rather than a repaired shape.
+// The compositor timer and the backend both take seconds, so seconds are the
+// only canonical unit. A row from an older release carries `minutes` instead;
+// resolve exactly one of the two fields without rewriting the source. A
+// malformed or ambiguous row is reported as invalid rather than repaired.
+const IDLE_MAX_SECONDS = 2147483647
+
+function idleRowSeconds(row) {
+  const hasSeconds = Object.prototype.hasOwnProperty.call(row, "seconds")
+  const hasMinutes = Object.prototype.hasOwnProperty.call(row, "minutes")
+  if (hasSeconds === hasMinutes) return null
+  const raw = hasSeconds ? row.seconds : row.minutes
+  if (typeof raw !== "number" || !isFinite(raw) || raw <= 0 || Math.floor(raw) !== raw) return null
+  const seconds = hasSeconds ? raw : raw * 60
+  if (!isFinite(seconds) || seconds < 1 || seconds > IDLE_MAX_SECONDS) return null
+  return seconds
+}
+
+// Canonical rows for the read path: seconds, action and only the known
+// optional fields. An absent class is filled from the project's own session
+// verbs; an explicit class stays authoritative. Legacy empty command rows are
+// preserved here (an older file may hold one) even though public add refuses
+// them. The input is never mutated and a non-list comes back unchanged.
 function normalizeIdleTimers(list) {
   if (!Array.isArray(list)) return list
-  let changed = false
   const out = []
   for (let i = 0; i < list.length; i++) {
     const r = list[i]
     if (!StoreGuards.isPlainObject(r)) return list
-    if (r.action === "command" && declaredIdleClass(r) === "" && typeof r.command === "string") {
-      const found = IDLE_VERB_CLASS[String(r.command).trim()]
-      if (found !== undefined) {
-        out.push({ minutes: r.minutes, action: r.action, command: r.command, commandClass: found })
-        changed = true
-        continue
-      }
+    const seconds = idleRowSeconds(r)
+    if (seconds === null) return list
+    const row = { seconds: seconds, action: r.action }
+    if (r.action === "command" && typeof r.command === "string") {
+      row.command = r.command
     }
-    out.push(r)
+    const declared = declaredIdleClass(r)
+    if (declared !== "") row.commandClass = declared
+    else if (r.action === "command" && typeof r.command === "string") {
+      const found = IDLE_VERB_CLASS[String(r.command).trim()]
+      if (found !== undefined) row.commandClass = found
+    }
+    out.push(row)
   }
-  return changed ? out : list
+  return out
 }
 
 // True when a command is one of those whole-argv-word spellings, which the
@@ -928,28 +948,30 @@ function declaresOwnCommand(command) {
     && IDLE_VERB_CLASS[String(command).trim()] !== undefined
 }
 
-// Write-path validation for the idle daemon's timer list (the Settings
-// store's setIdleTimers and the idle IPC surface both funnel through
-// here). Returns "" when `list` is a legal timer list, else an error
-// string. Rules: an array of {minutes, action[, command][, commandClass]}
-// rows with positive integer minutes, known actions, a known declared class
-// when one is present, strictly increasing minutes, and no two timers
-// sharing the same action - a second lock/suspend could never fire
+// Write- and read-path validation for the idle daemon's timer list (the
+// Settings store's setIdleTimers and the idle IPC surface both funnel through
+// here). Returns "" when `list` is a legal timer list, else an error string.
+// Rules: an array of rows with exactly one seconds/minutes field resolving to
+// a finite positive integer within the backend-safe range, known actions, a
+// known declared class when present, strictly increasing seconds, and no two
+// timers sharing the same action - a second lock/suspend could never fire
 // meaningfully, and a repeated command is just a duplicate. Two command
 // timers with different commands are distinct actions and may coexist
 // (identity is the trimmed command text plus the declared class, so the
-// same text declared as a lock and as a suspend are two timers).
+// same text declared as a lock and as a suspend are two timers). A legacy
+// empty command row is valid on read; the public add path refuses one.
 function validateIdleTimers(list) {
   if (!Array.isArray(list)) return "timers must be an array"
-  const seenMinutes = {}
+  const seenSeconds = {}
   const seenActions = {}
+  let previous = -1
   for (let i = 0; i < list.length; i++) {
     const r = list[i]
     if (typeof r !== "object" || r === null || Array.isArray(r))
       return "timer " + (i + 1) + " must be an object"
-    const m = r.minutes
-    if (typeof m !== "number" || !isFinite(m) || m <= 0 || Math.floor(m) !== m)
-      return "timer " + (i + 1) + " minutes must be a positive integer"
+    const seconds = idleRowSeconds(r)
+    if (seconds === null)
+      return "timer " + (i + 1) + " needs one positive integer seconds or minutes field"
     const a = r.action
     if (a !== "lock" && a !== "suspend" && a !== "command")
       return "timer " + (i + 1) + " action must be lock, suspend or command"
@@ -958,10 +980,11 @@ function validateIdleTimers(list) {
     const c = declaredIdleClass(r)
     if (IDLE_CLASSES.indexOf(c) === -1)
       return "timer " + (i + 1) + " commandClass must be lock, suspend or empty"
-    if (seenMinutes[m] !== undefined) return "duplicate timer minutes: " + m
-    seenMinutes[m] = true
-    if (i > 0 && m <= list[i - 1].minutes)
-      return "timers must be strictly increasing by minutes"
+    if (seenSeconds[seconds] !== undefined) return "duplicate timer seconds: " + seconds
+    seenSeconds[seconds] = true
+    if (seconds <= previous)
+      return "timers must be strictly increasing by seconds"
+    previous = seconds
     const key = a === "command" ? "command:" + c + ":" + String(r.command).trim() : a
     if (seenActions[key] !== undefined)
       return "timer " + (i + 1) + " duplicates the action of timer " + seenActions[key]
@@ -1073,7 +1096,19 @@ function resolve(schema, userData) {
   const validOverrides = {}
   const rawOverrides = extractOverrides(schema, userData)
   for (const key in rawOverrides) {
-    const check = validateValue(schema.byKey[key], rawOverrides[key])
+    // Migration (01B): the volume right-click defaults used to name the app's
+    // old toggle spelling. Substitute only the two full-namespace keys and
+    // only an override that is EXACTLY the retired string: a custom command
+    // is the user's own and stays untouched. The substituted value is used
+    // for both `values` and `validOverrides`, so a read reports the new
+    // command without writing anything back to the user's file.
+    let override = rawOverrides[key]
+    if ((key === "shell.statusbar.volumeRightClick"
+      || key === "shell.statusbar.volumeMicRightClick")
+      && override === "vb-shell app audioMixer") {
+      override = "vb-shell app toggle audioMixer"
+    }
+    const check = validateValue(schema.byKey[key], override)
     if (check.ok) {
       values[key] = check.value
       validOverrides[key] = check.value
@@ -1270,18 +1305,20 @@ function coerceBool(v) {
   return { ok: false, value: false }
 }
 
-// Build the rows a validated timer list is committed as: minutes + action
+// Build the rows a validated timer list is committed as: seconds + action
 // always, the command and its declared class only for a command row. A
 // dropped class is a silently ungated timer, so the class is carried through
-// the write rather than rebuilt away. Only meaningful for a list that
-// validateIdleTimers() already accepted.
+// the write rather than rebuilt away. A legacy minutes row is committed as
+// seconds, so every write has one canonical shape. Only meaningful for a
+// list that validateIdleTimers() already accepted.
 function buildIdleTimerRows(list) {
   const clean = []
   for (let i = 0; i < list.length; i++) {
-    const row = { minutes: list[i].minutes, action: list[i].action }
+    const row = { seconds: idleRowSeconds(list[i]), action: list[i].action }
     if (row.action === "command") {
       row.command = list[i].command
-      row.commandClass = declaredIdleClass(list[i])
+      const declared = declaredIdleClass(list[i])
+      if (declared !== "") row.commandClass = declared
     }
     clean.push(row)
   }

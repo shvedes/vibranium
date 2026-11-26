@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
+import "MixerTabs.js" as Tabs
 
 // Native audio mixer - the surface the bar's volume right-click and the
 // Settings "Volume mixer" row open. Everything the mixer can do is native
@@ -144,16 +145,35 @@ Singleton {
   // the property then returns a function object - which is truthy, so a
   // binding guarded on "is the mixer open" quietly passes while the window is
   // shut. `visible` is the state; `open()` is the verb.
+  // A tab requested before the window maps lives here. It is applied to the
+  // controller BEFORE `visible` goes true, so the window's first read of its
+  // tab is the requested one; a close cancels the pending option.
+  property string pendingTab: ""
+
+  function _applyPendingTab() {
+    if (root.pendingTab === "" || lease.controller === null) return
+    if (!Tabs.isValid(root.pendingTab)) {
+      root.pendingTab = ""
+      return
+    }
+    lease.controller.initialTab = root.pendingTab
+    root.pendingTab = ""
+  }
+
   function show() {
     if (root.visible) return true
     // Demand first: without a controller there is no window to show, so
     // `visible` must not be set either.
     if (lease.demand() === null) return false
+    root._applyPendingTab()
     closeSettle.stop()
     root.visible = true
     return true
   }
   function hide() {
+    // A close cancels a tab intent that never got applied: the next open is a
+    // fresh summon, not a continuation of one the user dismissed.
+    root.pendingTab = ""
     if (!root.visible) return
     root.visible = false
     // The window is gone the tick the facade hides it; the settle outlasts
@@ -165,7 +185,18 @@ Singleton {
   // The three verbs the `app` host dispatches. Each answers whether the window
   // is up afterwards rather than a bare true, so a caller that reached an
   // unavailable unit learns it from the verb and not only from `status()`.
-  function open() { return root.toggle() }
+  // `present` is the idempotent operation the app host calls. Opening an
+  // already open mixer focuses the live window; it never toggles it shut.
+  function present() {
+    if (root.visible) {
+      if (lease.controller !== null) lease.controller.focusWindow()
+      return true
+    }
+    return root.show()
+  }
+  // Wrappers kept for the in-process Registry callers. They are not public
+  // IPC spellings: the host owns those.
+  function open() { return root.present() }
   function close() { root.hide(); return !root.visible }
   function toggle() {
     if (root.visible) {
@@ -173,6 +204,48 @@ Singleton {
       return false
     }
     return root.show()
+  }
+
+  // The two explicit tab operations behind `app call audioMixer ...`.
+  function openTab(tab) {
+    if (!Tabs.isValid(tab)) return false
+    root.pendingTab = tab
+    return root.present()
+  }
+  function selectTab(tab) {
+    if (!Tabs.isValid(tab) || !root.visible || lease.controller === null) return false
+    return lease.controller.selectTab(tab) === true
+  }
+  function selectedTab() {
+    const ctrl = lease.controller
+    if (ctrl !== null && ctrl.window !== null && ctrl.window !== undefined) return ctrl.window.tab
+    if (root.pendingTab !== "") return root.pendingTab
+    return null
+  }
+
+  // The one in-process route hook Audio uses. It demands the controller
+  // invisibly and hands over the live objects plus Audio's own callback; no
+  // argv text reaches this method.
+  property bool _routePending: false
+
+  function routeFromIpc(node, device, capture, done) {
+    const ctrl = lease.demand()
+    if (ctrl === null) return false
+    const wrapped = function (ok) {
+      root._routePending = false
+      if (typeof done === "function") done(ok === true)
+    }
+    root._routePending = true
+    if (ctrl.routeFromIpc(node, device, capture, wrapped) !== true) {
+      root._routePending = false
+      wrapped(false)
+      return false
+    }
+    return true
+  }
+  function routeBusy() {
+    const ctrl = lease.controller
+    return ctrl !== null && (ctrl.moveBusy === true || ctrl.routingBusy === true)
   }
 
   // Boot's unit teardown hook calls this by name on every facade, so the shared
@@ -195,6 +268,12 @@ Singleton {
     // controller outright - the close settle is the path that gives it back.
     if (root.controllerState !== "ready" || lease.controller === null) return false
     if (root.visible) return false
+    // An IPC route keeps the lease even with no window: its callback belongs
+    // to Audio, and handing the controller back now would cancel the move.
+    if (root._routePending) {
+      idleRelease.restart()
+      return false
+    }
     // A `pactl list` in flight belongs to the controller and reports through a
     // callback that lives there, so releasing now would drop the parse that
     // was about to publish the routing map.
@@ -226,6 +305,7 @@ Singleton {
       routingReady: root.routingReady,
       routingError: root.routingError,
       routingBusy: root.routingBusy,
+      tab: root.selectedTab(),
       outputs: root.outputDevices.length,
       inputs: root.inputDevices.length,
       playback: root.playbackStreams.length,
@@ -249,7 +329,15 @@ Singleton {
     id: closeSettle
     interval: Ui.fastMs + 80
     repeat: false
-    onTriggered: lease.teardown()
+    onTriggered: {
+      // An IPC route still owns the controller: wait for its callback rather
+      // than tearing the graph down under an in-flight `pactl` move.
+      if (root._routePending) {
+        closeSettle.restart()
+        return
+      }
+      lease.teardown()
+    }
   }
 
   // The grace a demand that opened no window keeps its controller for. Long

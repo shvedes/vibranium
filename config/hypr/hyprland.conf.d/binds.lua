@@ -62,11 +62,13 @@ hl.bind(mainMod .. " + SHIFT + D", cycle_layout, { description = "Cycle window l
 -- hl.bind("XF86Explorer", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "Open file manager" })
 
 -- You can take screenshots directly by a key press.
--- hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_raw("vb-shell screenshots region"), { description = "Screenshots: capture region" })
--- hl.bind(mainMod .. " + SHIFT + Z", hl.dsp.exec_raw("vb-shell screenshots screen"), { description = "Screenshots: capture screen" })
+-- Hypr.Helpers.BindShell(mainMod .. " + SHIFT + S", "screenshots.region", { description = "Screenshots: capture region" })
+-- Hypr.Helpers.BindShell(mainMod .. " + SHIFT + Z", "screenshots.screen", { description = "Screenshots: capture screen" })
 
 -- If you're keyboard doesn't have XF86AudioMicMute.
-hl.bind(mainMod .. " + M", hl.dsp.exec_raw("vb-shell audio mictoggle"), { description = "Mute microphone" })
+-- Mic volume keys use microphone down/microphone up (formerly micdown/micup); an absolute
+-- level is `vb-shell audio microphone set N` (formerly `audio set N`, output only).
+Hypr.Helpers.BindShell(mainMod .. " + M", "audio.microphone.toggle", { description = "Mute microphone" })
 
 -- Maybe you need to adjust display scale live!
 -- ============================================

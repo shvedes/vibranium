@@ -56,6 +56,87 @@ Item {
   // unavailable instead of reporting a controller that is not there.
   property string startupError: ""
 
+  // --- idempotent presentation and the fixed IPC route hook ---
+  // The facade holds the pending tab until a window actually maps, so this
+  // property is read once at window construction and never written by the
+  // window itself.
+  property string initialTab: ""
+  readonly property var window: windowLoader.item
+
+  function focusWindow() {
+    if (root.window === null || root.window === undefined) return false
+    const win = root.window.win
+    if (win === null || win === undefined) return false
+    // The existing on-visible activation handles a window still waiting for a
+    // primary screen; this is the mapped path only, and it is a request to the
+    // compositor, not a claim that it complied.
+    win.requestActivate()
+    return true
+  }
+
+  function selectTab(tab) {
+    if (root.window === null || root.window === undefined) return false
+    root.window.tab = tab
+    return true
+  }
+
+  // True while a move job is in flight. The UI's own route actions and the
+  // one IPC slot share this controller; a second IPC request while either is
+  // active is refused by the facade before it reaches here.
+  property bool moveBusy: false
+  property var _moveDone: null
+  property int _routeRequestSeq: 0
+  property var _routeWaiter: null
+
+  // One fixed in-process hook for Audio's stream routing. The caller passes
+  // the live node objects and a closure it owns; no data or method name comes
+  // from argv. The refresh is coalesced by refreshRouting's own guard: when a
+  // read is already running we wait for the first result that started after
+  // this request (the queued refresh), then map against a fresh table.
+  function routeFromIpc(node, device, capture, done) {
+    if (typeof done !== "function") return false
+    if (root.moveBusy) return false
+    if (node === null || node === undefined || device === null || device === undefined) return false
+    const seq = ++root._routeRequestSeq
+    root._routeWaiter = function () {
+      if (seq !== root._routeRequestSeq) return
+      if (root.routingBusy) return
+      // Dead or replaced objects cannot be mapped: their ids would name a
+      // different node in the current routing table.
+      try {
+        if (node.isStream !== (capture !== true)) return
+        if (device.isStream !== false) return
+        if (typeof node.id !== "number" && typeof node.id !== "string") return
+        if (typeof device.id !== "number" && typeof device.id !== "string") return
+      } catch (ignored) {
+        root._finishIpcMove(false)
+        return
+      }
+      root.moveBusy = true
+      // routeStream reports a refused job through this same callback, so the
+      // slot is finished on both paths and no second report is made.
+      root.routeStream(node, device, capture, done)
+    }
+    if (root.routingBusy) return true
+    root._routeWaiter()
+    return true
+  }
+
+  function _finishIpcMove(ok) {
+    root.moveBusy = false
+    const done = root._moveDone
+    root._moveDone = null
+    root._routeWaiter = null
+    if (typeof done === "function") done(ok)
+  }
+
+  // A routing read that just landed: hand the waiting IPC request the first
+  // coalesced result after it was scheduled.
+  function _ipcRoutingAdopted() {
+    const waiter = root._routeWaiter
+    if (typeof waiter === "function") waiter()
+  }
+
   // --- the graph ---
   readonly property var nodes: AudioNodes.nodes
   readonly property bool graphReady: Core.PipeWireState.graphReady
@@ -391,7 +472,10 @@ Item {
       root.routingAt = Date.now()
       root.routingError = ""
     }
-    if (!root._routingQueued) return
+    if (!root._routingQueued) {
+      root._ipcRoutingAdopted()
+      return
+    }
     root._routingQueued = false
     // APP-3: defer through a next-turn timer, not a closure. The timer is a
     // child of this controller, so a teardown destroys it and the queued
@@ -443,7 +527,7 @@ Item {
   // number. The map is refreshed right after the move, because the change is
   // the daemon's and the link topology this app draws from follows it a beat
   // later.
-  function routeStream(node, device, capture) {
+  function routeStream(node, device, capture, done) {
     const streamKey = Model.nodeKey(node)
     const deviceKey = Model.nodeKey(device)
     if (streamKey === "" || deviceKey === "") return false
@@ -457,11 +541,25 @@ Item {
     }
     const argv = Model.moveArgv(capture === true, streamIndex, deviceIndex)
     if (argv.length === 0) return false
+    if (typeof done === "function") root._moveDone = done
+    // UI route actions and the IPC slot share this one owner: a move already
+    // in flight makes a new IPC request `busy` rather than a second job.
+    root.moveBusy = true
     const job = Exec.runJob(argv, root.moveOwner, {
       timeoutMs: root.routeTimeoutMs,
       onFinished: result => root._afterMove(result)
     })
-    if (job === null || job === undefined) root.routingError = "move refused"
+    if (job === null || job === undefined) {
+      root.routingError = "move refused"
+      // A job the registry refused has no completion: report the failure
+      // through the caller's callback now instead of leaving its slot pending.
+      if (typeof done === "function") {
+        root._moveDone = done
+        root.moveBusy = false
+        root._finishIpcMove(false)
+      }
+      return false
+    }
     return true
   }
 
@@ -471,6 +569,8 @@ Item {
   // either way, because a move the daemon refused still leaves the graph where
   // it was and the row's "you are here" dot has to agree.
   function _afterMove(result) {
+    root.moveBusy = false
+    const finished = typeof root._moveDone === "function" ? root._moveDone : null
     if (result !== null && result !== undefined && result.code === "ok") {
       root.routingError = ""
     } else if (result !== null && result !== undefined
@@ -478,9 +578,15 @@ Item {
       // The controller went away mid-move. It is not a failure to report to a
       // user who is no longer looking.
       root.routingError = ""
+      root._moveDone = null
+      root.moveBusy = false
       return
     } else {
       root.routingError = "move failed"
+    }
+    // Only a job that actually exited successfully is a done route.
+    if (finished !== null) {
+      root._finishIpcMove(result !== null && result !== undefined && result.code === "ok")
     }
     // `restart()` unconditionally sets the timer running, so it is guarded on
     // the window: an unconditional restart here would arm a `pactl list` every
@@ -1585,6 +1691,7 @@ Item {
   }
 
   Loader {
+    id: windowLoader
     // A PanelWindow with no screen to place itself on is a surface the
     // compositor decides about, so the load waits for a real one. Ui.primaryScreen
     // is already filtered to screens with a name and a non-zero size, and it is

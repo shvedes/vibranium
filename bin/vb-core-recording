@@ -1,433 +1,354 @@
 #!/bin/bash
 
-source vb-lib-cli
-
-if [[ $CHASSIS_TYPE == vm ]]; then
-  log Error "Screen recording is not available in a VM"
-  exit 1
-fi
-
-VERBOSE=${VERBOSE:-false}
-
-SELF="${0##*/}"
-LOG_FILE="$VIBRANIUM_CACHE/$SELF.log"
-
-log Info "$SELF started: log_file=$LOG_FILE"
+source vb-lib-cli || exit 1
 
 usage() {
   shcat << EOF
-Usage: ${0##*/} [--stop]
+Usage: ${0##*/} [--region | --stop | --status]
 
-Basic screen recording utility created for Vibranium.
-
-With no arguments, starts recording the screen.
+With no arguments, starts recording the focused screen.
 
 Options:
-  --stop      Stop active recording
-  -v, --verbose Enable verbose output
-  -h, --help  Display this help and exit
+  --region       Pick and record a screen region
+  --stop         Stop and save the active recording
+  --status       Exit successfully if a recording is active
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 EOF
 }
 
-get_output_dir() {
-  local -n _dir=$1
-  log Info "Resolving output directory"
-  # Generated recordings live directly under one stable Screencasts root, so
-  # the newest-file scan has a well-defined candidate set.
-  _dir="${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
-
-  if [[ ! -d "$_dir" ]]; then
-    mkdir -p "$_dir"
-    log Info "Created output directory: $_dir"
+notify() {
+  if command -v notify-send >/dev/null; then
+    timeout 2s notify-send -a "Screen Recorder" "$@" || true
   fi
-  log Info "Output directory resolved: $_dir"
 }
 
-output_file() {
-  local -n _path=$1
-  local dir timestamp
+offer_recording() {
+  local LC_ALL=C file="$1" uri="file://" char hex i
 
-  get_output_dir dir
+  # URI escapes represent bytes, so multibyte path characters need one
+  # escape per byte. The C locale makes Bash's substring loop byte-oriented.
+  for ((i = 0; i < ${#file}; i++)); do
+    char="${file:i:1}"
+    case "$char" in
+      [a-zA-Z0-9./_~-]) uri+="$char" ;;
+      *) printf -v hex '%%%02X' "'$char"; uri+="$hex" ;;
+    esac
+  done
+  if ! printf '%s\r\n' "$uri" | timeout 2s wl-copy -t text/uri-list; then
+    log Error "Could not copy the saved recording to the clipboard"
+    return 1
+  fi
+}
+
+report_saved() {
+  local file="$1" fallback="$2"
+  if [[ ! -f "$file" || ! -s "$file" ]]; then
+    log Error "Recorder exited without producing a nonempty recording"
+    notify "Recording failed" "The recorder did not produce a video. See $log_file"
+    return 1
+  fi
+
+  local message="$file"
+  if [[ "$fallback" == true ]]; then
+    message+=$'\nEncoded on the CPU after GPU startup failed.'
+  fi
+  if ! offer_recording "$file"; then
+    message+=$'\nCould not copy the file to the clipboard.'
+  fi
+  notify "Recording saved" "$message"
+}
+
+# /proc stat's command name may contain spaces and parentheses. The birth
+# timestamp distinguishes a stale marker from a live process that reused its PID.
+process_birth() {
+  local pid="$1" record
+  local -a fields
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
+  { IFS= read -r record < "/proc/$pid/stat"; } 2>/dev/null || return 1
+  read -r -a fields <<< "${record##*) }"
+  [[ "${fields[0]}" != Z && "${fields[0]}" != X && "${fields[19]}" =~ ^[0-9]+$ ]] || return 1
+  printf '%s\n' "${fields[19]}"
+}
+
+load_recording() {
+  local -a state=()
+  mapfile -t state < "$marker" || return 1
+  active_pid="${state[0]}"
+  active_socket="${state[1]}"
+  active_birth="${state[2]}"
+  local birth
+  birth=$(process_birth "$active_pid") || return 1
+  if (("${#state[@]}" == 1)); then
+    # A recorder already running when the script is upgraded has a PID-only marker.
+    local executable
+    executable=$(command -v gpu-screen-recorder) || return 1
+    [[ "/proc/$active_pid/exe" -ef "$executable" ]] || return 1
+    active_birth="$birth"
+    return 0
+  fi
+  [[ "$active_socket" == "$VIBRANIUM_RUNTIME"/gsr.??????/ctl &&
+     "$active_birth" == "$birth" ]]
+}
+
+cleanup_state() {
+  rm -f -- "$marker" "$legacy_out"
+}
+
+reserve_output() {
+  local extension="$1" timestamp
   printf -v timestamp '%(%Y-%m-%d_%H-%M-%S)T' -1
-  _path="$dir/recording-$timestamp.$EXT"
-  log Info "Output file: $_path"
+  output=$(mktemp --suffix=".$extension" "$output_dir/recording-$timestamp-XXXXXX") || return 1
+  log Info "Recording output: $output"
 }
 
-visualize() {
-  log Info "Visualizing recording state"
+start_encoder() {
+  local encoder="$1" extension="$2" codec="$3"
+  reserve_output "$extension" || return 1
+  log Info "Starting $encoder encoder for ${capture_flags[*]}"
 
-}
-
-# Offer a recorded file to the clipboard as a URI-list, so a paste target
-# receives a path it can open rather than the media bytes.
-copy() {
-  local -n _path=$1
-  local file="$_path" uri
-
-  if [[ -z $file || ! -f $file ]]; then
-    log Error "No finalized recording to offer, clipboard copy skipped"
-    return 1
-  fi
-
-  # A file URI must percent-encode the characters that would terminate or
-  # reparse the path. The percent sign is substituted first, so its own
-  # replacements are not encoded a second time; path separators stay literal,
-  # as a file URI requires.
-  uri="$file"
-  uri="${uri//\%/%25}"
-  uri="${uri// /%20}"
-  uri="${uri//\#/%23}"
-  uri="${uri//\?/%3F}"
-
-  # The trailing newline terminates the uri-list. wl-copy forks, so the offer
-  # outlives this process instead of dying with the clipboard-less pipe.
-  if printf '%s\n' "file://$uri" | wl-copy -t text/uri-list; then
-    log Info "Copied to clipboard: $file"
-  else
-    log Error "Clipboard copy failed: $file"
-    return 1
-  fi
-}
-
-set_recording_area() {
-  local -n _area=$1
-
-  log Info "Setting recording area: screen"
-  local monitor=""
-  IFS= read -r monitor < <(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name') || true
-  _area="$monitor"
-  log Info "Recording screen: $_area"
-}
-
-init_recording() {
-  local opt_flags=()
-  local fps frm codec quality capture_sink capture_source
-
-  # A nonempty first positional argument selects CPU fallback; the caller
-  # uses --fallback, and the text of the argument is not inspected.
-  if [[ -n ${1:-} ]]; then
-    opt_flags=(-encoder cpu)
-    log Info "Fallback mode: CPU encoding forced"
-  fi
-
-  if [[ -z $AREA ]]; then
-    log Error "Recording area not set"
-    exit 1
-  fi
-
-  log Info "init_recording: area=$AREA fallback=${1:-none}"
-
-  fps="$RECORDING_FPS"
-  EXT="$RECORDING_CONTAINER_TYPE"
-  frm="$RECORDING_FRAMERATE_MODE"
-  codec="$RECORDING_VIDEO_CODEC"
-  quality="$RECORDING_QUALITY"
-
-  capture_sink="$RECORDING_CAPTURE_SINK"
-  capture_source="$RECORDING_CAPTURE_SOURCE"
-
-  log Info "Recording config: fps=$fps ext=$EXT codec=$codec quality=$quality fm=$frm"
-
-  if [[ $capture_source == true && $capture_sink == true ]]; then
-    opt_flags+=(-a "default_input|default_output")
-    log Info "Audio: mic + system output"
-  elif [[ $capture_source == true ]]; then
-    opt_flags+=(-a "default_input")
-    log Info "Audio: mic only"
-  elif [[ $capture_sink == true ]]; then
-    opt_flags+=(-a 'default_output')
-    log Info "Audio: system output only"
-  fi
-
-  # The path is published through a global because a stop runs as a separate
-  # process: start_recording persists it next to the PID so the stop path can
-  # name the exact file instead of inferring it from a directory scan.
-  output_file RECORDING_OUT_FILE
-
-  # The focused monitor name is passed through as one recorder argument.
-  gpu-screen-recorder \
-    "${opt_flags[@]}" \
-    -q "$quality" \
-    -w "$AREA" \
+  gpu-screen-recorder "${audio_flags[@]}" \
+    -encoder "$encoder" \
+    -q "${RECORDING_QUALITY:-high}" \
+    "${capture_flags[@]}" \
     -k "$codec" \
-    -fm "$frm" \
-    -c "$EXT" \
-    -f "$fps" \
-    -o "$RECORDING_OUT_FILE" &> "$LOG_FILE" &
+    -fm "${RECORDING_FRAMERATE_MODE:-cfr}" \
+    -c "$extension" \
+    -f "${RECORDING_FPS:-30}" \
+    -ipc "$socket" \
+    -o "$output" > "$log_file" 2>&1 9>&- &
+  pid=$!
 
-  # $! is the PID assigned to the background launch. kill -0 only confirms
-  # that this process remains alive; it does not prove encoder initialization
-  # or successful recording.
-  RECORDING_PID=$!
-  log Info "GSR launched -> $RECORDING_OUT_FILE"
-
-  sleep 0.2
-  kill -0 "$RECORDING_PID" 2> /dev/null
+  local deadline=$((SECONDS + 5))
+  while birth=$(process_birth "$pid"); do
+    if [[ -S "$socket" ]] && timeout 0.4s gsr-cli -ipc "$socket" status >/dev/null 2>&1; then
+      return 0
+    fi
+    ((SECONDS < deadline)) || break
+    sleep 0.05
+  done
+  abort_start
+  return 1
 }
 
-fallback_notification() {
-  local msg
-  msg="Screen recording completed in fallback mode.\n"
-  msg+="Video was encoded on the CPU instead of the GPU.\n"
-  msg+="This may reduce quality and system performance.\n\n"
-  msg+="Please make sure your GPU supports selected codec.\n"
-  msg+="Click here to see the logs"
+abort_start() {
+  # This is our own unfinished launch. After its shell job expires, the job
+  # spec cannot name a different process that happens to reuse the PID.
+  kill -KILL %+ 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  if [[ -f "$output" && ! -s "$output" ]]; then rm -f -- "$output"; fi
+  rm -f -- "$socket"
+}
 
-  local action=""
-  IFS= read -r action < <(notify-send --action=true -r 4 -a "Screen Recorder" -u critical -t 25000 "Screen Recording" "$msg") || true
-
-  if [[ $action == 0 ]]; then
-    vb-launch-terminal -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_fallback"
+supervise() {
+  local session socket output pid birth fallback=false
+  session=$(mktemp -d "$VIBRANIUM_RUNTIME/gsr.XXXXXX") || return 1
+  socket="$session/ctl"
+  if ! start_encoder gpu "${RECORDING_CONTAINER_TYPE:-mp4}" "${RECORDING_VIDEO_CODEC:-auto}"; then
+    [[ ! -f "$log_file" ]] || mv -f -- "$log_file" "$log_file.latest_fallback"
+    fallback=true
+    if ! start_encoder cpu mp4 h264; then
+      rmdir -- "$session"
+      log Error "Both GPU and CPU recording failed. See $log_file"
+      notify "Recording failed" "GPU and CPU startup failed. See $log_file"
+      return 1
+    fi
   fi
-}
 
-both_failed_notification() {
-  local msg
-  msg="Failed to start screen recording in both normal and fallback modes.\n"
-  msg+="Click here to see the lock."
+  if ! printf '%s\n' "$pid" "$socket" "$birth" > "$session/state" ||
+     ! mv -fT -- "$session/state" "$marker"; then
+    abort_start
+    rm -f -- "$session/state"
+    rmdir -- "$session"
+    log Error "Could not publish recording state"
+    return 1
+  fi
 
-  local action=""
-  IFS= read -r action < <(notify-send --action=true -r 4 -a "Screen Recorder" -u critical -t 25000 "Screen Recording" "$msg") || true
+  # A one-line handshake lets the start command return, while this process
+  # stays the recorder's parent so it can reap it and observe its exit status.
+  exec 9>&-
+  printf 'started\n'
+  exec >/dev/null 2>&1
 
-  if [[ $action == 0 ]]; then
-    vb-launch-terminal -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_failed"
+  local result=0
+  wait "$pid" || result=$?
+  if exec 9>"$lock" && flock 9; then
+    local -a state=()
+    if [[ -r "$marker" ]]; then
+      mapfile -t state < "$marker"
+      if [[ "${state[1]}" == "$socket" ]]; then cleanup_state; fi
+    fi
+    exec 9>&-
+  fi
+  rm -f -- "$socket"
+  rmdir -- "$session"
+
+  if ((result == 0)); then
+    report_saved "$output" "$fallback"
+  else
+    if [[ ! -s "$output" ]]; then rm -f -- "$output"; fi
+    notify "Recording failed" "The recorder exited with status $result. See $log_file"
   fi
 }
 
 start_recording() {
-  log Info "Initializing recording"
-
-  local rec_status
-  init_recording
-  rec_status=$?
-
-  log Info "init_recording exit status: $rec_status"
-
-  if ((rec_status == 0)); then
-    log Info "Recording started (PID: $RECORDING_PID)"
-    # The output path is written before the PID file: the PID file's presence is
-    # the ongoing marker the shell watches, so this ordering keeps the invariant
-    # that a visible recording always has a recoverable output path.
-    echo "$RECORDING_OUT_FILE" > "$VIBRANIUM_RUNTIME/recording-out-file"
-    echo "$RECORDING_PID" > "$VIBRANIUM_RUNTIME/recording-ongoing"
-    visualize
-    return 0
-  fi
-
-  log Info "init_recording exit code: $rec_status, trying fallback"
-  RECORDING_VIDEO_CODEC="h264"
-  RECORDING_CONTAINER_TYPE="mp4"
-
-  # The retry replaces codec and container, rotates the first log, and then
-  # launches a second process. Success is recorded only after that retry passes
-  # the same liveness check.
-  mv "$LOG_FILE" "${LOG_FILE}.latest_fallback"
-
-  if ! init_recording --fallback; then
-    mv "$LOG_FILE" "${LOG_FILE}.latest_failed"
-    log Error "Failed to start recording in fallback mode"
-    both_failed_notification
-    exit 1
-  fi
-
-  # The retry replaced the codec and container, so it also chose a new output
-  # path; this is the one the running recorder writes to.
-  echo "$RECORDING_OUT_FILE" > "$VIBRANIUM_RUNTIME/recording-out-file"
-  echo "$RECORDING_PID" > "$VIBRANIUM_RUNTIME/recording-ongoing"
-  touch "$VIBRANIUM_CACHE/fallback_mode"
-  visualize
-  log Info "Recording started in fallback mode"
-}
-
-stop_rec() {
-  local pid="$1"
-
-  log Info "Stopping recording (PID: $pid)"
-
-  visualize
-  # Sending the signal is not a wait: the recorder finalizes the container only
-  # after it handles the signal and exits, so the flush is awaited below instead
-  # of assumed.
-  kill "$pid"
-  log Info "Kill signal sent to PID $pid"
-
-  wait_recorder "$pid"
-
-  # Both helpers take a variable name, following the nameref convention the rest
-  # of this script uses; SC2034 cannot see the write through the reference.
-  # shellcheck disable=SC2034
-  local out_file
-  get_recording_out_file out_file
-  copy out_file
-
-  if [[ -f "$VIBRANIUM_CACHE/fallback_mode" ]]; then
-    log Info "Fallback notification path"
-    fallback_notification
-    rm "$VIBRANIUM_CACHE/fallback_mode"
-  else
-    log Info "Standard notification path"
-    notify-send -r 3 -a "Screen Recorder" "Recording saved" "Recording has been saved to the default folder"
-  fi
-
-  rm -f "$VIBRANIUM_RUNTIME/recording-ongoing" "$VIBRANIUM_RUNTIME/recording-out-file"
-  log Info "Recording state files removed"
-}
-
-# Block until the recorder PID disappears. The recorder is not a child of this
-# process, so the loop observes the PID going away but cannot reap it; the
-# deadline bounds the wait so a recorder that ignores the signal cannot hold up
-# the clipboard offer or the notification.
-wait_recorder() {
-  local pid="$1"
-  local deadline=$((SECONDS + 5))
-
-  while kill -0 "$pid" 2> /dev/null; do
-    if ((SECONDS >= deadline)); then
-      log Error "Recorder PID $pid still alive after 5s, container may be incomplete"
-      return 1
-    fi
-
-    sleep 0.1
+  local dep
+  local target_tool=hyprctl
+  if [[ "$mode" == region ]]; then target_tool=vb-shell; fi
+  local -a missing=()
+  for dep in gpu-screen-recorder gsr-cli "$target_tool" jq; do
+    if ! command -v "$dep" >/dev/null; then missing+=("$dep"); fi
   done
-
-  log Info "Recorder PID $pid exited, container finalized"
-}
-
-get_ongoing_pid() {
-  local -n _pid=$1
-  local state_file
-
-  # The state file is trusted as a PID string; no ownership or process identity
-  # check is performed here, so stale contents are delegated to kill handling.
-  state_file="$VIBRANIUM_RUNTIME/recording-ongoing"
-  if [[ -f $state_file ]]; then
-    IFS= read -r _pid < "$state_file" || true
-    log Info "Ongoing recording PID: $_pid"
-  else
-    log Info "No ongoing recording state file at $state_file"
-  fi
-}
-
-# Resolve the file the running recorder encodes to. An empty result leaves the
-# caller to skip the clipboard offer rather than offer an unrelated file.
-get_recording_out_file() {
-  local -n _path=$1
-  local state_file="$VIBRANIUM_RUNTIME/recording-out-file"
-  local dir newest='' f
-
-  if [[ -f $state_file ]]; then
-    IFS= read -r _path < "$state_file" || true
-    log Info "Recording output file: $_path"
-    return 0
-  fi
-
-  # A recording begun before this state file existed has no persisted path, so
-  # the newest file in the output directory is the only recoverable candidate.
-  log Info "No recording output state file at $state_file, falling back to a directory scan"
-  get_output_dir dir
-
-  # The `-nt` comparison selects the most recently modified regular file even
-  # when the shell expands no matches; the explicit -f test drops the literal
-  # unmatched glob.
-  for f in "$dir"/recording-*; do
-    if [[ ! -f $f ]]; then
-      continue
-    fi
-
-    if [[ -z $newest || $f -nt $newest ]]; then
-      newest=$f
-    fi
-  done
-
-  _path="$newest"
-  log Info "Scanned recording file: ${newest:-none}"
-}
-
-ensure_deps() {
-  local missing=()
-  log Info "Verifying dependencies: gpu-screen-recorder jq"
-
-  for pkg in gpu-screen-recorder jq; do
-    if ! command -v "$pkg" > /dev/null; then
-      missing+=("$pkg")
-    fi
-  done
-
-  if ((${#missing[@]} > 0)); then
-    log Error "Missing dependencies: ${missing[*]}"
-    vb-cmd-dep-notify \
-      --name "Screen Recording" \
-      --deps "${missing[*]}"
+  if (("${#missing[@]}" > 0)); then
+    log Error "Missing recording tools: ${missing[*]}"
+    vb-cmd-dep-notify --name "Screen Recording" --deps "${missing[*]}"
     return 1
   fi
+
+  source vb-lib-core || return 1
+  local -a capture_flags
+  local selection geometry monitor
+  if [[ "$mode" == region ]]; then
+    selection=$(vb-shell --json tools picker pick logical) || return 1
+    if ! geometry=$(jq -er '
+      select(all(.x, .y, .w, .h; type == "number" and . == floor))
+      | select(.w > 0 and .h > 0)
+      | "\(.w)x\(.h)+\(.x)+\(.y)"
+    ' <<< "$selection"); then
+      log Error "The region picker did not return valid dimensions"
+      return 1
+    fi
+    capture_flags=(-w region -region "$geometry")
+  elif ! monitor=$(set -o pipefail; timeout 2s hyprctl -j monitors |
+      jq -er 'first(.[] | select(.focused == true) | .name | strings | select(length > 0))'); then
+    log Error "Could not find the focused monitor"
+    notify "Recording failed" "Could not find the focused monitor"
+    return 1
+  else
+    capture_flags=(-w "$monitor")
+  fi
+
+  local output_dir="${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
+  if ! mkdir -p -- "$output_dir"; then
+    log Error "Could not create the recordings directory: $output_dir"
+    notify "Recording failed" "Could not create $output_dir"
+    return 1
+  fi
+  output_dir=$(cd -- "$output_dir" && pwd -P) || return 1
+
+  local -a audio_flags=()
+  if [[ "${RECORDING_CAPTURE_SOURCE:-false}" == true ]]; then
+    if [[ "${RECORDING_CAPTURE_SINK:-true}" == true ]]; then
+      audio_flags=(-a "default_input|default_output")
+    else
+      audio_flags=(-a "default_input")
+    fi
+  elif [[ "${RECORDING_CAPTURE_SINK:-true}" == true ]]; then
+    audio_flags=(-a "default_output")
+  fi
+
+  local ready
+  IFS= read -r ready < <(supervise) && [[ "$ready" == started ]]
 }
 
-MODE=""
+stop_legacy() {
+  local output="$1" proc="/proc/$active_pid" executable
+  local -a args=()
+  [[ "$output" == /* ]] || return 1
+  executable=$(command -v gpu-screen-recorder) || return 1
+  { mapfile -d '' -t args < "$proc/cmdline"; } 2>/dev/null || return 1
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -v | --verbose)
-      export VERBOSE=true
-      shift
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    --stop)
-      MODE="$1"
-      shift
+  local i matches=false
+  for ((i = 1; i + 1 < ${#args[@]}; i++)); do
+    if [[ "${args[i]}" == -o && "${args[i+1]}" == "$output" ]]; then
+      matches=true
       break
-      ;;
-    *)
-      log Error "Unknown option: $*"
-      log Error "Try '$SELF --help' for more information"
-      exit 1
-      ;;
+    fi
+  done
+  [[ "$matches" == true && "$proc/exe" -ef "$executable" ]] || return 1
+
+  # Only PID-only markers from the old backend need a signal. Recheck the
+  # process birth immediately before sending it, and during the bounded wait.
+  [[ "$(process_birth "$active_pid")" == "$active_birth" ]] || return 1
+  kill -s INT "$active_pid" || return 1
+  local deadline=$((SECONDS + 5))
+  while [[ "$(process_birth "$active_pid")" == "$active_birth" ]]; do
+    ((SECONDS < deadline)) || return 1
+    sleep 0.1
+  done
+}
+
+stop_recording() {
+  if [[ -n "$active_socket" ]]; then
+    if timeout 5s gsr-cli -ipc "$active_socket" stop >/dev/null; then
+      return 0
+    fi
+  else
+    local output=""
+    if [[ -r "$legacy_out" ]]; then IFS= read -r output < "$legacy_out"; fi
+    if stop_legacy "$output"; then
+      cleanup_state
+      exec 9>&-
+      report_saved "$output" false
+      return
+    fi
+  fi
+  log Error "Recorder did not confirm the stop. The recording may still be active"
+  notify "Could not stop recording" "The recorder did not confirm that the video was saved"
+  return 1
+}
+
+mode=start
+while (($#)); do
+  case "$1" in
+    -v | --verbose) export VERBOSE=true ;;
+    -h | --help) usage; exit 0 ;;
+    --region) mode=region ;;
+    --stop) mode=stop ;;
+    --status) mode=status ;;
+    *) log Error "Unknown option: $1. Try '${0##*/} --help'"; exit 2 ;;
   esac
+  shift
 done
 
-log Info "MODE parsed: $MODE"
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  log Error "Screen recording is not available in a VM"
+  exit 1
+fi
 
-case "$MODE" in
-  "")
-    log Info "Starting screen recording"
+if [[ -z "$VIBRANIUM_RUNTIME" || -z "$VIBRANIUM_CACHE" ]]; then
+  log Error "Vibranium runtime or cache directory is unset"
+  exit 1
+fi
 
-    # The marker prevents a second start only when it is present; it is not a
-    # lock, so simultaneous invocations can still race until either writes it.
-    if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
-      log Error "Recording already in progress"
-      log Error "Use --stop to stop the active recording"
-      exit 1
-    fi
+umask 077
+mkdir -p -- "$VIBRANIUM_RUNTIME" "$VIBRANIUM_CACHE" || exit 1
+marker="$VIBRANIUM_RUNTIME/recording-ongoing"
+legacy_out="$VIBRANIUM_RUNTIME/recording-out-file"
+lock="$VIBRANIUM_RUNTIME/recording.lock"
+log_file="$VIBRANIUM_CACHE/${0##*/}.log"
 
-    if ! ensure_deps; then
-      exit 1
-    fi
+exec 9>"$lock" || exit 1
+if ! flock -n 9; then
+  log Error "A recording operation is already in progress"
+  exit 1
+fi
 
-    source vb-lib-core
+if [[ -f "$marker" ]]; then
+  if load_recording; then
+    case "$mode" in
+      stop) stop_recording; exit $? ;;
+      status) exit 0 ;;
+    esac
+    log Error "Recording already in progress. Use --stop to stop it"
+    exit 1
+  fi
+  cleanup_state || exit 1
+fi
 
-    if ! set_recording_area AREA; then
-      log Info "Area resolution failed"
-      exit 1
-    fi
-
-    log Info "Recording area set: AREA=$AREA"
-    start_recording
-    log Info "start_recording returned"
-    ;;
-  --stop)
-    log Info "Stopping active recording"
-
-    get_ongoing_pid GSR_PID
-
-    if [[ -n $GSR_PID ]]; then
-      source vb-lib-core
-      stop_rec "$GSR_PID"
-      exit 0
-    else
-      log Error "No active recording to stop"
-      exit 1
-    fi
-    ;;
-esac
+if [[ "$mode" == status ]]; then exit 1; fi
+if [[ "$mode" == stop ]]; then
+  log Error "No active recording to stop"
+  exit 1
+fi
+start_recording

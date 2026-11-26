@@ -123,7 +123,7 @@ Singleton {
   Component.onCompleted: {
     Registry.offer("log", {
       title: "Logging",
-      description: "the scoped shell log, its level gate and its scope rules",
+      description: "Read the shell diagnostic log",
       verbNames: [
         "status",
         "help",
@@ -176,7 +176,7 @@ Singleton {
       "",
       "a scope is derived from the file the call was written in:",
       "  features/clipboard/Clipboard.qml                 -> clipboard",
-      "  features/bar/modules/ArchUpdates/ArchUpdates.qml  -> bar.archUpdates",
+      "  features/bar/modules/SystemUpdates/SystemUpdates.qml  -> bar.systemUpdates",
       "  features/ and common/ are stripped, and so are services/ and boot/.",
       "Log.at(name) claims a scope explicitly; a script imports LogCore.js",
       "and calls the same five names.",
@@ -187,7 +187,7 @@ Singleton {
       "option and no per-scope map. Unset means the built-in level,",
       "which is " + Spec.DEFAULT_LEVEL + ".",
       "",
-      "example: " + root.envVar + "=debug,info,bar=warn,-bar.archUpdates",
+      "example: " + root.envVar + "=debug,info,bar=warn,-bar.systemUpdates",
       "  errors, warnings, info and debug everywhere except under bar, where",
       "  bar's own pin reduces it to warnings and errors"
     ].join("\n")

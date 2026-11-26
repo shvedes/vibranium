@@ -411,8 +411,12 @@ function resolveTimezone(city) {
     if (Object.prototype.hasOwnProperty.call(CITY_TO_TZ, norm))
         return CITY_TO_TZ[norm]
     let zones = getAllTimeZones()
+    const flat = norm.replace(/\s+/g, "")
     for (let i = 0; i < zones.length; i++) {
         let z = zones[i]
+        // A full IANA zone is accepted verbatim (case-insensitively), so
+        // `Europe/Berlin` cannot be mistaken for an unknown city.
+        if (z.toLowerCase() === flat) return z
         let slash = z.lastIndexOf("/")
         let tail = slash >= 0 ? z.substring(slash + 1) : z
         if (normalizeCity(tail) === norm) return z

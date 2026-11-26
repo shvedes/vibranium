@@ -516,7 +516,10 @@ function pluginConfigFromMeta(id, dir, meta, persisted) {
     _implLoadTried: false,
     _host: null,
     _view: null,
-    _denied: []
+    _denied: [],
+    // Incremented at load and at teardown: a host callback bound to an older
+    // generation can no longer publish results into a replacement runtime.
+    _generation: 0
   }
   for (let i = 0; i < persisted.length; i++) {
     if (persisted[i].id === id) {
@@ -683,6 +686,181 @@ function pluginDescriptor(cfg) {
 function pluginEnabledFlag(plugins, id) {
   const cfg = pluginById(plugins, id)
   return cfg !== null && cfg.enabled === true && cfg.broken !== true
+}
+
+// The only plugin-specific commands the launcher publishes. Each entry is a
+// shipped built-in id and its fixed verb names; an id or verb outside this
+// table is not dispatchable even if an implementation happens to export a
+// matching member. No plugin code or arbitrary export is reflected over.
+var BUILTIN_IPC_VERBS = ({
+  calc: ["eval"],
+  unit: ["convert"],
+  constants: ["lookup"],
+  color: ["parse"],
+  time: ["lookup", "convert"],
+  fx: ["convert"],
+  websearch: ["url"],
+  binary: []
+})
+
+function builtinIpcVerbs(id) {
+  if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(BUILTIN_IPC_VERBS, id)) return []
+  return BUILTIN_IPC_VERBS[id].slice()
+}
+
+// Presentation-only help for the eight shipped plugin ids. This table is the
+// single source for `appLauncher plugin command <ID> help`: a known disabled or broken
+// plugin still has a page, an unknown id has none, and answering never loads
+// plugin code, demands a controller or reads a user's registry.
+var BUILTIN_PLUGIN_HELP = ({
+  calc: {
+    summary: "Evaluate one arithmetic expression without copying the result",
+    notes: ["`eval <EXPR>` takes one arithmetic expression as a single quoted argv word",
+      "No result is copied to the clipboard and no launcher row is activated"],
+    examples: ["vb-shell appLauncher plugin command calc eval '5+5'"],
+    commands: [{
+      id: "appLauncher.plugin.command.calc.eval",
+      usage: "eval <EXPR>",
+      summary: "Evaluate <EXPR>, one arithmetic expression",
+      arguments: [{ name: "EXPR", type: "ref", summary: "Arithmetic expression, e.g. `5+5`" }],
+      examples: ["vb-shell appLauncher plugin command calc eval '5+5'"]
+    }]
+  },
+  unit: {
+    summary: "Convert one quantity between units without picking a result",
+    notes: ["`convert <QUERY>` takes one quantity query as a single quoted argv word",
+      "Successful conversions are returned in order; a query with no valid result is refused"],
+    examples: ["vb-shell appLauncher plugin command unit convert '1 light years'"],
+    commands: [{
+      id: "appLauncher.plugin.command.unit.convert",
+      usage: "convert <QUERY>",
+      summary: "Convert <QUERY>, a value with source and target units",
+      arguments: [{ name: "QUERY", type: "ref", summary: "Quantity query, e.g. `1 light years`" }],
+      examples: ["vb-shell appLauncher plugin command unit convert '1 light years'"]
+    }]
+  },
+  constants: {
+    summary: "Look up named constants without copying a result",
+    notes: ["`lookup <QUERY>` takes a constant name or keyword as one quoted argv word",
+      "Successful readings are returned in order; no reading is a refusal"],
+    examples: ["vb-shell appLauncher plugin command constants lookup 'speed of light'"],
+    commands: [{
+      id: "appLauncher.plugin.command.constants.lookup",
+      usage: "lookup <QUERY>",
+      summary: "Look up <QUERY>, a constant name or keyword",
+      arguments: [{ name: "QUERY", type: "ref", summary: "Constant name or keyword, e.g. `speed of light`" }],
+      examples: ["vb-shell appLauncher plugin command constants lookup 'speed of light'"]
+    }]
+  },
+  color: {
+    summary: "Parse one color expression into its known formats",
+    notes: ["`parse <COLOR>` takes one color expression as a single quoted argv word",
+      "A partial color is not a result and is refused"],
+    examples: ["vb-shell appLauncher plugin command color parse '#ff8800'"],
+    commands: [{
+      id: "appLauncher.plugin.command.color.parse",
+      usage: "parse <COLOR>",
+      summary: "Parse <COLOR>, one color expression",
+      arguments: [{ name: "COLOR", type: "ref", summary: "Color expression, e.g. `#ff8800`" }],
+      examples: ["vb-shell appLauncher plugin command color parse '#ff8800'"]
+    }]
+  },
+  time: {
+    summary: "Look up a zone's time or convert a typed time",
+    notes: ["`lookup <ZONE_OR_CITY>` takes one city or zone name as a quoted argv word",
+      "`convert <QUERY>` takes one typed time query; a cache miss is accepted and the read can be repeated"],
+    examples: ["vb-shell appLauncher plugin command time lookup 'Berlin'",
+      "vb-shell appLauncher plugin command time convert '7:55pm cst'"],
+    commands: [{
+      id: "appLauncher.plugin.command.time.lookup",
+      usage: "lookup <ZONE_OR_CITY>",
+      summary: "Read the time in <ZONE_OR_CITY>, a city or zone name",
+      arguments: [{ name: "ZONE_OR_CITY", type: "ref", summary: "City or zone name, e.g. `Berlin`" }],
+      examples: ["vb-shell appLauncher plugin command time lookup 'Berlin'"]
+    }, {
+      id: "appLauncher.plugin.command.time.convert",
+      usage: "convert <QUERY>",
+      summary: "Convert <QUERY>, one typed time between zones",
+      arguments: [{ name: "QUERY", type: "ref", summary: "Typed time query, e.g. `7:55pm cst`" }],
+      examples: ["vb-shell appLauncher plugin command time convert '7:55pm cst'"]
+    }]
+  },
+  fx: {
+    summary: "Convert one amount between currencies without picking a result",
+    notes: ["`convert <QUERY>` takes one currency query as a single quoted argv word",
+      "A pending provider fetch is accepted; repeat the read after it settles. No pick is recorded"],
+    examples: ["vb-shell appLauncher plugin command fx convert '1 USD to EUR'"],
+    commands: [{
+      id: "appLauncher.plugin.command.fx.convert",
+      usage: "convert <QUERY>",
+      summary: "Convert <QUERY>, one amount between currencies",
+      arguments: [{ name: "QUERY", type: "ref", summary: "Currency query, e.g. `1 USD to EUR`" }],
+      examples: ["vb-shell appLauncher plugin command fx convert '1 USD to EUR'"]
+    }]
+  },
+  websearch: {
+    summary: "Build a configured search engine URL without opening a browser",
+    notes: ["`url <QUERY>` takes one search phrase as a single quoted argv word",
+      "The command returns the configured engine URL only; browser execution stays in the UI activation path"],
+    examples: ["vb-shell appLauncher plugin command websearch url 'shell ipc'"],
+    commands: [{
+      id: "appLauncher.plugin.command.websearch.url",
+      usage: "url <QUERY>",
+      summary: "Build the URL for <QUERY>, one search phrase",
+      arguments: [{ name: "QUERY", type: "ref", summary: "Search phrase, e.g. `shell ipc`" }],
+      examples: ["vb-shell appLauncher plugin command websearch url 'shell ipc'"]
+    }]
+  },
+  binary: {
+    summary: "Launch programs by name; it has no plugin feature commands",
+    notes: ["`binary` keeps ordinary launcher behavior and plugin lifecycle controls only",
+      "There is no `plugin binary exec` command"],
+    examples: ["vb-shell appLauncher plugin binary status"],
+    commands: []
+  }
+})
+
+// The descriptor for `appLauncher plugin command <ID> help`. Every page points at
+// `plugin list` so an id can be discovered without reading a user's folders.
+function pluginHelpPage(id) {
+  if (typeof id !== "string") return null
+  if (!Object.prototype.hasOwnProperty.call(BUILTIN_PLUGIN_HELP, id)) return null
+  const p = BUILTIN_PLUGIN_HELP[id]
+  const discover = "vb-shell appLauncher plugin list"
+  const notes = ["Discover plugin ids with '" + discover + "'"]
+  for (let i = 0; i < p.notes.length; i++) notes.push(p.notes[i])
+  const examples = p.examples.slice()
+  if (examples.indexOf(discover) < 0) examples.push(discover)
+  const commands = []
+  for (let i = 0; i < p.commands.length; i++) {
+    const c = p.commands[i]
+    commands.push({
+      id: c.id,
+      usage: c.usage,
+      summary: c.summary,
+      arguments: c.arguments ? c.arguments.slice() : [],
+      examples: c.examples ? c.examples.slice() : []
+    })
+  }
+  return {
+    usage: "vb-shell appLauncher plugin command " + id,
+    summary: p.summary,
+    notes: notes,
+    examples: examples,
+    commands: commands
+  }
+}
+
+// The need-to-know projection for `appLauncher plugin list`.
+function pluginListRow(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    type: p.type,
+    keyword: p.keyword,
+    enabled: p.enabled === true
+  }
 }
 
 // The public record set, in one place: everything a status read may show and

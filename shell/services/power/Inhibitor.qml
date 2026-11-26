@@ -8,6 +8,7 @@ import qs.common
 import "../../common/bus/Busctl.js" as Busctl
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/Duration.js" as Duration
+import "../../common/text/IpcCatalog.js" as IpcCatalog
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/math/Range.js" as Range
 import "../../common/process/JobResult.js" as Job
@@ -126,22 +127,33 @@ Singleton {
     return true
   }
 
+  // Named finite steps in ascending order. Cycles are computed from the live
+  // `targetSec`, never from the remembered `cycleIndex`: a custom duration set
+  // through `start` has no named index, and the bar click and the CLI must step
+  // from the same value the user can observe.
+  readonly property var _finiteDurations: [300, 600, 900, 1800]
+
   function cycleForward() {
-    // Forward from the infinite tail releases the lock instead of
-    // wrapping to 5 min: the bar left click doubles as the disable
-    // path while infinite is on (middle click still stops from anywhere).
-    if (root.active && root.infinite) return root.stop()
-    const next = root.active ? (root.cycleIndex + 1) % root.durations.length : 0
-    return root.start(root.durations[next])
+    // off -> 300 -> 600 -> 900 -> 1800 -> infinite -> off. Forward from the
+    // infinite tail releases instead of wrapping: the bar left click doubles
+    // as the disable path while infinite is on.
+    if (!root.active) return root.start(root._finiteDurations[0])
+    if (root.infinite) return root.stop()
+    for (let i = 0; i < root._finiteDurations.length; i++) {
+      if (root._finiteDurations[i] > root.targetSec) return root.start(root._finiteDurations[i])
+    }
+    return root.start(0)
   }
 
   function cycleBackward() {
-    // Backward from the 5 min head releases the lock instead of wrapping
-    // to Infinite: off sits on both ends (forward from Infinite stops,
-    // backward from 5 min stops), so neither direction wraps past it.
-    if (root.active && root.cycleIndex <= 0) return root.stop()
-    const next = root.active ? (root.cycleIndex - 1 + root.durations.length) % root.durations.length : root.durations.length - 1
-    return root.start(root.durations[next])
+    // off -> infinite -> 1800 -> 900 -> 600 -> 300 -> off. Backward from the
+    // smallest step releases, so neither direction wraps past off.
+    if (!root.active) return root.start(0)
+    if (root.infinite) return root.start(root._finiteDurations[root._finiteDurations.length - 1])
+    for (let i = root._finiteDurations.length - 1; i >= 0; i--) {
+      if (root._finiteDurations[i] < root.targetSec) return root.start(root._finiteDurations[i])
+    }
+    return root.stop()
   }
 
   function toggle() {
@@ -190,14 +202,64 @@ Singleton {
   onRemainingChanged: root._publish()
   onTargetSecChanged: root._publish()
 
+  // --- typed gateway --------------------------------------------------------
+
+  function _ok(data, format) {
+    const frame = { v: 1, ok: true }
+    if (data !== undefined) frame.data = data
+    if (format) frame.format = format
+    return frame
+  }
+  function _error(code, message) {
+    return { v: 1, ok: false, error: { code: code, message: message } }
+  }
+  // JSON null while off, 0 only for an active infinite lock, otherwise whole
+  // seconds left floored at one until the owner's expiry edge moves `active`.
+  function _remainingValue() {
+    if (!root.active) return null
+    if (root.infinite) return 0
+    return Math.max(1, Math.ceil((root.deadlineMs - Date.now()) / 1000))
+  }
+
+  function _ipcStart(seconds) {
+    const n = Number(seconds)
+    if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n || n > 2147483647) {
+      return _error("invalid-argument", "seconds must be an integer 0..2147483647")
+    }
+    // Reuse the owner: a second start while active only retargets the one job.
+    root.start(n)
+    return _ok()
+  }
+
+  function _ipcStop() {
+    // Silent success when already off; stop() owns the cancellation and never
+    // touches a foreign inhibitor.
+    root.stop()
+    return _ok()
+  }
+
+  function _ipcStatus() {
+    return _ok({
+      unit: root.tag,
+      healthy: !root.inhibitDegraded,
+      active: root.active === true,
+      held: root.held === true,
+      infinite: root.infinite === true,
+      targetSec: root.targetSec,
+      remaining: root._remainingValue(),
+      registryDegraded: root.registryDegraded === true,
+      screenSaverBlocked: root.screenSaverBlocked === true,
+      screenSaverDegraded: root.screenSaverDegraded === true
+    }, { kind: "record" })
+  }
+
   // --- IPC ---
 
   IpcHandler {
     target: "inhibitor"
     function help(command: string): string {
-      return UnitIpc.help("inhibitor", "Inhibitor", "caffeine-style idle + sleep inhibit", [
+      return UnitIpc.help("inhibitor", "Inhibitor", "Keep the system awake for a set time", [
         { name: "isActive", help: "is an inhibit active?" },
-        { name: "toggle", help: "engage/release the inhibit" },
         { name: "start", help: "(seconds, 0 = infinite) start a timed inhibit" },
         { name: "stop", help: "release the inhibit" },
         { name: "cycleForward", help: "step to the next duration" },
@@ -225,15 +287,8 @@ Singleton {
     // functions through Registry.call and the menu row calls root.stop()
     // directly from its confirm closure. `error` is still returned for a verb
     // that changed nothing - a stop with no lock, a start with a target that
-    // is not a duration.
-    function toggle(): string {
-      // Always reports: toggle() is stop() when active and start() when not,
-      // so there is no outcome in which it leaves the state alone. It calls the
-      // two root functions rather than the verbs above, which is why this is
-      // one line and not two.
-      root.toggle()
-      return "ok"
-    }
+    // is not a duration. The native public `toggle` spelling is retired; the
+    // in-process root.toggle() remains for the Caffeine/menu consumers.
     function start(seconds: string): string {
       if (!root.start(Number(seconds))) return "error"
       return "ok"
@@ -995,20 +1050,19 @@ Singleton {
   Component.onCompleted: {
     Registry.offer("inhibitor", {
       title: "Inhibitor",
-      description: "caffeine-style idle + lock inhibit",
-      verbNames: [
-        "isActive",
-        "toggle",
-        "start",
-        "stop",
-        "cycleForward",
-        "cycleBackward",
-        "status",
-        "help",
-        "ping",
-      ]
+      description: "Keep the system awake for a set time",
+      verbNames: IpcCatalog.topLevelVerbs("inhibitor")
     })
     Registry.register(root.tag, root)
+    IpcRouter.register("inhibitor", root, {
+      "inhibitor.remaining": function () { return root._ok(root._remainingValue(), { kind: "value" }) },
+      "inhibitor.start": function (a) { return root._ipcStart(a.SECONDS) },
+      "inhibitor.stop": function () { return root._ipcStop() },
+      "inhibitor.cycle.next": function () { root.cycleForward(); return root._ok() },
+      "inhibitor.cycle.back": function () { root.cycleBackward(); return root._ok() },
+      "inhibitor.status": function () { return root._ipcStatus() },
+      "inhibitor.ping": function () { return root._ok("pong", { kind: "text" }) }
+    })
     root._registerMenuProvider()
     root._startMonitor()
     root._startSaMonitor()
@@ -1019,6 +1073,7 @@ Singleton {
   }
 
   Component.onDestruction: {
+    IpcRouter.unregister("inhibitor", root)
     // Teardown releases the provider id: the surface closes over this
     // root, so a survivor would keep a dead confirm closure.
     ProviderHost.unregisterProvider("caffeine", root)

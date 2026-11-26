@@ -410,8 +410,12 @@ function resolveTimezone(city) {
     if (Object.prototype.hasOwnProperty.call(CITY_TO_TZ, norm))
         return CITY_TO_TZ[norm]
     let zones = getAllTimeZones()
+    const flat = norm.replace(/\s+/g, "")
     for (let i = 0; i < zones.length; i++) {
         let z = zones[i]
+        // A full IANA zone is accepted verbatim (case-insensitively), so
+        // `Europe/Berlin` cannot be mistaken for an unknown city.
+        if (z.toLowerCase() === flat) return z
         let slash = z.lastIndexOf("/")
         let tail = slash >= 0 ? z.substring(slash + 1) : z
         if (normalizeCity(tail) === norm) return z
@@ -922,6 +926,36 @@ function tryTime(query, now) {
       const v = String(item && item.copyValue || "")
       if (v === "") return
       api.execDetached("printf %s " + api.shellQuote(v) + " | wl-copy")
+    },
+    ipc: {
+      lookup: function (query) {
+        const raw = String(query ?? "").trim()
+        // The IPC verb also accepts a bare city or full IANA zone; the UI's
+        // `time in <city>` prefix stays supported but is not required.
+        let city = parseTimeQuery(raw)
+        if (city === null) city = raw
+        if (city === "") return null
+        const tz = resolveTimezone(city)
+        if (!tz) return { error: "not-found" }
+        const cached = api.cachedTime(tz)
+        if (!cached) {
+          api.requestTime(tz)
+          return { state: "accepted", timezone: tz }
+        }
+        return {
+          city: toDisplayName(city), timezone: tz,
+          time: cached.time || "", date: cached.date || "", code: cached.code || ""
+        }
+      },
+      convert: function (query) {
+        const c = tryConvert(String(query ?? ""))
+        if (!c) return null
+        return {
+          sourceTime: c.sourceTime, sourceDate: c.sourceDate,
+          sourceOffset: c.sourceOffset, localTime: c.localTime,
+          localDate: c.localDate, localOffset: c.localOffset
+        }
+      }
     }
   }
 })()

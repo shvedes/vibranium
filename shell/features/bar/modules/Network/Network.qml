@@ -275,6 +275,14 @@ BarModule {
     }
     nameFlash.pulse()
   }
+
+  // IPC's explicit link announcement. It reuses the fullscreen defer and
+  // never connects, rescans or changes a named link.
+  function ipcTrigger(name) {
+    if (name !== "flashConnection") return false
+    root._fireLinkFlash()
+    return true
+  }
   onFullscreenActiveChanged: {
     if (root.fullscreenActive) {
       // Entering fullscreen with a flash up: park it and take it off

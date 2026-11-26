@@ -34,7 +34,7 @@ Singleton {
   property bool ongoing: false
   property bool confirmed: false
   // Epoch ms when the current recording started (detection time for
-  // external starts - the state file carries only the PID). Stamped
+  // external starts - the state file carries process identity). Stamped
   // before `ongoing` flips so the bus payload always pairs them.
   property double startedAtMs: 0
 
@@ -100,9 +100,18 @@ Singleton {
   property var _watchUnsub: null
 
   Component.onCompleted: {
+    IpcRouter.register("recording", root, {
+      "recording.start": function (_, ctx) { return root.start(ctx.words[1] === "region") ? "ok" : "error" },
+      "recording.stop": function () { return ipc.stop() },
+      "recording.toggle": function () { return ipc.toggle() },
+      "recording.open": function () { return ipc.open() },
+      "recording.close": function () { return ipc.close() },
+      "recording.status": function () { return ipc.status() },
+      "recording.ping": function () { return ipc.ping() }
+    })
     Registry.offer("recording", {
       title: "Recording",
-      description: "screen recorder",
+      description: "Record the screen",
       verbNames: [
         "close",
         "open",
@@ -125,9 +134,13 @@ Singleton {
       root._watchUnsub = Watch.subscribe(Paths.vibraniumRuntime + "/recording-ongoing", (text) => {
         root._refresh()
       })
+      // A session can end before the recorder's supervisor clears its marker.
+      if (root.ongoing)
+        Quickshell.execDetached([Paths.vibraniumHome + "/bin/vb-core-recording", "--status"])
     })
   }
   Component.onDestruction: {
+    IpcRouter.unregister("recording", root)
     // Teardown releases the provider id: the surface closes over this
     // root, so a survivor would keep a dead confirm closure.
     ProviderHost.unregisterProvider("recording", root)
@@ -201,8 +214,12 @@ Singleton {
     root._setIntent("stop")
   }
 
-  function _start() {
+  function _start(region) {
     const cmd = Paths.vibraniumHome + "/bin/vb-core-recording"
+    if (region === true) {
+      Quickshell.execDetached([cmd, "--region"])
+      return
+    }
     Quickshell.execDetached([cmd])
     // Same route as stop: spawn, then record the click as a pending intent.
     root._setIntent("start")
@@ -210,7 +227,7 @@ Singleton {
 
   // Public API --------------------------------------------------------------
 
-  function start(): bool {
+  function start(region): bool {
     if (root._isVm()) {
       root._notifyVm()
       return false
@@ -218,7 +235,7 @@ Singleton {
     if (root._syncOngoing()) {
       return false
     }
-    root._start()
+    root._start(region)
     return true
   }
 
@@ -267,9 +284,10 @@ Singleton {
   }
 
   IpcHandler {
+    id: ipc
     target: "recording"
     function help(command: string): string {
-      return UnitIpc.help("recording", "Recording", "screen recorder", [
+      return UnitIpc.help("recording", "Recording", "Record the screen", [
         { name: "close", help: "hide the panel" },
         { name: "open", help: "show the panel" },
         { name: "start", help: "start recording" },

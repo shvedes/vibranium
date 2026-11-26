@@ -316,7 +316,7 @@ BarModule {
             return
           }
           if (mouse.button === Qt.RightButton) {
-            root.clickCommand("micRightClick", "vb-shell app audioMixer")
+            root.clickCommand("micRightClick", "vb-shell app toggle audioMixer")
             return
           }
           Core.Audio.toggleSourceMute()
@@ -398,7 +398,7 @@ BarModule {
             return
           }
           if (mouse.button === Qt.RightButton) {
-            root.clickCommand("rightClick", "vb-shell app audioMixer")
+            root.clickCommand("rightClick", "vb-shell app toggle audioMixer")
             return
           }
           root.openIsland()

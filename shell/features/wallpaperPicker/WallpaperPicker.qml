@@ -247,9 +247,16 @@ Singleton {
     }
 
     Component.onCompleted: {
+      IpcRouter.register("wallpaperPicker", root, {
+        "wallpaperPicker.open": function () { return ipc.open() },
+        "wallpaperPicker.close": function () { return ipc.close() },
+        "wallpaperPicker.toggle": function () { return ipc.toggle() },
+        "wallpaperPicker.status": function () { return ipc.status() },
+        "wallpaperPicker.ping": function () { return ipc.ping() }
+      })
       Registry.offer("wallpaperPicker", {
         title: "Wallpaper picker",
-        description: "per-theme wallpaper picker",
+        description: "Choose per-theme wallpapers",
         verbNames: [
           "close",
           "open",
@@ -266,6 +273,7 @@ Singleton {
         })
     }
     Component.onDestruction: {
+        IpcRouter.unregister("wallpaperPicker", root)
         if (root._watchUnsub) root._watchUnsub()
         Registry.unregister("wallpaperPicker")
         // The closing flag comes first: cancelling a child reports its
@@ -1142,9 +1150,10 @@ Singleton {
         }
     }
     IpcHandler {
+        id: ipc
         target: "wallpaperPicker"
         function help(command: string): string {
-          return UnitIpc.help("wallpaperPicker", "Wallpaper picker", "per-theme wallpaper picker", [
+          return UnitIpc.help("wallpaperPicker", "Wallpaper picker", "Choose per-theme wallpapers", [
             { name: "close", help: "hide the picker" },
             { name: "open", help: "show the picker" },
             { name: "toggle", help: "show/hide" },

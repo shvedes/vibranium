@@ -14,6 +14,8 @@ import "MenuState.js" as MenuState
 import "../../common/math/Range.js" as Range
 import "../../common/settings/SettingsLib.js" as SettingsLib
 import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/text/IpcCatalog.js" as Catalog
+import "MenuIpc.js" as MenuIpc
 
 // Menu service: owns loaded bundles, the page stack, search state and the
 // per-item runtime store. Rendering lives in MenuView/MenuPanel; rows call
@@ -107,6 +109,20 @@ Singleton {
   property var _states: ({})
   property int rev: 0
 
+  // --- public gateway bookkeeping -----------------------------------------
+  // One open generation per successful replacement/open. Row refs are retired
+  // on close; page ordinals retire when the object under a page id is replaced
+  // so a recycled uid or a rebuilt page can never inherit old refs.
+  property int openGeneration: 0
+  property string ipcIncarnation: ""
+  property var _refPages: ({})
+  property int _pageOrdinalSeq: 0
+  property int _rowOrdinalSeq: 0
+  property var _refsByValue: ({})
+  property var _landingIntent: null
+  property bool _ipcRegistered: false
+  property bool _ipcProviderPending: false
+
   // The current frame and page are derived from the navigation stack.
   readonly property var frame: root.stack.length ? root.stack[root.stack.length - 1] : null
   readonly property string pageId: root.frame ? root.frame.id : ""
@@ -153,13 +169,68 @@ Singleton {
     printErrors: false
   }
 
+  // One explicit closure per catalog row id. The map is declared inside the
+  // registration so the manifest's static check sees exactly the same set the
+  // router receives at runtime.
   Component.onCompleted: {
+    root._ipcRegistered = IpcRouter.register("menu", root, {
+      "menu.open.inline": function (a, ctx) {
+        const text = ctx.tokens.JSON !== undefined ? String(ctx.tokens.JSON) : JSON.stringify(a.JSON)
+        const hash = text.indexOf("#")
+        const frag = hash < 0 ? "" : text.substring(hash + 1)
+        return root.ipcOpen({ inline: true, text: hash < 0 ? text : text.substring(0, hash),
+          frag: frag });
+      },
+      "menu.open.file": function (a) { return root.ipcOpen({ path: a.PATH }) },
+      "menu.toggle.inline": function (a, ctx) {
+        const text = ctx.tokens.JSON !== undefined ? String(ctx.tokens.JSON) : JSON.stringify(a.JSON)
+        const hash = text.indexOf("#")
+        const frag = hash < 0 ? "" : text.substring(hash + 1)
+        return root.ipcToggle({ inline: true, text: hash < 0 ? text : text.substring(0, hash),
+          frag: frag });
+      },
+      "menu.toggle.file": function (a) { return root.ipcToggle({ path: a.PATH }) },
+      "menu.close": function () { return root.ipcClose() },
+      "menu.pages": function () { return root.ipcPages() },
+      "menu.go": function (a) { return root.ipcGo(a.PAGE) },
+      "menu.back": function () { return root.ipcBack() },
+      "menu.list": function (a) { return root.ipcList(a.PAGE) },
+      "menu.current": function () { return root.ipcCurrent() },
+      "menu.select": function (a) { return root.ipcSelect(a.ROW) },
+      "menu.search.global": function (a) { return root.ipcSearch("global", a.QUERY) },
+      "menu.search.scoped": function (a) { return root.ipcSearch("scoped", a.QUERY) },
+      "menu.search.clear": function () { return root.ipcSearch("clear", "") },
+      "menu.item.ROW.get": function (a) { return root.ipcItemGet(a.ROW) },
+      "menu.item.ROW.activate": function (a) { return root.ipcItem(a.ROW, "activate", {}) },
+      "menu.item.ROW.open": function (a) { return root.ipcItem(a.ROW, "open", {}) },
+      "menu.item.ROW.close": function (a) { return root.ipcItem(a.ROW, "close", {}) },
+      "menu.item.ROW.toggle": function (a) { return root.ipcItem(a.ROW, "toggle", {}) },
+      "menu.item.ROW.set": function (a) { return root.ipcItem(a.ROW, "set", { value: a.JSON }) },
+      "menu.item.ROW.step.up": function (a) { return root.ipcItem(a.ROW, "step", { direction: "up" }) },
+      "menu.item.ROW.step.down": function (a) { return root.ipcItem(a.ROW, "step", { direction: "down" }) },
+      "menu.item.ROW.options": function (a) { return root.ipcItem(a.ROW, "options", {}) },
+      "menu.item.ROW.choose": function (a) { return root.ipcItem(a.ROW, "choose", { option: a.OPTION }) },
+      "menu.item.ROW.info.open": function (a) { return root.ipcItem(a.ROW, "info", { mode: "open" }) },
+      "menu.item.ROW.info.close": function (a) { return root.ipcItem(a.ROW, "info", { mode: "close" }) },
+      "menu.item.ROW.confirm.status": function (a) { return root.ipcItem(a.ROW, "confirm", { verb: "status" }) },
+      "menu.item.ROW.confirm.next": function (a) { return root.ipcItem(a.ROW, "confirm", { verb: "next" }) },
+      "menu.item.ROW.confirm.cancel": function (a) { return root.ipcItem(a.ROW, "confirm", { verb: "cancel" }) },
+      "menu.item.ROW.flow.status": function (a) { return root.ipcItem(a.ROW, "flow", { verb: "status" }) },
+      "menu.item.ROW.flow.next": function (a) { return root.ipcItem(a.ROW, "flow", { verb: "next" }) },
+      "menu.item.ROW.flow.back": function (a) { return root.ipcItem(a.ROW, "flow", { verb: "back" }) },
+      "menu.item.ROW.flow.commit": function (a) { return root.ipcItem(a.ROW, "flow", { verb: "commit" }) },
+      "menu.item.ROW.flow.cancel": function (a) { return root.ipcItem(a.ROW, "flow", { verb: "cancel" }) },
+      "menu.item.ROW.flow.set": function (a) {
+        return root.ipcItem(a.ROW, "flow", { verb: "set", step: a.STEP, value: a.JSON });
+      },
+      "menu.item.ROW.delete": function (a) { return root.ipcItem(a.ROW, "delete", {}) },
+      "menu.status": function () { return root.ipcOwnerStatus() },
+      "menu.ping": function () { return root.ipcPing() }
+    })
     Registry.offer("menu", {
       title: "Menu",
-      description: "Menu service",
-      verbNames: ["openFile", "open", "close", "toggleFile", "status", "dump", "probe",
-        "back", "debugActivate", "debugMove", "debugMoveOption", "debugRows",
-        "debugSetCurrentIdx", "debugState", "dumpRows", "help", "ping", "toggle"]
+      description: "Open and control menu bundles",
+      verbNames: Catalog.topLevelVerbs("menu")
     })
     Registry.register("menu", root)
     // Page surface half of the PageHost contract: state owners publish
@@ -177,6 +248,7 @@ Singleton {
   }
 
   Component.onDestruction: {
+    IpcRouter.unregister("menu", root)
     PageHost.release(root._pageHostHandler)
     Registry.unregister("menu")
   }
@@ -242,6 +314,21 @@ Singleton {
     return file === Paths.settingsBundlePath || file === Paths.settingsCatalogPath
   }
 
+  function _canonicalSource(path) {
+    const s = String(path ?? "")
+    const h = s.indexOf("#")
+    return h < 0 ? s : s.substring(0, h)
+  }
+
+  // The emoji picker asks whether its own bundle is already showing before it
+  // closes anything. Fragments select an entry inside one source, so they are
+  // deliberately ignored here; an inline bundle has no file source.
+  function isBundleOpen(path) {
+    if (!root.open || root._lastPath === undefined || root._lastPath === "") return false
+    const want = root._canonicalSource(path)
+    return want !== "" && root._canonicalSource(root._lastPath) === want
+  }
+
   function toggleFile(path) {
     if (root.open && root._lastPath === path) {
       root.close()
@@ -254,6 +341,7 @@ Singleton {
   function close() {
     if (!root.open) return
     root.stack = []
+    root._retireRefs()
     root.resetSearch()
     root._states = ({})
     // Flow stages are session state: a wizard left half-filled must not stay
@@ -470,6 +558,7 @@ Singleton {
   }
 
   property string _lastPath: ""
+  property string _lastInline: ""
   property var _bundleCache: ({})
   property bool _prewarmed: false
   property bool _lazyPreloaded: false
@@ -640,6 +729,7 @@ Singleton {
 
   function loadText(text, extOverride) {
     root._lastPath = ""
+    root._lastInline = String(text ?? "")
     root._loadContainers(text, extOverride)
     root._primeRuntime(root.bundle)
     root._claimToken = SurfaceClaim.claim("menu", root.close, root)
@@ -690,7 +780,20 @@ Singleton {
     return false
   }
 
+  // The internal entry used by the existing file/JSON open paths. It still
+  // swaps the active view once, through the same install step the gateway
+  // uses after it has prepared and validated a candidate.
   function _loadContainers(text, extOverride, entryFrag) {
+    root._installContainers(root._assembleContainers(text, extOverride,
+      root._lastPath, entryFrag))
+  }
+
+  // Pure assembly: read the bundle, merge the owned stores, apply the
+  // extension and scope the search index, then RETURN the candidate. Nothing
+  // here swaps the active view, retires dynamic pages or clears runtime
+  // state, so a gateway can prepare and validate a replacement before it
+  // closes the old bundle.
+  function _assembleContainers(text, extText, path, entryFrag) {
     const t0 = Date.now()
     // The unified catalog carries menu `menus`: parseBundle reads those,
     // while a generated settings bundle carries `pages`. Either way the
@@ -701,7 +804,7 @@ Singleton {
     // containers from the parsed `menus`. Every other bundle, and the catalog
     // before it has been read, still goes through the text path.
     let base = null
-    if (root._catalogFile(root._lastPath)) {
+    if (root._catalogFile(path)) {
       const catalog = SettingsCatalog.load()
       if (catalog && Array.isArray(catalog.menus)) {
         try {
@@ -715,9 +818,9 @@ Singleton {
     let searchBase = base
 
     const bare = base.pages.length === 1 && base.pages[0].items.length === 0
-    const linksSettings = root._catalogFile(root._lastPath) || bare
+    const linksSettings = root._catalogFile(path) || bare
       || root._linksPage(base, "settings")
-    root._settingsFamily = linksSettings
+    let settingsFamily = linksSettings
 
     // One tree, one merge. Each store hands over page descriptors for its own
     // half of the catalog (SettingsLib.buildPages) and _mergeStorePages
@@ -748,7 +851,6 @@ Singleton {
     // page (`menus`), and the dynamic settings/hypr leaves merged above.
     // Unrelated picker bundles opened via openJson stay untouched.
 
-    let extText = extOverride
     if (extText === undefined) {
       const extPath = Paths.configHome
       extensionLoader.path = extPath + "/vibranium/user-menu.jsonc"
@@ -769,7 +871,7 @@ Singleton {
     // search and the external-half gate span only the opened entry's tree,
     // the way one-file-per-menu scoped both before. Other bundles keep
     // their file scope.
-    const isCatalog = root._catalogFile(root._lastPath)
+    const isCatalog = root._catalogFile(path)
     if (isCatalog) {
       let entry = base.entry
       if (typeof entryFrag === "string" && entryFrag !== ""
@@ -799,11 +901,53 @@ Singleton {
           }
         }
       }
-      root._settingsFamily = fam
+      settingsFamily = fam
     }
 
-    root.bundle = base
-    root._builtinIndex = MenuLib.buildIndex(searchBase)
+    root._markSensitive(base, text)
+    return {
+      bundle: base,
+      index: MenuLib.buildIndex(searchBase),
+      settingsFamily: settingsFamily === true,
+      entry: base.entry,
+      byId: base.byId
+    }
+  }
+
+  // `sensitive` is an authoring flag on a bundle row. The normalized payload
+  // deliberately keeps a fixed key set, so carry the flag across as a private
+  // marker on the row the gateway can read without widening the public shape.
+  function _markSensitive(base, text) {
+    let raw
+    try { raw = JSON.parse(MenuLib.stripJsonc(String(text ?? ""))) } catch (e) { return }
+    if (!raw || !Array.isArray(raw.pages) || !base || !base.byId) return
+    const mark = function (items, rawItems) {
+      if (!Array.isArray(items) || !Array.isArray(rawItems)) return
+      for (let i = 0; i < items.length && i < rawItems.length; i++) {
+        const src = rawItems[i]
+        if (src && src.sensitive === true) items[i]._sensitive = true
+        if (src && Array.isArray(src.children))
+          mark(items[i] && items[i].children, src.children)
+      }
+    }
+    for (let p = 0; p < raw.pages.length; p++) {
+      const src = raw.pages[p]
+      if (!src || typeof src.id !== "string") continue
+      const page = base.byId[src.id]
+      if (page) mark(page.items, src.items)
+    }
+  }
+
+  // The only writer of the active containers. Dropped external pages are
+  // replayed by their owners afterwards; nothing here chooses a new entry
+  // frame or claims a surface.
+  function _installContainers(candidate) {
+    // The scope is recorded from the assemble decision; it is not computed a
+    // second way at install time.
+    const linksSettings = candidate.settingsFamily === true
+    root.bundle = candidate.bundle
+    root._builtinIndex = candidate.index
+    root._settingsFamily = linksSettings
     const droppedPages = Object.assign({}, root._dynamicPages, root._optionPages)
     root._dynamicPages = {}
     root._optionPages = {}
@@ -822,7 +966,19 @@ Singleton {
     PageHost.reportDropped()
   }
 
+  function _retireRefs() {
+    root._refPages = ({})
+    root._refsByValue = ({})
+    root._landingIntent = null
+  }
+
+  function _advanceOpenGeneration() {
+    root.openGeneration++
+    root._retireRefs()
+  }
+
   function _primeRuntime(bundle) {
+    root._advanceOpenGeneration()
     root.bundle = bundle
     root.resetSearch()
     root.pendingSel = -1
@@ -876,11 +1032,14 @@ Singleton {
   // An empty query needs no special case here: _applyQuery publishes it and
   // drops the ranked window, which is what clearing the bar means.
   function setQuery(q) {
+    root._landingIntent = null
     // Retire deferred index-provider callbacks from the previous query. A
     // scan completing against an erased query re-applies the old text,
     // re-enters search and drops the restored page's reveal claim, leaving
     // its expanded dropdown with no region or background.
     root._pendingQueryGen++
+    root._retireSearchRefs()
+    root._ipcProviderPending = false
     // A lazy merge rebuilds the index here; the new query is applied below,
     // so an intermediate re-scan of the outgoing query would only churn.
     root._applyingQuery = true
@@ -914,11 +1073,13 @@ Singleton {
       if (took && typeof provider.whenScanned === "function") {
         const gen = ++root._pendingQueryGen
         const held = String(q || "")
+        root._ipcProviderPending = true
         provider.whenScanned(() => {
           if (gen !== root._pendingQueryGen) return
           const live = String(root.query || "")
           if (live !== "" && live !== held) root.setQuery(live)
           else root.setQuery(held)
+          root._ipcProviderPending = false
         })
       }
     }
@@ -1075,6 +1236,7 @@ Singleton {
   // Search state resets together everywhere: navigation, close, reload.
   function resetSearch() {
     root._pendingQueryGen++
+    root._retireSearchRefs()
     root.clearScoped()
     root.query = ""
     root.results = []
@@ -1314,12 +1476,17 @@ Singleton {
 
   function _flowState(item) {
     const uid = item ? item.uid : ""
-    if (!uid) return { index: 0, values: {} }
+    if (!uid) return MenuState.blankFlow()
     let st = root._flow[uid]
     if (st === undefined) {
-      st = { index: 0, values: {} }
+      st = MenuState.blankFlow()
       root._flow[uid] = st
     }
+    // Older records from a live shell replace only the missing fields; the
+    // visited chain and the draft presence bit must exist for every flow.
+    if (!Array.isArray(st.visited)) st.visited = [Number(st.index) || 0]
+    if (!st.draft || typeof st.draft !== "object") st.draft = { set: false, value: null }
+    if (st.ready === undefined) st.ready = false
     return st
   }
 
@@ -1850,6 +2017,7 @@ Singleton {
   function commitOption(item) {
     const parent = root.itemByUid(item ? item._parentUid : "")
     if (!item || !parent) return false
+    if (item.enabled === false || root.isDisabled(item)) return false
     const isAction = parent.var === "" && (parent.onSelect !== "" || parent.onCall !== "")
     setValue(parent, item.value)
     if (isAction) {
@@ -1968,6 +2136,7 @@ Singleton {
   }
 
   function push(pageId) {
+    root._landingIntent = null
     if (!root.hasPage(pageId)) return false
     const next = root.stack.slice()
     next.push({
@@ -2008,6 +2177,7 @@ Singleton {
       root.close()
       return
     }
+    root._landingIntent = null
     root.collapseFrame(root.frame.id)
     root.resetSearch()
     // Leaf pages forget their cursor: only ancestors (parents) keep
@@ -2175,6 +2345,7 @@ Singleton {
 
   function _applyScopedQuery(q, pre) {
     root._scopedPending = ""
+    root._retireSearchRefs()
     root.scopedQuery = q
     let tree = pre
     if (!tree || !Array.isArray(tree.rows)) {
@@ -2244,16 +2415,18 @@ Singleton {
   }
 
   function setChecked(item, value) {
+    if (!item || !item.uid) return false
     if (item.var !== "") {
       let ok = false
       const v = String(item.var)
       if (v.indexOf("hypr.") === 0) ok = HyprlandSettings.setOption(item.var, value === true)
       else if (v.indexOf("misc.") === 0) ok = MiscSettings.setOption(item.var, value === true)
       else ok = Settings.setOption(item.var, value === true)
-      if (!ok) return
+      if (!ok) return false
     }
     root._rawState(item).checked = value === true
     root.rev++
+    return true
   }
 
   // Optimistic write for literal/mirror toggles (checked is a system
@@ -2270,16 +2443,18 @@ Singleton {
   }
 
   function setValue(item, value) {
+    if (!item || !item.uid) return false
     if (item.var !== "") {
       let ok = false
       const v = String(item.var)
       if (v.indexOf("hypr.") === 0) ok = HyprlandSettings.setOption(item.var, value)
       else if (v.indexOf("misc.") === 0) ok = MiscSettings.setOption(item.var, value)
       else ok = Settings.setOption(item.var, value)
-      if (!ok) return
+      if (!ok) return false
     }
     root._rawState(item).value = value
     root.rev++
+    return true
   }
 
   // --- expansion slots ---
@@ -2343,10 +2518,17 @@ Singleton {
         const kid = kids[i]
         if (!kid || !kid.uid) continue
         const st = root._states[kid.uid]
-        if (st && (st.expanded === true || st.info === true)) {
+        const modal = st && (st.expanded === true || st.info === true
+          || st.promptOpen === true || st.confirmKind !== ""
+          || (Number(st.confirmStage) || 0) !== 0)
+        if (modal) {
           st.expanded = false
           st.info = false
+          st.promptOpen = false
+          st.confirmKind = ""
+          st.confirmStage = 0
           root._setSlotClose(kid.uid, false)
+          if (MenuLib.isFlow(kid)) delete root._flow[kid.uid]
           changed = true
           root.trace("menu.descClear", { id: String(kid.id ?? kid.uid) })
         }
@@ -2412,7 +2594,572 @@ Singleton {
     if (next !== root._slotCloses) root._slotCloses = next
   }
 
-  // --- actions ---
+  // --- shared row actions ---------------------------------------------------
+  // Every mutation a row can cause lives here. The UI delegates and the public
+  // gateway both call these methods with the same normalized row and a context
+  // naming the page, the view and the caller. The context may carry two
+  // delegate-only callbacks (`collapse` and `focus`) for visual mechanics; a
+  // gateway call supplies neither and never inspects `currentItem`.
+
+  function rowCanOperate(item, ancestors) {
+    if (!item) return false
+    if (MenuIpc.layoutRow(item.type)) return false
+    const chain = (ancestors || []).concat([item])
+    for (let i = 0; i < chain.length; i++) {
+      const row = chain[i]
+      if (!row || row.enabled === false || root.isDisabled(row) || root.isUnavailable(row)) return false
+    }
+    return true
+  }
+
+  function rowState(item) { return root.stateOf(item) }
+
+  function _actionWasFiltered() { return root.scopedActive }
+
+  function _clearActionFilter(item) {
+    if (!root.scopedActive) return
+    if (item && item.scopedResult === true) return
+    if (root.panel) root.panel._scopedClearByAction = true
+    root.clearScoped()
+  }
+
+  function _collapseRow(item, ctx) {
+    if (ctx && typeof ctx.collapse === "function") ctx.collapse()
+    else {
+      root.clearDescendantState(item)
+      root.setExpanded(item, false)
+      const st = root.stateOf(item)
+      if (st.promptOpen || st.confirmKind !== "") root._setRowState(item, {
+        promptOpen: false, confirmKind: "", confirmStage: 0
+      })
+      if (MenuLib.isFlow(item)) root.resetFlow(item)
+    }
+  }
+
+  function _focusEditor(ctx) {
+    if (ctx && typeof ctx.focus === "function") ctx.focus()
+  }
+
+  // Copy-on-write patch of a row's shared modal state.
+  function _setRowState(item, patch) {
+    if (!item || !item.uid) return
+    const st = root._rawState(item)
+    for (const key in patch) st[key] = patch[key]
+    root.rev++
+  }
+
+  function setPromptOpen(item, value) {
+    if (!item) return
+    root._setRowState(item, { promptOpen: value === true })
+  }
+
+  function confirmKindOf(item) {
+    const st = root.stateOf(item)
+    return String(st.confirmKind || "")
+  }
+
+  function confirmStageOf(item) {
+    return Number(root.stateOf(item).confirmStage) || 0
+  }
+
+  function rowSetExpanded(item, value, ctx) {
+    if (!item) return false
+    if (MenuLib.isFlow(item) && value === false) root.resetFlow(item)
+    root.setExpanded(item, value === true)
+    return true
+  }
+
+  // A toggle flips through the same precedence the delegate used: provider
+  // first, then guarded mirror, then the owning settings store.
+  function rowSetToggle(item, state, ctx) {
+    if (!item || !root.rowCanOperate(item, ctx && ctx.ancestors)) return false
+    const _wasFiltered = root._actionWasFiltered()
+    try {
+      if (root.handleToggle(item, state)) return true
+      const guarded = typeof item.checked === "string" && item.checked !== ""
+      if (guarded) {
+        root.setGuardChecked(item, state)
+        if (item.onToggle) root.runCommand(item.onToggle, state)
+        root.refreshGuards()
+      } else {
+        if (item.var === "" && !item.onToggle) return false
+        if (!root.setChecked(item, state)) return false
+        if (item.onToggle) root.runCommand(item.onToggle, state)
+      }
+      return true
+    } finally {
+      if (_wasFiltered) root._clearActionFilter(item)
+    }
+  }
+
+  // Grid and list action dispatch. The grid route keeps its existing order:
+  // dynamic `insert` and the command first, then the close; a list route
+  // closes before dispatch unless `keepOpen`.
+  function rowRunAction(item, ctx) {
+    if (!item || !root.rowCanOperate(item, ctx && ctx.ancestors)) return false
+    if (item.id === "timer.stop") {
+      root.handleConfirm({ id: "timer" })
+      return true
+    }
+    const view = ctx && ctx.view === "grid" ? "grid" : "list"
+    if (view === "grid") {
+      const pageId = ctx && ctx.pageId ? ctx.pageId : root.pageId
+      const api = root.dynamicApi(pageId)
+      if (api && typeof api.insert === "function") api.insert(String(item.value ?? ""))
+      let cmd = String(item.command ?? "")
+      if (cmd === "") {
+        const pg = root.pageById(pageId)
+        if (pg && typeof pg.command === "string") cmd = pg.command
+      }
+      if (item.call !== "") root.runCall(item.call, item.value !== undefined ? item.value : "")
+      else if (cmd !== "") root.runCommand(cmd, item.value !== undefined ? item.value : "")
+      if (item.keepOpen !== true) root.close()
+      return true
+    }
+    if (item.keepOpen !== true) root.close()
+    if (item.call !== "") root.runCall(item.call, item.value !== undefined ? item.value : "")
+    else root.runCommand(item.command, item.value !== undefined ? item.value : "")
+    return true
+  }
+
+  function rowOpen(item, ctx) {
+    if (!item) return false
+    if (item.type === "submenu") {
+      const panel = root.panel || root.probeSource
+      if (panel && typeof panel.pushPage === "function") panel.pushPage(item.page)
+      else root.push(item.page)
+      return true
+    }
+    if (item.type === "select" || item.type === "group" || item.type === "expandable") {
+      if (item.infoOnly && (item.type === "expandable")) return false
+      root.setExpanded(item, true)
+      return true
+    }
+    if (item.type === "number" || item.type === "range" || item.type === "text") {
+      // Seeding the editor is not a persisted write: it makes the field show
+      // the value the commit will use.
+      if (!root.isExpanded(item)) {
+        root.setValue(item, item.type === "text"
+          ? String(root.valueOf(item) ?? "")
+          : (ctx && ctx.numeric !== undefined ? Number(ctx.numeric) : root._numericFor(item)))
+      }
+      root.setExpanded(item, true)
+      _focusEditor(ctx)
+      return true
+    }
+    return false
+  }
+
+  function _numericFor(item) {
+    if (!item) return 0
+    const v = root.valueOf(item)
+    const n = Number(v === undefined || v === null ? (item.value !== undefined ? item.value : item.min) : v)
+    return isFinite(n) ? n : Number(item.min) || 0
+  }
+
+  function rowClose(item, ctx) {
+    if (!item) return false
+    root._collapseRow(item, ctx)
+    return true
+  }
+
+  function rowSetInfo(item, value, ctx) {
+    if (!item) return false
+    root.setInfo(item, value === true)
+    return true
+  }
+
+  function rowChoose(item, value, ctx) {
+    if (!item) return false
+    if (item.type === "option") {
+      const parent = root.itemByUid(item._parentUid)
+      if (parent && !root.rowCanOperate(parent, ctx && ctx.ancestors)) return false
+      return root.commitOption(item)
+    }
+    if (!root.rowCanOperate(item, ctx && ctx.ancestors)) return false
+    const _wasFiltered = root._actionWasFiltered()
+    try {
+      if (MenuLib.isFlow(item) && String(item.type) === "select") {
+        if (root.rowFlowAdvance(value, ctx)) return true
+        root.rowFlowCommit(ctx)
+        return true
+      }
+      if (item.editValue !== undefined && String(value) === String(item.editValue)) {
+        root.setPromptOpen(item, true)
+        root.setExpanded(item, true)
+        _focusEditor(ctx)
+        return true
+      }
+      const isAction = item.var === "" && (item.onSelect !== "" || item.onCall !== "")
+      root._collapseRow(item, ctx)
+      const st = root.stateOf(item)
+      if (!isAction && String(st.value) === String(value)) return true
+      if (!root.setValue(item, value)) return false
+      if (isAction) {
+        if (item.keepOpen === true) {
+          if (item.onCall !== "") root.runCall(item.onCall, value)
+          else root.runCommand(item.onSelect, value)
+        } else {
+          root.close()
+          Qt.callLater(() => item.onCall !== ""
+            ? root.runCall(item.onCall, value)
+            : root.runCommand(item.onSelect, value))
+        }
+      } else {
+        if (item.onCall !== "") root.runCall(item.onCall, value)
+        else root.runCommand(item.onSelect, value)
+      }
+      return true
+    } finally {
+      if (_wasFiltered) root._clearActionFilter(item)
+    }
+  }
+
+  // Commit the value an editor holds. Text is trimmed, numbers are parsed as
+  // a leading decimal then clamped and quantized, and the display-unit rule
+  // is the same one Entry used for onChange.
+  function rowCommitEdit(item, text, ctx) {
+    if (!item) return false
+    if (MenuLib.isFlow(item)) {
+      if (root.rowFlowAdvance(text, ctx)) return true
+      root.rowFlowCommit(ctx)
+      return true
+    }
+    if (root.confirmKindOf(item) !== "") return false
+    if (root.stateOf(item).promptOpen) {
+      const typed = String(text).trim()
+      root.setPromptOpen(item, false)
+      root._collapseRow(item, ctx)
+      if (typed !== "" && item.editCall !== undefined && item.editCall !== "")
+        root.runCall(item.editCall, typed)
+      return true
+    }
+    if (item.type === "text") {
+      const t = String(text).trim()
+      if (item.var !== undefined && item.var !== "") {
+        if (!root.setValue(item, t)) return false
+        if (t !== "" && item.onSubmit) root.runCommand(item.onSubmit, t)
+        root._collapseRow(item, ctx)
+        return true
+      }
+      if (item.allowEmpty !== true && t === "" && item.onSubmit) {
+        root._collapseRow(item, ctx)
+        return true
+      }
+      if (item.onSubmit) {
+        // A caller-supplied shell template may only be interpolated with a
+        // quoted, standalone %v token. The UI path keeps its configured
+        // template unchanged and passes the text as the raw substitution
+        // value, exactly as the editor always did. Validate before the write.
+        const template = ctx && ctx.origin === "ui" ? item.onSubmit
+          : MenuIpc.safeShellTemplate(item.onSubmit) ? item.onSubmit : null
+        if (template === null) return false
+        // The UI keeps its clear-then-run rule. A gateway write reports the
+        // value it committed, so the typed text stays in the row's value slot.
+        if (ctx && ctx.origin === "ui") root.setValue(item, "")
+        else root.setValue(item, t)
+        if (ctx && ctx.origin === "ui") root.runCommand(template, t)
+        else root.runCommand(MenuIpc.quoteShellValue(template, t), "")
+      } else root.setValue(item, t)
+      root._collapseRow(item, ctx)
+      return true
+    }
+    if (item.type === "number" || item.type === "range") {
+      const raw = String(text).trim()
+      if (raw === "") { root._collapseRow(item, ctx); return true }
+      const typed = MenuLib.leadingNumber(raw)
+      if (typed === null) return false
+      const next = MenuLib.quantize(MenuLib.clamp(typed, Number(item.min) || 0, Number(item.max) || 0))
+      if (!root.setValue(item, next)) return false
+      if (!root.handleNumberChange(item, next) && item.onChange !== "")
+        root.runCommand(item.onChange, Format.fixed(next, MenuLib.decimalsOf(Number(item.step) || 1))
+          + MenuLib.unitSuffix(item.unit))
+      root._collapseRow(item, ctx)
+      if (item.close === true) root.close()
+      return true
+    }
+    return false
+  }
+
+  function rowStep(item, direction, ctx) {
+    if (!item || (item.type !== "number" && item.type !== "range")) return false
+    if (!root.rowCanOperate(item, ctx && ctx.ancestors)) return false
+    if (root.isNumberActive(item)) return false
+    const ctx2 = ctx || {}
+    const stepSize = ctx2.numeric !== undefined ? Number(ctx2.step !== undefined ? ctx2.step : item.step) : (Number(item.step) || 1)
+    const lo = ctx2.minimum !== undefined ? Number(ctx2.minimum) : Number(item.min) || 0
+    const hi = ctx2.maximum !== undefined ? Number(ctx2.maximum) : Number(item.max) || 0
+    const current = ctx2.numeric !== undefined ? Number(ctx2.numeric) : Number(root._numericFor(item))
+    let next = MenuLib.clamp(current + direction * (stepSize || 1), lo, hi)
+    next = MenuLib.quantize(next)
+    if (next === current) return true
+    if (!root.setValue(item, next)) return false
+    if (!root.handleNumberChange(item, next) && item.onChange !== "")
+      root.runCommand(item.onChange, Format.fixed(next,
+        ctx2.decimals !== undefined ? Number(ctx2.decimals) : MenuLib.decimalsOf(stepSize))
+        + (ctx2.unit !== undefined ? String(ctx2.unit) : MenuLib.unitSuffix(item.unit)))
+    return true
+  }
+
+  // --- staged flow (one cursor per flow uid) --------------------------------
+
+  function _flowDraft(item, value, hasValue) {
+    const uid = item ? item.uid : ""
+    if (!uid) return false
+    const st = root._flowState(item)
+    st.draft = { set: hasValue === true, value: value }
+    root.rev++
+    return true
+  }
+
+  function rowFlowAdvance(value, ctx) {
+    const item = ctx && ctx.item ? ctx.item : null
+    const src = item && MenuLib.isFlow(item) ? item : null
+    if (!src || !root.isExpanded(src)) return false
+    const idx = root.flowIndexOf(src)
+    const stage = MenuLib.flowStep(src, idx)
+    if (!stage) return false
+    if (stage.required && String(value === undefined || value === null ? "" : value).trim() === "") return false
+    if (stage.kind === "select" || stage.kind === "number" || stage.kind === "range"
+      || stage.kind === "text") {
+      root._flowDraft(src, value, true)
+    }
+    const values = root.flowValuesOf(src)
+    const next = MenuLib.nextFlowIndex(src, idx + 1, values)
+    const st = root._flowState(src)
+    if (next >= MenuLib.flowCount(src)) {
+      // The last stage was answered: copy the draft into the committed map
+      // and arm the one-shot commit. Another commit is then refused until the
+      // flow is reopened.
+      st.values[String(idx)] = value
+      st.draft = { set: false, value: null }
+      st.ready = true
+      root.rev++
+      return false
+    }
+    if (Array.isArray(st.visited) && st.visited.indexOf(next) < 0) st.visited.push(next)
+    st.index = next
+    st.draft = { set: false, value: null }
+    root.rev++
+    _focusEditor(ctx)
+    return true
+  }
+
+  function rowFlowSet(step, value, ctx) {
+    const item = ctx && ctx.item ? ctx.item : null
+    const src = item && MenuLib.isFlow(item) ? item : null
+    if (!src) return false
+    const idx = Number(step) || 0
+    if (idx !== root.flowIndexOf(src)) return false
+    const stage = MenuLib.flowStep(src, idx)
+    if (!stage) return false
+    if (stage.sensitive === true) return false
+    return root._flowDraft(src, value, true)
+  }
+
+  function rowFlowBack(ctx) {
+    const item = ctx && ctx.item ? ctx.item : null
+    const src = item && MenuLib.isFlow(item) ? item : null
+    if (!src || root.flowIndexOf(src) <= 0) return false
+    const st = root._flowState(src)
+    const visited = Array.isArray(st.visited) ? st.visited : []
+    let prev = visited.length > 1 ? visited[visited.length - 2] : root.flowIndexOf(src) - 1
+    if (!Number.isInteger(prev) || prev < 0) prev = root.flowIndexOf(src) - 1
+    // A revisited step clears everything after it.
+    const keep = {}
+    for (const k in st.values) if (Number(k) < prev) keep[k] = st.values[k]
+    st.values = keep
+    st.visited = visited.filter(i => i < prev).concat([prev])
+    st.index = prev
+    st.ready = false
+    st.draft = { set: false, value: null }
+    if (!root.isExpanded(src)) root.setExpanded(src, true)
+    root.rev++
+    _focusEditor(ctx)
+    return true
+  }
+
+  function rowFlowCommit(ctx) {
+    const item = ctx && ctx.item ? ctx.item : null
+    const src = item && MenuLib.isFlow(item) ? item : null
+    if (!src) return false
+    const st = root._flowState(src)
+    if (st.ready !== true) return false
+    for (let i = 0; i < (st.visited || []).length; i++) {
+      const step = MenuLib.flowStep(src, Number(st.visited[i]))
+      if (step && step.required && String(st.values[String(st.visited[i])] ?? "").trim() === "")
+        return false
+    }
+    const vals = Object.assign({}, st.values)
+    const draft = st.draft
+    if (draft && draft.set === true) vals[String(root.flowIndexOf(src))] = draft.value
+    st.draft = { set: false, value: null }
+    root.rev++
+    const last = Array.isArray(st.visited) && st.visited.length > 0
+      ? st.visited[st.visited.length - 1] : MenuLib.flowCount(src) - 1
+    const text = vals[String(last)] !== undefined ? String(vals[String(last)]) : ""
+    const handled = root.handleFlow(src, vals)
+    root._collapseRow(src, ctx)
+    if (handled) return true
+    const shell = function (template) {
+      if (ctx && ctx.origin === "ipc" && MenuIpc.safeShellTemplate(template))
+        root.runCommand(MenuIpc.quoteShellValue(template, text), "")
+      else root.runCommand(template, text)
+    }
+    if (item.onCall !== "") root.runCall(item.onCall, text)
+    else if (item.onSelect !== "") shell(item.onSelect)
+    else if (item.onChange !== "") shell(item.onChange)
+    else if (item.editCall !== "") root.runCall(item.editCall, text)
+    else if (item.onSubmit !== "") shell(item.onSubmit)
+    if (item.close === true) root.close()
+    return true
+  }
+
+  function rowFlowCancel(ctx) {
+    const item = ctx && ctx.item ? ctx.item : null
+    if (!item) return false
+    root.resetFlow(item)
+    root._collapseRow(item, ctx)
+    return true
+  }
+
+  // --- shared confirmation and deletion ------------------------------------
+
+  function rowConfirm(item, kind, ctx) {
+    if (!item) return false
+    const descriptor = kind === "delete"
+      ? (root._deleteConfirmFor ? root._deleteConfirmFor(item) : null)
+      : root.confirmFor(item)
+    if (!descriptor) return false
+    if (kind === "activate" && descriptor.action === "clearHistory"
+      && Registry.get("appLauncher", "hasUsageHistory") === false) return false
+    const st = root.stateOf(item)
+    const activeKind = String(st.confirmKind || "")
+    const stages = Number(descriptor.stages) || 1
+    let stage = Number(st.confirmStage) || 0
+    if (activeKind !== kind) { stage = 1; root._setRowState(item, { confirmKind: kind, confirmStage: 1 }) }
+    else if (stage === 0) { stage = 1; root._setRowState(item, { confirmStage: 1 }) }
+    else if (stage < stages) { stage++; root._setRowState(item, { confirmStage: stage }) }
+    else {
+      // Clear before dispatch so a re-entrant command cannot re-arm it.
+      root._setRowState(item, { confirmKind: "", confirmStage: 0 })
+      root._collapseRow(item, ctx)
+      if (kind === "delete") root._runDelete(item)
+      else if (!root.handleConfirm(item)) {
+        if (item.confirm && typeof item.confirm.command === "string" && item.confirm.command !== "")
+          root.runCommand(item.confirm.command, "")
+      }
+      if (item.close === true) root.close()
+      return true
+    }
+    if (!root.isExpanded(item)) root.setExpanded(item, true)
+    return true
+  }
+
+  function _runDelete(item) {
+    const dc = String(item.delCommand ?? "")
+    if (dc === "") return
+    const value = item.value !== undefined ? String(item.value) : ""
+    if (dc === "@forget") {
+      const api = root.frame ? root.dynamicApi(root.frame.id) : null
+      if (api && typeof api.forget === "function") api.forget(value)
+    } else root.runCommand(dc, value)
+  }
+
+  function _deleteConfirmFor(item) {
+    if (!item || typeof item.delCommand !== "string" || item.delCommand === "") return null
+    return {
+      stages: 2,
+      hint: "Press Delete again to remove " + String(item.label ?? "this item"),
+      armed: "<b><u>Press Delete again to confirm removal</u></b>",
+      label: "Remove " + String(item.label ?? "item")
+    }
+  }
+
+  // Grid deletion has no delegate: one direct forget, as before.
+  function rowDelete(item, ctx) {
+    if (!item || typeof item.delCommand !== "string" || item.delCommand === "") return false
+    if (ctx && ctx.view === "grid") {
+      root._runDelete(item)
+      return true
+    }
+    return root.rowConfirm(item, "delete", ctx)
+  }
+
+  function rowConfirmStatus(item) {
+    const st = root.stateOf(item)
+    const kind = String(st.confirmKind || "")
+    const descriptor = kind === "delete" ? root._deleteConfirmFor(item) : root.confirmFor(item)
+    return MenuIpc.confirmStatus(kind, st.confirmStage, descriptor)
+  }
+
+  function rowConfirmCancel(item, ctx) {
+    if (!item) return false
+    root._setRowState(item, { confirmKind: "", confirmStage: 0 })
+    root._collapseRow(item, ctx)
+    return true
+  }
+
+  // --- one activation entry point ------------------------------------------
+
+  function rowActivate(item, ctx) {
+    if (!item || !root.rowCanOperate(item, ctx && ctx.ancestors)) return false
+    const _wasFiltered = root._actionWasFiltered()
+    const callCtx = ctx || {}
+    try {
+      if (MenuLib.isFlow(item)) {
+        root.setExpanded(item, true)
+        return true
+      }
+      const kind = root.confirmKindOf(item)
+      if (kind !== "" || root.confirmFor(item)) {
+        return root.rowConfirm(item, "activate", callCtx)
+      }
+      switch (item.type) {
+      case "submenu":
+        root.rowOpen(item, callCtx)
+        return true
+      case "toggle":
+        root.rowSetToggle(item, !root.isToggleOn(item), callCtx)
+        if (item.close === true) root.close()
+        return true
+      case "action":
+        if (callCtx.view === "grid") root.rowRunAction(item, callCtx)
+        else root.rowRunAction(item, callCtx)
+        return true
+      case "select":
+        if (!root.rowCanOperate(item, (callCtx.ancestors || []))) return false
+        root.rowSetExpanded(item, !root.isExpanded(item), callCtx)
+        return true
+      case "option":
+        root.rowChoose(item, item.value, callCtx)
+        return true
+      case "number":
+      case "range":
+      case "text":
+        root.rowOpen(item, callCtx)
+        return true
+      case "group":
+      case "expandable":
+        if (!item.infoOnly && callCtx.emptyBody !== true)
+          root.rowSetExpanded(item, !root.isExpanded(item), callCtx)
+        return true
+      case "result":
+        if (callCtx.consumeResult && typeof callCtx.consumeResult === "function") callCtx.consumeResult()
+        else {
+          const panel = root.panel || root.probeSource
+          if (panel && typeof panel.consumePendingResult === "function") {
+            panel.pendingResult = item
+            Qt.callLater(panel.consumePendingResult)
+          } else root.jumpTo(item.pageId, item.row)
+        }
+        return true
+      }
+      return false
+    } finally {
+      if (_wasFiltered) root._clearActionFilter(item)
+    }
+  }
 
   // Run a command template through bash; %v substitutes with `value`.
   function runCommand(template, value) {
@@ -2441,7 +3188,802 @@ Singleton {
     Registry.call(parts[0], parts[1], ...args)
   }
 
-  // --- ipc ---
+  // --- public model gateway ------------------------------------------------
+  // MenuIpc is a pure projection/guard library; this owner supplies runtime
+  // state, claims, page/provider data and the router frames. No command below
+  // synthesises a key event, polls a delegate or evaluates caller-supplied
+  // shell source.
+
+  function _ok(data) { return data === undefined ? MenuIpc.silent() : MenuIpc.ok(data) }
+  function _err(code, message) { return MenuIpc.fail(code, message === undefined ? code : message) }
+
+  function _pendingQuery() {
+    // A generation counter is not a pending flag: it grows with every guard
+    // batch. Only a deferred provider, a debounced scoped projection or an
+    // in-flight query can make a result view unreliable for a write.
+    return root._ipcProviderPending === true
+      || (root._scopedPending !== undefined && root._scopedPending !== "")
+      || root._applyingQuery === true
+  }
+
+  function _scope() {
+    return MenuIpc.scopeOf(root.query !== "", root.scopedActive && root.scopedQuery !== "")
+  }
+
+  function _closedFrame() {
+    return MenuIpc.ok(MenuIpc.closedSnapshot(root.rev))
+  }
+
+  function _currentFrame(withBundle) {
+    if (!root.open) return _closedFrame()
+    const panel = root.panel || root.probeSource
+    const data = {
+      open: true,
+      page: root.pageId,
+      depth: root.stack.length,
+      scope: root._scope(),
+      revision: root.rev,
+      row: null,
+      pending: root._pendingQuery() || (panel && panel._settlePending === true) || false
+    }
+    if (withBundle) {
+      data.bundleEntry = root.bundle && root.bundle.entry ? String(root.bundle.entry) : ""
+      data.guardsPending = root._pendingQuery()
+    }
+    // A protected page is visible as a page frame but publishes no rows.
+    const rows = MenuIpc.isProtectedPage(root.pageId) ? [] : root._currentRows()
+    if (rows.length > 0) data.row = rows[0]
+    return MenuIpc.ok(data)
+  }
+
+  function ipcStatus() { return _currentFrame(true) }
+  function ipcCurrent() { return _currentFrame(false) }
+
+  // --- page tree and references -------------------------------------------
+
+  function _pageOrdinalFor(page) {
+    if (!page || typeof page.id !== "string") return null
+    const rec = root._refPages[page.id]
+    if (rec && rec.page === page) return rec
+    const next = {
+      page: page,
+      ordinal: ++root._pageOrdinalSeq,
+      rows: Object.create(null)
+    }
+    const all = Object.assign({}, root._refPages)
+    all[page.id] = next
+    root._refPages = all
+    return next
+  }
+
+  function _mintRowRef(item, page, ancestors, searchHit) {
+    if (!item || !item.uid || !page) return null
+    const rec = root._pageOrdinalFor(page)
+    if (!rec) return null
+    let row = rec.rows[item.uid]
+    if (!row || row.item !== item || (searchHit === true && row.search !== true)) {
+      row = { ordinal: ++root._rowOrdinalSeq, item: item, search: searchHit === true,
+        ancestors: (ancestors || []).slice() }
+      rec.rows[item.uid] = row
+    }
+    const ref = MenuIpc.ref(IpcRouter.incarnation, root.openGeneration,
+      rec.ordinal, row.ordinal)
+    if (ref) {
+      root._refsByValue[ref] = {
+        item: item, page: page, pageId: page.id, uid: item.uid,
+        ancestors: row.ancestors.slice(), ref: ref, search: searchHit === true
+      }
+    }
+    return ref
+  }
+
+  // A re-ranked result set is a new projection: refs minted from a previous
+  // query never address a hit in the new one, even when the same uid returns.
+  function _retireSearchRefs() {
+    const pages = Object.assign({}, root._refPages)
+    for (const id in pages) {
+      const rows = pages[id].rows
+      for (const uid in rows) if (rows[uid].search === true) delete rows[uid]
+    }
+    const refs = Object.assign({}, root._refsByValue)
+    for (const ref in refs) if (refs[ref].search === true) delete root._refsByValue[ref]
+  }
+
+  function _resolveRef(ref) {
+    if (typeof ref !== "string" || ref === "") return { error: "stale" }
+    const parsed = MenuIpc.refMatches(ref, IpcRouter.incarnation, root.openGeneration)
+    if (!parsed) return { error: "stale" }
+    const entry = root._refsByValue[ref]
+    if (!entry) return { error: "stale" }
+    const page = root.pageById(entry.pageId)
+    const item = entry.search === true ? entry.item : root.itemByUid(entry.uid)
+    if (!page || page !== entry.page || !item || item !== entry.item)
+      return { error: "stale" }
+    if (entry.search !== true) for (let i = 0; i < entry.ancestors.length; i++) {
+      const a = entry.ancestors[i]
+      if (root.itemByUid(a.uid) !== a) return { error: "stale" }
+    }
+    // A protected row is still discoverable: reads redact it, writes refuse.
+    return {
+      item: item, page: page, pageId: entry.pageId,
+      ancestors: entry.ancestors, ref: ref, entry: entry,
+      protected: MenuIpc.isProtectedRow(item, page,
+        MenuLib.isFlow(item) ? MenuLib.flowStep(item, root.flowIndexOf(item)) : null)
+    }
+  }
+
+  function _walkPage(page, visit, ancestors, depth) {
+    if (!page || !Array.isArray(page.items)) return
+    const parent = ancestors || []
+    for (let i = 0; i < page.items.length; i++) {
+      const it = page.items[i]
+      if (!it) continue
+      visit(it, parent, depth || 0, page)
+      if (Array.isArray(it.children) && it.children.length > 0)
+        root._walkChildren(it.children, visit, parent.concat([it]), (depth || 0) + 1, page)
+    }
+  }
+
+  function _walkChildren(list, visit, ancestors, depth, page) {
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i]
+      if (!it) continue
+      visit(it, ancestors, depth, page)
+      if (Array.isArray(it.children) && it.children.length > 0)
+        root._walkChildren(it.children, visit, ancestors.concat([it]), depth + 1, page)
+    }
+  }
+
+  function _locate(uid) {
+    if (!uid) return null
+    const pages = []
+    if (root.bundle && root.bundle.pages) pages.push.apply(pages, root.bundle.pages)
+    for (const id in root._dynamicPages) pages.push(root._dynamicPages[id])
+    for (const id in root._optionPages) pages.push(root._optionPages[id])
+    for (let i = 0; i < pages.length; i++) {
+      let found = null
+      root._walkPage(pages[i], function (it, ancestors, depth, page) {
+        if (!found && it.uid === uid) found = { item: it, ancestors: ancestors.slice(), page: page, depth: depth }
+      }, [], 0)
+      if (found) return found
+    }
+    return null
+  }
+
+  function _rowActions(item) {
+    const out = []
+    const keys = ["activate", "open", "close", "toggle", "set", "step", "options",
+      "choose", "info", "confirm", "flow", "delete"]
+    for (let i = 0; i < keys.length; i++) {
+      if (MenuIpc.supports(item.type, keys[i])) out.push(keys[i])
+    }
+    if (typeof item.delCommand === "string" && item.delCommand !== "" && out.indexOf("delete") < 0)
+      out.push("delete")
+    if (MenuLib.isFlow(item) && out.indexOf("flow") < 0) out.push("flow")
+    return out
+  }
+
+  function _rowRecord(item, page, ancestors, depth, ref, searchProxy) {
+    const state = root.stateOf(item)
+    const parent = ancestors && ancestors.length > 0
+      ? root._mintRowRef(ancestors[ancestors.length - 1], page, ancestors.slice(0, -1)) : null
+    const protectedRow = MenuIpc.isProtectedRow(item, page)
+    return MenuIpc.rowRecord({
+      ref: ref, uid: item.uid, id: item.id, page: page ? page.id : root.pageId,
+      parent: parent, depth: depth || 0, type: searchProxy ? "result" : item.type,
+      label: item.label, available: root.rowCanOperate(item, ancestors),
+      expanded: state.expanded === true, actions: protectedRow ? [] : root._rowActions(item),
+      protected: protectedRow
+    })
+  }
+
+  function _currentRows() {
+    if (!root.open) return []
+    const panel = root.panel || root.probeSource
+    const out = []
+    const seen = Object.create(null)
+    const emit = function (item, page, ancestors, depth, proxy) {
+      if (!item || !root.isListed(item)) return
+      const ref = root._mintRowRef(item, page, ancestors, proxy === true)
+      const rec = root._rowRecord(item, page, ancestors, depth, ref, proxy)
+      out.push(rec)
+      seen[item.uid] = true
+      // Expanded children are appended in displayed order, using the same
+      // group child filter Entry uses.
+      if (!proxy && root.isExpanded(item) && Array.isArray(item.children)) {
+        const kids = root._groupChildFilter ? root._groupChildFilter(item) : item.children
+        for (let i = 0; i < kids.length; i++) {
+          if (kids[i]) emit(kids[i], page, (ancestors || []).concat([item]), (depth || 0) + 1, false)
+        }
+      }
+    }
+    if (panel && Array.isArray(panel.rowsModel) && panel.rowsModel.length > 0) {
+      for (let i = 0; i < panel.rowsModel.length; i++) {
+        const row = panel.rowsModel[i]
+        if (!row) continue
+        if (row.scopedResult || row.searchResult || row.type === "result") {
+          emit(row, root.pageById(root.pageId), [], 0, true)
+          continue
+        }
+        const loc = root._locate(row.uid)
+        if (!loc) continue
+        emit(loc.item, loc.page, loc.ancestors, loc.depth, false)
+      }
+      return out
+    }
+    // Without a mounted panel the ranked window is the only rendered view;
+    // project it as result proxies, the same rows a panel would install.
+    if (root.query !== "" && Array.isArray(root.results) && root.results.length > 0) {
+      for (let i = 0; i < root.results.length; i++) {
+        const hit = root.results[i]
+        if (MenuIpc.isProtectedPage(hit.pageId)) continue
+        const pg = root.pageById(hit.pageId)
+        const it = pg && Array.isArray(pg.items) ? pg.items[Number(hit.row)] : null
+        if (it) emit(it, pg, [], 0, true)
+      }
+      return out
+    }
+    const page = root.pageById(root.pageId)
+    if (!page) return out
+    root._walkPage(page, function (it, ancestors, depth, pg) {
+      emit(it, pg, ancestors, depth, false)
+    }, [], 0)
+    return out
+  }
+
+  function ipcList(pageId) {
+    if (!root.open) {
+      return MenuIpc.fail("unavailable", "menu is closed")
+    }
+    if (pageId !== undefined && pageId !== null && pageId !== "") {
+      const page = root.pageById(String(pageId))
+      if (!page) return MenuIpc.fail("not-found", "no such page")
+      if (MenuIpc.isProtectedPage(String(pageId)))
+        return MenuIpc.fail("unsupported", "protected page")
+      const out = []
+      root._walkPage(page, function (it, ancestors, depth, pg) {
+        out.push(root._rowRecord(it, pg, ancestors, depth,
+          root._mintRowRef(it, pg, ancestors), false))
+      }, [], 0)
+      return MenuIpc.ok(out)
+    }
+    if (MenuIpc.isProtectedPage(root.pageId)) return MenuIpc.ok([])
+    return MenuIpc.ok(root._currentRows())
+  }
+
+  function ipcPages() {
+    if (!root.open) return MenuIpc.ok([])
+    const out = []
+    const seen = Object.create(null)
+    const add = function (id, reachable) {
+      if (typeof id !== "string" || id === "" || seen[id] === true) return
+      const page = root.pageById(id)
+      if (!page) return
+      if (MenuIpc.isProtectedPage(id)) { seen[id] = true; return }
+      if (page.items === undefined && root._dynamicPages[id] === undefined) return
+      seen[id] = true
+      out.push({
+        id: id, title: String(page.title ?? id),
+        layout: root._gridPage(id) ? "grid" : "list",
+        reachable: reachable === true
+      })
+      const items = Array.isArray(page.items) ? page.items : []
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]
+        if (it && it.type === "submenu" && typeof it.page === "string") add(it.page, true)
+      }
+    }
+    add(root.pageId, false)
+    if (root.bundle) add(root.bundle.entry, false)
+    for (let i = 0; i < root.stack.length; i++) add(root.stack[i].id, false)
+    return MenuIpc.ok(out)
+  }
+
+  function _gridPage(id) {
+    const page = root.pageById(id)
+    return !!(page && (page.grid === true || page.layout === "grid"))
+  }
+
+  // Shortest allowed link path; a blocked link is never a path.
+  function _linkPath(from, to) {
+    if (!from || !to || from === to) return []
+    const queue = [[from, []]]
+    const seen = Object.create(null)
+    seen[from] = true
+    while (queue.length > 0) {
+      const cur = queue.shift()
+      const page = root.pageById(cur[0])
+      if (!page) continue
+      const items = Array.isArray(page.items) ? page.items : []
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]
+        if (!it || it.type !== "submenu" || typeof it.page !== "string") continue
+        const next = it.page
+        if (seen[next] === true) continue
+        if (!root.rowCanOperate(it, [])) continue
+        seen[next] = true
+        const path = cur[1].concat([next])
+        if (next === to) return path
+        queue.push([next, path])
+      }
+    }
+    return null
+  }
+
+  function ipcGo(pageId) {
+    if (!root.open) return MenuIpc.fail("unavailable", "menu is closed")
+    const target = String(pageId ?? "")
+    if (!root.pageById(target)) return MenuIpc.fail("not-found", "no such page")
+    if (MenuIpc.isProtectedPage(target)) return MenuIpc.fail("unsupported", "protected page")
+    if (target === root.pageId) return MenuIpc.ok({ page: root.pageId, depth: root.stack.length })
+    // A frame on the real stack pops back without a new push/checkpoint.
+    const at = root.stack.map(f => f.id).indexOf(target)
+    if (at >= 0) {
+      while (root.stack.length > at + 1) root.pop()
+      return MenuIpc.ok({ page: root.pageId, depth: root.stack.length })
+    }
+    const fromCurrent = root._linkPath(root.pageId, target)
+    const fromEntry = root.bundle ? root._linkPath(root.bundle.entry, target) : null
+    let chain = fromCurrent
+    if (!chain || (fromEntry && fromEntry.length < chain.length)) chain = fromEntry
+    if (!chain || chain.length === 0) return MenuIpc.fail("refused", "no allowed link path")
+    const panel = root.panel || root.probeSource
+    if (panel && typeof panel.pushPage === "function") {
+      for (let i = 0; i < chain.length; i++) panel.pushPage(chain[i])
+    } else {
+      for (let i = 0; i < chain.length; i++) root.push(chain[i])
+    }
+    return MenuIpc.ok({ page: root.pageId, depth: root.stack.length })
+  }
+
+  function ipcBack() {
+    if (!root.open) return _ok({ open: false, page: null })
+    root.back()
+    return MenuIpc.ok({ open: root.open, page: root.pageId })
+  }
+
+  // --- selection and search ------------------------------------------------
+
+  function ipcSelect(ref) {
+    if (!root.open) return MenuIpc.fail("unavailable", "menu is closed")
+    const found = root._resolveRef(ref)
+    if (found.error) return MenuIpc.fail(found.error, "row reference")
+    const panel = root.panel || root.probeSource
+    if (!panel) return MenuIpc.fail("unavailable", "no visible panel")
+    // Expand the verified ancestor chain, then seat by uid through the panel.
+    root.setExpandedBatch(found.ancestors, true)
+    if (typeof panel.applyModelSelection === "function") {
+      const okSeat = panel.applyModelSelection(found.item, found.page, found.ancestors)
+      if (okSeat === false) return MenuIpc.fail("unavailable", "row not in view")
+    } else {
+      const idx = panel.indexOfUid(found.item.uid)
+      if (idx < 0 || !panel.focusIndex(idx)) return MenuIpc.fail("unavailable", "row not in view")
+    }
+    root._landingIntent = { ref: ref, uid: found.item.uid, rev: root.rev }
+    return MenuIpc.silent()
+  }
+
+  function ipcSearch(kind, query) {
+    if (!root.open) return MenuIpc.fail("unavailable", "menu is closed")
+    if (kind === "clear") {
+      if (root.scopedActive) root.clearScoped()
+      if (root.query !== "") root.clearQuery()
+      return MenuIpc.ok({ scope: "none", pending: root._pendingQuery() })
+    }
+    const text = String(query ?? "")
+    const page = root.pageById(root.pageId)
+    if (kind === "global") {
+      if (root._dynamicPages[root.pageId] !== undefined && page && page.searchGlobal !== true)
+        return MenuIpc.fail("unsupported", "page has no global search")
+      root.setQuery(text)
+      return MenuIpc.ok({ scope: "global", pending: root._pendingQuery() })
+    }
+    if (kind === "scoped") {
+      if (!root.scopedActive) root.beginScoped()
+      root.setScopedQuery(text)
+      return MenuIpc.ok({ scope: "scoped", pending: root._pendingQuery() })
+    }
+    return MenuIpc.fail("unsupported", "unknown search mode")
+  }
+
+  // --- bundle open/toggle/close -------------------------------------------
+
+  function _readSource(spec) {
+    if (spec && typeof spec === "object" && spec.inline === true) {
+      return { text: String(spec.text), path: "", frag: String(spec.frag || "") }
+    }
+    const raw = String(spec && spec.path ? spec.path : spec ?? "")
+    const hash = raw.indexOf("#")
+    const path = hash < 0 ? raw : raw.substring(0, hash)
+    const frag = hash < 0 ? "" : raw.substring(hash + 1)
+    if (path === "") return null
+    loader.path = ""
+    loader.path = path
+    if (!loader.waitForJob()) return null
+    root._registerLazySearch(loader.text(), path)
+    return { text: loader.text(), path: path, frag: frag }
+  }
+
+  function _prepareOpen(spec) {
+    if (!spec) return null
+    const src = root._readSource(spec)
+    if (!src) return null
+    const frag = src.frag
+    if (frag !== "" && !spec.inline) {
+      // Validate the fragment against the parsed bundle before closing the
+      // old one; an explicitly requested unknown entry is not a silent fall
+      // back to the default page.
+      const probe = MenuLib.parseBundle(src.text)
+      if (!probe.byId || probe.byId[frag] === undefined) return null
+    }
+    extensionLoader.path = ""
+    extensionLoader.path = Paths.configHome + "/vibranium/user-menu.jsonc"
+    const extText = extensionLoader.waitForJob() ? extensionLoader.text() : ""
+    let candidate
+    try {
+      candidate = root._assembleContainers(src.text, extText, src.path, frag)
+    } catch (e) {
+      return null
+    }
+    const entry = frag !== "" ? frag : candidate.bundle.entry
+    if (!candidate.byId || candidate.byId[entry] === undefined) return null
+    return {
+      candidate: candidate,
+      source: src,
+      entry: entry,
+      identity: src.path !== "" ? src.path + "#" + entry
+        : "inline:" + src.text + (frag !== "" ? "#" + frag : "")
+    }
+  }
+
+  function _installPrepared(prepared) {
+    root._installContainers(prepared.candidate)
+    root._lastPath = prepared.source.path + (prepared.source.frag !== ""
+      ? "#" + prepared.source.frag : "")
+    root._lastInline = prepared.source.path === "" ? prepared.source.text : ""
+    root._primeRuntime(prepared.candidate.bundle)
+    if (prepared.candidate.byId[prepared.entry] !== undefined)
+      root.stack = [{ id: prepared.entry, sel: 0, y: 0 }]
+    root._claimToken = SurfaceClaim.claim("menu", root.close, root)
+    Qt.callLater(root.evaluateGuards)
+    return MenuIpc.ok({ open: true, page: root.pageId })
+  }
+
+  function _currentIdentity() {
+    if (!root.open) return ""
+    if (root._lastInline !== "" && root._lastPath === "") return "inline:" + root._lastInline
+    if (root._lastPath === undefined || root._lastPath === "") return ""
+    const canonical = root._canonicalSource(root._lastPath)
+    return canonical + "#" + root.pageId
+  }
+
+  function ipcOpen(spec) {
+    const prepared = root._prepareOpen(spec)
+    if (!prepared) return MenuIpc.fail("not-found", "bundle could not be prepared")
+    if (root.open && root._currentIdentity() === prepared.identity)
+      return MenuIpc.ok({ open: true, page: root.pageId })
+    if (root.open) root.close()
+    return root._installPrepared(prepared)
+  }
+
+  function ipcToggle(spec) {
+    const prepared = root._prepareOpen(spec)
+    if (!prepared) return MenuIpc.fail("not-found", "bundle could not be prepared")
+    if (root.open && root._currentIdentity() === prepared.identity) {
+      root.close()
+      return MenuIpc.ok({ open: false, page: null })
+    }
+    if (root.open) root.close()
+    return root._installPrepared(prepared)
+  }
+
+  function ipcClose() {
+    root.close()
+    return MenuIpc.ok({ open: false, page: null })
+  }
+
+  // --- item operations -----------------------------------------------------
+
+  function _itemPayload(found) {
+    const item = found.item
+    const page = found.page
+    const st = root.stateOf(item)
+    const state = {
+      value: root.rowCanOperate(item, found.ancestors) ? st.value : undefined,
+      checked: st.checked, info: st.info,
+      confirmStage: Number(st.confirmStage) || 0
+    }
+    const flowItem = MenuLib.isFlow(item) ? item : null
+    let flow = null
+    if (flowItem) {
+      const fs = root._flowState(flowItem)
+      flow = {
+        active: root.isExpanded(item), index: Number(fs.index) || 0,
+        visited: (fs.visited || []).slice(), ready: fs.ready === true,
+        values: Object.assign({}, fs.values),
+        kind: String((MenuLib.flowStep(flowItem, Number(fs.index) || 0) || {}).kind || "")
+      }
+    }
+    const protectedRow = MenuIpc.isProtectedRow(item, page)
+    return MenuIpc.itemDetail({
+      ref: found.ref, uid: item.uid, id: item.id, page: page.id,
+      parent: found.ancestors.length > 0 ? root._mintRowRef(
+        found.ancestors[found.ancestors.length - 1], page, found.ancestors.slice(0, -1)) : null,
+      depth: found.ancestors.length, type: item.type, label: item.label,
+      available: root.rowCanOperate(item, found.ancestors),
+      expanded: st.expanded === true,
+      actions: root._rowActions(item),
+      protected: protectedRow, item: item, state: state,
+      selected: root.optionIsChosen(item),
+      options: MenuIpc.optionsProjection(item.options || [], st.value, protectedRow),
+      confirm: root.confirmFor(item),
+      flow: flow,
+      min: item.min, max: item.max, step: item.step
+    })
+  }
+
+  function _itemContext(found, view) {
+    return {
+      pageId: found.pageId, view: view || "list", origin: "ipc",
+      item: found.item, ancestors: found.ancestors,
+      numeric: root._numericFor(found.item)
+    }
+  }
+
+  function _writableItem(found, view) {
+    if (!root.open) return MenuIpc.fail("unavailable", "menu is closed")
+    if (found.error) return MenuIpc.fail(found.error, "row reference")
+    if (root._pendingQuery()) return MenuIpc.fail("busy", "search pending")
+    if (found.protected === true) return MenuIpc.fail("unsupported", "protected row")
+    if (found.pageId !== root.pageId && view !== "result")
+      return MenuIpc.fail("refused", "row is not on the active page")
+    if (!root.rowCanOperate(found.item, found.ancestors))
+      return MenuIpc.fail("refused", "row is blocked")
+    return null
+  }
+
+  function ipcItemGet(ref) {
+    const found = root._resolveRef(ref)
+    if (found.error) return MenuIpc.fail(found.error, "row reference")
+    return MenuIpc.ok(root._itemPayload(found))
+  }
+
+  function ipcItem(ref, op, opts) {
+    const arg = opts && typeof opts === "object" && !Array.isArray(opts) ? opts.value : opts
+    if (op === "get") return root.ipcItemGet(ref)
+    let found = root._resolveRef(ref)
+    let searchProxy = false
+    if (found.error && root.query !== "") {
+      // A current search result may only be activated, through the existing
+      // pending-result landing path. Never mutate a search proxy.
+      const panel = root.panel || root.probeSource
+      const rows = panel && Array.isArray(panel.rowsModel) ? panel.rowsModel : []
+      const hit = rows.find(r => r && r.ref === ref)
+      if (hit && op === "activate") {
+        found = { item: hit, page: root.pageById(hit.page), pageId: hit.page,
+          ancestors: [], ref: ref }
+        searchProxy = true
+      }
+    }
+    const denied = root._writableItem(found, searchProxy ? "result" : "list")
+    if (denied) return denied
+    const item = found.item
+    const ctx = root._itemContext(found)
+    const protectedRow = MenuIpc.isProtectedRow(item, found.page)
+    if (protectedRow && op !== "get")
+      return MenuIpc.fail("unsupported", "protected row")
+    const isFlowRow = MenuLib.isFlow(item)
+    const kindError = MenuIpc.operationError(searchProxy ? "result" : item.type, op)
+    if (kindError && !(op === "action" && item.type === "action")
+      && !(op === "set" && isFlowRow)
+      && !(isFlowRow && (op === "open" || op === "activate" || op === "close")))
+      return MenuIpc.fail(kindError, "operation not allowed for row type")
+
+    switch (op) {
+    case "activate":
+      if (searchProxy) {
+        const panel = root.panel || root.probeSource
+        if (!panel || typeof panel.consumePendingResult !== "function")
+          return MenuIpc.fail("unavailable", "no result handoff")
+        panel.pendingResult = item
+        Qt.callLater(panel.consumePendingResult)
+        return MenuIpc.silent()
+      }
+      root.rowActivate(item, ctx)
+      return MenuIpc.silent()
+    case "open":
+      if (isFlowRow) {
+        root.setExpanded(item, true)
+        return MenuIpc.ok({ open: true, page: root.pageId })
+      }
+      if (item.type === "submenu") {
+        const panel = root.panel || root.probeSource
+        if (panel && typeof panel.pushPage === "function") panel.pushPage(item.page)
+        else root.push(item.page)
+        return MenuIpc.ok({ page: root.pageId })
+      }
+      root.rowOpen(item, ctx)
+      return MenuIpc.ok({ open: root.isExpanded(item), page: root.pageId })
+    case "close":
+      root.rowClose(item, ctx)
+      return MenuIpc.ok({ open: root.isExpanded(item), page: root.pageId })
+    case "toggle":
+      if (!root.rowSetToggle(item, !root.isToggleOn(item), ctx)) return MenuIpc.fail("refused", "toggle was not applied")
+      return MenuIpc.ok({ value: root.isToggleOn(item) })
+    case "set": {
+      const value = arg
+      if (MenuLib.isFlow(item)) {
+        const step = Number(flowIndexOf(item)) || 0
+        if (!root.rowFlowSet(step, value, ctx)) return MenuIpc.fail("refused", "flow step")
+        return MenuIpc.silent()
+      }
+      if (item.type === "select") {
+        if (root.stateOf(item).promptOpen !== true)
+          return MenuIpc.fail("refused", "select is not in edit mode")
+        if (typeof value !== "string") return MenuIpc.fail("invalid-argument", "edit prompt wants a string")
+        if (!root.rowCommitEdit(item, value, ctx)) return MenuIpc.fail("refused", "edit was not applied")
+        return MenuIpc.ok({ value: root.valueOf(item) })
+      }
+      const bad = MenuIpc.valueError(item, value)
+      if (bad) return MenuIpc.fail(bad, "wrong value type")
+      if (item.type === "toggle") {
+        if (!root.rowSetToggle(item, value === true, ctx)) return MenuIpc.fail("refused", "toggle was not applied")
+        return MenuIpc.ok({ value: root.isToggleOn(item) })
+      }
+      if (!root.rowCommitEdit(item, value, ctx)) return MenuIpc.fail("refused", "edit was not applied")
+      return MenuIpc.ok({ value: root.valueOf(item) })
+    }
+    case "step": {
+      const up = String(opts && opts.direction ? opts.direction : (arg || "up")).toLowerCase()
+      if (up !== "up" && up !== "down") return MenuIpc.fail("invalid-argument", "step wants up or down")
+      root.rowStep(item, up === "up" ? 1 : -1, ctx)
+      return MenuIpc.ok({ value: root.valueOf(item) })
+    }
+    case "options":
+      return MenuIpc.ok(MenuIpc.optionsProjection(item.options || [], root.stateOf(item).value,
+        MenuIpc.isProtectedRow(item, found.page)))
+    case "choose": {
+      const idx = MenuIpc.optionIndex(String(opts && opts.option !== undefined ? opts.option : arg))
+      const options = MenuIpc.optionsProjection(item.options || [], root.stateOf(item).value, false)
+      if (idx < 0 || idx >= options.length) return MenuIpc.fail("not-found", "no such option")
+      const opt = options[idx]
+      if (!opt.enabled) return MenuIpc.fail("refused", "option is disabled")
+      if (!root.rowChoose(item, root._rawOptions(item)[idx].value, ctx))
+        return MenuIpc.fail("refused", "option was not applied")
+      return MenuIpc.ok({ value: root.valueOf(item) })
+    }
+    case "info": {
+      const value = String(opts && opts.mode !== undefined ? opts.mode : (arg || "")) === "open"
+      const has = String(item.desc ?? "") !== "" || String(item.warning ?? "") !== ""
+      if (value && !has && !root.isExpanded(item))
+        return MenuIpc.fail("unsupported", "row has no description")
+      root.rowSetInfo(item, value, ctx)
+      return MenuIpc.ok({ open: root.infoOpen(item) })
+    }
+    case "confirm":
+      return root.ipcItemConfirm(found,
+        String(opts && opts.verb !== undefined ? opts.verb : (arg || "status")), ctx)
+    case "flow":
+      return root.ipcItemFlow(found,
+        String(opts && opts.verb !== undefined ? opts.verb : (arg || "")), ctx, opts || {})
+    case "delete":
+      root.rowDelete(item, ctx)
+      return MenuIpc.silent()
+    case "action":
+      root.rowRunAction(item, ctx)
+      return MenuIpc.silent()
+    }
+    return MenuIpc.fail("unsupported", "unknown item operation")
+  }
+
+  function _rawOptions(item) {
+    const stage = MenuLib.isFlow(item) ? MenuLib.flowStep(item, flowIndexOf(item)) : null
+    const declared = stage && stage.options !== undefined ? stage.options : item.options
+    if (Array.isArray(declared)) return declared
+    return declared && declared.length !== undefined ? Array.prototype.slice.call(declared) : []
+  }
+
+  function ipcItemConfirm(found, verb, ctx) {
+    const item = found.item
+    if (verb === "status") return MenuIpc.ok(root.rowConfirmStatus(item))
+    if (verb === "next") {
+      const kind = root.confirmKindOf(item)
+      if (kind === "") return MenuIpc.fail("refused", "no active confirmation")
+      if (!root.rowConfirm(item, kind, ctx)) return MenuIpc.fail("refused", "no confirmation")
+      return MenuIpc.ok(root.rowConfirmStatus(item))
+    }
+    if (verb === "cancel") {
+      root.rowConfirmCancel(item, ctx)
+      return MenuIpc.ok(root.rowConfirmStatus(item))
+    }
+    return MenuIpc.fail("unsupported", "unknown confirmation verb")
+  }
+
+  function ipcItemFlow(found, verb, ctx, opts) {
+    const item = found.item
+    if (!MenuLib.isFlow(item)) return MenuIpc.fail("unsupported", "row has no flow")
+    const fs = root._flowState(item)
+    const status = function () {
+      return MenuIpc.ok(MenuIpc.flowStatus({
+        active: root.isExpanded(item), index: Number(fs.index) || 0,
+        values: fs.values, ready: fs.ready === true
+      }, String((MenuLib.flowStep(item, Number(fs.index) || 0) || {}).kind || ""),
+        MenuIpc.isProtectedRow(item, found.page)))
+    }
+    if (verb === "status") return status()
+    if (verb === "set") {
+      const step = Number(opts && opts.step !== undefined ? opts.step : 0) || 0
+      if (step !== flowIndexOf(item)) return MenuIpc.fail("refused", "not the current step")
+      const stage = MenuLib.flowStep(item, step)
+      if (!stage) return MenuIpc.fail("not-found", "no such step")
+      if (stage.sensitive === true) return MenuIpc.fail("unsupported", "protected step")
+      const bad = MenuIpc.valueErrorForKind(String(stage.kind || ""), opts ? opts.value : undefined)
+      if (bad) return MenuIpc.fail(bad, "wrong value type")
+      const value = opts ? opts.value : undefined
+      if (stage.kind === "number" || stage.kind === "range") {
+        const n = Number(value)
+        const tooLow = stage.min !== undefined && n < Number(stage.min)
+        const tooHigh = stage.max !== undefined && n > Number(stage.max)
+        if (!isFinite(n) || tooLow || tooHigh)
+          return MenuIpc.fail("refused", "value outside step bounds")
+      }
+      if (stage.kind === "select") {
+        const offered = Array.isArray(stage.options) ? stage.options : []
+        if (!offered.some(o => o && String(o.value) === String(value)))
+          return MenuIpc.fail("refused", "value is not an offered option")
+      }
+      if (!root.rowFlowSet(step, value, ctx))
+        return MenuIpc.fail("refused", "draft not accepted")
+      return MenuIpc.silent()
+    }
+    if (verb === "next") {
+      const draft = fs.draft && fs.draft.set === true ? fs.draft.value : undefined
+      const stage = MenuLib.flowStep(item, flowIndexOf(item))
+      if (stage && stage.required && String(draft ?? "").trim() === "")
+        return MenuIpc.fail("refused", "required step has no value")
+      const before = flowIndexOf(item)
+      root.rowFlowAdvance(draft, ctx)
+      if (flowIndexOf(item) === before && fs.ready !== true)
+        return MenuIpc.fail("refused", "flow did not advance")
+      return status()
+    }
+    if (verb === "back") {
+      if (!root.rowFlowBack(ctx)) return MenuIpc.fail("refused", "no earlier step")
+      return status()
+    }
+    if (verb === "commit") {
+      const shellKeys = ["onSelect", "onChange", "onSubmit"]
+      for (let i = 0; i < shellKeys.length; i++) {
+        const template = item[shellKeys[i]]
+        if (typeof template === "string" && template.indexOf("%v") >= 0
+          && !MenuIpc.safeShellTemplate(template))
+          return MenuIpc.fail("unsupported", "flow shell template cannot take typed text")
+      }
+      if (!root.rowFlowCommit(ctx)) return MenuIpc.fail("refused", "flow is not ready")
+      return MenuIpc.silent()
+    }
+    if (verb === "cancel") {
+      root.rowFlowCancel(ctx)
+      return MenuIpc.ok({ active: false, step: 0, kind: "", ready: false, values: {} })
+    }
+    return MenuIpc.fail("unsupported", "unknown flow verb")
+  }
+
+  // --- router status -------------------------------------------------------
+
+  function ipcOwnerStatus() {
+    return MenuIpc.ok({
+      open: root.open, page: root.pageId, depth: root.stack.length,
+      scope: root._scope(), revision: root.rev,
+      bundleEntry: root.bundle && root.bundle.entry ? String(root.bundle.entry) : "",
+      guardsPending: root._pendingQuery(),
+      registered: root._ipcRegistered
+    })
+  }
+
+  // Injected common rows use the router's text adapter, not the gateway
+  // frame path: a gateway frame here would be stringified as [object Object].
+  function ipcPing() { return "pong" }
 
   Component {
     id: procComponent
@@ -2465,7 +4007,7 @@ Singleton {
   IpcHandler {
     target: "menu"
     function help(command: string): string {
-      return UnitIpc.help("menu", "Menu", "settings + menu framework", [
+      return UnitIpc.help("menu", "Menu", "Open and control menu bundles", [
         { name: "back", help: "go back one page" },
         { name: "close", help: "close the menu" },
         { name: "debugActivate", help: "activate the current row" },
