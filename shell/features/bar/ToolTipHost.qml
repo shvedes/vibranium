@@ -518,11 +518,23 @@ LayerSurface {
     if (root._placeQueued) return
     root._placeQueued = true
     const winner = root._winner
-    Qt.callLater(() => {
+    // A timer owned by this host cannot fire after teardown; a Qt.callLater
+    // callback can, and then reads a destroyed object in an invalid context.
+    placeTimer.winner = winner
+    placeTimer.start()
+  }
+
+  Timer {
+    id: placeTimer
+    interval: 0
+    repeat: false
+    property var winner: null
+    onTriggered: {
+      if (root._placeQueued === false) return
       if (winner !== root._winner) return
       root._placeQueued = false
       root.place(winner)
-    })
+    }
   }
 
   // Park the bubble next to the served module on every appearance, whenever

@@ -9,6 +9,7 @@ import qs.features.bar
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/capture/ShotLib.js" as ShotLib
 import "../../../../common/text/Format.js" as Format
+import qs.features.bar.control
 
 // Now Playing bar module (opt-in, off by default). Shows the active
 // MPRIS track title in the bar; left click opens the island, right click
@@ -272,7 +273,7 @@ CollapsibleSlot {
   // contract). A client with nothing loaded has no title to reveal, so it
   // lands on the bare slot rather than reserving room for empty text.
   collapseShown: root.shown
-  collapseFull: root.titleSlide > 0 ? pill.width : Bar.iconSlot
+  collapseFull: root.titleSlide > 0 ? pill.width : BarControl.iconSlot
   // The reveal is the pill's one open/close clock. The name swap is a second
   // scalar folded into the same width expression, not a width Behavior:
   // gating a width chase on titleSlide === 1 made the close freeze and the
@@ -294,10 +295,10 @@ CollapsibleSlot {
 
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
-    width: Bar.iconSlot + root.titleSlide * (root.nameWidth + 4 + Bar.slotInset)
+    width: BarControl.iconSlot + root.titleSlide * (root.nameWidth + 4 + BarControl.slotInset)
     height: root.height
     // clip keeps the sliding name inside the slot while nameWidth catches
-    // up. The Bar.iconSlot base keeps collapseFull continuous when the
+    // up. The bar.iconSlot base keeps collapseFull continuous when the
     // flash closes (pill settles exactly onto the icon-only width).
     clip: true
 
@@ -312,7 +313,7 @@ CollapsibleSlot {
 
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      width: Bar.iconSlot
+      width: BarControl.iconSlot
       height: parent.height
       clip: true
 
@@ -363,7 +364,7 @@ CollapsibleSlot {
       visible: root.titleSlide > 0
       level: 3
       width: Math.min(implicitWidth, 240)
-      font.pixelSize: Bar.pillFontSize
+      font.pixelSize: BarControl.pillFontSize
       text: root.title
       elide: Text.ElideRight
       // Shift composes with the anchors, so the slide below never
@@ -480,10 +481,10 @@ CollapsibleSlot {
       // The card closes as the window opens: the window is a toplevel and
       // covers the bar, so an island left open behind it is a second surface
       // showing the same track with no way back to it. That close now lives in
-      // Bar.showLyrics (LYR-1) so the pad and the menu/keybind verb share one
+      // bar.showLyrics (LYR-1) so the pad and the menu/keybind verb share one
       // owner - this handler no longer closes the island itself.
       onLyricsFullscreenRequested: {
-        Bar.showLyrics(island.player, ShotLib.matchScreen(root.barScreen, Ui.validScreens))
+        BarControl.showLyrics(island.player, ShotLib.matchScreen(root.barScreen, Ui.validScreens))
       }
     }
   }

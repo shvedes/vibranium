@@ -8,6 +8,8 @@ import qs.common
 import qs.common as Common
 import qs.features.wallpaper
 import qs.boot
+import qs.features.bar.control
+import qs.features.colorPicker
 // NOTE: qs.services and the other qs.features.* modules are imported by the
 // late halves, not here. Importing a module loads its whole file set before
 // anything paints, so every module named here is on the time-to-paint path.
@@ -16,11 +18,12 @@ import qs.boot
 // that compiles and maps first, and the bar arrives when the async half lands
 // (see _bootVisuals). Floor and Phase 1 need only the three above.
 //
-// The late work is split into two components so the bar does not wait for
-// modules it never uses: BootBar.qml carries the services and the bar itself,
+// The late work is split into two components so features do not wait for
+// services they never use: BootServices.qml carries the service singletons,
 // BootLate.qml carries the feature modules (menu, launcher, apps, pickers,
 // annotations, notifications). Both load in the same turn and are adopted
-// independently.
+// independently. The bar runtime is a third, demand-loaded instance owned by
+// the persisted master switch, not by the boot graph.
 
 Item {
   id: boot
@@ -242,15 +245,18 @@ Item {
       id: "bar",
       phase: "visual",
       criticality: "optional",
-      activation: "resident",
+      // The persisted master switch is the sole owner of the bar runtime.
+      // A transient hide is a control-state override and never a unit owner.
+      activation: "first_use",
       // `icons` is deliberately not an edge. The icon scan is a `bash find`
       // over every shipped SVG whose result fills bindings in place when it
       // lands (Icons swaps `_raw` wholesale), so the only thing the edge bought
       // was a bar that could not start until the whole asset set had been read
       // - which delayed the entrance latch, and the whole drain behind it.
       dependencies: ["settings", "theme", "ui", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("bar") },
-      teardown: null,
+      resolver: function() { return boot._mountBarRuntime() },
+      ready: function() { return boot._barRuntimeItem !== null },
+      teardown: function() { boot._unmountBarRuntime() },
       retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
@@ -759,6 +765,9 @@ Item {
     if (!boot._registerCatalog()) {
       return
     }
+    boot._catalogRegistered = true
+    // The bar lease can only be acquired once its descriptor is registered.
+    boot._reconcileBar()
     boot._bootP0()
     // Phase 1: visual surfaces on the first frames after the floor.
     boot._bootVisuals()
@@ -791,7 +800,7 @@ Item {
   function _bootState(): string { return JSON.stringify(boot._stateSnapshot()) }
   function _bootTimeline(): string { return JSON.stringify(boot._timeline()) }
 
-  // The late halves of boot: BootBar.qml (the bar surface), BootServices.qml
+  // The late halves of boot: the resident Bar control, BootServices.qml
   // (the qs.services singletons) and BootLate.qml (feature modules). All three
   // load asynchronously so their type loading happens off the UI thread
   // instead of blocking first paint. Each half imports only the module set it
@@ -830,6 +839,16 @@ Item {
   // runs it (see _beginDrain).
   property bool _drainRequested: false
 
+  // The bar runtime is a URL-loaded instance, not a boot singleton. The URL is
+  // empty on a cold shell and only set while the master switch is on.
+  property int _barGeneration: 0
+  property bool _barDecisionMade: false
+  property bool _barLeaseHeld: false
+  property var _barRuntimeItem: null
+  // The early tier and the bar lease must not start until every descriptor is
+  // registered; a unit change raised mid-registration is not a demand yet.
+  property bool _catalogRegistered: false
+
   function _loadLate() {
     // Order is the bar first (measured: the smallest set is the one on the
     // critical path), then the services the bar's modules read.
@@ -842,7 +861,11 @@ Item {
     // bar's path to screen. Nothing on the first screen resolves a feature
     // type, and the entrance queue drains after the entrance anyway, so the
     // wait costs the first screen nothing.
-    boot._loadBarHalf()
+    // The resident control is light: resolving `Bar` here loads no visual bar
+    // type. It registers `bar` IPC and the menu providers before any demand,
+    // so Settings and the CLI work even when the runtime never mounts.
+    void BarControl.tag
+    void ColorPickerController.tag
     boot._loadServicesHalf()
   }
 
@@ -874,33 +897,88 @@ Item {
     boot._halfSettled(heavy)
   }
 
-  function _loadBarHalf() {
-    if (boot._lateBar || boot._lateBarComponent) return
-    const comp = Qt.createComponent("BootBar.qml", Component.Asynchronous)
-    if (comp.status === Component.Ready) {
-      boot._adoptBarHalf(comp)
-    } else if (comp.status === Component.Error) {
-      Log.error("boot: bar half failed to load: " + comp.errorString())
-      boot._halfSettled(true)
-    } else {
-      boot._lateBarComponent = comp
-      comp.statusChanged.connect(boot._onBarHalfStatus)
-    }
+  // The visual bar is not a boot half any more. The resident `Bar` control is
+  // constructed by this module's import; the visual runtime is demand-loaded
+  // by URL only while the persisted master switch is on. A cold disabled shell
+  // resolves no visual bar type and constructs no bar window.
+  function _barDemand() {
+    return Settings.ready === true && Settings.statusbarEnabled === true
   }
 
-  function _onBarHalfStatus() {
-    const comp = boot._lateBarComponent
-    if (!comp || comp.status === Component.Loading) return
-    comp.statusChanged.disconnect(boot._onBarHalfStatus)
-    boot._lateBarComponent = null
-    if (comp.status === Component.Ready) {
-      boot._adoptBarHalf(comp)
+  function _mountBarRuntime() {
+    if (!boot._barDemand()) return false
+    if (boot._barRuntimeItem || barRuntimeLoader.status === Loader.Loading) return true
+    boot._barGeneration++
+    barRuntimeLoader.active = true
+    barRuntimeLoader.setSource(Qt.resolvedUrl("../features/bar/BarRuntime.qml"), {
+      control: BarControl,
+      generation: boot._barGeneration
+    })
+    return true
+  }
+
+  function _unmountBarRuntime() {
+    // Invalidate the outstanding load identity before clearing the URL, so a
+    // late Loaded or Error handler cannot attach a retired runtime.
+    boot._barGeneration++
+    boot._barRuntimeItem = null
+    barRuntimeLoader.active = false
+    barRuntimeLoader.source = ""
+  }
+
+  function _barRuntimeAccepted(item) {
+    if (!item || item.generation !== boot._barGeneration || !boot._barDemand()) {
+      return false
+    }
+    boot._barRuntimeItem = item
+    boot._settleBarHalf()
+    UnitGate.refresh("bar")
+    return true
+  }
+
+  // The bar's construction slot is settled exactly once per boot. A later
+  // enable has no boot slot to decrement; it uses the runtime's local reveal.
+  function _settleBarHalf() {
+    if (boot._barDecisionMade) return
+    boot._barDecisionMade = true
+    // The services half owns the first early-tier turn. Starting it here can
+    // land before _bootP0(), leaving facade dependencies blocked with no
+    // later edge to re-ensure them (AppLauncher's IPC target among them).
+    boot._halfSettled(true)
+  }
+
+  // A known-absent bar settles the entrance wait and retires only its played
+  // obligation, leaving an enabled wallpaper's own fade to report its finish.
+  function _barAbsent() {
+    if (boot._barDecisionMade) return
+    boot._settleBarHalf()
+    DesktopLayoutState.noteBootEntranceSettled()
+    DesktopLayoutState.retireBootEntranceParticipant("bar")
+    boot._loadFeaturesHalf()
+  }
+
+  // One owner for the master setting across the whole shell process.
+  function _reconcileBar() {
+    if (!boot._catalogRegistered || !Settings.ready) return
+    const want = Settings.statusbarEnabled === true
+    if (want) {
+      // Re-ensuring is idempotent and re-checks blocked dependencies, so this
+      // also lands the bar once its floor dependencies become ready.
+      const result = UnitGate.ensure("bar", "bar-settings")
+      if (result && result.lease) boot._barLeaseHeld = true
+      // The initial construction slot is the settings decision, not the
+      // runtime's compile. Wallpaper's first fade waits on this milestone, so
+      // holding it for a module-heavy URL load would put a second, later
+      // compile on the first-paint path.
+      boot._settleBarHalf()
       return
     }
-    // The shell degrades to no bar; the feature half still lands and starts
-    // the drain, and the entrance milestone falls back to its backstop.
-    Log.error("boot: bar half failed to load: " + comp.errorString())
-    boot._halfSettled(true)
+    if (boot._barLeaseHeld) {
+      boot._barLeaseHeld = false
+      UnitGate.releaseOwner("bar-settings")
+    }
+    boot._unmountBarRuntime()
+    boot._barAbsent()
   }
 
   function _loadServicesHalf() {
@@ -959,31 +1037,6 @@ Item {
     }
     boot._failHalf("late half failed to load: " + comp.errorString())
     boot._beginDrain()
-  }
-
-  // The bar half landed. Services before the surface (see _startEarly): one
-  // budgeted turn of the early tier runs before the bar's construction is
-  // demanded, so the bus-name daemons exist while the bar is still compiling
-  // instead of one entrance later. It is bounded by frameBudgetMs, so it
-  // cannot starve the bar build it precedes.
-  function _adoptBarHalf(comp) {
-    boot._lateBar = comp.createObject(boot, { boot: boot })
-    if (!boot._lateBar) {
-      boot._failHalf("bar half failed to instantiate", true)
-      return
-    }
-    Log.debug("boot: bar half adopted in " + boot._sinceProcessStart() + "ms")
-    boot._startEarly()
-    // The demand lives with the half that can serve it: a demand with nothing
-    // to dispatch to would leave UnitGate marking the unit ready with the bar
-    // nonexistent. The record's construction figure is the bar's own.
-    try {
-      UnitGate.ensure("bar", "boot")
-    } catch (error) {
-      // Recorded on the unit's record by UnitGate.
-    }
-    boot._replayNext()
-    boot._halfSettled(true)
   }
 
   // The services half landed. Nothing is demanded from it here: the early tier
@@ -1592,7 +1645,56 @@ Item {
       boot._refreshUnit(id)
       boot._unitMilestone(id)
       boot._armRetry()
+      // A first_use unit is skipped by the dependency cascade: its owner must
+      // re-ensure it on the readiness edges its own dependencies produce.
+      boot._reconcileBar()
     }
+  }
+
+  // The visual bar runtime. `setSource` is called only with a current settings
+  // demand; clearing the URL is how a master disable retires the instance.
+  Loader {
+    id: barRuntimeLoader
+    active: false
+    asynchronous: true
+    onLoaded: {
+      // A load that finished after a disable carries a stale generation and
+      // must attach nothing, publish nothing and arm no retry.
+      boot._barRuntimeAccepted(item)
+    }
+    onStatusChanged: {
+      if (status !== Loader.Error) return
+      if (!boot._barDecisionMade) {
+        Log.error("boot: bar runtime failed to load")
+        boot._barAbsent()
+      }
+    }
+  }
+
+  // A hydration failure or a hang must not hold boot behind a bar that never
+  // arrives. The milestone backstops still cover the entrance and the drain.
+  QQ.Timer {
+    interval: 2000
+    repeat: false
+    running: true
+    onTriggered: {
+      if (!boot._barDecisionMade) boot._barAbsent()
+    }
+  }
+
+  Connections {
+    target: Settings
+    ignoreUnknownSignals: true
+    function onReadyChanged() { boot._reconcileBar() }
+    function onStatusbarEnabledChanged() { boot._reconcileBar() }
+  }
+
+  // Capture dots own their lifetime. They are mounted with the shell, not by
+  // the bar runtime, so a bar toggle or reload never unmaps them.
+  Loader {
+    id: privacyIndicatorsLoader
+    asynchronous: true
+    source: Qt.resolvedUrl("../features/privacy/PrivacyIndicators.qml")
   }
 
   // The annotation controller exists only between a request and its
@@ -1695,7 +1797,7 @@ Item {
     //
     // The wallpaper is constructed here, on this thread: it is the surface the
     // first frame paints, and its file set is small - the view, the transition
-    // helper and its shader. The bar is the opposite: Bar.qml imports the
+    // helper and its shader. The bar is the opposite: BarControl.qml imports the
     // module registry, and a module import compiles its whole file set before
     // anything paints, so the bar is a late unit that _adoptLate demands. That
     // is what lets this surface map and fade while the registry is still being

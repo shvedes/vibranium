@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.bar
+import qs.features.bar.control
 
 // Timer indicator. Owned slot that appears while the native timer service
 // counts down or has expired. Static timer glyph on the left plus a
@@ -36,14 +37,14 @@ CollapsibleSlot {
   // countdown pill (the caffeine finite-pill shape). Zero width while
   // idle so it leaves no gap.
   collapseShown: root.shown
-  collapseFull: Bar.iconSlot + pill.width + Bar.slotInset
+  collapseFull: BarControl.iconSlot + pill.width + BarControl.slotInset
 
   // Static timer glyph on the left, docked like the caffeine glyph.
   Icon {
     id: glyph
 
     anchors.left: parent.left
-    anchors.leftMargin: (Bar.iconSlot - 15) / 2
+    anchors.leftMargin: (BarControl.iconSlot - 15) / 2
     anchors.verticalCenter: parent.verticalCenter
     name: "timer"
     colorKey: "foreground_0"

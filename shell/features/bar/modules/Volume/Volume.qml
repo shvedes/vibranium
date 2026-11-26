@@ -6,6 +6,7 @@ import qs.services as Core
 import qs.features.bar
 import "Model.js" as Model
 import "../../../../common/text/Format.js" as Format
+import qs.features.bar.control
 
 // Volume module: single volume icon with the microphone pill folded into
 // the same slot. Right-click toggles the shell's audio mixer over IPC
@@ -351,7 +352,7 @@ BarModule {
       readonly property int pctWidth: pctText.implicitWidth + 4
 
       implicitWidth: root.slotWidth + Math.round(pctSlide * pctWidth)
-      implicitHeight: Bar.height
+      implicitHeight: BarControl.height
       width: implicitWidth
       height: implicitHeight
 
@@ -380,7 +381,7 @@ BarModule {
         opacity: volumeBox.pctSlide
         visible: opacity > 0
         level: 3
-        font.pixelSize: Bar.pillFontSize
+        font.pixelSize: BarControl.pillFontSize
         color: Ui.solid(root.volumeIconColor)
         text: Format.percent(root.outputVolume)
       }
@@ -437,7 +438,7 @@ BarModule {
         visible: root.sinkNameSlide > 0
         level: 3
         width: Math.min(implicitWidth, 200)
-        font.pixelSize: Bar.pillFontSize
+        font.pixelSize: BarControl.pillFontSize
         text: root.sinkLabel
         elide: Text.ElideRight
       }

@@ -4,7 +4,7 @@
 //   shell/features/bar/modules/Tray/Tray.qml   the trigger, latch and affordance
 //   shell/features/bar/BarView.qml             the per-window drag grace
 //   shell/features/bar/modules/Session/Session.qml  the independent power button
-//   shell/features/bar/Bar.qml                 standalone slots, no pin
+//   shell/features/bar/BarRuntime.qml                 standalone slots, no pin
 //   shell/common/settings/catalog.jsonc        default order and toggles
 //
 // Limitation: BarView is a LayerSurface and Quickshell.screens is empty under
@@ -24,7 +24,7 @@ const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const TRAY = path.join(SHELL, 'features', 'bar', 'modules', 'Tray', 'Tray.qml')
 const BARVIEW = path.join(SHELL, 'features', 'bar', 'BarView.qml')
 const SESSION = path.join(SHELL, 'features', 'bar', 'modules', 'Session', 'Session.qml')
-const BAR = path.join(SHELL, 'features', 'bar', 'Bar.qml')
+const BAR = path.join(SHELL, 'features', 'bar', 'BarRuntime.qml')
 const CATALOG = path.join(SHELL, 'common', 'settings', 'catalog.jsonc')
 
 const tray = fs.readFileSync(TRAY, 'utf8')

@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import qs.features.bar
+import qs.features.bar.control
 
 // One status notifier icon. Left-click activates (or opens the menu for
 // menu-only items), middle-click secondary-activates, right-click opens
@@ -16,8 +16,8 @@ MouseArea {
   // Live bar metrics - the same tokens the shared Icon primitive paints from,
   // read straight off Bar so a tray icon scales with bar height and preset
   // exactly like every normal module's does.
-  readonly property int _slot: Bar.iconSlot
-  readonly property int _canvas: Bar.iconCanvas
+  readonly property int _slot: BarControl.iconSlot
+  readonly property int _canvas: BarControl.iconCanvas
   readonly property real _dpr: Window.window ? Window.window.devicePixelRatio : 1
 
   signal menuRequested(var handle, var anchor)

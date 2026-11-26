@@ -18,7 +18,7 @@ import qs.features.lock
 // hardware, qs.services + qs.features.bar costs about twice qs.features.bar
 // alone, and that difference sat directly on the bar's path to screen.
 //
-// Boot.qml loads this half and BootBar.qml in the same turn, both
+// Boot.qml loads this half beside the resident bar control, both
 // asynchronously, and adopts whichever lands first. The early service tier
 // starts at the bar half's adoption (see Boot._adoptBarHalf); this half only
 // answers the resolvers, so a demand that arrives before it lands is stashed
@@ -28,7 +28,7 @@ import qs.features.lock
 // essential unit whose module is small and whose absence is what holds the
 // shell's readiness, so it rides this half rather than the feature half. A
 // unit whose type lives in any other feature module belongs in BootLate.qml,
-// and the bar itself belongs in BootBar.qml: resolve() answers false for an id
+// the bar is owned by Boot: resolve() answers false for an id
 // it does not own, and Boot stashes that demand for the half that does.
 Item {
   id: late

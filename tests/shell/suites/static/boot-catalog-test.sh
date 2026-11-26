@@ -42,7 +42,7 @@ t_init "boot-catalog" "the _catalog data: counts, the essential 14, activation m
 require_tools node awk sed grep sort paste tr wc uniq
 
 BOOT_QML="$SHELL_DIR/boot/Boot.qml"
-BOOTBAR_QML="$SHELL_DIR/boot/BootBar.qml"
+BAR_RUNTIME_QML="$SHELL_DIR/features/bar/BarRuntime.qml"
 BOOTSERVICES_QML="$SHELL_DIR/boot/BootServices.qml"
 BOOTLATE_QML="$SHELL_DIR/boot/BootLate.qml"
 GATE_QML="$SHELL_DIR/common/runtime/UnitGate.qml"
@@ -340,12 +340,11 @@ expect_count() {
 # resolver_cases prints the case labels of Boot.qml's _resolveDescriptor.
 resolver_cases() {
   # The resolver map is split: floor, Phase-1 and demand-driven cases live
-  # in Boot.qml (pre-paint), the bar in BootBar.qml, the service singletons
-  # in BootServices.qml and the feature modules in BootLate.qml (all three
-  # post-paint). The union is what has to cover the catalog exactly once.
+  # in Boot.qml (pre-paint), the service singletons in BootServices.qml and
+  # the feature modules in BootLate.qml (both post-paint). The bar is no longer
+  # a resolver case: Boot owns its URL loader and settings lease directly. The
+  # union is what has to cover the catalog exactly once.
   awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/' "$BOOT_QML" |
-    sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
-  awk '/^  function resolve\(id\) \{$/,/^    return true$/' "$BOOTBAR_QML" |
     sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
   awk '/^  function resolve\(id\) \{$/,/^    return true$/' "$BOOTSERVICES_QML" |
     sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
@@ -555,7 +554,7 @@ t_eq "gated_compat is systemUpdates, printers" \
   "$DOC_GATED_CSV" "$(units_with ACT gated_compat)"
 t_eq "facade is appLauncher, pass, audioMixer, imageViewer" "$DOC_FACADE_CSV" \
   "$(units_with ACT facade)"
-t_eq "first_use is annotations alone" "annotations" "$(units_with ACT first_use)"
+t_eq "first_use is annotations and the bar" "bar,annotations" "$(units_with ACT first_use)"
 t_eq "the eager floor is the twelve units everything else assumes" \
   "exec,hyprlandSettings,icons,log,miscSettings,paths,settings,state,systemFont,theme,ui,watch" \
   "$(units_with ACT eager | tr ',' '\n' | LC_ALL=C sort | paste -sd, -)"
@@ -600,10 +599,13 @@ fi
 
 t_section "the resolver map covers the catalog exactly"
 RESOLVER_CASES="$(resolver_cases)"
-t_count "the _resolveDescriptor switch has one case per unit" "$U_N" \
+# The bar is the one catalog unit Boot owns directly: its resolver starts the
+# URL loader instead of dispatching through a late half, so it has no case in
+# the switch. The other 51 cases still cover the rest of the catalog exactly.
+t_count "the _resolveDescriptor switch covers every unit except the bar" "$((U_N - 1))" \
   "$(printf '%s\n' "$RESOLVER_CASES" | wc -l | tr -d ' ')"
-t_eq "the switch and the catalog are the same set of ids" \
-  "$(printf '%s\n' "$RESOLVER_CASES" | LC_ALL=C sort)" "$(id_list | LC_ALL=C sort)"
+t_eq "the switch plus the bar equal the catalog" \
+  "$(printf '%s\n' "$RESOLVER_CASES" bar | LC_ALL=C sort)" "$(id_list | LC_ALL=C sort)"
 t_contains "annotations resolves by activating the loader" "annotationLoader.active = true" \
   "$(awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/' "$BOOT_QML" |
     sed -n 's/^[[:space:]]*case "annotations":[[:space:]]*//p')"
@@ -627,7 +629,15 @@ while ((i < U_N)); do
     "$LEGAL_ACT_RE" "${U_ACT[$i]}"
   t_eq "$id ($at) dependencies is an array" "array" "${U_ARR[$i]}"
   t_eq "$id ($at) resolver is a function expression" "function" "${U_RKIND[$i]}"
-  t_eq "$id ($at) the resolver names its own id" "yes" "${U_RSELF[$i]}"
+  if [[ $id == bar ]]; then
+    # Boot owns the bar loader directly; the resolver starts it by name rather
+    # than dispatching to a half that would name the unit's own id.
+    t_eq "$id ($at) the resolver mounts the runtime" "yes" \
+      "$(sed -n '/id: "bar"/,/^    },$/p' "$BOOT_QML" |
+        grep -q '_mountBarRuntime' && printf yes || printf no)"
+  else
+    t_eq "$id ($at) the resolver names its own id" "yes" "${U_RSELF[$i]}"
+  fi
   t_match "$id ($at) ready is a function expression or null" \
     '^(function|null|absent)$' "${U_READYKIND[$i]}"
   t_match "$id ($at) teardown is a function expression or null" \
@@ -689,15 +699,15 @@ t_contains "appLauncher's teardown delegates to the late half" "_lateTeardown" \
   "$(unit_field appLauncher TDBODY)"
 t_contains "pass's teardown delegates to the late half" "_lateTeardown" \
   "$(unit_field pass TDBODY)"
-t_file "BootBar.qml exists" "$BOOTBAR_QML"
+t_file "BarRuntime.qml exists" "$BAR_RUNTIME_QML"
 t_file "BootServices.qml exists" "$BOOTSERVICES_QML"
 t_file "BootLate.qml exists" "$BOOTLATE_QML"
 t_contains "the late half releases the appLauncher controller" "AppLauncher.teardownController()" \
   "$(latelate_body)"
 t_contains "the late half releases the pass controller" "Pass.teardownController()" \
   "$(latelate_body)"
-t_eq "exactly seven units sit outside the eager/resident floor" \
-  "annotations,appLauncher,audioMixer,imageViewer,pass,printers,systemUpdates" \
+t_eq "exactly eight units sit outside the eager/resident floor" \
+  "annotations,appLauncher,audioMixer,bar,imageViewer,pass,printers,systemUpdates" \
   "$(printf '%s\n' "${U_ID[@]}" |
     while read -r unit; do
       case "$(unit_field "$unit" ACT)" in
@@ -846,7 +856,9 @@ t_eq "a failed late half reaches the drain" "true" "$(late_val late.drainStarted
 t_eq "a failed late half reaches a terminal verdict" "ready" "$(late_val late.verdict)"
 t_eq "the settle runs before the drain" "true" "$(late_val late.settleBeforeDrain)"
 t_eq "the failure is still logged" "true" "$(late_val late.errorLogged)"
-t_eq "the four half-failure paths share one settle helper" "4" \
+# The bar no longer has a component half to fail: its load errors are handled
+# by the loader, so three component halves remain on the shared settle helper.
+t_eq "the three half-failure paths share one settle helper" "3" \
   "$(grep -c 'boot._failHalf(' "$BOOT_QML")"
 t_contains "the shared helper owns the settle" 'boot._halfSettled(heavy)' \
   "$(awk '/^  function _failHalf\(/,/^  \}$/' "$BOOT_QML")"

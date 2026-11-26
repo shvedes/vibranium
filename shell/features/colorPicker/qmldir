@@ -1,0 +1,3 @@
+module qs.features.colorPicker
+
+singleton ColorPickerController 1.0 ColorPickerController.qml

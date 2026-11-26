@@ -94,7 +94,7 @@ group('the Quickshell resource prefix in front of the path is never parsed', () 
 group('a file stem repeats its directory name only once', () => {
   eq('Clipboard.qml in clipboard/', Scope.scopeFromPath('features/clipboard/Clipboard.qml'), 'clipboard')
   eq('case-insensitively, so Wallpaper.qml in wallpaper/', Scope.scopeFromPath('features/wallpaper/Wallpaper.qml'), 'wallpaper')
-  eq('Bar.qml in bar/ collapses too', Scope.scopeFromPath('features/bar/Bar.qml'), 'bar')
+  eq('Bar.qml in bar/ collapses too', Scope.scopeFromPath('features/bar/BarRuntime.qml'), 'bar.barRuntime')
   eq('a different stem keeps both', Scope.scopeFromPath('features/clipboard/ClipboardPanel.qml'), 'clipboard.clipboardPanel')
   eq('an island under a module keeps all three', Scope.scopeFromPath('features/bar/modules/SystemUpdates/SystemUpdatesIsland.qml'), 'bar.systemUpdates.systemUpdatesIsland')
 })
@@ -117,7 +117,7 @@ group('the first letter of a segment is lowered, and a capital run is one acrony
   // Lowering only the first character of a run would produce `oSDView`, which
   // is a spelling nobody writes.
   eq('PascalCase', Scope.scopeFromPath('features/osd/OSDView.qml'), 'osd.osdView')
-  eq('one capital is a word starting capitalised', Scope.scopeFromPath('features/bar/Bar.qml'), 'bar')
+  eq('one capital is a word starting capitalised', Scope.scopeFromPath('features/bar/BarRuntime.qml'), 'bar.barRuntime')
   eq('a run with nothing after it is one word', Scope.scopeFromPath('features/bar/IPC.qml'), 'bar.ipc')
   eq('two words in a row', Scope.scopeFromPath('features/bar/modules/ColorPicker/ColorPicker.qml'), 'bar.colorPicker')
   eq('already lower is untouched', Scope.scopeFromPath('features/launcher/AppLauncher.qml'), 'launcher.appLauncher')
@@ -140,7 +140,7 @@ group('lowerFirst is the rule, stated on its own', () => {
   eq('the empty string', Scope.lowerFirst(''), '')
 })
 group('stripLine drops the line number, with or without a function name', () => {
-  eq('with one', Scope.stripLine('probe@qs:@/qs/features/bar/Bar.qml:12'), 'probe@qs:@/qs/features/bar/Bar.qml')
+  eq('with one', Scope.stripLine('probe@qs:@/qs/features/bar/BarRuntime.qml:12'), 'probe@qs:@/qs/features/bar/BarRuntime.qml')
   eq('the trailing line only', Scope.stripLine('/qs/a/B.qml:3'), '/qs/a/B.qml')
   eq('with no line at all', Scope.stripLine('/qs/a/B.qml'), '/qs/a/B.qml')
   eq('a suffix that is not a line number', Scope.stripLine('/qs/a/B.qml:x'), '/qs/a/B.qml:x')
@@ -167,7 +167,7 @@ group('scopeFromFrame is the url half of scopeFromStack', () => {
   eq('name@url', Scope.scopeFromFrame('probe@qs:@/qs/features/osd/OSDView.qml:12'), 'osd.osdView')
   eq('a bare url with no name', Scope.scopeFromFrame('@qs:@/qs/features/osd/OSDView.qml:12'), 'osd.osdView')
   eq('a binding frame', Scope.scopeFromFrame('expression for text@qs:@/qs/features/osd/OSDView.qml:12'), 'osd.osdView')
-  eq('an anonymous frame', Scope.scopeFromFrame('<anonymous>@qs:@/qs/features/bar/Bar.qml:1'), 'bar')
+  eq('an anonymous frame', Scope.scopeFromFrame('<anonymous>@qs:@/qs/features/bar/BarRuntime.qml:1'), 'bar.barRuntime')
   eq('whitespace only', Scope.scopeFromFrame('   '), null)
   eq('a non-string', Scope.scopeFromFrame(null), null)
 })
@@ -259,8 +259,8 @@ group('depth is an index into the trace, and the frame at it is the call site', 
   eq('depth 1 names the caller', Scope.scopeFromStack(st, 1), 'clipboard')
 })
 group('a frame with no function name is still a location', () => {
-  const st = stackOf('@qs:@/qs/features/bar/Bar.qml:7')
-  eq('the bare url form', Scope.scopeFromStack(st, 0), 'bar')
+  const st = stackOf('@qs:@/qs/features/bar/BarRuntime.qml:7')
+  eq('the bare url form', Scope.scopeFromStack(st, 0), 'bar.barRuntime')
   const binding = stackOf('expression for text@qs:@/qs/features/osd/OSDView.qml:12')
   eq('a binding frame', Scope.scopeFromStack(binding, 0), 'osd.osdView')
 })

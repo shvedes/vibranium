@@ -6,6 +6,7 @@ import Quickshell.Wayland
 import qs.common
 import qs.features.bar
 import "../../common/text/DropPayload.js" as DropPayload
+import qs.features.bar.control
 
 // Persistent input proxy and full-screen feedback for the bar-position
 // gesture.
@@ -41,13 +42,13 @@ LayerSurface {
 
   property var sourceView: null
   readonly property bool inputReady: root.sourceView !== null
-  readonly property bool ownsGesture: Bar.movePressed
-    && Bar.moveOwner === root
+  readonly property bool ownsGesture: BarControl.movePressed
+    && BarControl.moveOwner === root
     && !!root.winScreen
-    && Bar.moveScreenKey === root.winScreen.name
-  readonly property bool matches: Bar.moveActive && root.ownsGesture
-  readonly property real barY: Bar.position === "top"
-    ? 0 : Math.max(0, root.winScreen.height - Bar.height)
+    && BarControl.moveScreenKey === root.winScreen.name
+  readonly property bool matches: BarControl.moveActive && root.ownsGesture
+  readonly property real barY: BarControl.position === "top"
+    ? 0 : Math.max(0, root.winScreen.height - BarControl.height)
   // The zone rects the idle region subtracts, read off the per-monitor bar
   // window's own `moveExcl*` scalars. Flat scalars rather than a list of
   // objects for the reason BarView keeps them flat: a number notifies only
@@ -93,12 +94,12 @@ LayerSurface {
   // is the gate for the same reason: before the store lands the layout is
   // empty and would otherwise read as "no modules".
   readonly property bool idleRegion: root.inputReady
-    && Bar.enabled
-    && !Bar.hideToggle
+    && BarControl.enabled
+    && !BarControl.hideToggle
     && !root.screenFullscreen
     && Settings.ready
     && (root.excl0W + root.excl1W + root.excl2W > 0
-      || (Bar.layout.left.length + Bar.layout.center.length + Bar.layout.right.length === 0))
+      || (BarControl.layout.left.length + BarControl.layout.center.length + BarControl.layout.right.length === 0))
   property bool proxyPressed: false
   property bool proxyDragging: false
   property real pressedX: 0
@@ -106,11 +107,11 @@ LayerSurface {
   readonly property real dragThreshold: 6
 
   function refreshSourceView() {
-    root.sourceView = Bar.moveViewFor(root.winScreen)
+    root.sourceView = BarControl.moveViewFor(root.winScreen)
   }
 
   function cancelLocal() {
-    Bar.cancelBarMove(root)
+    BarControl.cancelBarMove(root)
     root.proxyPressed = false
     root.proxyDragging = false
   }
@@ -127,7 +128,7 @@ LayerSurface {
   // mask until something re-maps the surface (which is exactly what a
   // random menu toggle did). Staying unmapped until the holes exist makes
   // the first map carry the correct region.
-  visible: Bar.enabled && !Bar.hideToggle && (root.ownsGesture || root.idleRegion)
+  visible: BarControl.enabled && !BarControl.hideToggle && (root.ownsGesture || root.idleRegion)
   surface: "vibranium:bar-drag"
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
   mask: Region {
@@ -135,7 +136,7 @@ LayerSurface {
     y: root.ownsGesture ? 0 : root.barY
     width: root.ownsGesture || root.idleRegion ? root.winScreen.width : 0
     height: root.ownsGesture ? root.winScreen.height
-      : (root.idleRegion ? Bar.height : 0)
+      : (root.idleRegion ? BarControl.height : 0)
 
     Region {
       x: root.excl0X
@@ -215,7 +216,7 @@ LayerSurface {
   onWinScreenChanged: root.invalidateScreen()
 
   Connections {
-    target: Bar
+    target: BarControl
     function onMoveViewsRevisionChanged() {
       root.refreshSourceView()
     }
@@ -246,7 +247,7 @@ LayerSurface {
       id: slab
 
       required property string modelData
-      readonly property bool candidate: modelData === Bar.moveCandidate
+      readonly property bool candidate: modelData === BarControl.moveCandidate
 
       color: Ui.tint("accent", 0.16)
       border.color: candidate ? Ui.solid("accent") : Ui.tint("accent", 0.5)
@@ -258,7 +259,7 @@ LayerSurface {
       x: 0
       y: modelData === "top" ? 0 : root.height - height
       width: root.width
-      height: Bar.height
+      height: BarControl.height
 
       // Dim away when a slot is just a hint (non-candidate); snap instantly
       // to a bright highlight when it becomes the candidate.
@@ -287,14 +288,14 @@ LayerSurface {
     id: wallpaperDrop
 
     anchors.fill: parent
-    enabled: Bar.enabled && !Bar.hideToggle && DesktopLayoutState.wallpaperEnabled
+    enabled: BarControl.enabled && !BarControl.hideToggle && DesktopLayoutState.wallpaperEnabled
     // True only while a payload that passed the hover filter is over the
     // area. DropArea.containsDrag is true for every hovering drag whether
     // or not onEntered accepted it, so the slab binds to this verdict and
     // to the bar window's half instead.
     property bool dragOk: false
     onEntered: drag => {
-      if (!Bar.enabled || Bar.hideToggle || !DesktopLayoutState.wallpaperEnabled) return
+      if (!BarControl.enabled || BarControl.hideToggle || !DesktopLayoutState.wallpaperEnabled) return
       // The same filter the bar window's own half applies, so a drag that
       // crosses a module zone and a drag that crosses a gap get the same
       // verdict and the same slab.
@@ -304,7 +305,7 @@ LayerSurface {
     onExited: dragOk = false
     onDropped: drop => {
       dragOk = false
-      if (!Bar.enabled || Bar.hideToggle || !DesktopLayoutState.wallpaperEnabled) return
+      if (!BarControl.enabled || BarControl.hideToggle || !DesktopLayoutState.wallpaperEnabled) return
       if (root.sourceView) root.sourceView.forwardWallpaperDrop(drop)
     }
   }
@@ -317,7 +318,7 @@ LayerSurface {
     x: 0
     y: root.barY
     width: parent.width
-    height: Bar.height
+    height: BarControl.height
     visible: wallpaperDrop.dragOk
       || (root.sourceView ? root.sourceView.wallpaperDropHover : false)
     color: Ui.solid("background_0")
@@ -372,8 +373,8 @@ LayerSurface {
     id: moveGrab
 
     anchors.fill: parent
-    visible: root.inputReady && Bar.enabled && !Bar.hideToggle
-    enabled: root.inputReady && Bar.enabled && !Bar.hideToggle
+    visible: root.inputReady && BarControl.enabled && !BarControl.hideToggle
+    enabled: root.inputReady && BarControl.enabled && !BarControl.hideToggle
     acceptedButtons: Qt.LeftButton
     pressAndHoldInterval: 200
     hoverEnabled: true
@@ -393,9 +394,9 @@ LayerSurface {
 
     function beginDrag(mouse) {
       if (!root.proxyPressed || !moveGrab.pressed || !root.ownsGesture) return false
-      if (!Bar.startBarMove(root)) return false
+      if (!BarControl.startBarMove(root)) return false
       root.proxyDragging = true
-      Bar.updateBarMove(root, mouse.x, mouse.y)
+      BarControl.updateBarMove(root, mouse.x, mouse.y)
       return true
     }
 
@@ -404,7 +405,7 @@ LayerSurface {
         mouse.accepted = false
         return
       }
-      if (!Bar.pressBar(root.winScreen, root)) {
+      if (!BarControl.pressBar(root.winScreen, root)) {
         mouse.accepted = false
         moveGrab.reset()
         return
@@ -425,16 +426,16 @@ LayerSurface {
         return
       }
       if (!(mouse.buttons & Qt.LeftButton)) {
-        if (root.proxyDragging || Bar.moveActive) {
-          Bar.cancelBarMove(root)
+        if (root.proxyDragging || BarControl.moveActive) {
+          BarControl.cancelBarMove(root)
         } else {
-          Bar.releaseBar(root)
+          BarControl.releaseBar(root)
         }
         moveGrab.reset()
         return
       }
       if (!moveGrab.pressed) {
-        Bar.cancelBarMove(root)
+        BarControl.cancelBarMove(root)
         moveGrab.reset()
         return
       }
@@ -445,20 +446,20 @@ LayerSurface {
         moveGrab.beginDrag(mouse)
         return
       }
-      Bar.updateBarMove(root, mouse.x, mouse.y)
+      BarControl.updateBarMove(root, mouse.x, mouse.y)
     }
 
     onReleased: mouse => {
       if (root.proxyPressed && root.ownsGesture) {
-        if (root.proxyDragging || Bar.moveActive) {
+        if (root.proxyDragging || BarControl.moveActive) {
           if (!moveGrab.insideScreen(mouse)) {
-            Bar.cancelBarMove(root)
+            BarControl.cancelBarMove(root)
           } else {
-            Bar.updateBarMove(root, mouse.x, mouse.y)
-            Bar.endBarMove(root)
+            BarControl.updateBarMove(root, mouse.x, mouse.y)
+            BarControl.endBarMove(root)
           }
         } else {
-          Bar.releaseBar(root)
+          BarControl.releaseBar(root)
         }
       }
       moveGrab.reset()
@@ -466,7 +467,7 @@ LayerSurface {
     }
 
     onCanceled: {
-      Bar.cancelBarMove(root)
+      BarControl.cancelBarMove(root)
       moveGrab.reset()
     }
 
@@ -474,7 +475,7 @@ LayerSurface {
   }
 
   Component.onDestruction: {
-    Bar.cancelBarMove(root)
+    BarControl.cancelBarMove(root)
     root.proxyPressed = false
     root.proxyDragging = false
   }

@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.common
 import qs.features.bar
 import "DownloadsLib.js" as DL
+import qs.features.bar.control
 
 // Statusbar entry for the downloader. The module owns the running job and the
 // busy state so the island can be closed mid-download without cancelling
@@ -17,7 +18,7 @@ import "DownloadsLib.js" as DL
 BarModule {
   id: root
 
-  implicitWidth: Bar.iconSlot
+  implicitWidth: BarControl.iconSlot
   fillButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
   barTipText: "Downloader"
   barTipActive: root.hovered && !root.islandOpen
@@ -818,7 +819,7 @@ BarModule {
   // second moving glyph behind it would be noise.
   IconSweep {
     anchors.centerIn: parent
-    canvas: Bar.iconCanvas
+    canvas: BarControl.iconCanvas
     active: root.downloading && !root.islandOpen
   }
 

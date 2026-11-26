@@ -1,10 +1,10 @@
-pragma Singleton
 pragma ComponentBehavior: Bound
 
 import QtQml
 import QtQuick
 import Quickshell
 import qs.common
+import qs.features.lyrics
 import qs.services as Core
 import qs.features.bar
 import qs.features.bar.modules.Clock
@@ -33,7 +33,6 @@ import qs.features.bar.modules.Downloader
 import "../../common/math/Range.js" as Range
 import "BarLib.js" as BarLib
 import "BarIpc.js" as BarIpc
-import "../../common/text/IpcCatalog.js" as Catalog
 
 // The bar. Owns the bar's shell-internal settings (the raw "statusbar"
 // section under shell.* in settings.json: enabled, position, showBorder
@@ -62,16 +61,14 @@ import "../../common/text/IpcCatalog.js" as Catalog
 // Scale (bar metrics: height, slot tokens, per-module construction
 // records, metrics), Modules (registry, owned dynamics, readiness,
 // enable/disable, menu providers, IPC bridge).
-Singleton {
+Item {
   id: root
 
-  readonly property string tag: "bar"
-  // Bound components throw on an assignment to an undeclared property. This
-  // must exist before Component.onCompleted stores the registration verdict,
-  // or the rest of the completion hook (registry + layout + menu providers)
-  // never runs and the bar renders empty.
-  property bool _ipcRegistered: false
-  property bool _colorIpcRegistered: false
+  readonly property string tag: "bar-runtime"
+  // Supplied by the URL loader. Identity is the handoff: a late completion
+  // from a retired runtime must never attach to the accepted control again.
+  property var control: null
+  property int generation: 0
 
   // Real screens for the per-monitor surfaces: one bar window and one move
   // gesture window per valid screen (placeholder screens that appear on
@@ -118,24 +115,17 @@ Singleton {
 
   // --- settings (live view of the raw statusbar section) ---
 
-  readonly property bool enabled: Settings.statusbarEnabled
-  // Transient IPC-only hide: when true the bar unmaps and releases its
-  // exclusive zone so tiled windows reclaim the space. Never persisted
-  // (no Settings key, no schema entry, no menu row) and only reachable
-  // through `qs ipc call bar` (`set hideToggle <bool>` or `hideToggle`
-  // to flip). Resets to false on every shell start.
-  property bool hideToggle: false
-  // Effective visibility: the persistent master switch AND the transient
-  // hide. Every surface (BarView, MoveWindow) and the published
-  // desktop layout read this, so a hidden bar frees screen space exactly
-  // like a disabled one without touching the persisted `enabled` value.
+  readonly final property bool enabled: root.control && root.control.enabled
+  // The transient override lives in the resident control so it survives a
+  // master switch cycle without a runtime to hold it.
+  readonly property bool hideToggle: root.control && root.control.hideToggle
   readonly property bool effectiveEnabled: root.enabled && !root.hideToggle
-  readonly property string position: Settings.statusbarPosition
-  readonly property bool showBorder: Settings.statusbarShowBorder
+  readonly property string position: root.control && root.control.position
+  readonly property bool showBorder: root.control && root.control.showBorder
   // Bar thickness is fixed: no user-facing height setting, no wheel resize.
-  readonly property int height: 28
+  readonly property int barHeight: 28
   function publishDesktopLayout() {
-    DesktopLayoutState.publishBarLayout(root, root.effectiveEnabled, root.position, root.height)
+    if (root.control) root.control._publishLayout()
   }
   // Single source of truth: shell.statusbar.layout
   // { left, center, right, disabled }. Zones hold every known slot;
@@ -185,7 +175,7 @@ Singleton {
   // The slot is the hit target: never smaller than 12, never taller than
   // the bar minus breathing room on both edges.
   readonly property int iconSlot: Range.clamp(
-    Math.round(Ui.barIconSlot * root.iconScale), 12, Math.max(12, height - 4))
+    Math.round(Ui.barIconSlot * root.iconScale), 12, Math.max(12, barHeight - 4))
   // The painted canvas sits inside the slot with >=3px inset per edge
   // (~0.54 of the fixed bar height at scale 1 - see the Ui token rule).
   readonly property int iconCanvas: Range.clamp(
@@ -227,6 +217,19 @@ Singleton {
     return BarLib.layoutSignature(v)
   }
 
+  // The weather backend's cadence follows a mounted, enabled weather slot.
+  // Managed here (not in the module's own completion hook) so a headless
+  // construction of a module does not demand a service window.
+  property bool _weatherHeld: false
+
+  function _syncWeatherDemand() {
+    const want = root.isModuleVisible("weather")
+    if (want === root._weatherHeld) return
+    root._weatherHeld = want
+    if (want) Core.Weather.acquire()
+    else Core.Weather.release()
+  }
+
   function updateLayout() {
     const out = BarLib.renderLayout(root.positions, root.disabledModules,
       root.zones, root._pinned, id => root.componentFor(id), id => root.isOwned(id))
@@ -234,6 +237,7 @@ Singleton {
     if (sig === root._layoutSig) return
     root._layoutSig = sig
     root.layout = out
+    root._syncWeatherDemand()
     // Readiness, on the layout side: updateLayout runs on every registry and
     // settings change and this is the only path in the bar that walks the
     // whole layout to settle the module records.
@@ -777,7 +781,7 @@ Singleton {
   // enough to leave the window empty at the start. It is a distance toward
   // the current screen edge, so a top/bottom flip mid-entrance re-aims the
   // travel.
-  readonly property real entranceSlideFrom: root.position === "top" ? -root.height : root.height
+  readonly property real entranceSlideFrom: root.position === "top" ? -root.barHeight : root.barHeight
   property real entranceSlide: 0
   // The strip's travel is the only edge the modules' release waits for. One
   // writer (the slide animation's onFinished) marks it done; no other handler
@@ -1069,71 +1073,13 @@ Singleton {
   }
 
   Component.onCompleted: {
-    root.publishDesktopLayout()
+    // The resident control owns IPC, providers and layout publication. This
+    // instance only accepts the live seat; a retired generation cannot take it
+    // back because attachRuntime is identity-checked.
+    root.control.attachRuntime(root, root.generation)
     const meta = {}
     for (const id in BarIpc.metadata) meta[id] = BarIpc.metadata[id]
     root._ipcMeta = meta
-    root._ipcRegistered = IpcRouter.register("bar", root, {
-      "bar.enable": function () { return root.ipcSetEnabled(true) },
-      "bar.disable": function () { return root.ipcSetEnabled(false) },
-      "bar.toggle": function () { return root.ipcSetEnabled(!root.enabled) },
-      "bar.show": function () { return root.ipcSetHidden(false) },
-      "bar.hide": function () { return root.ipcSetHidden(true) },
-      "bar.showToggle": function () { return root.ipcSetHidden(!root.hideToggle) },
-      "bar.position.get": function () { return BarIpc.ok(root.position) },
-      "bar.position.set": function (a) { return root.ipcSetPosition(a.POSITION) },
-      "bar.layout.get": function () { return BarIpc.ok(root.ipcLayout()) },
-      "bar.layout.set": function (a) { return root.ipcSetLayout(a.LAYOUT) },
-      "bar.module.list": function (a) { return root.ipcModuleList(a.FILTER) },
-      "bar.module.ID.status": function (a) { return root.ipcModuleStatus(a.MODULE) },
-      "bar.module.ID.enable": function (a) { return root.ipcSetModule(a.MODULE, true) },
-      "bar.module.ID.disable": function (a) { return root.ipcSetModule(a.MODULE, false) },
-      "bar.module.ID.toggle": function (a) {
-        return root.ipcSetModule(a.MODULE, !root.isEnabled(a.MODULE))
-      },
-      "bar.module.ID.island.open": function (a) {
-        return root.ipcIsland(a.MODULE, "open", a.OUTPUT)
-      },
-      "bar.module.ID.island.close": function (a) {
-        return root.ipcIsland(a.MODULE, "close", a.OUTPUT)
-      },
-      "bar.module.ID.island.toggle": function (a) {
-        return root.ipcIsland(a.MODULE, "toggle", a.OUTPUT)
-      },
-      "bar.module.ID.island.is-open": function (a) {
-        return root.ipcIsland(a.MODULE, "is-open", a.OUTPUT)
-      },
-      "bar.module.ID.opt.list": function (a) { return root.ipcOptList(a.MODULE) },
-      "bar.module.ID.opt.KEY.get": function (a) { return root.ipcOptGet(a.MODULE, a.KEY) },
-      "bar.module.ID.opt.KEY.set": function (a) {
-        return root.ipcOptSet(a.MODULE, a.KEY, a.JSON)
-      },
-      "bar.module.ID.trigger": function (a) {
-        return root.ipcTriggerModule(a.MODULE, a.NAME, a.OUTPUT)
-      },
-      // Injected status/ping use the router's text adapter, not the gateway
-      // frame path: a frame object here would stringify as [object Object].
-      "bar.status": function () {
-        return { v: 1, ok: true, data: root.ipcStatus(), format: { kind: "record" } }
-      },
-      "bar.ping": function () { return "pong" }
-    })
-    // Top-level alias for keybinds and scripts. The standalone `colorPicker`
-    // target shares these owner methods: no second picker seat, no duplicate
-    // state, no new service.
-    root._colorIpcRegistered = IpcRouter.register("colorPicker", root, {
-      "colorPicker.pick": function () { return root.ipcPickColor() },
-      "colorPicker.close": function () { return root.ipcCloseColorPick() },
-      "colorPicker.status": function () { return root.ipcColorStatus() },
-      "colorPicker.ping": function () { return "pong" }
-    })
-    Registry.offer("bar", {
-      title: "Bar",
-      description: "Inspect and control the status bar",
-      verbNames: Catalog.topLevelVerbs("bar")
-    })
-    Registry.register(root.tag, root)
-    Registry.register("lyrics", root)
     // Every registered id is a standalone layout slot; there are no group
     // members to expand, so the layout holds exactly the ids below.
     root._components = { workspaces: workspacesComp, privacy: privacyComp, clock: clockComp, weather: weatherComp, keyboardLayout: keyboardLayoutComp, bluetooth: bluetoothComp, battery: batteryComp, network: networkComp, printers: printersComp, powerProfile: powerProfileComp, systemUpdates: systemUpdatesComp, colorPicker: colorPickerComp, nightLight: nightLightComp, nowPlaying: nowPlayingComp, volume: volumeComp, session: sessionComp, tray: trayComp, downloader: downloaderComp }
@@ -1185,18 +1131,16 @@ Singleton {
     // One-shot stale-slot heal: runs here and on the settings-ready path
     // below, whichever sees the loaded layout first (idempotent).
     root._migrateStaleSlotsOnce()
-    root._registerMenuProviders()
   }
   Component.onDestruction: {
-    IpcRouter.unregister("colorPicker", root)
-    IpcRouter.unregister("bar", root)
-    // Teardown releases every provider id: each surface closes over this
-    // root, so a survivor would keep a dead toggle closure.
-    root._releaseMenuProviders()
-    for (const id of root._gatedIds) UnitGate.releaseOwner(root._gateOwner(id))
-    DesktopLayoutState.releaseBarLayout(root)
-    Registry.unregister("lyrics")
-    Registry.unregister(root.tag)
+    root.control.detachRuntime(root, root.generation)
+    if (root._weatherHeld) {
+      root._weatherHeld = false
+      Core.Weather.release()
+    }
+    // Destruction runs with an invalid QML context: call no method on `root`
+    // here. The owner string is data, so build it directly.
+    for (const id of root._gatedIds) UnitGate.releaseOwner("bar:" + id)
   }
 
   Connections {
@@ -1657,7 +1601,7 @@ Singleton {
     if (root.moveOwner !== owner || !root.movePressed) return false
     if (!root.moveScreenKey || root.moveScreenHeight <= 0 || root.moveActive) return false
     root.moveActive = true
-    root.moveCandidate = Bar.position
+    root.moveCandidate = root.position
     return true
   }
 
@@ -1676,7 +1620,7 @@ Singleton {
       return false
     }
     const target = root.moveCandidate
-    const was = Bar.position
+    const was = root.position
     root.clearBarMove()
     // A gesture that ends on the edge the bar already occupies is a real
     // outcome - the user aimed at it, saw the preview and let go - and it
@@ -1720,21 +1664,9 @@ Singleton {
   }
   onEffectiveEnabledChanged: {
     root.publishDesktopLayout()
-    if (!root.effectiveEnabled) lyricsOverlay.close()
+    if (!root.effectiveEnabled) Lyrics.close()
   }
   onPositionChanged: root.publishDesktopLayout()
-
-  // The fullscreen lyrics window has one owner: the Now Playing module loads
-  // per bar and is absent while disabled, so neither it nor a keybind can be
-  // the target the Utilities menu calls. The singleton owns the surface and
-  // the `lyrics` Registry name, the same shape colorPicker uses below. A
-  // caller from the island hands in its client and screen; the menu hands in
-  // neither and gets the shell's active MPRIS client on the primary screen.
-  LyricsFullscreenOverlay {
-    id: lyricsOverlay
-
-    targetScreen: Ui.primaryScreen
-  }
 
   // LYR-1: the ONE owner of "close the bar surface showing this player".
   // Both entry paths converge on showLyrics below - the island pad used to
@@ -1769,10 +1701,7 @@ Singleton {
     // Close the duplicate surface for this track on EITHER path, before the
     // overlay maps. The gesture wrapper no longer does this itself.
     root._closeIslandShowingPlayer(p)
-    lyricsOverlay.targetScreen = screen !== null && screen !== undefined
-      ? screen : Ui.primaryScreen
-    lyricsOverlay.open(p)
-    return true
+    return Lyrics.showLyrics(p, screen)
   }
 
   // --- per-module IPC bridge: colorPicker ---
@@ -1826,19 +1755,6 @@ Singleton {
     }
   }
 
-  // A per-screen privacy indicator that is NOT a bar surface: an Overlay
-  // layer window that shows the capture dots whenever the bar's own copy
-  // is not on screen. Its own visibility is gated on Settings.privacyOverlay
-  // rather than on the bar module, so hiding the module does not silently
-  // drop the indicator too; it keeps existing while the bar itself is off.
-  Variants {
-    model: root.screens
-    delegate: PrivacyOverlay {
-      required property ShellScreen modelData
-      winScreen: modelData
-    }
-  }
-
   // The layout half of the bar's reported state, shared by `status` and
   // `dumpAll` so the two IPC verbs cannot describe different bars.
   function stateSnapshot(): var {
@@ -1848,7 +1764,7 @@ Singleton {
       effectiveEnabled: root.effectiveEnabled,
       position: root.position,
       showBorder: root.showBorder,
-      height: root.height,
+      height: root.barHeight,
       layout: root.layout,
       storedLayout: root.storedLayout,
       disabled: root.disabledModules,

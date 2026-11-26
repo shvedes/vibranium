@@ -13,7 +13,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { suite, section, group, eq, contains, notContains, finish, SHELL_DIR } from '../../lib/assert.mjs'
 
-const BAR = fs.readFileSync(path.join(SHELL_DIR, 'features/bar/Bar.qml'), 'utf8')
+const BAR = fs.readFileSync(path.join(SHELL_DIR, 'features/bar/BarRuntime.qml'), 'utf8')
 const VIEW = fs.readFileSync(path.join(SHELL_DIR, 'features/bar/BarView.qml'), 'utf8')
 const ZONE = fs.readFileSync(path.join(SHELL_DIR, 'features/bar/Zone.qml'), 'utf8')
 
@@ -60,22 +60,22 @@ group('the reveal steps are ordered', () => {
   eq('contents slidefade only after the strip lands', stripAt < contentsAt, true)
   contains('the contents clock starts from the snap', reveal, 'from: 0')
   contains('the contents clock ends released', reveal, 'to: 1')
-  contains('the strip shares the boot travel property', VIEW, 'y: Bar.entranceSlide')
+  contains('the strip shares the boot travel property', VIEW, 'y: BarControl.entranceSlide')
 })
 
 section('every slot slidefades onto the landed strip')
 group('the contents factor is separate from boot intro', () => {
   contains('the factor rests at 1 and holds warm', ZONE,
-    'readonly property real revealIntro: Bar.entranceWarmOpacity')
+    'readonly property real revealIntro: BarControl.entranceWarmOpacity')
   contains('the factor follows the reveal clock', ZONE,
-    '(1 - Bar.entranceWarmOpacity) * Bar.revealProgress')
+    '(1 - BarControl.entranceWarmOpacity) * BarControl.revealProgress')
   contains('opacity multiplies the factor', ZONE, 'slot.enter * slot.intro * slot.revealIntro')
   contains('travel rides the same axis', ZONE,
     '+ (1 - slot.revealIntro) * slot.introOffset')
   notContains('no Behavior can animate the arm', ZONE, 'Behavior on revealIntro')
   notContains('boot intro is not re-armed', ZONE, 'Bar.revealRunning')
   contains('boot intro keeps its original gate', ZONE,
-    '? ((Bar.entranceModulesReady && contentLoader.status === Loader.Ready) ? 1 : Bar.entranceWarmOpacity) : 1')
+    '? ((BarControl.entranceModulesReady && contentLoader.status === Loader.Ready) ? 1 : BarControl.entranceWarmOpacity) : 1')
   contains('boot intro Behavior is unchanged', ZONE,
     'enabled: slot._bootHeld && MotionPolicy.enabled')
 })
@@ -91,7 +91,7 @@ group('sampling the release never fades back out', () => {
   eq('no frame moves backwards',
     samples.every((value, i) => i === 0 || value >= samples[i - 1]), true)
   contains('the model matches the shipped derivation', ZONE,
-    '(1 - Bar.entranceWarmOpacity) * Bar.revealProgress')
+    '(1 - BarControl.entranceWarmOpacity) * BarControl.revealProgress')
 })
 
 section('boot keeps its one-shot contract')

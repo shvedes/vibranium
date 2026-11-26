@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.common
+import qs.features.bar.control
 
 // The bar's small filled pill: one line of tabular copy in a themed
 // background, sized from its own text and glided as the digits narrow so
@@ -26,8 +27,8 @@ Rectangle {
   anchors.verticalCenter: parent.verticalCenter
   anchors.right: root.alignRight ? parent.right : undefined
   anchors.left: root.alignRight ? undefined : parent.left
-  anchors.rightMargin: root.alignRight ? Bar.slotInset : 0
-  anchors.leftMargin: root.alignRight ? 0 : Bar.slotInset
+  anchors.rightMargin: root.alignRight ? BarControl.slotInset : 0
+  anchors.leftMargin: root.alignRight ? 0 : BarControl.slotInset
   width: label.implicitWidth + 8
   height: label.implicitHeight
   radius: RoundingPolicy.radius
@@ -43,7 +44,7 @@ Rectangle {
 
     anchors.centerIn: parent
     level: 3
-    font.pixelSize: Bar.pillFontSize
+    font.pixelSize: BarControl.pillFontSize
     color: root.foreground
     text: root.text
   }

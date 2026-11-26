@@ -1,0 +1,3 @@
+module qs.features.lyrics
+
+singleton Lyrics 1.0 Lyrics.qml

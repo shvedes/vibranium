@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.features.bar
+import qs.features.bar.control
 
 // Module group container. A group occupies one slot in the bar layout (its
 // key id) but renders several member modules side by side, in fixed order,
@@ -25,10 +26,10 @@ Item {
   // Which group this is; set by the slot wrapper once it knows the slot id.
   // Derives the member ids so the container never hard-codes composition.
   property string groupKey: ""
-  readonly property var memberIds: root.groupKey !== "" ? Bar.groupMembers(root.groupKey) : []
+  readonly property var memberIds: root.groupKey !== "" ? BarControl.groupMembers(root.groupKey) : []
 
   implicitWidth: membersRow.implicitWidth
-  implicitHeight: Bar.height
+  implicitHeight: BarControl.height
   width: implicitWidth
   height: implicitHeight
 
@@ -54,7 +55,7 @@ Item {
         // so an async Loader would collapse the kept sibling to zero width
         // and pop it back while the toggled one slides. Synchronous
         // post-boot births land at full width in the same frame instead.
-        asynchronous: !Bar.entranceReady
+        asynchronous: !BarControl.entranceReady
         // No explicit size: the Loader adopts the member's own implicit
         // size (an explicit width/height would collapse the member instead).
         //
@@ -71,8 +72,8 @@ Item {
           // static registry id by construction (ownModule rejects any id the
           // static map or _groups already holds), so the two agree here and
           // the group container stays the single place a slot resolves.
-          const comp = Bar.componentFor(modelData)
-          Bar.markBuildStart(modelData, comp)
+          const comp = BarControl.componentFor(modelData)
+          BarControl.markBuildStart(modelData, comp)
           return comp
         }
         onLoaded: {
@@ -80,7 +81,7 @@ Item {
             root.barWindow.forgetIpcModule(modelData, memberLoader._ipcMemberItem)
           memberLoader._ipcMemberItem = item
           if (item) root.forwardMember(item, modelData)
-          Bar.reportModuleReady(modelData)
+          BarControl.reportModuleReady(modelData)
         }
         Component.onDestruction: {
           if (root.barWindow && memberLoader._ipcMemberItem)

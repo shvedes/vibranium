@@ -6,6 +6,7 @@ import qs.services as Svc
 import qs.features.bar
 import qs.features.bar.modules.SystemUpdates
 import "Model.js" as Model
+import qs.features.bar.control
 
 // System updates indicator. Static right-zone module that visualises
 // the SystemUpdates service (official repository packages and AUR,
@@ -56,7 +57,7 @@ BarModule {
 
   // Visual: single package-aur icon, no count badge. Always takes
   // the fixed slot, even when up to date.
-  implicitWidth: Bar.iconSlot
+  implicitWidth: BarControl.iconSlot
 
   // Glyph per state: package-aur with a green "+" when updates are
   // available, package-error with a red xmark on failure, plain package

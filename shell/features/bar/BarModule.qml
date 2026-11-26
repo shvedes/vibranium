@@ -4,12 +4,13 @@ import QtQuick
 import Quickshell
 import qs.common
 import qs.features.bar
+import qs.features.bar.control
 
 // Base for every bar module. Owns the pieces a module would otherwise hand-roll:
 //
 //  - the module contract: barScreen / barWindow (set by the slot wrapper
 //    right after instantiation) and the implicit-size contract
-//    (implicitHeight: Bar.height, width follows implicitWidth);
+//    (implicitHeight: bar.height, width follows implicitWidth);
 //  - the settings-command click: clickSetting()/clickCommand() resolve
 //    shell.statusbar.<moduleId><action> and run the command through Exec;
 //  - the hover surface: a built-in fill MouseArea (pointing-hand cursor,
@@ -112,13 +113,13 @@ Item {
 
   // Scaled bar metrics (F4): every module boxes into these instead of raw
   // Ui constants, so bar height + icon preset rescale everything.
-  readonly property int iconSlot: Bar.iconSlot
-  readonly property int iconCanvas: Bar.iconCanvas
-  readonly property real textScale: Bar.textScale
+  readonly property int iconSlot: BarControl.iconSlot
+  readonly property int iconCanvas: BarControl.iconCanvas
+  readonly property real textScale: BarControl.textScale
 
-  // Implicit-size contract: the bar row sizes modules by Bar.height and
+  // Implicit-size contract: the bar row sizes modules by bar.height and
   // their own implicitWidth.
-  implicitHeight: Bar.height
+  implicitHeight: BarControl.height
   width: implicitWidth
   height: implicitHeight
 

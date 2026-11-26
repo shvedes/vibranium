@@ -2,7 +2,7 @@
 // Suite: the color-pick keybind works without its statusbar module
 // (gateway fallback owner).
 //
-//   shell/features/bar/Bar.qml          the gateway verbs and the fallback slot
+//   shell/features/bar/BarRuntime.qml          the gateway verbs and the fallback slot
 //   shell/features/bar/BarView.qml      the headless engine's real window
 //   shell/features/bar/modules/ColorPicker/ColorPicker.qml
 //
@@ -20,7 +20,7 @@ import {
 } from '../../lib/assert.mjs'
 
 const read = (...parts) => fs.readFileSync(path.join(SHELL_DIR, ...parts), 'utf8')
-const BAR = read('features', 'bar', 'Bar.qml')
+const BAR = read('features', 'bar', 'BarRuntime.qml')
 const BARVIEW = read('features', 'bar', 'BarView.qml')
 const MODULE = read('features', 'bar', 'modules', 'ColorPicker', 'ColorPicker.qml')
 const CATALOG = loadLib(path.join(SHELL_DIR, 'common/text/IpcCatalog.js'))
@@ -175,9 +175,9 @@ group('wiring', () => {
   contains('the engine loader is gated to the primary screen', loader,
     'active: win.screen === Ui.primaryScreen')
   contains('the engine registers as the fallback owner', loader,
-    'Bar.registerFallbackPicker(pickerEngine)')
+    'ColorPickerController.registerFallbackPicker(pickerEngine)')
   contains('the engine releases the fallback on teardown', loader,
-    'Bar.unregisterFallbackPicker(pickerEngine)')
+    'ColorPickerController.unregisterFallbackPicker(pickerEngine)')
   eq('the engine never sets barScreen', loader.includes('barScreen:'), false)
   contains('Bar exposes the fallback slot', BAR, 'property Item _pickerFallback: null')
   contains('Bar exposes the active picker slot', BAR, 'property var _activePicker: null')
@@ -185,8 +185,8 @@ group('wiring', () => {
     'function registerFallbackPicker(m: Item)')
   contains('the module owner still needs a real barScreen', MODULE,
     'readonly property bool _ipcOwner: root.barScreen !== null')
-  contains('the module stamps the active picker', MODULE, 'Bar.claimActivePicker(root)')
-  contains('teardown clears the active picker', MODULE, 'Bar.clearActivePicker(root)')
+  contains('the module stamps the active picker', MODULE, 'ColorPickerController.claimActivePicker(root)')
+  contains('teardown clears the active picker', MODULE, 'ColorPickerController.clearActivePicker(root)')
 })
 
 finish()

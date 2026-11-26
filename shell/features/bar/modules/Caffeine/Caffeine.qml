@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.bar
+import qs.features.bar.control
 
 // Caffeine indicator. Owned slot that appears while an inhibit is
 // active: a caffeine icon on the left plus a countdown pill on the right
@@ -36,7 +37,7 @@ CollapsibleSlot {
   // Idle takes no space; the infinite tail is exactly one slot; finite
   // adds the pill plus one inset.
   collapseShown: root.active
-  collapseFull: Bar.iconSlot + root.pillSlide * (pill.width + Bar.slotInset)
+  collapseFull: BarControl.iconSlot + root.pillSlide * (pill.width + BarControl.slotInset)
   property real pillSlide: root.finiteShown ? 1 : 0
   Behavior on pillSlide {
     enabled: MotionPolicy.enabled
@@ -56,7 +57,7 @@ CollapsibleSlot {
     // Docked left ahead of the pill: the slot grows rightward from the
     // glyph, so the glyph rides left while the pill holds the right edge.
     anchors.left: parent.left
-    anchors.leftMargin: (Bar.iconSlot - 15) / 2
+    anchors.leftMargin: (BarControl.iconSlot - 15) / 2
     anchors.verticalCenter: parent.verticalCenter
     name: "caffeine"
     // Mug stays in theme foreground in every state; the steam (the only

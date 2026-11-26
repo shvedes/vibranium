@@ -17,7 +17,7 @@ import {
 } from '../../lib/assert.mjs'
 
 const SRC = fs.readFileSync(
-  path.join(SHELL_DIR, 'features', 'bar', 'PrivacyOverlay.qml'), 'utf8')
+  path.join(SHELL_DIR, 'features', 'privacy', 'PrivacyOverlay.qml'), 'utf8')
 
 // The surface-level assignments carry two spaces of indent; the Dot slots
 // and the content wrapper carry four. Take the first match of each.

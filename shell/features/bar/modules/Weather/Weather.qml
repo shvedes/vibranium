@@ -4,6 +4,7 @@ import QtQuick
 import qs.common
 import qs.services as Core
 import qs.features.bar
+import qs.features.bar.control
 
 // Weather module. Static right-zone module showing a condition SVG +
 // temperature; left click opens the forecast island, middle refreshes.
@@ -111,23 +112,23 @@ BarModule {
   // NOTE: Icon/Text expose their painted size as implicitWidth/Height
   // (width stays 0 - children paint past it when unclipped), so every
   // size computation below reads implicit* properties. The text side boxes
-  // itself with Bar.slotInset: the zone row has zero gap and an icon-only
+  // itself with bar.slotInset: the zone row has zero gap and an icon-only
   // slot keeps (slot - canvas) / 2 of air at each edge, so the label must
   // carry the same inset or it rides flush against the next module.
   // Icon-only (showTemp off) boxes to the full icon slot with the glyph
   // centered, exactly like every icon-only module.
-  implicitWidth: Math.round(Bar.iconSlot + root.tempSlide * ((weatherIcon.implicitWidth + labelText.implicitWidth + 4 + Bar.slotInset) - Bar.iconSlot))
+  implicitWidth: Math.round(BarControl.iconSlot + root.tempSlide * ((weatherIcon.implicitWidth + labelText.implicitWidth + 4 + BarControl.slotInset) - BarControl.iconSlot))
 
   Item {
     id: pill
     // Flush left: the Icon's slot already carries (slot - canvas) / 2 of
-    // internal air, so the module's own Bar.slotInset all lands on the
+    // internal air, so the module's own bar.slotInset all lands on the
     // trailing text edge - exactly the optical inset an icon-only module
     // has on each side. Centering the pill would split the inset half/half
     // and double-pad the icon edge while starving the text edge.
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
-    width: Math.round(Bar.iconSlot + root.tempSlide * ((weatherIcon.implicitWidth + labelText.implicitWidth + 4) - Bar.iconSlot))
+    width: Math.round(BarControl.iconSlot + root.tempSlide * ((weatherIcon.implicitWidth + labelText.implicitWidth + 4) - BarControl.iconSlot))
     height: root.height
 
     CrossfadeIcon {
@@ -157,7 +158,7 @@ BarModule {
       anchors.verticalCenter: parent.verticalCenter
       visible: root.tempSlide > 0
       level: 3
-      font.pixelSize: Bar.pillFontSize
+      font.pixelSize: BarControl.pillFontSize
       text: Core.Weather.reportTempNum !== "" ? Core.Weather.reportTempNum + Core.Weather.tempUnit : "—"
     }
   }

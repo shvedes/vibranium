@@ -41,6 +41,13 @@ LayerSurface {
   id: overlay
 
   signal pickedAt(real x, real y)
+  signal sampled(real r, real g, real b, real a, int gen)
+  signal sampleFailed()
+
+  // The module's generation check. The sampler lives under THIS window so it
+  // always has a scene graph, including when the session is standalone and
+  // the bar module is absent.
+  property var pickValid: null
   // The pick is being abandoned: Escape and right-click today, and the module
   // abandons on its own for a screen that went away or a bar that was disabled.
   signal cancelled()
@@ -114,6 +121,21 @@ LayerSurface {
   // surface keeps the pointer even when the cursor sits on another output, and
   // the module's probe clamps an out-of-frame coordinate to the frame's edge -
   // a real color from the wrong place.
+  function pickCurrent(gen) {
+    return typeof overlay.pickValid === "function" ? overlay.pickValid(gen) : false
+  }
+
+  function sample(url, x, y, ratio, gen) {
+    sampler.pending = { gen: gen, url: url, x: x, y: y, ratio: ratio }
+    samplerProbe.source = url
+    sampler.loadImage(url)
+  }
+
+  function retireSampler() {
+    sampler.pending = null
+    samplerProbe.source = ""
+  }
+
   function pickAim() {
     if (overlay.aimX < 0 || overlay.aimY < 0) return false
     if (overlay.aimX > overlay.width) return false
@@ -554,7 +576,13 @@ LayerSurface {
         return
       }
       // The aimed point, not the press point: an arrow-key step moves the
-      // cross off the pointer, and the cross is what a pick samples.
+      // cross off the pointer, and the cross is what a pick samples. A fresh
+      // overlay has no aim at all, so the first click establishes one; without
+      // this a click on an untouched surface is silently discarded.
+      if (overlay.aimX < 0 || overlay.aimY < 0) {
+        overlay.aimX = mouse.x
+        overlay.aimY = mouse.y
+      }
       overlay.pickAim()
     }
     onPositionChanged: mouse => {
@@ -568,6 +596,70 @@ LayerSurface {
       overlay.magScale = Range.clamp(
         overlay.magScale + (wheel.angleDelta.y > 0 ? 1 : -1), 2, 20)
       wheel.accepted = true
+    }
+  }
+
+  // The pixel readout lives under this window. A standalone session has no
+  // BarView to host a Canvas; without this window's scene graph the sample
+  // never paints and a click cannot confirm the pick.
+  Image {
+    id: samplerProbe
+    visible: false
+    cache: false
+    source: ""
+    onStatusChanged: {
+      if (status !== Image.Ready || sampler.pending === null) return
+      if (!overlay.pickCurrent(sampler.pending.gen)) return
+      sampler.requestPaint()
+    }
+  }
+
+  Canvas {
+    id: sampler
+    width: 1
+    height: 1
+    visible: false
+    contextType: "2d"
+    property var pending: null
+
+    function finishFailed() {
+      sampler.pending = null
+      samplerProbe.source = ""
+      overlay.sampleFailed()
+    }
+
+    onImageLoaded: sampler.requestPaint()
+    onPaint: {
+      if (sampler.pending === null || samplerProbe.status !== Image.Ready) return
+      const p = sampler.pending
+      if (!sampler.isImageLoaded(p.url)) {
+        if (sampler.isImageError(p.url)) sampler.finishFailed()
+        return
+      }
+      if (!overlay.pickCurrent(p.gen)) return
+      const ctx = sampler.getContext("2d")
+      if (ctx === null) {
+        sampler.finishFailed()
+        return
+      }
+      const fw = samplerProbe.implicitWidth
+      const fh = samplerProbe.implicitHeight
+      if (fw <= 0 || fh <= 0 || !(p.ratio > 0)) {
+        sampler.finishFailed()
+        return
+      }
+      const gx = Range.clamp(Math.floor(p.x * p.ratio), 0, fw - 1)
+      const gy = Range.clamp(Math.floor(p.y * p.ratio), 0, fh - 1)
+      ctx.clearRect(0, 0, 1, 1)
+      ctx.drawImage(samplerProbe, gx, gy, 1, 1, 0, 0, 1, 1)
+      const px = ctx.getImageData(0, 0, 1, 1)
+      sampler.pending = null
+      samplerProbe.source = ""
+      if (!px || !px.data || px.data.length < 3) {
+        overlay.sampleFailed()
+        return
+      }
+      overlay.sampled(px.data[0], px.data[1], px.data[2], px.data[3], p.gen)
     }
   }
 }

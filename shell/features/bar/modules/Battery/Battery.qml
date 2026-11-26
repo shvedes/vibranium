@@ -5,6 +5,7 @@ import Quickshell.Services.UPower
 import qs.common
 import qs.features.bar
 import "../../../../common/power/BatteryModel.js" as Model
+import qs.features.bar.control
 
 // Battery module: shows a battery device with a level glyph. The device is
 // the machine's own battery pack unless the wheel has picked another one;
@@ -480,8 +481,8 @@ CollapsibleSlot {
   // one clock rather than a width Behavior chasing textSlide's own Glide.
   readonly property bool textShown: root.percentageVisible || root.flashActive
   property real pillWidth: root.textShown
-    ? Bar.iconSlot + root.labelWidth + root.textGap + Bar.slotInset
-    : Bar.iconSlot
+    ? BarControl.iconSlot + root.labelWidth + root.textGap + BarControl.slotInset
+    : BarControl.iconSlot
   Behavior on pillWidth {
     Glide { duration: Ui.slowMs }
   }
@@ -498,12 +499,12 @@ CollapsibleSlot {
   // iconCanvas/4, leaving the right half of the icon slot empty. The text
   // starts 8px past that painted edge, so the visible padding is the 8px
   // below rather than the much larger transparent air of the icon slot.
-  readonly property real textGap: 8 - (Bar.iconSlot / 2 - Bar.iconCanvas / 4)
+  readonly property real textGap: 8 - (BarControl.iconSlot / 2 - BarControl.iconCanvas / 4)
 
   // Icon + percentage pill. The right zone grows leftward, so the pill is
   // trailing-anchored: the percentage sits at the trailing edge with the
   // icon ahead of it, exactly the requested icon-then-text order. The text
-  // carries Bar.slotInset on its right edge, matching the air an icon-only
+  // carries bar.slotInset on its right edge, matching the air an icon-only
   // slot has against its neighbor.
   Item {
     id: pill
@@ -544,12 +545,12 @@ CollapsibleSlot {
         id: pctText
 
         anchors.right: parent.right
-        anchors.rightMargin: Bar.slotInset
+        anchors.rightMargin: BarControl.slotInset
         anchors.verticalCenter: parent.verticalCenter
         visible: root.percentageSlide > 0 && root.flashSlide < 1
         opacity: root.percentageSlide * (1 - root.flashSlide)
         level: 3
-        font.pixelSize: Bar.pillFontSize
+        font.pixelSize: BarControl.pillFontSize
         color: Ui.solid(root.iconColor)
         text: root.percentageText
       }
@@ -560,12 +561,12 @@ CollapsibleSlot {
         id: flashLabel
 
         anchors.right: parent.right
-        anchors.rightMargin: Bar.slotInset
+        anchors.rightMargin: BarControl.slotInset
         anchors.verticalCenter: parent.verticalCenter
         visible: root.flashSlide > 0
         opacity: root.flashSlide
         level: 3
-        font.pixelSize: Bar.pillFontSize
+        font.pixelSize: BarControl.pillFontSize
         color: Ui.solid(root.iconColor)
         text: root.flashText
       }

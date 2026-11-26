@@ -48,6 +48,24 @@ Singleton {
 
   readonly property string tag: "weather"
 
+  // Demand from mounted weather slots. The singleton stays cheap and idle
+  // once the last slot goes away: no forecast cadence, retry burst or
+  // geocode debounce survives a bar teardown.
+  property int demand: 0
+
+  function acquire() {
+    root.demand++
+  }
+
+  function release() {
+    if (root.demand === 0) return
+    root.demand--
+    if (root.demand > 0) return
+    geocodeDebounce.stop()
+    forecastRetryTimer.stop()
+    dailyForecastRetryTimer.stop()
+  }
+
   // --- location state (ShellState "weather" section) ---
 
   property var configuredLocationState: ({ name: "", latitude: null, longitude: null })
@@ -706,7 +724,7 @@ Singleton {
 
   Timer {
     interval: root.refreshMinutes * 60 * 1000
-    running: true
+    running: root.demand > 0
     repeat: true
     triggeredOnStart: true
     onTriggered: root.refresh()

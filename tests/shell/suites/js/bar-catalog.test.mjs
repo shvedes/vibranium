@@ -16,7 +16,8 @@ import {
 
 const read = (...parts) => fs.readFileSync(path.join(SHELL_DIR, ...parts), 'utf8')
 const B = loadLib(path.join(SHELL_DIR, 'features/bar/BarIpc.js'))
-const BAR = read('features', 'bar', 'Bar.qml')
+const BAR = read('features', 'bar', 'BarRuntime.qml')
+const CONTROL = read('features', 'bar', 'control', 'BarControl.qml')
 const VIEW = read('features', 'bar', 'BarView.qml')
 const ZONE = read('features', 'bar', 'Zone.qml')
 const GROUP = read('features', 'bar', 'Group.qml')
@@ -119,7 +120,7 @@ group('frames are typed', () => {
 section('owner registration')
 group('every bar row has one constant closure', () => {
   const registered = new Set()
-  for (const m of BAR.matchAll(/IpcRouter\.register\([\s\S]*?\}\)\s*(?:\n|$)/g)) {
+  for (const m of CONTROL.matchAll(/IpcRouter\.register\([\s\S]*?\}\)\s*(?:\n|$)/g)) {
     for (const id of m[0].matchAll(/"(bar\.[A-Za-z0-9_.-]+)"/g)) registered.add(id[1])
   }
   const expected = CATALOG.findTarget('bar').rows
@@ -128,7 +129,7 @@ group('every bar row has one constant closure', () => {
     .concat(['bar.status', 'bar.ping']).sort()
   eq('no bar route is unowned', expected.filter(id => !registered.has(id)), [])
   eq('no bar closure is unlisted', [...registered].filter(id => !expected.includes(id)).sort(), [])
-  contains('unregister retires by owner identity', BAR, 'IpcRouter.unregister("bar", root)')
+  contains('unregister retires by owner identity', CONTROL, 'IpcRouter.unregister("bar", root)')
   notContains('no native bar handler', BAR, 'target: "bar"')
   notContains('no native color picker handler', BAR, 'target: "colorPicker"')
 })
@@ -151,9 +152,9 @@ group('Bound-component property declarations', () => {
     eq(`${label}: every assigned private property is declared`,
       [...assigned].filter(n => !declared.has(n)).sort(), [])
   }
-  eq('the registration verdict is declared', /property bool _ipcRegistered: false/.test(BAR), true)
+  eq('the registration verdict is declared', /IpcRouter\.register\("bar", root, \{/.test(CONTROL), true)
   eq('the verdict is stored exactly once',
-    (BAR.match(/root\._ipcRegistered\s*=\s*IpcRouter\.register\(/g) || []).length, 1)
+    (CONTROL.match(/IpcRouter\.register\("bar", root, \{/g) || []).length, 1)
 })
 
 group('persistent and transient writes stay separate', () => {
@@ -221,9 +222,9 @@ group('the active picker is independent of the owner', () => {
   contains('close cancels the active picker', BAR, 'picker.cancelPick()')
   contains('duplicate pick does not restart', BAR, 'if (root._activePicker) return BarIpc.silent')
   const mod = read('features', 'bar', 'modules', 'ColorPicker', 'ColorPicker.qml')
-  contains('stamp after admission', mod, 'Bar.claimActivePicker(root)')
-  contains('clear on teardown', mod, 'Bar.clearActivePicker(root)')
-  contains('clear on destruction', mod, 'Bar.clearActivePicker(root)')
+  contains('stamp after admission', mod, 'ColorPickerController.claimActivePicker(root)')
+  contains('clear on teardown', mod, 'ColorPickerController.clearActivePicker(root)')
+  contains('clear on destruction', mod, 'ColorPickerController.clearActivePicker(root)')
 })
 
 finish()

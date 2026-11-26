@@ -6,6 +6,7 @@ import Quickshell.Hyprland
 import qs.common
 import qs.features.bar
 import "Model.js" as WSM
+import qs.features.bar.control
 
 // Barebones workspaces: plain numbers, flashing red for urgents.
 // No occupied/empty states, no opacity dimming, no timers - the strip
@@ -36,7 +37,7 @@ BarModule {
 
   builtinFill: false
   implicitWidth: row.implicitWidth
-    + (root.submapActive ? WSM.numberGap() + submapText.implicitWidth + Bar.slotInset : 0)
+    + (root.submapActive ? WSM.numberGap() + submapText.implicitWidth + BarControl.slotInset : 0)
 
   Component.onCompleted: Hyprland.rawEvent.connect(root.onRawEvent)
   Component.onDestruction: Hyprland.rawEvent.disconnect(root.onRawEvent)
@@ -93,7 +94,7 @@ BarModule {
         }
 
         width: root.cellWidth
-        height: Bar.height
+        height: BarControl.height
 
         // Number and focus glyph share one fixed cell and both read focusK.
         // Each layer owns its resting size, so a focus change only moves the

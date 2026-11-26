@@ -10,6 +10,8 @@ import "../../../../common/math/Range.js" as Range
 import "../../../../common/capture/ShotLib.js" as ShotLib
 import "../../../../common/process/JobResult.js" as Job
 import "../../../../common/text/StringUtils.js" as SU
+import qs.features.bar.control
+import qs.features.colorPicker
 
 // Color picker module. Left click starts a native pick: a full-screen
 // overlay on this module's screen shows the captured frame through
@@ -569,7 +571,7 @@ BarModule {
 
   property var _pendingCopies: ({})
   property int _copySeq: 0
-  readonly property string _copyScope: "bar.colorPicker:copy:" + Date.now().toString(36)
+  readonly property string _copyScope: "BarControl.colorPicker:copy:" + Date.now().toString(36)
     + "-" + Math.floor(Math.random() * 1679616).toString(36)
   readonly property int _copySpawnWindowMs: 1500
   readonly property int _copyDeadlineMs: 5000
@@ -713,7 +715,7 @@ BarModule {
   // per instance even though the history is shared: a pick runs on THIS
   // instance's overlay, probe and canvas, so two pickers on different
   // monitors must never retire each other's pick.
-  readonly property string _pickScope: "bar.colorPicker:" + Date.now().toString(36)
+  readonly property string _pickScope: "BarControl.colorPicker:" + Date.now().toString(36)
     + "-" + Math.floor(Math.random() * 1679616).toString(36)
   readonly property string _pickKey: "pixel"
   // Live generation of this instance's pick; 0 while no pick runs.
@@ -776,7 +778,7 @@ BarModule {
     // The bar tracks the ACTIVE picker independently of the primary/fallback
     // owner. Stamping here (after admission, never before) is what lets a
     // later `close` retire this exact instance and its captured generation.
-    Bar.claimActivePicker(root)
+    ColorPickerController.claimActivePicker(root)
     return true
   }
 
@@ -789,7 +791,7 @@ BarModule {
   // The state teardown every close shares.
   function _teardownPick() {
     root._retirePick()
-    Bar.clearActivePicker(root)
+    ColorPickerController.clearActivePicker(root)
     root.picking = false
     root.pickScreen = null
     root._grabResult = null
@@ -802,8 +804,7 @@ BarModule {
     }
     // The decode inputs go with the generation: a frame still decoding or
     // a sample still pending would otherwise paint into a later pick.
-    pixelSampler.pending = null
-    frameProbe.source = ""
+    overlayPick.retireSampler()
   }
 
   // Window-logical click point -> frame pixel -> history + clipboard.
@@ -830,7 +831,7 @@ BarModule {
       // The overlay's own ratio, not one derived here: the lens the user
       // aimed with magnifies by that one, and a click mapped through a
       // second ratio reads a real color from the wrong pixel.
-      pixelSampler.sample(url, x, y, overlayPick.frameRatio, gen)
+      overlayPick.sample(url, x, y, overlayPick.frameRatio, gen)
     })
   }
 
@@ -891,119 +892,21 @@ BarModule {
     format: root.pickFmt
     previewEnabled: root.showLivePreview
     onPickedAt: (x, y) => root.sampleAt(x, y)
+    pickValid: gen => RequestGate.current(root._pickHandle(gen))
+    onSampled: (r, g, b, a, gen) => {
+      root._grabResult = null
+      root.finishPick(r, g, b, a, gen)
+    }
+    onSampleFailed: root._sampleFailed()
     // The overlay names the gesture that abandoned the pick (escape,
     // right-click); the module's own cancels below pass their own reasons.
     onCancelled: root.cancelPick()
   }
 
-  // Pixel readout: the hidden Image probe decodes the grabbed frame and
-  // reports its true pixel size, then the 1x1 Canvas crops the one
-  // clicked pixel with drawImage + getImageData. The grab result stays
-  // referenced (root._grabResult) until sampling ends, keeping its URL
-  // valid across the async decode.
-  //
-  // The Canvas needs a second copy of the frame and loads it itself:
-  // drawImage on an Image argument does not use the item's texture, and the
-  // load is asynchronous and independent of frameProbe's status. A paint
-  // that runs before it lands reads zeros, and a pick that commits zeros is
-  // black - a real answer to a click that never touched black. So the sample
-  // waits for both copies.
-  Image {
-    id: frameProbe
-
-    visible: false
-    cache: false
-    source: ""
-
-    onStatusChanged: {
-      if (status !== Image.Ready || pixelSampler.pending === null) return
-      // A decode of a retired frame still reports Ready; only the pick
-      // that asked for it may sample it.
-      if (!RequestGate.current(root._pickHandle(pixelSampler.pending.gen))) return
-      pixelSampler.requestPaint()
-    }
-  }
-
-  Canvas {
-    id: pixelSampler
-
-    width: 1
-    height: 1
-    visible: false
-    contextType: "2d"
-
-    // The sample still owed by the live pick: its coordinates plus the
-    // generation that issued it, null when nothing is owed.
-    property var pending: null
-
-    function sample(url, x, y, ratio, gen) {
-      pixelSampler.pending = {
-        gen: gen,
-        url: url,
-        x: x,
-        y: y,
-        ratio: ratio
-      }
-      frameProbe.source = url
-      pixelSampler.loadImage(url)
-    }
-
-    // imageLoaded() carries no argument and fires only for a load that was
-    // still in flight, so it is a retry, never the gate: the paint below asks
-    // isImageLoaded() instead.
-    onImageLoaded: pixelSampler.requestPaint()
-
-    onPaint: {
-      if (pixelSampler.pending === null || frameProbe.status !== Image.Ready) return
-      const p = pixelSampler.pending
-      // Both copies in hand: the Image's decode reports the frame's size, the
-      // Canvas's own copy supplies the pixels. Drawing before that copy lands
-      // reads the bare backing - zeros - and a pick that commits zeros is
-      // black, a real answer to a click that never touched black.
-      if (!pixelSampler.isImageLoaded(p.url)) {
-        if (pixelSampler.isImageError(p.url)) {
-          pixelSampler.pending = null
-          frameProbe.source = ""
-          root._sampleFailed()
-        }
-        return
-      }
-      if (!RequestGate.current(root._pickHandle(p.gen))) return
-      const ctx = pixelSampler.getContext("2d")
-      if (ctx === null) {
-        root._sampleFailed()
-        return
-      }
-      const fw = frameProbe.implicitWidth
-      const fh = frameProbe.implicitHeight
-      if (fw <= 0 || fh <= 0 || !(p.ratio > 0)) {
-        root._sampleFailed()
-        return
-      }
-      // The one conversion in the component that can change the ANSWER
-      // rather than only the position: a window-logical click point is mapped
-      // onto physical frame pixels here, and a wrong ratio or a wrong
-      // rounding returns a real color from the wrong place. The rounding is
-      // floor, not round, and must stay floor: the magnified block the cross
-      // covers is the one containing the pointer, which is floor of the
-      // click's frame coordinate. Rounding to the nearest pixel centre reads
-      // the neighbour on half of all clicks.
-      const gx = Range.clamp(Math.floor(p.x * p.ratio), 0, fw - 1)
-      const gy = Range.clamp(Math.floor(p.y * p.ratio), 0, fh - 1)
-      ctx.clearRect(0, 0, 1, 1)
-      ctx.drawImage(frameProbe, gx, gy, 1, 1, 0, 0, 1, 1)
-      const px = ctx.getImageData(0, 0, 1, 1)
-      pixelSampler.pending = null
-      frameProbe.source = ""
-      root._grabResult = null
-      if (!px || !px.data || px.data.length < 3) {
-        root._sampleFailed()
-        return
-      }
-      const d = px.data
-      root.finishPick(d[0], d[1], d[2], d[3], p.gen)
-    }
-  }
+  // The sampler (Image probe + 1px Canvas) lives inside ColorPickerOverlay,
+  // under the pick window's own scene graph. This is what lets a standalone
+  // session confirm a click without a BarView. The module only supplies the
+  // generation check and receives the decoded pixel back.
 
   // --- island ---
 
@@ -1030,12 +933,12 @@ BarModule {
   islandComponent: islandComp
 
   Connections {
-    target: Bar
+    target: BarControl
 
     function onEnabledChanged() {
       // The bar going away takes the module with it, so a live pick dies
       // here rather than at teardown.
-      if (!Bar.enabled) root.cancelPick()
+      if (!BarControl.enabled) root.cancelPick()
     }
   }
 
@@ -1098,14 +1001,14 @@ BarModule {
   // never sit at a fractional x while the pill grows. `clip` keeps the
   // collapsing label inside the module.
   clip: true
-  implicitWidth: Math.round(root.codeSlide > 0 ? pill.width : Bar.iconSlot)
+  implicitWidth: Math.round(root.codeSlide > 0 ? pill.width : BarControl.iconSlot)
 
   Item {
     id: pill
 
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
-    width: Bar.iconSlot + root.codeSlide * (Math.min(labelText.implicitWidth, 240) + 4 + Bar.slotInset)
+    width: BarControl.iconSlot + root.codeSlide * (Math.min(labelText.implicitWidth, 240) + 4 + BarControl.slotInset)
     height: root.height
 
     Item {
@@ -1113,7 +1016,7 @@ BarModule {
 
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
-      width: Bar.iconSlot
+      width: BarControl.iconSlot
       height: parent.height
 
       Icon {
@@ -1138,7 +1041,7 @@ BarModule {
       visible: root.codeSlide > 0
       level: 3
       width: Math.min(implicitWidth, 240)
-      font.pixelSize: Bar.pillFontSize
+      font.pixelSize: BarControl.pillFontSize
       text: root.flashText
       elide: Text.ElideRight
     }
@@ -1165,7 +1068,7 @@ BarModule {
   // runs on that instance's screen). vb-shell colorPicker pick is the
   // keybind surface.
   //
-  // Bar.registerPicker is last-writer-wins, so exactly one instance may
+  // ColorPickerController.registerPicker is last-writer-wins, so exactly one instance may
   // call it, and the claim is keyed on the primary screen
   // (Ui.validScreens[0]): unique per session, so the owner no longer
   // depends on which instance happened to complete first, and a second
@@ -1180,8 +1083,8 @@ BarModule {
   on_IpcOwnerChanged: {
     // Exactly one instance owns the verb, and which one moves with the
     // primary screen.
-    if (root._ipcOwner) Bar.registerPicker(root)
-    else Bar.unregisterPicker(root)
+    if (root._ipcOwner) ColorPickerController.registerPicker(root)
+    else ColorPickerController.unregisterPicker(root)
   }
 
   Component.onCompleted: root._ensureStore()
@@ -1191,7 +1094,7 @@ BarModule {
     // when the copies below cancel. A pick interrupted by the module going
     // away would otherwise leave the gate's entry live.
     root._retirePick()
-    Bar.clearActivePicker(root)
+    ColorPickerController.clearActivePicker(root)
     root._releaseCopies()
     // The screen claim goes with the module: a claim whose owner is being
     // destroyed is dropped rather than fired, so nothing runs against a
@@ -1206,6 +1109,6 @@ BarModule {
       DocumentAdoption.release(root._storeReader)
       root._storeReader = null
     }
-    Bar.unregisterPicker(root)
+    ColorPickerController.unregisterPicker(root)
   }
 }

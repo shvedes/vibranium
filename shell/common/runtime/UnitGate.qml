@@ -188,7 +188,7 @@ Singleton {
   // release() all end here, and boot calls them in bursts: 52 registrations,
   // then two cascades per eager unit, then one per drain step. Firing on every
   // call made each of those a whole-boot report rebuild and a dependency walk
-  // that found nothing it did not already know (Bar.qml documents the same
+  // that found nothing it did not already know (the bar control documents the same
   // cost from the consumer side). The emitted fields are this record's
   // last-published view; a call that moved none of them has nothing to say.
   function _changed(record) {
@@ -492,6 +492,11 @@ Singleton {
         root._stop(record, false)
       } else if (record.state === "starting" || record.state === "ready") {
         root._stop(record, true)
+      } else if (record.state === "failed") {
+        // _fail already tore the unit down. Stop without a second teardown so
+        // the retry deadline is cleared and an ownerless unit cannot keep
+        // Boot's retry pump armed; a fresh ensure gets a fresh budget.
+        root._stop(record, false)
       }
     }
     return true

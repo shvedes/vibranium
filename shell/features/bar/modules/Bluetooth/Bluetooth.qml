@@ -6,6 +6,7 @@ import qs.common
 import qs.features.bar
 import "../../BackendGrace.js" as BackendGrace
 import "Model.js" as Model
+import qs.features.bar.control
 
 // Bluetooth module: shows the adapter state with the shipped bluetooth
 // icons. Connected device - the connected glyph in the default foreground
@@ -317,7 +318,7 @@ BarModule {
 
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
-    width: root.slotWidth + root.nameSlide * (Math.min(labelText.implicitWidth, 240) + 4 + Bar.slotInset)
+    width: root.slotWidth + root.nameSlide * (Math.min(labelText.implicitWidth, 240) + 4 + BarControl.slotInset)
     height: root.height
 
     // The glyph flashes green-normal for the reveal: the reveal names the
@@ -361,7 +362,7 @@ BarModule {
       visible: root.nameSlide > 0
       level: 3
       width: Math.min(implicitWidth, 240)
-      font.pixelSize: Bar.pillFontSize
+      font.pixelSize: BarControl.pillFontSize
       text: root.deviceName
       elide: Text.ElideRight
     }

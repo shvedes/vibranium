@@ -452,14 +452,26 @@ Item {
     kv("retry.unknownUnit", UnitGate.retry("no-such-unit"))
     kv("retry.unknownUnit.due", UnitGate.retryDue("no-such-unit"))
 
-    // A holder that lets go and comes back finds the unit still due.
+    // Releasing the last owner of a failed unit stops it and disarms its retry
+    // deadline: an ownerless unit has nobody to retry for, so Boot's pump must
+    // not stay armed for it. The teardown already ran on failure.
     UnitGate.register("t6", unit("t6", [], {
+      activation: "first_use",
       retry: { maxAttempts: 3, backoffMs: 0, maxBackoffMs: 1000 },
       ready: function() { throw new Error("failing") }
     }))
     UnitGate.ensure("t6", "t6owner")
     UnitGate.releaseOwner("t6owner")
     kv("retry.holderReleased.owners", UnitGate.state("t6").ownerCount)
+    kv("retry.holderReleased.state", UnitGate.state("t6").state)
+    kv("retry.holderReleased.nextRetryMs", UnitGate.state("t6").nextRetryMs)
+    kv("retry.holderReleased.retryAt", UnitGate.retryAt("t6"))
+    kv("retry.holderReleased.notDue", UnitGate.retryDue("t6"))
+    // A fresh demand starts a fresh attempt with a fresh retry budget rather
+    // than inheriting the exhausted one from the failed generation.
+    UnitGate.ensure("t6", "t6owner")
+    kv("retry.holderReacquired.state", UnitGate.state("t6").state)
+    kv("retry.holderReacquired.freshBudget", UnitGate.state("t6").retryCount)
     kv("retry.holderReacquired.isDue", UnitGate.retryDue("t6"))
     // retry() reports whether the unit came up, not whether the attempt was
     // allowed; a unit that fails again returns false and still burns one.

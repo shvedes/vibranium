@@ -9,6 +9,7 @@ import qs.features.bar
 import "../../BackendGrace.js" as BackendGrace
 import "Model.js" as Model
 import "../../../../common/capture/ShotLib.js" as ShotLib
+import qs.features.bar.control
 
 // Network module: shows the link state with a single wifi glyph.
 // Connected via wifi -> wifi-3 in the default foreground color; wired ->
@@ -343,7 +344,7 @@ BarModule {
 
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
-    width: root.slotWidth + root.nameSlide * (Math.min(labelText.implicitWidth, 240) + 4 + Bar.slotInset)
+    width: root.slotWidth + root.nameSlide * (Math.min(labelText.implicitWidth, 240) + 4 + BarControl.slotInset)
     height: root.height
 
     // The glyph flashes green-normal for the reveal: the reveal names the
@@ -387,7 +388,7 @@ BarModule {
       visible: root.nameSlide > 0
       level: 3
       width: Math.min(implicitWidth, 240)
-      font.pixelSize: Bar.pillFontSize
+      font.pixelSize: BarControl.pillFontSize
       text: root.ssid
       elide: Text.ElideRight
     }
@@ -467,10 +468,10 @@ BarModule {
   // A hidden bar must not leave its network island floating on screen
   // (the host itself closes centrally; the QR overlay is separate).
   Connections {
-    target: Bar
+    target: BarControl
 
     function onEnabledChanged() {
-      if (!Bar.enabled) qrOverlay.close()
+      if (!BarControl.enabled) qrOverlay.close()
     }
   }
 }

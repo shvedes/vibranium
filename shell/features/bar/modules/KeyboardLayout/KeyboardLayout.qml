@@ -4,6 +4,7 @@ import QtQuick
 import qs.common
 import qs.services
 import qs.features.bar
+import qs.features.bar.control
 
 // Keyboard layout indicator: the active layout as a lowercased two-letter
 // code ("us", "de", "ru"). The code is the only display form - there is no
@@ -25,7 +26,7 @@ CollapsibleSlot {
     return code.toLowerCase()
   }
 
-  // Collapsible slot (see CollapsibleSlot.qml). Bar.slotInset per side
+  // Collapsible slot (see CollapsibleSlot.qml). bar.slotInset per side
   // (not the fixed sidePad): the zone row has zero gap and an icon-only
   // slot keeps (slot - canvas) / 2 of air at each edge, so the text module
   // boxes itself with the same inset and keeps the conventional
@@ -36,7 +37,7 @@ CollapsibleSlot {
   // keeps the centered glyph inside the shrinking box, so the label is
   // revealed from its own centre rather than sliding off an edge.
   collapseShown: root.label !== ""
-  collapseFull: glyph.implicitWidth + Bar.slotInset * 2
+  collapseFull: glyph.implicitWidth + BarControl.slotInset * 2
 
   // The code label, centered in the slot exactly like the other bar
   // modules' content.

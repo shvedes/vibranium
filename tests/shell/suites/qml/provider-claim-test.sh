@@ -107,7 +107,7 @@ t_not_contains "and the claim takes no fourth argument" \
   "function claimProvider(id, surface, owner, deferred)" "$HOST_SRC"
 
 UNITS=(
-  "features/bar/Bar.qml"
+  "features/bar/control/BarControl.qml"
   "features/launcher/AppLauncher.qml"
   "features/pickers/theme/ThemeRemover.qml"
   "services/media/Timer.qml"

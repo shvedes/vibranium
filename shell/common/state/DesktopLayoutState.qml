@@ -95,6 +95,22 @@ Singleton {
     return true
   }
 
+  // Retire a participant that will never draw a boot entrance because it is
+  // intentionally absent, rather than because its animation failed to report.
+  // Only that participant's obligation is removed: an enabled wallpaper still
+  // holds the milestone until its own fade reports, and the backstop still
+  // covers a participant with no completion edge.
+  function retireBootEntranceParticipant(participant): bool {
+    const key = String(participant === undefined || participant === null ? "" : participant)
+    if (root._bootPlayLeft[key] !== true) return false
+    const left = Object.assign({}, root._bootPlayLeft)
+    delete left[key]
+    root._bootPlayLeft = left
+    if (Object.keys(left).length > 0) return false
+    root.bootEntrancePlayed = true
+    return true
+  }
+
   // The backstop: a surface that never reports (the wallpaper switched off, a
   // bar that was never built) must not hold the background prewarms off for
   // the whole session.
@@ -254,7 +270,7 @@ Singleton {
     // rather than one per evaluation.
     //
     // DEBUG, and the reason is the owner: `_ownerName` returns `owner.tag`, and
-    // the only publisher in the tree is `Bar.qml`, whose tag is "bar". So the
+    // the only publisher in the tree is the resident bar control, whose tag is "bar". So the
     // most prominent part of this line can only ever read "published by bar" -
     // a constant spending the place a fact should go. What varies is on/off,
     // position and height, and all three are on screen and in Settings at the

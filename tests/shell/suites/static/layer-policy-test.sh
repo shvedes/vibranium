@@ -169,7 +169,7 @@ t_contains "and it is the bar" 'exclusion: "normal"' \
   "$(grep -E '^  "vibranium:bar"' "$REGISTRY")"
 BAR_SRC="$(<"$SHELL_DIR/features/bar/BarView.qml")"
 t_contains "the bar reserves its own height" \
-  "exclusiveZone: (Bar.enabled && !Bar.hideToggle) ? Bar.height : 0" "$BAR_SRC"
+  "exclusiveZone: (BarControl.enabled && !BarControl.hideToggle) ? BarControl.height : 0" "$BAR_SRC"
 t_not_contains "and does not opt out of the zone" "exclusionMode:" "$BAR_SRC"
 
 # Every other surface is fullscreen chrome: it draws over the desktop without
@@ -184,7 +184,7 @@ t_section "modal scrims take input and passive surfaces do not"
 t_eq "three classes are click-through" "3" "$(reg_mask_count empty)"
 t_eq "two surfaces follow their content" "2" "$(reg_mask_count content)"
 for rel in \
-  features/bar/PrivacyOverlay.qml \
+  features/privacy/PrivacyOverlay.qml \
   features/bar/ToolTipHost.qml \
   features/osd/OSDView.qml \
   services/screenshots/Screenshots.qml; do

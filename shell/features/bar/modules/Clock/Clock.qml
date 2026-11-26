@@ -6,6 +6,7 @@ import qs.common
 import qs.features.bar
 import "../../../../common/text/Clock.js" as ClockFmt
 import "../../../../common/ui/CalendarLib.js" as CalendarLib
+import qs.features.bar.control
 
 // Clock module. Minute precision: the label only re-renders when the
 // minute ticks. Clicking it opens the calendar island anchored to this
@@ -82,11 +83,11 @@ BarModule {
   // the correction rides here instead.
   readonly property real restingY: (root.height - segments.height) / 2 + Math.round(Ui.fontM * root.textScale * 0.08)
 
-  // Bar.slotInset on both sides: the zone row has zero gap and an icon-only
+  // bar.slotInset on both sides: the zone row has zero gap and an icon-only
   // slot keeps (slot - canvas) / 2 of air at each edge, so the text module
   // boxes itself with the same inset instead of riding flush against the
   // next module.
-  implicitWidth: segments.implicitWidth + Bar.slotInset * 2
+  implicitWidth: segments.implicitWidth + BarControl.slotInset * 2
 
   // Clips the segments to the module slot while its width tracks them.
   clip: true
@@ -276,7 +277,7 @@ BarModule {
   // The label as segments: day/date, time, am/pm suffix. Toggling a
   // segment's setting grows or retracts its holder (width Glide) while
   // the text slide-fades in, the same entrance language as NowPlaying.
-  // Every Title is level 1 at Bar.textScale and opts out of the level's bold,
+  // Every Title is level 1 at bar.textScale and opts out of the level's bold,
   // which the bar's other text modules do as well.
   Row {
     id: segments

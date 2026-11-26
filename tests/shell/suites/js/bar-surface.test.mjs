@@ -7,7 +7,8 @@ import { suite, section, group, eq, contains, notContains, finish, SHELL_DIR } f
 
 const C = loadLib(path.join(SHELL_DIR, 'common/text/IpcCatalog.js'))
 const P = loadLib(path.join(SHELL_DIR, 'common/text/IpcProtocol.js'))
-const BAR = fs.readFileSync(path.join(SHELL_DIR, 'features/bar/Bar.qml'), 'utf8')
+const BAR = fs.readFileSync(path.join(SHELL_DIR, 'features/bar/BarRuntime.qml'), 'utf8')
+const CONTROL = fs.readFileSync(path.join(SHELL_DIR, 'features/bar/control/BarControl.qml'), 'utf8')
 
 suite('bar-surface', 'exact bar summaries and retired rows')
 
@@ -53,8 +54,8 @@ group('catalog and owner', () => {
 
 section('status and module status projection')
 group('typed status frame and toggleable', () => {
-  contains('status returns a typed frame', BAR, 'data: root.ipcStatus(), format: { kind: "record" }')
-  notContains('status no longer stringifies JSON', BAR, 'JSON.stringify(root.ipcStatus())')
+  contains('status returns a typed frame', CONTROL, 'data: root.ipcStatus(), format: { kind: "record" }')
+  notContains('status no longer stringifies JSON', CONTROL, 'JSON.stringify(root.ipcStatus())')
   contains('status projection uses hidden', BAR, 'hidden: root.hideToggle')
   notContains('no hideToggle key in stateSnapshot', BAR, 'hideToggle: root.hideToggle')
   notContains('no hiddenByOverride result key', BAR, 'hiddenByOverride: root.hideToggle')

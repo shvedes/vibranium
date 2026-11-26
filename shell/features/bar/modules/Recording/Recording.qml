@@ -6,6 +6,7 @@ import Quickshell
 import qs.common
 import qs.features.bar
 import "../../../../common/text/Duration.js" as Duration
+import qs.features.bar.control
 // Recording indicator. Owned slot that appears only while a screen
 // recording is ongoing: it paints the red recording-ongoing icon with a
 // tooltip and stops the recording on left click. The module owns no
@@ -41,8 +42,8 @@ CollapsibleSlot {
   // so it leaves no gap.
   collapseShown: root.active
   collapseFull: (root.elapsedPill && root.active)
-    ? (Bar.slotInset + pill.width + Bar.slotInset)
-    : Bar.iconSlot
+    ? (BarControl.slotInset + pill.width + BarControl.slotInset)
+    : BarControl.iconSlot
 
   Icon {
     // Pinned to the trailing edge the box grows from (right-anchored zone):

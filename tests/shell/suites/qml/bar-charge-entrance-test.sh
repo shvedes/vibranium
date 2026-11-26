@@ -23,7 +23,7 @@ trap qp_teardown EXIT
 # stale when the modules change.
 BAR_BATTERY_SRC="$(cat "$SHELL_DIR/features/bar/modules/Battery/Battery.qml")"
 export BAR_BATTERY_SRC
-BAR_BAR_SRC="$(cat "$SHELL_DIR/features/bar/Bar.qml")"
+BAR_BAR_SRC="$(cat "$SHELL_DIR/features/bar/BarRuntime.qml")"
 export BAR_BAR_SRC
 
 if ! qp_run "$TESTS_SHELL_DIR/suites/qml/probes/bar-charge-entrance.qml" 20; then

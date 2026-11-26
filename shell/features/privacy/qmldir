@@ -1,0 +1,4 @@
+module qs.features.privacy
+
+PrivacyOverlay 1.0 PrivacyOverlay.qml
+PrivacyIndicators 1.0 PrivacyIndicators.qml

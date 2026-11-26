@@ -1,0 +1,3 @@
+module qs.features.bar.control
+
+singleton BarControl 1.0 BarControl.qml

@@ -7,19 +7,21 @@ import qs.common
 import qs.features.bar
 import qs.features.bar.modules.ColorPicker
 import "../../common/text/DropPayload.js" as DropPayload
+import qs.features.bar.control
+import qs.features.colorPicker
 
 // Per-screen bar surface on the bottom layer. One window per real screen,
-// spanning the full width at Bar.height, reserving an exclusive zone so
+// spanning the full width at bar.height, reserving an exclusive zone so
 // tiled windows never overlap it. The three zones live here as reusable
 // Zone components (self-anchored) - each renders its layout + owned slots
 // and handles its own drag reorder with boundary hints and a live config
-// write through Bar.
+// write through bar.
 //
 // Dragging empty bar space (anywhere the zones don't cover) starts the bar
 // position gesture: the pointer's screen y picks a top/bottom target, the
 // per-monitor MoveWindow previews it, and releasing persists it live. The
 // press itself lands on the MoveWindow overlay, not here: this window is
-// only `Bar.height` tall, and the compositor keeps a held pointer on the
+// only `bar.height` tall, and the compositor keeps a held pointer on the
 // pressed surface only while some window holds keyboard focus (see the
 // MoveWindow comment), so on an empty workspace the drag would die the
 // moment the pointer left the strip. The `moveExcl*` rects are what lets the
@@ -32,8 +34,8 @@ LayerSurface {
   id: win
 
   property string moveRegistrationKey: ""
-  readonly property real moveBarY: Bar.position === "top"
-    ? 0 : Math.max(0, win.screen.height - Bar.height)
+  readonly property real moveBarY: BarControl.position === "top"
+    ? 0 : Math.max(0, win.screen.height - BarControl.height)
 
   // The three zone rects the move proxy's input region subtracts, one set of
   // four scalars per zone. Scalars rather than a list of objects because the
@@ -126,7 +128,7 @@ LayerSurface {
     onTriggered: if (win._slotDragCount <= 0) win.recentDragActive = false
   }
 
-  visible: Bar.enabled && !Bar.hideToggle
+  visible: BarControl.enabled && !BarControl.hideToggle
   // Transparent: the backdrop is drawn by barBackdrop below so that it can
   // travel with the boot entrance slide. A surface color is painted by the
   // window itself and cannot move, and it would leave the strip on screen
@@ -136,14 +138,14 @@ LayerSurface {
   // windows); an explicit Ignore would let windows slide under the bar.
   // A transient IPC-only hide (hideToggle) releases the zone like a
   // disabled bar so tiled windows reclaim the space.
-  exclusiveZone: (Bar.enabled && !Bar.hideToggle) ? Bar.height : 0
+  exclusiveZone: (BarControl.enabled && !BarControl.hideToggle) ? BarControl.height : 0
   anchors {
     left: true
     right: true
-    top: Bar.position === "top"
-    bottom: Bar.position === "bottom"
+    top: BarControl.position === "top"
+    bottom: BarControl.position === "bottom"
   }
-  implicitHeight: Bar.height
+  implicitHeight: BarControl.height
 
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
@@ -158,7 +160,7 @@ LayerSurface {
   Item {
 
     anchors.fill: parent
-    y: Bar.entranceSlide
+    y: BarControl.entranceSlide
 
     // The bar's background, as an item rather than the window color so it
     // rides the entrance slide with the modules (see the color above).
@@ -186,7 +188,6 @@ LayerSurface {
       // zone carrying a module above everything.)
       Zone {
         id: leftZone
-        region: "left"
         hostWindow: win
       }
 
@@ -205,13 +206,13 @@ LayerSurface {
       IslandHost {
         id: islandHost
 
-        barPosition: Bar.position
+        barPosition: BarControl.position
       }
 
       ToolTipHost {
         id: toolTipHost
 
-        barPosition: Bar.position
+        barPosition: BarControl.position
       }
     }
 
@@ -219,10 +220,10 @@ LayerSurface {
 
       z: 1
       x: 0
-      y: Bar.position === "top" ? parent.height - height : 0
+      y: BarControl.position === "top" ? parent.height - height : 0
       width: parent.width
       height: 1
-      visible: Bar.showBorder
+      visible: BarControl.showBorder
       color: Ui.solid("background_3")
     }
   }
@@ -279,16 +280,16 @@ LayerSurface {
   property alias toolTipHost: toolTipHost
 
   Connections {
-    target: Bar
+    target: BarControl
 
     function onEnabledChanged() {
-      if (!Bar.enabled || Bar.hideToggle) {
+      if (!BarControl.enabled || BarControl.hideToggle) {
         islandHost.close()
         toolTipHost.hide()
       }
     }
     function onHideToggleChanged() {
-      if (!Bar.enabled || Bar.hideToggle) {
+      if (!BarControl.enabled || BarControl.hideToggle) {
         islandHost.close()
         toolTipHost.hide()
       }
@@ -300,22 +301,22 @@ LayerSurface {
     if (key === win.moveRegistrationKey) return
     if (win.moveRegistrationKey !== "") {
       win.clearIpcModules()
-      Bar.unregisterMoveView(win)
+      BarControl.unregisterMoveView(win)
     }
     win.moveRegistrationKey = key
     // Trace: the MoveWindow proxy finds its bar window through this key, so
     // a strip that stopped receiving presses is explained by the
     // registration (or its loss) rather than by the input region.
-    if (key !== "") Bar.registerMoveView(win)
+    if (key !== "") BarControl.registerMoveView(win)
   }
 
   Component.onCompleted: {
     win.moveRegistrationKey = String(win.screen.name ?? "")
-    if (win.moveRegistrationKey !== "") Bar.registerMoveView(win)
+    if (win.moveRegistrationKey !== "") BarControl.registerMoveView(win)
   }
   onScreenChanged: win.refreshMoveRegistration()
   Component.onDestruction: {
-    Bar.unregisterMoveView(win)
+    BarControl.unregisterMoveView(win)
   }
 
   function wireModule(item) {
@@ -383,8 +384,8 @@ LayerSurface {
         width: 0
         height: 0
 
-        Component.onCompleted: Bar.registerFallbackPicker(pickerEngine)
-        Component.onDestruction: Bar.unregisterFallbackPicker(pickerEngine)
+        Component.onCompleted: ColorPickerController.registerFallbackPicker(pickerEngine)
+        Component.onDestruction: ColorPickerController.unregisterFallbackPicker(pickerEngine)
       }
     }
   }

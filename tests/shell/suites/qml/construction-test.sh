@@ -190,7 +190,7 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 128 of the 271 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 124 of the 274 declared types, and every one of them
 # fails through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
@@ -211,8 +211,7 @@ qs.features.polkit.PolkitView
 qs.features.powerMenu.PowerMenuView
 qs.features.wallpaperPicker.WallpaperPickerView"
 
-EXPECTED_NEEDS_ENVIRONMENT="qs.boot.BootBar
-qs.boot.BootLate
+EXPECTED_NEEDS_ENVIRONMENT="qs.boot.BootLate
 qs.boot.BootServices
 qs.common.IslandHost
 qs.common.OverlayWindow
@@ -235,18 +234,10 @@ qs.features.apps.audioMixer.VolumeSlider
 qs.features.apps.imageViewer.ImageViewer
 qs.features.apps.imageViewer.ImageViewerController
 qs.features.apps.imageViewer.ImageViewerWindow
-qs.features.bar.Bar
-qs.features.bar.BarModule
-qs.features.bar.BarPill
+qs.features.bar.BarRuntime
 qs.features.bar.BarView
-qs.features.bar.CollapsibleSlot
-qs.features.bar.Group
 qs.features.bar.MoveWindow
-qs.features.bar.PrivacyOverlay
-qs.features.bar.RevealFlash
-qs.features.bar.ToolTipBind
 qs.features.bar.ToolTipHost
-qs.features.bar.Zone
 qs.features.bar.modules.ColorPicker.ColorPicker
 qs.features.bar.modules.ColorPicker.ColorPickerOverlay
 qs.features.bar.modules.KeyboardLayout.KeyboardLayout
@@ -312,6 +303,8 @@ qs.features.pickers.theme.ThemeRoots
 qs.features.polkit.Polkit
 qs.features.powerMenu.PowerMenu
 qs.features.powerMenu.PowerMenuPanel
+qs.features.privacy.PrivacyIndicators
+qs.features.privacy.PrivacyOverlay
 qs.features.wallpaper.Wallpaper
 qs.features.wallpaper.WallpaperView
 qs.features.wallpaperPicker.WallpaperEntry
@@ -358,7 +351,7 @@ supplied.qs.common.MenuOverlayShadow=host: null
 supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 269 declared entries over 47 qmldir files, one of which is excluded from the
+# 272 declared entries over 51 qmldir files, one of which is excluded from the
 # work list (boot/Boot.qml), so 268 cases are built. The 136 that are not built
 # are the needs-environment and declared-but-uncreatable sets below. A
 # singleton (RowGeometry, Paths) is not creatable either; the probe's case for
@@ -373,8 +366,8 @@ supplied.qs.common.LyricsPane=player: null"
 # qs.common.ConfirmStage replace the two feature-local declarations, all clean
 # headless builds over Text/Item/QtObject.)
 # Batch A declared qs.common.IpcRouter in common/qmldir, so the tree now
-# publishes 271 entries rather than 270.
-EXPECTED_DECLARED_COUNT=271
+# publishes 274 entries rather than 273.
+EXPECTED_DECLARED_COUNT=274
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -404,8 +397,8 @@ EXPECTED_DECLARED_COUNT=271
 # RotationAnimation, DismissNet a QtObject, GlassPill an Item over a Rectangle
 # and ConfirmStage a QtObject state machine - none reaches a window.
 # qs.common.IpcRouter (Batch A) is a clean singleton over plain JS libraries.
-EXPECTED_CLEAN_COUNT=132
-EXPECTED_NEEDS_COUNT=129
+EXPECTED_CLEAN_COUNT=142
+EXPECTED_NEEDS_COUNT=122
 EXPECTED_UNCREATABLE_COUNT=9
 
 # --------------------------------------------------------------------------
@@ -453,7 +446,7 @@ CASE_COUNT="$(grep -c '^    \["' "$WORKLIST")"
 
 t_section "the work list comes from the qmldir files, not from a hand-written list"
 
-t_eq "the number of qmldir files" "47" "$QMLDIR_COUNT"
+t_eq "the number of qmldir files" "51" "$QMLDIR_COUNT"
 
 # The declared surface itself, held still. Every count below is measured
 # against a list that moved, so without this the suite would stay green while

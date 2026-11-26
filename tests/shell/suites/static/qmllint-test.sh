@@ -147,7 +147,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # contributes two Info diagnostics; the warning set is unchanged.
 # The Lockscreen gateway's IpcRouter.unregister adds one unqualified warning;
 # retiring the native effect toggles removes one Info diagnostic.
-RECORDED_FILE_COUNT=272
+RECORDED_FILE_COUNT=275
 RECORDED_WARNING_COUNT=112
 RECORDED_INFO_COUNT=18
 

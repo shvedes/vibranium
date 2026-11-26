@@ -225,7 +225,7 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 4, features 183, services 30, common 175.
+# The table: composition 1, boot 3, features 184, services 30, common 175.
 # Batch E added MenuIpc.js and batch C added BarIpc.js under features/.
 # Batch B added MixerTabs.js (features), AudioIpc.js (services) and
 # AudioNodeKind.js (common); Batch A added the three shared IPC files to
@@ -253,12 +253,12 @@ for layer in boot common features services; do
   t_true "the $layer/ layer directory exists" test -d "$SHELL_DIR/$layer"
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
-t_count "features/ holds the tree's 183 .qml and .js files" "183" "$(layer_files features)"
+t_count "features/ holds the tree's 187 .qml and .js files" "187" "$(layer_files features)"
 # services/ gained Login1Sleep.js when grace began closing on the logind
 # sleep boundary rather than on the wall clock alone.
 t_count "services/ holds the 30 files the README publishes" "30" "$(layer_files services)"
 t_count "common/ holds the 175 files the README publishes" "175" "$(layer_files common)"
-t_count "boot/ holds the 4 files the README publishes" "4" "$(layer_files boot)"
+t_count "boot/ holds the 3 files the README publishes" "3" "$(layer_files boot)"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
 
 t_section "every module sits inside one of the four layers, and every file inside one"
@@ -351,7 +351,7 @@ t_section "the bar demands its gated services itself and never names the catalog
 # so only a scan reaches it. The scan reads .qml and .js, the set the resolver
 # reads too, so the README naming the forbidden names cannot fail its own gate.
 t_match "Bar.qml carries an executable UnitGate.ensure call" \
-  '\bUnitGate\.ensure\([^)]' "$(cat "$SHELL_DIR/features/bar/Bar.qml")"
+  '\bUnitGate\.ensure\([^)]' "$(cat "$SHELL_DIR/features/bar/BarRuntime.qml")"
 BAR_CATALOG_REFS="$(grep -rn --include='*.qml' --include='*.js' -E '\b(qs\.boot|BootRegistry)\b' \
   "$SHELL_DIR/features/bar" | wc -l | tr -d ' ')"
 t_note "features/bar names qs.boot or BootRegistry on $BAR_CATALOG_REFS line(s)"

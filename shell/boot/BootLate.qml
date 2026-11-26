@@ -25,7 +25,7 @@ import qs.features.powerMenu
 // clipboard, polkit, OSD, power menu) and the singleton touches that reach
 // them.
 //
-// The services and the bar live in BootBar.qml, not here. Splitting the two
+// The services live in BootServices.qml, not here. Splitting them
 // is what keeps the bar off this file's compile: a component's imports load
 // their whole file sets before it is ready, so when the bar shared this half
 // it could not be demanded until every feature module had been loaded too.

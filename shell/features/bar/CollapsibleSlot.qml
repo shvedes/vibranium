@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.bar
+import qs.features.bar.control
 
 // Collapsible module slot: the one tray-convention collapse every dynamic
 // bar module hand-rolled before this file existed.
@@ -35,7 +36,7 @@ BarModule {
   // The visibility condition; false parks the slot at zero width.
   property bool collapseShown: true
   // The open width in px; rounded per frame through the slide.
-  property real collapseFull: Bar.iconSlot
+  property real collapseFull: BarControl.iconSlot
   // Tray's easing variant; false is Glide's own OutCubic.
   property bool collapseInOut: false
   // Extra slide gate; true everywhere but Volume's cold-boot settle.

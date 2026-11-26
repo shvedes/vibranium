@@ -60,7 +60,8 @@ const HANDLERS = [
   'services/power/Inhibitor.qml',
   // Batch C owners: bar (including its color-picker seat), clipboard and
   // the emoji picker. The four clipboard-copy rows are client-owned by design.
-  'features/bar/Bar.qml',
+  'features/bar/control/BarControl.qml',
+  'features/colorPicker/ColorPickerController.qml',
   'features/clipboard/Clipboard.qml',
   'features/pickers/emoji/EmojiPicker.qml',
 ]

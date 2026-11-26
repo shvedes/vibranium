@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell.Services.SystemTray
 import qs.common
 import qs.features.bar
+import qs.features.bar.control
 
 // Tray module. Hosts the StatusNotifier items in a collapsible slot with its
 // own disclosure affordance: a left-pointing chevron pinned to the slot's
@@ -292,15 +293,15 @@ CollapsibleSlot {
     id: trayMenu
 
     anchorWindow: root.barWindow
-    barPosition: Bar.position
+    barPosition: BarControl.position
   }
 
   // A hidden bar must not leave its tray menus floating on screen.
   Connections {
-    target: Bar
+    target: BarControl
 
     function onEnabledChanged() {
-      if (!Bar.enabled) trayMenu.close()
+      if (!BarControl.enabled) trayMenu.close()
     }
   }
 }

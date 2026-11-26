@@ -7,6 +7,7 @@ import qs.features.bar
 import "BarLib.js" as BarLib
 import "../../common/collections/ZoneGeometry.js" as ZoneGeometry
 import "../../common/math/Range.js" as Range
+import qs.features.bar.control
 
 // One bar zone (left / center / right). Renders the zone's slots from a
 // single ordered model - layout slots (plain modules and module groups)
@@ -49,7 +50,7 @@ Item {
 
   // The zone's persisted slot order, mixed: static modules, groups and
   // owned dynamic modules interleaved exactly as the user left them.
-  readonly property var zoneLayout: Bar.layout[root.region] || []
+  readonly property var zoneLayout: BarControl.layout[root.region] || []
 
   // The zone's movable slot ids for a drag: every layout slot except fixed
   // obstacles. Pinned slots are a wall at the end of their zone;
@@ -59,7 +60,7 @@ Item {
     const out = []
     const zl = root.zoneLayout
     for (let i = 0; i < zl.length; i++)
-      if (!Bar.isFixedSlot(zl[i])) out.push(zl[i])
+      if (!BarControl.isFixedSlot(zl[i])) out.push(zl[i])
     return out
   }
 
@@ -67,7 +68,7 @@ Item {
   // layout slot. The mixed model publishes this per entry and the row keys
   // its rows by the pair, so a kind flip is a distinct row for the same id.
   function _kindOf(id) {
-    return Bar.isOwned(id) ? "owned" : "static"
+    return BarControl.isOwned(id) ? "owned" : "static"
   }
 
   // Visual order. Resting: the persisted mixed layout as-is. Dragging: the
@@ -77,7 +78,7 @@ Item {
   // (`leaving`) splice back at their cached display index so the row
   // shrinks in place around them.
   readonly property var displayOrder: BarLib.displayOrder(
-    root.zoneLayout, root.workList, id => Bar.isFixedSlot(id),
+    root.zoneLayout, root.workList, id => BarControl.isFixedSlot(id),
     id => root._kindOf(id), root.leaving)
 
   // A drag is live on this window - own or sibling zone. Scanned, not
@@ -426,7 +427,7 @@ Item {
   readonly property real contentWidth: root.geoSnapshot !== null
     ? root.geoSnapshot.total : 0
   width: root.contentWidth
-  height: Bar.height
+  height: BarControl.height
   // Dead-center pivot: the slot nearest the zone's own middle (ties
   // go left - strict `<` keeps the first). The offset below parks
   // this slot's center on screen center, so siblings spawning either
@@ -578,7 +579,7 @@ Item {
     const snap = root.geoSnapshot
     if (snap === null) return []
     return ZoneGeometry.dropCandidates(snap.ids, snap.widths, snap.prefix,
-      root.workList, id => Bar.isFixedSlot(id))
+      root.workList, id => BarControl.isFixedSlot(id))
   }
 
   // Begin a drag from the slot that owns `handler`. `handler` is that slot's
@@ -670,7 +671,7 @@ Item {
     const order = root.displayOrder
     for (let i = 0; i < order.length; i++) {
       const e = order[i]
-      if (e.kind !== "static" || !Bar.isPinned(e.id)) continue
+      if (e.kind !== "static" || !BarControl.isPinned(e.id)) continue
       const px = root.xForSlot(e.kind, e.id)
       const pw = root.widthFor(e.kind, e.id)
       if (locX >= px && locX <= px + pw) {
@@ -754,13 +755,13 @@ Item {
     }
     // Home release (or over empty space): write when moved. Accepted
     // write: zoneLayout is already current (the commit propagates
-    // synchronously through Settings.values -> Bar.layout), so there is
+    // synchronously through Settings.values -> bar.layout), so there is
     // no flash-back window. Rejected write: falls back to the persisted
     // layout. Either way the working order's job is done once moveSlot
     // returns.
     if (dz !== "" && root.workList !== null && root.dragId !== ""
       && root.workList.indexOf(root.dragId) !== root.dragFrom) {
-      Bar.moveSlot(root.region, root.workList)
+      BarControl.moveSlot(root.region, root.workList)
     }
     // Drop the carry NOW so the module eases into its gap (or home) while
     // the working order is still live; the order itself releases once the
@@ -789,7 +790,7 @@ Item {
       const order = t.displayOrder
       for (let i = 0; i < order.length; i++) {
         const e = order[i]
-        if (Bar.isFixedSlot(e.id)) continue
+        if (BarControl.isFixedSlot(e.id)) continue
         if (t.leaving && t.leaving[e.id] !== undefined) continue
         slots.push({ x: t.xForSlot(e.kind, e.id), width: t.widthFor(e.kind, e.id) })
       }
@@ -799,7 +800,7 @@ Item {
     root.clearDrag()
     // The target index is -1 when the pointer was not over a resolvable gap,
     // which is a rejected drop rather than a drop at position 0.
-    if (idx >= 0) Bar.moveSlotAcross(id, from, dz, idx)
+    if (idx >= 0) BarControl.moveSlotAcross(id, from, dz, idx)
   }
 
   function clearDrag(keepOrder) {
@@ -834,7 +835,7 @@ Item {
     let oi = 0
     const zl = root.zoneLayout
     for (let i = 0; i < zl.length; i++) {
-      if (Bar.isFixedSlot(zl[i])) continue
+      if (BarControl.isFixedSlot(zl[i])) continue
       if (root.workList[oi] !== zl[i]) return false
       oi++
     }
@@ -853,7 +854,7 @@ Item {
 
   // Backstop only: commitDrag releases the working order right after the
   // write (the commit propagates synchronously through Settings.values ->
-  // Bar.layout), so this normally never fires with workList live. Kept in
+  // bar.layout), so this normally never fires with workList live. Kept in
   // case a future settings write path ever becomes async - then it drops
   // the working order once zoneLayout catches up (identical arrangement,
   // so nothing visually changes - only the source of truth flips back).
@@ -861,7 +862,7 @@ Item {
     root.rebuildMemberModel()
     // Backstop only: commitDrag releases the working order right after the
     // write (the commit propagates synchronously through Settings.values ->
-    // Bar.layout), so this normally never fires with workList live. Kept in
+    // bar.layout), so this normally never fires with workList live. Kept in
     // case a future settings write path ever becomes async - then it drops
     // the working order once zoneLayout catches up.
     if (!root.dragActive && root.workList !== null) root.releaseWorkList()
@@ -913,9 +914,9 @@ Item {
   // from inside the binding this call runs under, and Qt answers that by
   // dropping the binding.
   function resolveSlot(id) {
-    const comp = Bar.componentFor(id)
-    if (!Bar.isGroup(id) && comp !== null && comp !== undefined) {
-      Bar.markBuildStart(id, comp)
+    const comp = BarControl.componentFor(id)
+    if (!BarControl.isGroup(id) && comp !== null && comp !== undefined) {
+      BarControl.markBuildStart(id, comp)
     }
     return comp
   }
@@ -930,7 +931,7 @@ Item {
     // Layout slots are draggable unless fixed: pinned slots and
     // non-draggable owned modules stay put while remaining fully toggleable
     // upstream (static case). No layout slot is pinned today.
-    readonly property bool draggable: !Bar.isFixedSlot(slot.modelData.id)
+    readonly property bool draggable: !BarControl.isFixedSlot(slot.modelData.id)
     // The dragged slot is "lifted": it rides the cursor wearing the held
     // wrap below, and the freed gap is wherever its geometry isn't
     // currently covering.
@@ -968,8 +969,8 @@ Item {
     x: slot.carried ? root.carryX - (root.carryGrabDX >= 0 ? root.carryGrabDX : 0)
       : root.xForSlot(slot.modelData.kind, slot.modelData.id)
     width: Math.round(contentLoader.implicitWidth * slot.grow)
-    height: Bar.height
-    implicitHeight: Bar.height
+    height: BarControl.height
+    implicitHeight: BarControl.height
     // Toggled-in modules fade in WHILE growing (same window as the width
     // slide, mic-style) - never after it. Creation-driven: the Repeater
     // rebuilds every delegate on a toggle, so a membership binding would
@@ -991,15 +992,15 @@ Item {
     // reveal's own travel on the same axis, one step behind the strip.
     y: (1 - slot.intro) * slot.introOffset
       + (1 - slot.revealIntro) * slot.introOffset
-    readonly property real introOffset: Bar.position === "top" ? -Ui.s : Ui.s
+    readonly property real introOffset: BarControl.position === "top" ? -Ui.s : Ui.s
     // The contents half of a transient show's entrance, derived from the one
-    // Bar.revealProgress every slot reads. It rests at 1, snaps to 0 when the
+    // bar.revealProgress every slot reads. It rests at 1, snaps to 0 when the
     // show arms (so the contents leave the screen in the same frame as the
     // strip, with no fade-out), then runs to 1 once the strip has landed.
     // No Behavior here: the arm must be a snap, and the release is paced by
     // Bar's own animation.
-    readonly property real revealIntro: Bar.entranceWarmOpacity
-      + (1 - Bar.entranceWarmOpacity) * Bar.revealProgress
+    readonly property real revealIntro: BarControl.entranceWarmOpacity
+      + (1 - BarControl.entranceWarmOpacity) * BarControl.revealProgress
     // Boot entrance hold: 0 until the bar's strip has slid in AND this
     // slot's own Loader is Ready, then 1 together with every other held slot.
     // _bootHeld captures birth before the release - only those animate.
@@ -1009,13 +1010,13 @@ Item {
     // keeps a slot whose async build lands after the global release (a
     // second screen a frame behind) sliding in instead of popping.
     property bool _bootHeld: true
-    // Held at Bar.entranceWarmOpacity rather than 0: an item at opacity 0 is
+    // Held at bar.entranceWarmOpacity rather than 0: an item at opacity 0 is
     // culled by the renderer, so a bar held at 0 has uploaded nothing by the
     // time the entrance releases it - and then pays all of it on the first
     // frame of the animation (measured: 85ms inside the boot fade). The warm
-    // opacity is drawn but not visible. See Bar._latchEntrance.
+    // opacity is drawn but not visible. See bar._latchEntrance.
     property real intro: slot._bootHeld
-      ? ((Bar.entranceModulesReady && contentLoader.status === Loader.Ready) ? 1 : Bar.entranceWarmOpacity) : 1
+      ? ((BarControl.entranceModulesReady && contentLoader.status === Loader.Ready) ? 1 : BarControl.entranceWarmOpacity) : 1
     Behavior on intro {
       enabled: slot._bootHeld && MotionPolicy.enabled
       NumberAnimation { duration: Ui.slowMs; easing.type: Easing.OutCubic }
@@ -1030,7 +1031,7 @@ Item {
       // Capture birth before/after the modules' release: boot slots (born
       // held) keep the intro tween armed, post-boot births disarm it (see
       // the Behavior above) and skip straight to visible.
-      slot._bootHeld = !Bar.entranceModulesReady
+      slot._bootHeld = !BarControl.entranceModulesReady
       slot.grow = root._targetGrow(slot.modelData.id)
       // Arm the simultaneous fade: breaks the binding (stays 1), so the
       // later enteringIds cleanup cannot replay a second, delayed fade.
@@ -1082,7 +1083,7 @@ Item {
       // Geometry survives the boot gap through the geoSnapshot copy (an
       // uninstantiated delegate reads 0 there), and the construction
       // clock still brackets resolveSlot -> onLoaded, only longer.
-      asynchronous: !Bar.entranceReady
+      asynchronous: !BarControl.entranceReady
 
       sourceComponent: root.resolveSlot(slot.modelData.id)
 
@@ -1109,7 +1110,7 @@ Item {
         // convenience whose members are timed individually in Group.qml, and
         // a `session loaded in 40ms` line would name one module where the
         // user sees two on the bar.
-        if (!Bar.isGroup(slot.modelData.id)) Bar.reportModuleReady(slot.modelData.id)
+        if (!BarControl.isGroup(slot.modelData.id)) BarControl.reportModuleReady(slot.modelData.id)
       }
     }
 
@@ -1138,7 +1139,7 @@ Item {
     DragHandler {
       id: dragHandler
 
-      enabled: slot.draggable && !Bar.movePressed
+      enabled: slot.draggable && !BarControl.movePressed
 
       target: null
       // Reordering is horizontal: track the x axis only, so a plain click
@@ -1176,7 +1177,7 @@ Item {
     x: root.region === "left" ? 0 : root.region === "right" ? -root.dropHitW : -root.dropHitW / 2
     y: 4
     width: root.dropHitW
-    height: Bar.height - 8
+    height: BarControl.height - 8
     radius: RoundingPolicy.radius
     color: Ui.tint("accent", 0.10)
     border.color: Ui.solid("accent")
