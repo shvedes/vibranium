@@ -430,6 +430,15 @@ function manualDir() {
   return _manualIntent === null ? 0 : _manualDirOf(_manualIntent.value)
 }
 
+// MPRIS metadata is free text: a client can publish a title or artist with
+// embedded newlines, tabs or repeated spaces. Every display surface shapes the
+// field into one line, so normalize here once rather than in each view. The
+// cache/intent key keeps the raw text; this is presentation only.
+function displayText(value) {
+  if (value === null || value === undefined) return ""
+  return String(value).replace(/\s+/g, " ").trim()
+}
+
 function playerKey(p) {
   if (!p) return ""
   const md = p.metadata && typeof p.metadata === "object" ? p.metadata : {}

@@ -105,9 +105,9 @@ Item {
     metaText.kickMeta()
   }
   onLinkCopiedChanged: titleMarquee.reset()
-  readonly property string title: root.player !== null ? root.player.trackTitle ?? "" : ""
-  readonly property string artist: root.player !== null ? root.player.trackArtist ?? "" : ""
-  readonly property string album: root.player !== null ? root.player.trackAlbum ?? "" : ""
+  readonly property string title: root.player !== null ? NP.displayText(root.player.trackTitle) : ""
+  readonly property string artist: root.player !== null ? NP.displayText(root.player.trackArtist) : ""
+  readonly property string album: root.player !== null ? NP.displayText(root.player.trackAlbum) : ""
   readonly property string artUrl: root.player !== null ? root.player.trackArtUrl ?? "" : ""
   // The lyrics pad asks the module for the fullscreen transcript, which owns
   // its own window and outlives this island.
@@ -263,7 +263,11 @@ Item {
   // player can fake, and probing by writing a position would audibly jump
   // playback - not a trade a seek bar is worth.
   readonly property bool canSeekPosition: NP.canSetPlayerPosition(root.player)
-  property real shownPosition: 0
+  // One displayed position, derived from the live player. The drag preview is
+  // the only imperative writer, and only while the finger owns the lane; the
+  // strip, the readout and the clock never hold a copy that can fall stale.
+  property real previewPosition: 0
+  readonly property real shownPosition: root._seeking ? root.previewPosition : NP.reanchorPosition(root.player, root.lengthSec)
   readonly property real progressRatio: root.lengthSec > 0 ? Math.min(1, root.shownPosition / root.lengthSec) : 0
 
   // Width probe for the two time columns, which hold the same value and so are
@@ -295,15 +299,7 @@ Item {
     text: "100%"
   }
 
-  function reanchor() {
-    root.shownPosition = NP.reanchorPosition(root.player, root.lengthSec)
-  }
-
-  onPlayerChanged: {
-    root.reanchor()
-    root.refreshTrackUrl()
-  }
-  onLengthSecChanged: root.reanchor()
+  onPlayerChanged: root.refreshTrackUrl()
 
   // Previous sorted view, kept so a regroup can re-point playerIndex at the
   // same player object instead of whatever lands on its old slot.
@@ -390,25 +386,22 @@ Item {
     root.player.positionChanged()
   }
 
-  // Absolute seek: ratio across the lane width maps onto lengthSec.
-  // The strip adopts the target at once; the live onPositionChanged
-  // below corrects on daemon notify.
+  // Absolute seek: ratio across the lane width maps onto lengthSec. The lane
+  // derives from the player, so the one position write moves it at once; the
+  // daemon's notify corrects it when the client reports back.
   function seekAt(x, w) {
     if (!root.canSeekPosition || w <= 0) return
     const t = NP.scrubPosition(x, w, root.lengthSec)
     root.player.position = t
-    // Optimistic adopt so the strip jumps at once; the live
-    // onPositionChanged above corrects on daemon notify.
-    root.shownPosition = t
     if (root.player) root.player.positionChanged()
   }
 
-  // Scrub preview: moves the strip only, writes nothing. Per-move
-  // position writes queue up in the player and replay back and forth
-  // after release, so a drag commits once, on release.
+  // Scrub preview: moves the preview the strip derives from, writes no player
+  // state. Per-move position writes queue up in the player and replay back and
+  // forth after release, so a drag commits once, on release.
   function scrubTo(x, w) {
     if (!root.canSeekPosition || w <= 0) return
-    root.shownPosition = NP.scrubPosition(x, w, root.lengthSec)
+    root.previewPosition = NP.scrubPosition(x, w, root.lengthSec)
   }
 
   // Active player's own volume (0..1, never the system sink), kept here for
@@ -426,11 +419,11 @@ Item {
     root.player.togglePlaying()
   }
 
-  // Discrete MPRIS position, driven by the shared playback clock: the notify
+  // Live MPRIS position, driven by the shared playback clock: the notify
   // re-evaluates shownPosition and the strip width follows. The card tracks
   // whichever client it shows, including the active one, and holds the clock
-  // only while it is actually advancing a position - a paused or scrubbed
-  // card takes no tick at all.
+  // only while it is actually advancing a position - a paused or scrubbed card
+  // runs no driver at all.
   PlaybackClockHold {
     wanted: root.playing && !root._seeking && root.player !== null
   }
@@ -442,14 +435,15 @@ Item {
 
   Connections {
     target: root.player
-    // While scrubbing the strip belongs to the finger: daemon notifies
-    // (including our own positionChanged poke in seekAt) must not yank
-    // it back mid-drag. Release re-arms; the next notify settles.
-    function onPositionChanged() { if (!root._seeking) root.reanchor() }
+    // "Previous" on the first track restarts it in some clients without
+    // publishing a new track. Re-read the position at that edge so the strip
+    // and the transcript return to the head with the audio. This only asks for
+    // a fresh reading; shownPosition stays a binding on the player.
     function onPlaybackStateChanged() {
-      root.reanchor()
+      if (root.player) root.player.positionChanged()
       if (root.playing && root.playerVolume <= 0) NP.setMuteResumePending(root.player, false)
     }
+    function onTrackChanged() { if (root.player) root.player.positionChanged() }
   }
 
   Component.onCompleted: {
@@ -1034,14 +1028,9 @@ Item {
                     width: parent.width * root.progressRatio
                     height: parent.height
                     color: Ui.solid("accent")
-
-                    Behavior on width {
-                      enabled: root.animOn && root.lengthSec > 0 && !root._seeking
-                      NumberAnimation {
-                        duration: Ui.normalMs
-                        easing.type: Easing.OutCubic
-                      }
-                    }
+                    // The width follows the clock directly. A Behavior here
+                    // restarted its tween on every position tick and could
+                    // never reach the target, leaving the fill empty.
                   }
                 }
 
@@ -1074,10 +1063,7 @@ Item {
                     }
                     root._seeking = false
                   }
-                  onCanceled: {
-                    root._seeking = false
-                    root.reanchor()
-                  }
+                  onCanceled: root._seeking = false
                 }
 
                 WheelHandler {
@@ -1088,7 +1074,6 @@ Item {
                     const d = event.angleDelta.y > 0 ? 5 : -5
                     const t = Range.clamp(root.shownPosition + d, 0, root.lengthSec)
                     root.player.position = t
-                    root.shownPosition = t
                     if (root.player) root.player.positionChanged()
                     event.accepted = true
                   }

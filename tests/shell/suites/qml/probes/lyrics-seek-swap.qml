@@ -10,9 +10,9 @@
 // rather than silently passing.
 //
 // APP-4: the four commit routes (seekAt, seekTo, drag release, wheel) must all
-// funnel through ONE commitSeek that clamps, writes position and shownPosition
-// once, clears _seeking and notifies once. scrubTo stays the only preview
-// writer of shownPosition.
+// funnel through ONE commitSeek that clamps, writes the player's position once,
+// clears _seeking and notifies once. The shown lane is a binding on the live
+// position; scrubTo is the only writer of the preview, and only while seeking.
 //
 // APP-5: the swap animation must own one scalar; lyricsSide.opacity is derived
 // from it, and closing mid-swap resets it so reopening the SAME track (no new
@@ -183,7 +183,8 @@ Item {
       '  id: root',
       '  property bool canSeekPosition: true',
       '  property real lengthSec: 100',
-      '  property real shownPosition: 0',
+      '  property real previewPosition: 0',
+      '  readonly property real shownPosition: root._seeking ? root.previewPosition : root.player.position',
       '  property bool _seeking: false',
       '  property real width: 200',
       '  property int commitCalls: 0',
@@ -240,7 +241,6 @@ Item {
       '  function _holdStart() {}',
       '  function _holdStop() { root.holdStops++ }',
       '  function _readBackdrop() {}',
-      '  function reanchor() {}',
       '  function onOpened() { ' + opened + ' }',
       trackKey,
       '}'
@@ -282,8 +282,9 @@ Item {
       kv("p4.commitClamps", commit.indexOf("Range.clamp(") >= 0)
       kv("p4.commitClearsSeeking", commit.indexOf("_seeking = false") >= 0)
       kv("p4.commitSingleNotify", count(commit, "positionChanged()") === 1)
-      kv("p4.commitSingleShownWrite", count(commit, "shownPosition =") === 1)
-      kv("p4.scrubOnlyPreview", scrubTo.indexOf("shownPosition =") >= 0
+      kv("p4.commitNoShownWrite", count(commit, "shownPosition =") === 0)
+      kv("p4.scrubOnlyPreview", scrubTo.indexOf("previewPosition =") >= 0
+        && scrubTo.indexOf("shownPosition =") < 0
         && scrubTo.indexOf("positionChanged") < 0 && scrubTo.indexOf("commitSeek") < 0)
 
       const sm = buildSeekMachine()
@@ -299,9 +300,9 @@ Item {
         for (let i = 0; i < routes2.length; i++) {
           const r = routes2[i]
           sm.commitCalls = 0; sm.notifyCalls = 0
-          sm.player.position = 0; sm.shownPosition = 0; sm._seeking = false
+          sm.player.position = 0; sm.previewPosition = 0; sm._seeking = false
           // A drag has a preview on the lane when the finger lifts.
-          if (r.tag === "release") { sm._seeking = true; sm.shownPosition = 33 }
+          if (r.tag === "release") { sm._seeking = true; sm.previewPosition = 33 }
           r.fire()
           kv("p4." + r.tag + ".calls", sm.commitCalls)
           kv("p4." + r.tag + ".notify", sm.notifyCalls)
@@ -309,14 +310,20 @@ Item {
           kv("p4." + r.tag + ".position", Math.round(sm.player.position * 100) / 100)
           kv("p4." + r.tag + ".shown", Math.round(sm.shownPosition * 100) / 100)
         }
-        // Scrub is preview only: it writes shownPosition and nothing else.
+        // Scrub is preview only: it writes the preview and nothing else. The
+        // lane follows it only while the finger owns it.
         sm.commitCalls = 0; sm.notifyCalls = 0
-        sm.player.position = 0; sm.shownPosition = 0; sm._seeking = false
+        sm.player.position = 0; sm.previewPosition = 0; sm._seeking = true
         sm.scrubTo(100, 200)
         kv("p4.scrub.calls", sm.commitCalls)
         kv("p4.scrub.notify", sm.notifyCalls)
         kv("p4.scrub.position", sm.player.position)
         kv("p4.scrub.shown", Math.round(sm.shownPosition * 100) / 100)
+        // Outside a scrub the lane is a derivation of the live player, not a
+        // snapshot left behind by the preview.
+        sm._seeking = false
+        sm.player.position = 70; sm.previewPosition = 10
+        kv("p4.derived.idle", Math.round(sm.shownPosition * 100) / 100)
       }
 
       // ---------------- APP-5: opacity survives same-track reopen ----------

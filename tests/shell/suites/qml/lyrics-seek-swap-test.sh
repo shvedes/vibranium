@@ -2,8 +2,9 @@
 # Suite: lyrics-seek-swap - one seek commit path and swap opacity restoration.
 #
 # APP-4: seekAt, seekTo, drag release and wheel must all funnel through one
-# commitSeek (clamp, one position/shownPosition write, one notify, one drag
-# release); scrubTo remains the only preview writer of shownPosition.
+# commitSeek (clamp, one player position write, one notify, one drag release).
+# The shown lane is derived from the live position; scrubTo is the only writer
+# of the preview, and only while a drag owns the lane.
 #
 # APP-5: the track-swap animation owns one scalar, lyricsSide.opacity is derived
 # from it, and closing mid-swap resets it so reopening the SAME track cannot
@@ -47,7 +48,7 @@ qp_assert "no route commits a position itself" "p4.noDirectPositionWrite" "true"
 qp_assert "commitSeek clamps" "p4.commitClamps" "true"
 qp_assert "commitSeek clears the drag" "p4.commitClearsSeeking" "true"
 qp_assert "commitSeek notifies once" "p4.commitSingleNotify" "true"
-qp_assert "commitSeek writes the shown lane once" "p4.commitSingleShownWrite" "true"
+qp_assert "commitSeek writes no shown lane" "p4.commitNoShownWrite" "true"
 qp_assert "scrubTo only previews the lane" "p4.scrubOnlyPreview" "true"
 qp_assert "every commit fragment was found" "p4.missing" ""
 
@@ -76,6 +77,7 @@ qp_assert "scrub never commits" "p4.scrub.calls" "0"
 qp_assert "scrub never notifies" "p4.scrub.notify" "0"
 qp_assert "scrub leaves the player alone" "p4.scrub.position" "0"
 qp_assert "scrub moves only the lane" "p4.scrub.shown" "50"
+qp_assert "outside a scrub the lane derives from the player" "p4.derived.idle" "70"
 
 t_section "APP-5: derived opacity, one swap scalar"
 qp_assert "the swap script was lifted" "swap.scriptFound" "true"

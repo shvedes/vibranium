@@ -44,6 +44,7 @@ Item {
   property alias fontStrikeout: label.font.strikeout
   property alias fontFeatures: label.font.features
   property alias textFormat: label.textFormat
+  property alias horizontalAlignment: label.horizontalAlignment
 
   // Which elide a label uses when it is NOT travelling. Title's default is
   // ElideRight; a path row needs ElideLeft so the file name survives, and a

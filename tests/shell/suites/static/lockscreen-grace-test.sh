@@ -465,7 +465,8 @@ t_eq "the progress gate does nothing when motion stays on" "true" "${G[progressO
 # auth edge that re-arms it on exit. The timer must not read auth at all; the
 # edge stops the countdown on entry and grabFocus() re-arms it on exit.
 # LCK-9: the progress reveal must not also be reset on the visible edge;
-# `hasTrack` owns that reset, and `visible` only re-anchors the position.
+# `hasTrack` owns that reset. `visible` owns neither the reveal nor the
+# position, which is derived from the live player.
 #
 # Both handlers are lifted from the real QML and driven against stubs, as the
 # gate handlers above are. A handler that still owns the duplicate shows up as
@@ -547,9 +548,9 @@ const fireIdle = drive(triggerBody, c => autohideStubs(c, false))
 out.idleTimerFades = fireIdle.includes("fade:true")
 out.idleTimerNoRearm = !fireIdle.includes("restart")
 
-// LCK-9: visible only reanchors; hasTrack owns the reset in both directions.
+// LCK-9: visible writes nothing; hasTrack owns the reset in both directions.
 const shown = reveal(visibleBody, true, true)
-out.visibleOnlyReanchors = shown.calls.length === 1 && shown.calls[0] === "reanchor"
+out.visibleWritesNothing = shown.calls.length === 0
 out.visibleKeepsDriver = shown.root.progressAppear === 7
 const trackOn = reveal(hasTrackBody, true, true)
 out.trackRestartsReveal = trackOn.calls.includes("restart")
@@ -576,7 +577,7 @@ t_eq "the idle timer still fades the field" "true" "${O[idleTimerFades]}"
 t_eq "the idle timer never restarts itself" "true" "${O[idleTimerNoRearm]}"
 
 t_section "LCK-9: the has-track edge alone resets the progress reveal"
-t_eq "the visible edge only reanchors" "true" "${O[visibleOnlyReanchors]}"
+t_eq "the visible edge writes no position or reveal" "true" "${O[visibleWritesNothing]}"
 t_eq "the visible edge leaves the reveal driver alone" "true" "${O[visibleKeepsDriver]}"
 t_eq "a new track restarts the reveal" "true" "${O[trackRestartsReveal]}"
 t_eq "losing the track stops the reveal" "true" "${O[trackStopsReveal]}"

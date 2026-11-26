@@ -1,8 +1,9 @@
 // Probe: lyrics flick return edge and gliding return (APP-4/APP-5 revision).
 //
-// LyricsPane is shared by the fullscreen lyrics overlay (scrollable) and the
-// lock card (scrollable: false), and a ListView with real delegates cannot be
-// flicked offscreen. So the probe reads the REAL LyricsPane.qml with XHR and
+// LyricsPane is shared by the bar island (reader-driven) and the lock card
+// (scrollable: false); the Player view now turns the gate off entirely. A
+// ListView with real delegates cannot be flicked offscreen. So the probe reads
+// the REAL LyricsPane.qml with XHR and
 // evaluates its OWN _follow / _centre / settleGuard body plus the view's
 // movement handlers in a headless QtObject with a stub view. The stub exposes
 // live `moving`, `flicking`, `contentY`, `atYBeginning`/`atYEnd` and a

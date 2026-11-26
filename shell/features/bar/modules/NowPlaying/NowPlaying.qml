@@ -34,9 +34,9 @@ CollapsibleSlot {
   readonly property var player: root.players.length > 0
     ? root.players[Math.min(root.playerIndex, root.players.length - 1)] ?? null
     : null
-  readonly property string title: root.player !== null ? root.player.trackTitle ?? "" : ""
-  readonly property string artist: root.player !== null ? root.player.trackArtist ?? "" : ""
-  readonly property string album: root.player !== null ? root.player.trackAlbum ?? "" : ""
+  readonly property string title: root.player !== null ? NP.displayText(root.player.trackTitle) : ""
+  readonly property string artist: root.player !== null ? NP.displayText(root.player.trackArtist) : ""
+  readonly property string album: root.player !== null ? NP.displayText(root.player.trackAlbum) : ""
   // The module is here for a registered client, whatever that client is
   // doing: the pill is the click target for the island, and a paused or idle
   // player is precisely what the island is there to be resumed from.

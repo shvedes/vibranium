@@ -71,16 +71,16 @@ Item {
     && root._lastReadyKey !== lyrics.trackKey
   readonly property bool lyricsUp: root.playing && root._lockPauseSettled
     && root.hasTrack && (lyrics.ready || root._lyricsBetweenTracks)
-  readonly property string title: root.player !== null ? root.player.trackTitle ?? "" : ""
-  readonly property string artist: root.player !== null ? root.player.trackArtist ?? "" : ""
-  readonly property string album: root.player !== null ? root.player.trackAlbum ?? "" : ""
+  readonly property string title: root.player !== null ? NP.displayText(root.player.trackTitle) : ""
+  readonly property string artist: root.player !== null ? NP.displayText(root.player.trackArtist) : ""
+  readonly property string album: root.player !== null ? NP.displayText(root.player.trackAlbum) : ""
   readonly property bool hasTrack: root.player !== null && root.title !== "" && root.player.playbackState !== MprisPlaybackState.Stopped
 
-  // Progress tracking: same idea as lib/ProgressBar.qml - discrete
-  // MPRIS position (polled) drives `shownPosition`, while the fill width
-  // (`progressRatio`) glides via a Behavior (lib/Glide, OutCubic) like
-  // the menu's numeric/range bars.
-  property real shownPosition: 0
+  // Progress tracking: same idea as lib/ProgressBar.qml - the live MPRIS
+  // position is read directly by `shownPosition`, with no local copy to keep
+  // in step. The fill width (`progressRatio`) glides via a Behavior
+  // (lib/Glide, OutCubic) like the menu's numeric/range bars.
+  readonly property real shownPosition: NP.reanchorPosition(root.player, root.lengthSec)
 
   // The player's own length, through the shared accessor the island and
   // MediaState read. Reading `player.length` raw makes a
@@ -95,20 +95,8 @@ Item {
   // the ProgressBar-compatible Behavior below.
   property real progressAppear: 0
 
-  function reanchor() {
-    root.shownPosition = NP.reanchorPosition(root.player, root.lengthSec)
-  }
-
-  onPlayerChanged: root.reanchor()
-  // Visibility belongs to the host, which gates on the setting and the track.
-  // The reveal is reset by onHasTrackChanged alone; this edge only re-anchors
-  // the position to the player that is actually on screen.
-  onVisibleChanged: {
-    root.reanchor()
-  }
   Component.onCompleted: {
     root._pinHead()
-    root.reanchor()
     // A pause-on-lock pause needs a beat to land. Hold only when there is a
     // playing client or the client list is not known yet; a paused lock or a
     // later play must not wait.
@@ -119,17 +107,15 @@ Item {
       progressAppearAnim.restart()
     }
   }
-  onLengthSecChanged: root.reanchor()
   onPlayingChanged: {
-    root.reanchor()
     if (!root.playing) root._lockPauseSettled = true
   }
 
   // Keep position fresh while playing - MPRIS only pushes on seeks, so the
-  // position needs a 1 Hz nudge. That nudge is the shared playback clock's
-  // tick, held only while this pill is tracking a playing client: the pill
-  // pins whichever client it shows, including the active one, because nothing
-  // else may tick that player while the lock holds it.
+  // binding needs a frame edge. That edge is the shared playback clock's tick,
+  // held only while this pill is tracking a playing client: the pill pins
+  // whichever client it shows, including the active one, because nothing else
+  // may drive that player while the lock holds it.
   PlaybackClockHold {
     wanted: root.playing && root.player !== null
   }
@@ -137,18 +123,6 @@ Item {
   Connections {
     target: PlaybackClock
     function onTick() { if (root.player) root.player.positionChanged() }
-  }
-
-  Connections {
-    target: root.player
-
-    function onPositionChanged() {
-      root.reanchor()
-    }
-
-    function onPlaybackStateChanged() {
-      root.reanchor()
-    }
   }
 
   // Remember the last sheet that was actually up. While the next track's

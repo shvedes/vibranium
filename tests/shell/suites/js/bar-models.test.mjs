@@ -1852,7 +1852,7 @@ group('the whole published surface is here, and it is the only copy', () => {
   // the assertion is the full surface: every documented helper publishes, and
   // the set is exactly these - which still catches a helper being dropped.
   const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualDir', 'peekManual', 'consumeManual']
-  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'dropPlayerIntents', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'reanchorPosition', 'scrubPosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked', 'parseLrc', 'lyricIndexAt', 'parsePlainLyrics', 'lyricsFromSearch', 'lyricsCacheKey', 'lyricsCacheGet', 'lyricsCachePut', 'lyricsCacheSize', 'lyricsCacheClear']
+  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'dropPlayerIntents', 'playerKey', 'displayText', 'playerPosition', 'playerLength', 'normalizePosition', 'reanchorPosition', 'scrubPosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked', 'parseLrc', 'lyricIndexAt', 'parsePlainLyrics', 'lyricsFromSearch', 'lyricsCacheKey', 'lyricsCacheGet', 'lyricsCachePut', 'lyricsCacheSize', 'lyricsCacheClear']
   for (const k of shared) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   for (const k of unique) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   is('BROWSER_TOKENS publishes the client table', CN.BROWSER_TOKENS, (v) => Array.isArray(v) && v.every((t) => t === String(t).toLowerCase()), 'lowercase tokens')
@@ -2345,6 +2345,17 @@ group('normalizePosition never lets the position outrun the length', () => {
   eq('a null length is no bound', CN.normalizePosition(5, null), 5)
   eq('both NaN', CN.normalizePosition(NaN, NaN), 0)
   eq('string fields are coerced', CN.normalizePosition('5', '10'), 5)
+})
+group('displayText folds MPRIS free text into one display line', () => {
+  eq('no field', CN.displayText(null), '')
+  eq('undefined field', CN.displayText(undefined), '')
+  eq('a plain title is unchanged', CN.displayText('Erase Your Social'), 'Erase Your Social')
+  eq('a newline becomes a space', CN.displayText('NOO! Guys\nreleased'), 'NOO! Guys released')
+  eq('a CRLF pair is one space', CN.displayText('first\r\nsecond'), 'first second')
+  eq('a tab and repeated spaces collapse', CN.displayText('a\t  b'), 'a b')
+  eq('the ends are trimmed', CN.displayText('  spaced  '), 'spaced')
+  eq('a unicode line separator folds too', CN.displayText('a\u2028b'), 'a b')
+  eq('a number still renders', CN.displayText(42), '42')
 })
 group('reanchorPosition is the player reading, clamped to a known length', () => {
   eq('no player', CN.reanchorPosition(null, 10), 0)

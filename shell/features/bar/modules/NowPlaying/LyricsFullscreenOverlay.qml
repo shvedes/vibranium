@@ -65,17 +65,28 @@ QtObject {
 
   readonly property bool animOn: MotionPolicy.enabled
   readonly property string artUrl: root.player !== null ? root.player.trackArtUrl ?? "" : ""
+  // One normalized reading per field: a client that puts newlines or repeated
+  // spaces in its metadata must not push the centred lines into the transport
+  // row or wrap the tooltip. All three consumers read these, not the raw tags.
+  readonly property string title: root.player !== null ? NP.displayText(root.player.trackTitle) : ""
+  readonly property string artist: root.player !== null ? NP.displayText(root.player.trackArtist) : ""
+  readonly property string album: root.player !== null ? NP.displayText(root.player.trackAlbum) : ""
   readonly property bool playing: root.player !== null
     && root.player.playbackState === MprisPlaybackState.Playing
   readonly property real lengthSec: NP.playerLength(root.player)
   readonly property bool canSeekPosition: NP.canSetPlayerPosition(root.player)
   // Transport, gated per client exactly as the island's pads are: a
   // capability the client publishes false refuses the write and dims its pad.
-  readonly property bool hasTrack: root.player !== null
-    && String(root.player.trackTitle ?? "") !== ""
+  readonly property bool hasTrack: root.title !== ""
   readonly property bool canTogglePlaying: root.player !== null
     && root.player.canTogglePlaying !== false
-  property real shownPosition: 0
+  // One displayed position, derived from the live player. A seek preview is
+  // the only imperative writer, and only while the finger owns the lane;
+  // outside a scrub there is no copy to fall stale. The clock's frame edge
+  // re-evaluates this binding, so the strip, the clock readout and the lyric
+  // cue all read the same value.
+  property real previewPosition: 0
+  readonly property real shownPosition: root._seeking ? root.previewPosition : NP.reanchorPosition(root.player, root.lengthSec)
   readonly property real progressRatio: root.lengthSec > 0
     ? Math.min(1, root.shownPosition / root.lengthSec) : 0
   // Click seeks ease, sustained drags snap: the pointer must travel past 6px
@@ -159,7 +170,6 @@ QtObject {
 
   function open(p) {
     root.player = p !== undefined ? p : null
-    root.reanchor()
     root.opened = true
     // LYR-2: focus is claimed on the window's real activation edge below, not
     // here. A speculative claim at open time fires before the toplevel is
@@ -174,21 +184,16 @@ QtObject {
     root.opened = false
   }
 
-  function reanchor() {
-    root.shownPosition = NP.reanchorPosition(root.player, root.lengthSec)
-  }
-
   // The one position-commit path. Every seek on this surface - lane click,
   // drag release, wheel step and the transcript's own seek requests - funnels
-  // through here: one gate, one clamp, one write of the player's position and
-  // the shown lane, one notify, one release of the drag. An optimistic adopt
-  // makes the lane jump at once; the daemon's notify corrects it a moment
-  // later. `scrubTo` stays the only preview writer of shownPosition.
+  // through here: one gate, one clamp, one write of the player's position, one
+  // notify, one release of the drag. The lane is derived from the player, so
+  // the write moves it at once; the daemon's notify corrects it a moment later.
+  // `scrubTo` owns the preview, and only until the drag ends.
   function commitSeek(seconds) {
     if (!root.canSeekPosition || root.player === null) return
     const t = Range.clamp(Number(seconds) || 0, 0, root.lengthSec)
     root.player.position = t
-    root.shownPosition = t
     root._seeking = false
     root.player.positionChanged()
   }
@@ -198,12 +203,12 @@ QtObject {
     root.commitSeek(NP.scrubPosition(x, w, root.lengthSec))
   }
 
-  // Scrub preview: moves the lane only, writes nothing. A per-move position
-  // write queues up in the player and replays after release, so a drag
-  // commits once, on release.
+  // Scrub preview: moves the preview the lane derives from, writes no player
+  // state. A per-move position write queues up in the player and replays after
+  // release, so a drag commits once, on release.
   function scrubTo(x, w) {
     if (!root.canSeekPosition || w <= 0) return
-    root.shownPosition = NP.scrubPosition(x, w, root.lengthSec)
+    root.previewPosition = NP.scrubPosition(x, w, root.lengthSec)
   }
 
   function seekTo(seconds) {
@@ -242,7 +247,6 @@ QtObject {
       // A toggle made in another bar's overlay is a cache write, and this is
       // the only read that follows it: the property itself is not a binding.
       root._readBackdrop()
-      root.reanchor()
     } else {
       // Teardown is an edge too: retire any staged fade so a later reopen of
       // the same track starts from a fully shown transcript.
@@ -259,11 +263,9 @@ QtObject {
   Component.onDestruction: root._holdStop()
   onPlayerChanged: {
     root._seeking = false
-    root.reanchor()
     // A client leaving the bus drops the surface into standby; the window
     // stays up so the next player can be adopted without another menu trip.
   }
-  onLengthSecChanged: root.reanchor()
   onStandbyChanged: if (root.standby) root.artExpanded = false
   // --- logind hold ---------------------------------------------------------
   //
@@ -400,9 +402,9 @@ QtObject {
     onClosing: root.close()
 
   // The transcript follows the shared playback clock the way the island does:
-  // one position advance per second while the client plays, plus the daemon's
-  // own notify. The pane holds the clock only while it is open on a playing
-  // client, so a sheet left closed costs no wakeup.
+  // one tick while the client plays, plus the daemon's own notify. The pane
+  // holds the clock only while it is open on a playing client, so a sheet left
+  // closed runs no driver at all.
   PlaybackClockHold {
     wanted: root.opened && root.playing && !root._seeking && root.player !== null
   }
@@ -414,11 +416,12 @@ QtObject {
 
   Connections {
     target: root.player
-
-    // A scrub owns the lane until release; notifies, including the poke
-    // seekAt makes, must not move it under the pointer.
-    function onPositionChanged() { if (!root._seeking) root.reanchor() }
-    function onPlaybackStateChanged() { root.reanchor() }
+    // Some clients answer "Previous" on the first track by restarting it
+    // without a new track identity. The stop/play edge re-reads the position
+    // so the fill and the lyric cue go back to the head with the audio. No
+    // local copy is written: shownPosition is still a binding on the player.
+    function onPlaybackStateChanged() { if (root.player) root.player.positionChanged() }
+    function onTrackChanged() { if (root.player) root.player.positionChanged() }
   }
 
   // Standby adopts the first usable client rather than waiting for another
@@ -747,27 +750,37 @@ QtObject {
         width: content.coverBoxW
         spacing: 2
 
-        Text {
+        // The same marquee the bar island uses: a title that overflows its
+        // column eases out and back instead of losing its tail. Its own gate is
+        // the window's visibility, never MotionPolicy - the reading aid has to
+        // keep working when shell motion is switched off.
+        ScrollLabel {
           width: parent.width
-          horizontalAlignment: Text.AlignHCenter
-          text: root.player ? String(root.player.trackTitle ?? "") : ""
+          height: implicitHeight
+          scrolling: root.opened
+          startPauseMs: 0
+          text: root.title
           color: Ui.tint("foreground_0", 0.95)
-          font.pixelSize: content.trackPx
-          font.family: Ui.fontFamily
-          font.bold: true
-          elide: Text.ElideRight
+          fontSize: content.trackPx
+          fontFamily: Ui.fontFamily
+          fontBold: true
+          horizontalAlignment: Text.AlignHCenter
           textFormat: Text.PlainText
+          opticalCenter: false
         }
 
-        Text {
+        ScrollLabel {
           width: parent.width
-          horizontalAlignment: Text.AlignHCenter
-          text: root.player ? String(root.player.trackArtist ?? "") : ""
+          height: implicitHeight
+          scrolling: root.opened
+          startPauseMs: 0
+          text: root.artist
           color: Ui.tint("foreground_1", 0.7)
-          font.pixelSize: content.artistPx
-          font.family: Ui.fontFamily
-          elide: Text.ElideRight
+          fontSize: content.artistPx
+          fontFamily: Ui.fontFamily
+          horizontalAlignment: Text.AlignHCenter
           textFormat: Text.PlainText
+          opticalCenter: false
         }
       }
 
@@ -947,13 +960,9 @@ QtObject {
                   }
                 }
 
-                Behavior on width {
-                  enabled: root.animOn && root.lengthSec > 0 && !root._seeking
-                  NumberAnimation {
-                    duration: Ui.normalMs
-                    easing.type: Easing.OutCubic
-                  }
-                }
+                // The width follows the clock directly. A Behavior here
+                // restarted its tween on every position tick and could never
+                // reach the target, leaving the fill empty.
               }
             }
 
@@ -977,10 +986,7 @@ QtObject {
                 else root.seekAt(mouse.x, width)
                 root._seeking = false
               }
-              onCanceled: {
-                root._seeking = false
-                root.reanchor()
-              }
+              onCanceled: root._seeking = false
             }
 
             WheelHandler {
@@ -1038,9 +1044,8 @@ QtObject {
           // A ready transcript is painted by the effect passes below: the pane
           // is their capture source, kept at zero opacity so the sharp and
           // blurred copies are the only transcript on screen. Zero (not
-          // invisible): the item still renders for the capture and still takes
-          // the reader's scroll and taps. Loading and error text stay on the
-          // pane itself.
+          // invisible): the item still renders for the capture, with its input
+          // handlers off. Loading and error text stay on the pane itself.
           opacity: pane.ready ? 0 : (pane.status === "none" || !root.hasTrack ? 0 : 1)
           // The placeholder carries its own fade, but this host hides the whole
           // pane on an answer: without a tween here "Getting lyrics..." leaves
@@ -1056,12 +1061,10 @@ QtObject {
           position: root.shownPosition
           active: root.opened
           playing: root.playing
-          seekable: root.canSeekPosition
-          // A presentation surface has nothing to dismiss back to, so a
-          // right-click stays inert and the reader's scroll is the only
-          // gesture that moves the transcript.
-          dismissable: false
-          scrollable: true
+          // A presentation surface is autonomous: the clock owns the
+          // transcript and the one gate takes every reader gesture away from
+          // it. Seeking stays on the transport lane, not on the words.
+          interactive: false
           textScale: content.lyricsScale
           onSeekRequested: seconds => root.seekTo(seconds)
         }

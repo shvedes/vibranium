@@ -39,10 +39,13 @@ Item {
   // drag should not take the transcript away from the current cue.
   property bool dismissable: true
   property bool scrollable: true
+  // An autonomous pane follows the clock alone: every input handler is off, so
+  // no hover, tap or scroll can move the transcript or claim the reader's pin.
+  property bool interactive: true
 
-  readonly property string title: root.player ? String(root.player.trackTitle ?? "") : ""
-  readonly property string artist: root.player ? String(root.player.trackArtist ?? "") : ""
-  readonly property string album: root.player ? String(root.player.trackAlbum ?? "") : ""
+  readonly property string title: root.player ? NP.displayText(root.player.trackTitle) : ""
+  readonly property string artist: root.player ? NP.displayText(root.player.trackArtist) : ""
+  readonly property string album: root.player ? NP.displayText(root.player.trackAlbum) : ""
   readonly property real lengthSec: NP.playerLength(root.player)
   // One identity per recording, normalized in the shared library, so the same
   // track on another client is the same sheet and a regroup inside a track
@@ -154,7 +157,18 @@ Item {
     }
     root._load()
   }
-  onPositionChanged: root._track()
+  // A transport restart moves the playhead backwards to the head of the same
+  // recording. Any reader pin from the previous pass is stale at that edge, so
+  // the transcript follows the cue back instead of holding the old scroll.
+  property real _lastPosition: 0
+  onPositionChanged: {
+    if (root.position + 0.5 < root._lastPosition) {
+      root._pinnedByUser = false
+      root._returnPending = false
+    }
+    root._lastPosition = root.position
+    root._track()
+  }
   // Several inputs ask for the same follow in one turn - a height step, a new
   // cue, a fresh sheet - and the height one arrives on every frame of the host
   // card's resize. One queued follow per turn is enough; `_centre` re-aims a
@@ -549,7 +563,7 @@ Item {
       transform: Translate { x: root._sheetX }
       opacity: root._sheetOpacity
       clip: true
-      interactive: root.scrollable
+      interactive: root.scrollable && root.interactive
       spacing: 6
       model: root.lines
       boundsBehavior: Flickable.StopAtBounds
@@ -590,6 +604,7 @@ Item {
       // next cue change free to pull them back. Scrolling the cue under the
       // middle again - or clicking a line, or a new sheet - releases it.
       onContentYChanged: {
+        if (!root.interactive) return
         if (root._placing || scrollTo.running || settleGuard.running
           || root._freshSheet) return
         if (view.contentHeight <= view.height) return
@@ -622,7 +637,7 @@ Item {
         // column reads as one line with context rather than as a list.
         color: index === root.currentIndex
           ? Ui.solid("accent")
-          : Ui.tint("foreground_1", lineHovered ? 0.65 : 0.4)
+          : Ui.tint("foreground_1", root.interactive && lineHovered ? 0.65 : 0.4)
 
         // The cue changing is a color handover as well as a scroll, so the
         // old line dims as the new one takes the accent instead of both
@@ -676,8 +691,9 @@ Item {
         // flickable has not claimed yet lands as a click on the row under the
         // pointer - a seek and a recentre instead of a scroll.
         TapHandler {
+          enabled: root.interactive
           acceptedButtons: Qt.LeftButton
-          cursorShape: root.seekable && root.synced ? Qt.PointingHandCursor : Qt.ArrowCursor
+          cursorShape: root.interactive && root.seekable && root.synced ? Qt.PointingHandCursor : Qt.ArrowCursor
           onTapped: {
             if (!root.seekable || !root.synced) return
             // Acting on a line asks for the clock to take the view back: the
@@ -689,6 +705,7 @@ Item {
         }
 
         HoverHandler {
+          enabled: root.interactive
           onHoveredChanged: line.lineHovered = hovered
         }
       }
@@ -779,9 +796,9 @@ Item {
     // the transcript and a left click does nothing.
     MouseArea {
       anchors.fill: parent
-      enabled: root.dismissable
+      enabled: root.dismissable && root.interactive
       acceptedButtons: Qt.RightButton
-      cursorShape: root.dismissable ? Qt.PointingHandCursor : Qt.ArrowCursor
+      cursorShape: root.interactive && root.dismissable ? Qt.PointingHandCursor : Qt.ArrowCursor
       onClicked: root.dismissed()
     }
   }
