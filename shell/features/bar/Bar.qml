@@ -885,6 +885,66 @@ Singleton {
     onFinished: root.entranceSlideDone = true
   }
 
+  // --- transient show reveal ---
+  //
+  // A visibility show replays the boot entrance: the strip travels in from
+  // the screen edge first, then every slot slidefades onto it. Boot's gate
+  // above stays one-shot for its milestones; this is a separate, re-armable
+  // clock so a toggle never re-runs boot construction or its played report.
+  //
+  // revealProgress is the contents half of that clock. It rests at 1, snaps
+  // to 0 when a show arms the reveal, then runs to 1 once the strip has
+  // landed. revealAnim owns the running write; _replayEntrance arms it and
+  // _resetReveal restores rest on a hide. Every slot reads this one value,
+  // so they cannot finish at different times.
+  //
+  // No Behavior on it: the arm is an imperative snap, and a Behavior cannot
+  // distinguish that snap from the release tween - both would animate, so
+  // the contents would fade out under the arriving strip.
+  property real revealProgress: 1
+
+  function _replayEntrance() {
+    // A hide set before the boot strip has landed has no entrance to replay;
+    // the boot animation still owns the travel in that case.
+    if (!MotionPolicy.enabled || !root.enabled || !root.entranceModulesReady) return
+    // Arm in this turn, alongside the window becoming visible: a ScriptAction
+    // would run on the next animation tick and paint one frame of the resting
+    // bar before the entrance starts.
+    root.revealProgress = 0
+    root.entranceSlide = root.entranceSlideFrom
+    revealAnim.restart()
+  }
+
+  function _resetReveal() {
+    revealAnim.stop()
+    root.revealProgress = 1
+  }
+
+  // entranceSlide is the single strip-travel value for both entrances. Boot's
+  // entranceSlideAnim owns it until the strip lands; this animation owns it
+  // after that, and _replayEntrance parks it in the turn the show arrives.
+  // The entranceModulesReady guard keeps the two owners from overlapping.
+  SequentialAnimation {
+    id: revealAnim
+
+    NumberAnimation {
+      target: root
+      property: "entranceSlide"
+      to: 0
+      duration: Ui.slowMs
+      easing.type: Easing.OutCubic
+    }
+
+    NumberAnimation {
+      target: root
+      property: "revealProgress"
+      from: 0
+      to: 1
+      duration: Ui.slowMs
+      easing.type: Easing.OutCubic
+    }
+  }
+
   // Is `kind` on the bar? The group walk remains so a group reintroduced by
   // a caller resolves its members through the key that holds the slot.
   function _inLayout(layout, kind) {
@@ -1653,6 +1713,10 @@ Singleton {
   onHideToggleChanged: {
     root.publishDesktopLayout()
     if (!root.effectiveEnabled) root.cancelBarMove()
+    // A transient show replays the boot entrance; a hide only parks it.
+    // The persistent enabled switch above never reaches this edge.
+    if (root.hideToggle) root._resetReveal()
+    else root._replayEntrance()
   }
   onEffectiveEnabledChanged: {
     root.publishDesktopLayout()

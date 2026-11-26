@@ -981,14 +981,25 @@ Item {
     // Boot entrance (intro below) multiplies this: during the boot hold
     // both are live (enter 1, intro 0 -> opacity 0), and once the bar's own
     // slide has landed intro carries the slidefade. Post-boot toggles ride
-    // enter alone.
-    opacity: slot.enter * slot.intro
+    // enter alone. A transient show uses revealIntro for the same slidefade
+    // without touching this factor.
+    opacity: slot.enter * slot.intro * slot.revealIntro
     // Boot slide: held above the bar (top) or below it (bottom) until
     // Bar releases the modules, then glides home with the fade above.
     // Position-driven, so a top/bottom flip mid-hold re-aims the travel;
-    // at rest (intro 1) this is 0 whatever the position is.
+    // at rest (intro 1) this is 0 whatever the position is. A show adds the
+    // reveal's own travel on the same axis, one step behind the strip.
     y: (1 - slot.intro) * slot.introOffset
+      + (1 - slot.revealIntro) * slot.introOffset
     readonly property real introOffset: Bar.position === "top" ? -Ui.s : Ui.s
+    // The contents half of a transient show's entrance, derived from the one
+    // Bar.revealProgress every slot reads. It rests at 1, snaps to 0 when the
+    // show arms (so the contents leave the screen in the same frame as the
+    // strip, with no fade-out), then runs to 1 once the strip has landed.
+    // No Behavior here: the arm must be a snap, and the release is paced by
+    // Bar's own animation.
+    readonly property real revealIntro: Bar.entranceWarmOpacity
+      + (1 - Bar.entranceWarmOpacity) * Bar.revealProgress
     // Boot entrance hold: 0 until the bar's strip has slid in AND this
     // slot's own Loader is Ready, then 1 together with every other held slot.
     // _bootHeld captures birth before the release - only those animate.
