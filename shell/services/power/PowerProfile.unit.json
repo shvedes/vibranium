@@ -1,0 +1,16 @@
+{
+  "id": "powerProfile",
+  "after": "systemUpdates",
+  "provider": "services",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch", "paths"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

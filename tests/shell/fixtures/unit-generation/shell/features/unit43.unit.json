@@ -1,0 +1,18 @@
+{
+  "id": "unit43",
+  "after": "unit42",
+  "provider": "features",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit42"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

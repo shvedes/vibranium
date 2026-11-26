@@ -1,0 +1,19 @@
+{
+  "id": "unit51",
+  "after": "unit50",
+  "provider": "bar",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit50"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": true,
+  "hooks": "shell/boot/unit51Hooks.qml"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "systemUpdates",
+  "after": "annotations",
+  "provider": "services",
+  "phase": "on_demand",
+  "activation": "gated_compat",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch", "paths"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

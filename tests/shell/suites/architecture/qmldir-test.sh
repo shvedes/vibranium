@@ -190,7 +190,15 @@ END {
     s = lines[n]
     sub(/^[ \t]*import[ \t]+/, "", s)
     k = split(s, w, /[ \t]+/)
-    if (w[2] == "as" && k >= 3 && w[1] ~ /^qs\./) {
+    # Quoted single-file hook imports are paths, not modules. They are
+    # recorded for the import resolver, which checks that the file exists,
+    # but they carry no qmldir membership contract here.
+    if (w[1] ~ /^"/ && w[2] == "as" && k >= 3) {
+      pathalias[w[3]] = 1
+      print "IMPORTS", self, n, "@path", w[3], "path", 0
+    } else if (w[1] ~ /^"/) {
+      print "IMPORTS", self, n, "@path", "-", "path", 0
+    } else if (w[2] == "as" && k >= 3 && w[1] ~ /^qs\./) {
       aliasmod[w[3]] = w[1]
       aliasline[w[3]] = n
       aliaslist[++nalias] = w[3]
@@ -465,12 +473,20 @@ t_note "$(count "$PRAGMA_FILES") files carry \`pragma Singleton\`; three of them
 each, so $(( $(count "$SINGLETON_FILES") + 3 )) singleton entries name $(count "$SINGLETON_FILES") files"
 
 # Every .qml beside a qmldir is declared in it, so a component cannot sit in a
-# module directory and be reachable only by accident.
+# module directory and be reachable only by accident. Authored hook modules are
+# the pinned exception: a declaration names the exact file next to its owner,
+# and generated handlers import that file by path, never through the module.
+HOOK_FILES="$WORK/hook-files.txt"
+grep -rh '"hooks"' --include='*.unit.json' "$SHELL_DIR" |
+  sed -n 's/.*"hooks"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
+  sed -n "s|^shell/|$SHELL_DIR/|p" | LC_ALL=C sort -u >"$HOOK_FILES"
+t_note "authored hook modules exempted by declaration: $(wc -l <"$HOOK_FILES" | tr -d ' ')"
 UNDECLARED_SIBLINGS="$WORK/undeclared-siblings.txt"
 : >"$UNDECLARED_SIBLINGS"
 for dir in $(cut -f1 "$QMLDIR_MODULE" | sort -u); do
   for f in "$dir"/*.qml; do
     [[ -e $f ]] || continue
+    grep -Fxq "$f" "$HOOK_FILES" && continue
     if ! awk -v want="$(basename "$f")" '$NF == want { found = 1; exit } END { exit(found ? 0 : 1) }' \
       "$dir/qmldir"; then
       printf '%s is not declared in %s\n' "$(rel_to_shell "$f")" \
@@ -493,8 +509,18 @@ ALIAS_READS="$(awk -F'|' '{ n += $8 } END { print n + 0 }' "$ALIAS_RECORDS")"
 ALIAS_SITES="$(awk -F'|' '{ print $2 "|" $4 "|" $6 }' "$ALIAS_RECORDS" | sort -u | wc -l | tr -d ' ')"
 ALIAS_FILES="$(cut -d'|' -f2 "$ALIAS_RECORDS" | sort -u | wc -l | tr -d ' ')"
 ALIAS_IMPORTS="$(awk -F'|' '$1 == "IMPORTS" && $6 == "alias"' "$RESOLVED" | wc -l | tr -d ' ')"
+GENERATED_ALIAS_IMPORTS="$(awk -F'|' -v g="$SHELL_DIR/boot/generated/" \
+  '$1 == "IMPORTS" && $6 == "alias" && index($2, g) == 1' "$RESOLVED" | wc -l | tr -d ' ')"
+AUTHORED_ALIAS_IMPORTS=$((ALIAS_IMPORTS - GENERATED_ALIAS_IMPORTS))
 t_ne "the resolver found member reads through an alias" "0" "$ALIAS_READS"
-t_count "the tree has 33 aliased \`import qs.* as Alias\` lines" "32" "$ALIAS_IMPORTS"
+# The generated provider types add aliased qs imports from validated
+# declarations, so their number moves with the declaration set. The authored
+# tree is pinned; every generated alias still goes through the same
+# declaration check below, so a new alias cannot hide in the moving figure.
+t_count "the authored tree has 32 aliased \`import qs.* as Alias\` lines" "32" \
+  "$AUTHORED_ALIAS_IMPORTS"
+t_note "$GENERATED_ALIAS_IMPORTS aliased imports come from the five generated provider types; \
+all resolve through the module table below"
 t_note "$ALIAS_READS reads through $ALIAS_SITES alias/module pairs, across $ALIAS_FILES files; \
 $((ALIAS_IMPORTS - ALIAS_SITES)) of the $ALIAS_IMPORTS aliased imports is never read"
 
@@ -535,12 +561,31 @@ done
 sort -u -o "$IMPORTED_MODULES" "$IMPORTED_MODULES"
 
 # A relative import is the other way in, and every one must be a .js library
-# rather than a directory: a directory import would sidestep the qmldir.
+# rather than a directory: a directory import would sidestep the qmldir. Two
+# pinned forms are exempt. The five provider-private generated directories are
+# keyed by owning source and exact import string; a single-file hook import is
+# a QML file next to its owner, admitted only when that exact file exists.
+# No general directory exemption is granted.
+GENERATED_DIR_IMPORTS='boot/Boot.qml -> generated/floor|generated/bar|generated/demand; boot/BootServices.qml -> generated/services; boot/BootLate.qml -> generated/features'
 RELATIVE_NONJS="$WORK/relative-nonjs.txt"
+: >"$RELATIVE_NONJS"
 while IFS= read -r qml; do
-  sed -n 's/^[[:space:]]*import[[:space:]]*"\([^"]*\)".*/\1/p' "$qml"
-done <"$QML_FILES" | grep -v '\.js$' | sort -u >"$RELATIVE_NONJS"
-t_eq "every relative import is a .js library, not a directory" "" "$(cat "$RELATIVE_NONJS")"
+  while IFS= read -r hit; do
+    entry="$(rel_to_shell "$qml"): $hit"
+    case "$entry" in
+      'boot/Boot.qml: generated/floor'|'boot/Boot.qml: generated/bar'| \
+      'boot/Boot.qml: generated/demand'|'boot/BootServices.qml: generated/services'| \
+      'boot/BootLate.qml: generated/features') continue ;;
+    esac
+    if [[ $hit == *.qml && -f "$(dirname "$qml")/$hit" ]]; then
+      continue
+    fi
+    printf '%s\n' "$entry" >>"$RELATIVE_NONJS"
+  done < <(sed -n 's/^[[:space:]]*import[[:space:]]*"\([^"]*\)".*/\1/p' "$qml" | grep -v '\.js$')
+done <"$QML_FILES"
+sort -u -o "$RELATIVE_NONJS" "$RELATIVE_NONJS"
+t_eq "every relative import is a .js library, a real hook file or a pinned generated directory ($GENERATED_DIR_IMPORTS)" \
+  "" "$(cat "$RELATIVE_NONJS")"
 
 # --------------------------------------------------------------------------
 # 6. the contract: a bare member use from an unaliased import
@@ -602,17 +647,23 @@ t_eq "no bare \`Timer\` is shadowed by an unaliased qs.services or bar Timer imp
 # 7. boot/Boot.qml, the composition root
 # --------------------------------------------------------------------------
 
-t_section "boot/Boot.qml reads through Common. (Services. lives in BootLate.qml)"
+t_section "boot/Boot.qml: module aliases are declared, path aliases are pinned"
 
 BOOT_QML="$SHELL_DIR/boot/Boot.qml"
 t_file "boot/Boot.qml exists" "$BOOT_QML"
 BOOT_ALIASES="$(awk -F'|' -v b="$BOOT_QML" '$1 == "IMPORTS" && $2 == b && $6 == "alias" { print $5 }' \
   "$RESOLVED" | sort -u | tr '\n' ' ')"
-t_eq "the aliases Boot.qml imports" "Common " "$BOOT_ALIASES"
+t_eq "the module aliases Boot.qml imports" "Common " "$BOOT_ALIASES"
+# The migrated boot-owned rows are reached through quoted single-file or
+# pinned-directory aliases, not through qs module members. Their exact set is
+# pinned here so an accidental new module import cannot hide behind that move.
+BOOT_PATH_ALIASES="$(awk -F'|' -v b="$BOOT_QML" '$1 == "IMPORTS" && $2 == b && $6 == "path" { print $5 }' \
+  "$RESOLVED" | sort -u | tr '\n' ' ')"
+t_eq "the path aliases Boot.qml imports" "Adapter BootTrace GeneratedBar GeneratedDemand GeneratedFloor Protocol Units " \
+  "$BOOT_PATH_ALIASES"
 BOOT_READS="$WORK/boot-reads.tsv"
 awk -F'|' -v b="$BOOT_QML" '$1 == "ALIAS" && $2 == b' "$RESOLVED" | sort >"$BOOT_READS"
-t_ne "Boot.qml reads members through its aliases" "0" "$(count "$BOOT_READS")"
-t_note "Boot.qml: $(awk -F'|' '{ printf "%s.%s ", $4, $5 }' "$BOOT_READS")"
+t_note "Boot.qml module-alias member reads: $(awk -F'|' '{ printf "%s.%s ", $4, $5 }' "$BOOT_READS")"
 while IFS='|' read -r _b_kind b_file b_line b_alias b_member b_module _b_status _b_reads; do
   [[ -n $b_file ]] || continue
   t_contains "Boot.qml:$b_line $b_alias.$b_member is declared in $b_module" \

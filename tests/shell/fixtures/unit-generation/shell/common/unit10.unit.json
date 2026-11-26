@@ -1,0 +1,18 @@
+{
+  "id": "unit10",
+  "after": "unit09",
+  "provider": "floor",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit09"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

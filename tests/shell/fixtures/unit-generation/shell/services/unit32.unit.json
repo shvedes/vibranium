@@ -1,0 +1,18 @@
+{
+  "id": "unit32",
+  "after": "unit31",
+  "provider": "services",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit31"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

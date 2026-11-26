@@ -15,6 +15,9 @@ import qs.features.wallpaper
 import qs.boot
 import qs.features.bar.control
 import qs.features.colorPicker
+import "generated/floor" as GeneratedFloor
+import "generated/bar" as GeneratedBar
+import "generated/demand" as GeneratedDemand
 // NOTE: qs.services and the other qs.features.* modules are imported by the
 // late halves, not here. Importing a module loads its whole file set before
 // anything paints, so every module named here is on the time-to-paint path.
@@ -51,6 +54,13 @@ Item {
   }
 
   readonly property var _catalog: Adapter.descriptors(boot)
+
+  // Generated dispatch maps for the ids this component owns. Each row is
+  // inert until its id is demanded; hook instances receive this Boot so the
+  // bar runtime and the annotation loader are reached only from resolve().
+  property var floorHandlers: GeneratedFloor.FloorHandlers { boot: boot }
+  property var barHandlers: GeneratedBar.BarHandlers { boot: boot }
+  property var demandHandlers: GeneratedDemand.DemandHandlers { boot: boot }
 
   property var _queue: []
   property var _deferredQueue: []
@@ -1137,30 +1147,26 @@ Item {
     return ""
   }
 
-  // Floor, Phase-1 and demand-driven resolvers. Everything else is a late
-  // unit and goes through BootLate (see _lateResolve): naming those
-  // singletons here would import their modules and load their whole file
-  // sets before first paint.
+  // Boot owns the floor, bar and demand rows. They are checked in that order;
+  // an id in none of them goes to the late halves. Keeping the lookup to those
+  // three maps is what leaves stash/replay and adoption order unchanged for
+  // services and feature ids.
+  function _ownedHandler(id) {
+    if (Object.prototype.hasOwnProperty.call(floorHandlers.handlers, id)) return floorHandlers.handlers[id]
+    if (Object.prototype.hasOwnProperty.call(barHandlers.handlers, id)) return barHandlers.handlers[id]
+    if (Object.prototype.hasOwnProperty.call(demandHandlers.handlers, id)) return demandHandlers.handlers[id]
+    return null
+  }
+
   function _resolveDescriptor(id) {
-    switch (id) {
-      case "log":              void Log.tag; break
-      case "paths":            void Paths.home; break
-      case "watch":            void Watch.tag; break
-      case "settings":         void Settings.tag; break
-      case "hyprlandSettings": void HyprlandSettings.tag; break
-      case "miscSettings":     void MiscSettings.tag; break
-      case "systemFont":       void SystemFont.tag; break
-      case "theme":            void Theme.tag; break
-      case "ui":               void Ui.primaryScreen; break
-      case "icons":            void Icons.tag; break
-      case "exec":             void Exec.run; break
-      case "state":            void Common.AppState.tag; break
-      case "wallpaper":        void Wallpaper.enabled; break
-      case "bar":              return boot._mountBarRuntime()
-      case "annotations":      annotationLoader.active = true; break
-      default:                  return boot._lateResolve(id)
+    const row = boot._ownedHandler(id)
+    if (row) {
+      // The bar is the only owned row that can refuse: with the master switch
+      // off there is no runtime to mount, and false is that gate answer.
+      if (row.resolve() === false) return false
+      return true
     }
-    return true
+    return boot._lateResolve(id)
   }
 
   // Late-unit dispatch. A demand that lands before its half has loaded is
@@ -1196,30 +1202,23 @@ Item {
   }
 
   // Boot-owned readiness/teardown kept local to Boot after the catalog
-  // extraction. The catalog adapter's wrappers call these; every other id
-  // falls through to the provider dispatchers above, so provider ownership and
-  // demand/replay order are unchanged.
+  // extraction. The catalog adapter's wrappers call these; the generated rows
+  // carry only the predicates and releases their declarations require, and
+  // every other id falls through to the late provider dispatchers, so provider
+  // ownership and demand/replay order are unchanged.
   function _unitReady(id) {
-    switch (id) {
-      case "log":              return Log.ready === true
-      case "paths":            return typeof Paths.home === "string" && Paths.home !== ""
-      case "watch":            return typeof Watch.tag === "string" && Watch.tag !== ""
-      case "settings":         return Settings.ready === true
-      case "hyprlandSettings": return HyprlandSettings.ready === true
-      case "miscSettings":     return MiscSettings.ready === true
-      case "icons":            return Icons.ready === true
-      case "bar":              return boot._barRuntimeItem !== null
-      case "annotations":      return boot._annotationsReady()
-      default:                 return boot._lateReady(id)
-    }
+    const row = boot._ownedHandler(id)
+    if (row && row.ready) return row.ready() === true
+    return boot._lateReady(id)
   }
 
   function _unitTeardown(id) {
-    switch (id) {
-      case "bar":         boot._unmountBarRuntime(); return
-      case "annotations": boot._teardownAnnotations(); return
-      default:            boot._lateTeardown(id); return
+    const row = boot._ownedHandler(id)
+    if (row && row.teardown) {
+      row.teardown()
+      return
     }
+    boot._lateTeardown(id)
   }
 
   // Rebuild the diagnostic report. Called by the verbs that read it, never by
@@ -1422,6 +1421,12 @@ Item {
       return result.state === "failed" ? false : "pending"
     }
     return false
+  }
+
+  // The demand provider reaches the loader through Boot, which keeps the
+  // controller component supply in the late half.
+  function _activateAnnotations() {
+    annotationLoader.active = true
   }
 
   function _annotationsReady() {

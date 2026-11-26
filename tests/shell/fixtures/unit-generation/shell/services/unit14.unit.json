@@ -1,0 +1,19 @@
+{
+  "id": "unit14",
+  "after": "unit13",
+  "provider": "services",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit13"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": false,
+  "hooks": "shell/services/unit14Hooks.qml"
+}

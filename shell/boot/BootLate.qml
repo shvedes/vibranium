@@ -19,6 +19,7 @@ import qs.features.pickers.cursor
 import qs.features.pickers.font
 import qs.features.wallpaperPicker
 import qs.features.powerMenu
+import "generated/features" as Generated
 
 // Feature half of the late boot: the feature modules nothing on the first
 // screen needs (menu, launcher, apps, pickers, annotations, notifications,
@@ -47,107 +48,14 @@ Item {
   // it so the gate bookkeeping stays in one place.
   property var boot: null
 
-  // One row per owned id. Each resolve closure is the former case body, and
-  // ready/teardown carry the predicates and controller releases that used to
-  // live in the other two switches. The table itself runs no singleton code.
-  property var handlers: ({
-    "clipboard": {
-      resolve: function() { void Clipboard.tag },
-      ready: null,
-      teardown: null
-    },
-    "osd": {
-      resolve: function() { void OSD.tag },
-      ready: null,
-      teardown: null
-    },
-    "notifications": {
-      resolve: function() { void Notifications.tag },
-      ready: function() { return Notifications.tag === "notifications" },
-      teardown: null
-    },
-    "menu": {
-      resolve: function() { void Menu.tag },
-      ready: null,
-      teardown: null
-    },
-    "app": {
-      resolve: function() { void AppHost.tag },
-      ready: function() { return AppHost.tag === "app" },
-      teardown: null
-    },
-    "appLauncher": {
-      resolve: function() { void AppLauncher.tag },
-      ready: function() { return AppLauncher.facadeReady === true },
-      teardown: function() { AppLauncher.teardownController() }
-    },
-    "polkit": {
-      resolve: function() { void Polkit.tag },
-      ready: null,
-      teardown: null
-    },
-    "emojiPicker": {
-      resolve: function() { void EmojiPicker.tag },
-      ready: null,
-      teardown: null
-    },
-    "keybindings": {
-      resolve: function() { void Keybindings.tag },
-      ready: null,
-      teardown: null
-    },
-    "themePicker": {
-      resolve: function() { void ThemePicker.tag },
-      ready: null,
-      teardown: null
-    },
-    "themeRemover": {
-      resolve: function() { void ThemeRemover.tag },
-      ready: null,
-      teardown: null
-    },
-    "cursorPicker": {
-      resolve: function() { void CursorPicker.tag },
-      ready: null,
-      teardown: null
-    },
-    "wallpaperPicker": {
-      resolve: function() { void WallpaperPicker.tag },
-      ready: null,
-      teardown: null
-    },
-    "fontPicker": {
-      resolve: function() { void FontPicker.tag },
-      ready: null,
-      teardown: null
-    },
-    "pass": {
-      resolve: function() {
-        void Pass.tag
-        late._observePass()
-      },
-      ready: function() { return Pass.facadeReady === true },
-      teardown: function() { Pass.teardownController() }
-    },
-    "audioMixer": {
-      resolve: function() { void AudioMixer.tag },
-      ready: function() { return AudioMixer.facadeReady === true },
-      teardown: function() { AudioMixer.teardownController() }
-    },
-    "imageViewer": {
-      resolve: function() { void ImageViewer.tag },
-      ready: function() { return ImageViewer.facadeReady === true },
-      teardown: function() { ImageViewer.teardownController() }
-    },
-    "powerMenu": {
-      resolve: function() { void PowerMenu.tag },
-      ready: null,
-      teardown: null
-    }
-  })
+  // Generator-owned rows for every id this half owns. Constructed
+  // synchronously in this provider's adoption turn and inert until a generated
+  // id is demanded.
+  property var generatedHandlers: Generated.FeaturesHandlers { boot: boot }
 
   function handler(id) {
-    return Object.prototype.hasOwnProperty.call(handlers, id) ? handlers[id] : null
+    if (Object.prototype.hasOwnProperty.call(generatedHandlers.handlers, id)) return generatedHandlers.handlers[id]
+    return null
   }
 
   function resolve(id) {
@@ -176,24 +84,5 @@ Item {
   }
   function annotationComponent() {
     return annotationComp
-  }
-
-  // An observation edge, attached when the unit is first resolved rather than
-  // when this half is constructed. A Connections element evaluates `target`
-  // at creation, so `target: Pass` here instantiated the singleton the moment
-  // _adoptLate built this object - before its turn and inside the window the
-  // split exists to keep clear. Boot refreshes each unit right after
-  // resolve(), so the initial state needs no connection; this only carries
-  // later transitions.
-  function _observePass() {
-    if (passConnection.target === null) passConnection.target = Pass
-  }
-
-  Connections {
-    id: passConnection
-    target: null
-    function onInitializedChanged() {
-      if (late.boot) late.boot._refreshUnit("pass")
-    }
   }
 }

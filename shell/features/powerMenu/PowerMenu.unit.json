@@ -1,0 +1,16 @@
+{
+  "id": "powerMenu",
+  "after": "tools",
+  "provider": "features",
+  "phase": "deferred",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch", "menu", "session"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

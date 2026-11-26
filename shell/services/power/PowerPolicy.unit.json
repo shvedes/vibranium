@@ -1,0 +1,16 @@
+{
+  "id": "powerPolicy",
+  "after": "printers",
+  "provider": "services",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch", "paths", "powerProfile"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

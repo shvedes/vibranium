@@ -1,0 +1,17 @@
+{
+  "id": "screenshots",
+  "after": "connectivity",
+  "provider": "services",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "paths", "state", "watch"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": false,
+  "hooks": "shell/services/screenshots/ScreenshotsUnitHooks.qml"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "wallpaperPicker",
+  "after": "cursorPicker",
+  "provider": "features",
+  "phase": "deferred",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch", "paths", "theme"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

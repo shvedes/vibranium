@@ -1,0 +1,17 @@
+{
+  "id": "exec",
+  "after": "icons",
+  "provider": "floor",
+  "phase": "floor",
+  "activation": "eager",
+  "criticality": "essential",
+  "dependencies": ["paths"],
+  "retry": {
+    "maxAttempts": 0,
+    "backoffMs": 0,
+    "maxBackoffMs": 1000
+  },
+  "hasReady": false,
+  "hasTeardown": false,
+  "ref": "Exec.run"
+}

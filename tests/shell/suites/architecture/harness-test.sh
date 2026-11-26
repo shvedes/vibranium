@@ -236,6 +236,18 @@ if _mismatch_for "$REQUIRED_QUICKSHELL_VERSION" "0.0.0"; then
 else
   t_no "an impossible Qt version is reported as a mismatch" "platform_mismatch returned clean"
 fi
+# The gate is an exact pin, not a "same minor is close enough" check. These
+# cases keep a future relaxation from passing silently: a wrong major, a wrong
+# minor, a bogus string and even a different patch of the pinned minor must all
+# still be reported as mismatches.
+t_eq "the gate rejects a Qt version from another major" "0" \
+  "$(_mismatch_for "$REQUIRED_QUICKSHELL_VERSION" "5.12.1" >/dev/null; echo $?)"
+t_eq "the gate rejects a Qt version from another minor" "0" \
+  "$(_mismatch_for "$REQUIRED_QUICKSHELL_VERSION" "6.11.1" >/dev/null; echo $?)"
+t_eq "the gate rejects a bogus Qt version" "0" \
+  "$(_mismatch_for "$REQUIRED_QUICKSHELL_VERSION" "not-a-version" >/dev/null; echo $?)"
+t_eq "the gate compares patch releases, so 6.12.0 is not $REQUIRED_QT_VERSION" "0" \
+  "$(_mismatch_for "$REQUIRED_QUICKSHELL_VERSION" "6.12.0" >/dev/null; echo $?)"
 t_eq "the gate compares patch releases, so 0.3.0 is not $REQUIRED_QUICKSHELL_VERSION" "0" \
   "$(_mismatch_for "0.3.0" "$REQUIRED_QT_VERSION" >/dev/null; echo $?)"
 t_note "hasVersion()/hasQtVersion() are deliberately not used as the gate: they do not verify patch releases, so a different patch would still satisfy the pin"

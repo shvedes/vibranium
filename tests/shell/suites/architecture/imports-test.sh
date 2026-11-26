@@ -101,8 +101,14 @@ FNR == 1 {
     print file "\t" n "\treljs\t" s
   }
   if (line ~ /^[ \t]*import[ \t]+"/) {
-    s = line; sub(/^[ \t]*import[ \t]+"/, "", s); sub(/".*$/, "", s)
+    full = line; sub(/^[ \t]*import[ \t]+"/, "", full)
+    s = full; sub(/".*$/, "", s)
     print file "\t" n "\trelqml\t" s
+    al = ""
+    if (full ~ /^[^"]*"[ \t]+as[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*$/) {
+      al = full; sub(/^[^"]*"[ \t]+as[ \t]+/, "", al); sub(/[ \t]*$/, "", al)
+    }
+    if (al != "" && !(al in alias)) alias[al] = "@rel:" s
   }
   if (line ~ /^[ \t]*import[ \t]+[A-Za-z_][A-Za-z0-9_.]*/) {
     s = line; sub(/^[ \t]*import[ \t]+/, "", s)
@@ -145,6 +151,17 @@ BEGIN {
   while ((getline ln < modfile) > 0) { split(ln, a, "\t"); moddir[a[1]] = a[2] }
   while ((getline ln < alfile) > 0) { split(ln, a, "\t"); aliasmod[a[1] SUBSEP a[2]] = a[3] }
   while ((getline ln < exfile) > 0) exists[ln] = 1
+  # Provider-private directory imports: the five relative directories admitted
+  # anywhere in the tree. A source, its exact import string and the pinned
+  # generated QML inside the target directory must all agree, so an arbitrary
+  # directory or a nonexistent path is still missing. None of the five has a
+  # qmldir by design. Authored hook modules are single files and are admitted
+  # by normal file existence below, never as unpinned directories.
+  pair["shell/boot/Boot.qml" SUBSEP "generated/floor"] = "FloorHandlers.qml"
+  pair["shell/boot/Boot.qml" SUBSEP "generated/bar"] = "BarHandlers.qml"
+  pair["shell/boot/Boot.qml" SUBSEP "generated/demand"] = "DemandHandlers.qml"
+  pair["shell/boot/BootServices.qml" SUBSEP "generated/services"] = "ServicesHandlers.qml"
+  pair["shell/boot/BootLate.qml" SUBSEP "generated/features"] = "FeaturesHandlers.qml"
 }
 function norm(p,   sp, parts, stack, top, i, out) {
   sp = split(p, parts, "/")
@@ -171,10 +188,23 @@ function norm(p,   sp, parts, stack, top, i, out) {
     target = norm(base "/" d4)
     if (target in exists) tkind = "file"
     else if (target "/qmldir" in exists) tkind = "dir"
+    else if (kind == "relqml" && (src SUBSEP d4) in pair &&
+             (target "/" pair[src SUBSEP d4]) in exists) tkind = "dir"
     else tkind = "missing"
   } else if (kind == "member") {
     am = aliasmod[src SUBSEP e[4]]
     if (am == "") tkind = "noalias"
+    else if (am ~ /^@rel:/) {
+      base = src; sub(/\/[^\/]*$/, "", base)
+      reldir = norm(base "/" substr(am, 6))
+      if (reldir in exists) { target = reldir; tkind = "relfile" }
+      else if ((src SUBSEP substr(am, 6)) in pair &&
+               e[5] ".qml" == pair[src SUBSEP substr(am, 6)] &&
+               (reldir "/" e[5] ".qml") in exists) {
+        target = reldir "/" e[5] ".qml"
+        tkind = "reldir"
+      } else tkind = "missing"
+    }
     else if (am in moddir) { target = moddir[am]; tkind = "module" }
     else if (am ~ /^Qt[.A-Z]/ || am ~ /^Quickshell([.]|$)/) tkind = "external"
     else tkind = "unknown-module"
@@ -265,6 +295,36 @@ t_eq "no .qml file uses the .import form" \
 t_note "the .qml-to-library edge is the directory-relative form instead: $(awk -F'\t' '$3 == "relqml"' "$WORK/resolved.tsv" | wc -l | tr -d ' ') of them, all resolved"
 t_true "and at least one library is reached that way" \
   test "$(awk -F'\t' '$3 == "relqml"' "$WORK/resolved.tsv" | wc -l)" -gt 0
+
+# --------------------------------------------------------------------------
+t_section "single-file hook imports resolve as files, never as directories"
+# A generated handler reads an authored hook through `import "path/Hook.qml"
+# as Hook`. The alias is resolved by the same table as a module alias, but its
+# target must be one real file. The five provider directories are the only
+# relative directories, each pinned to its owner and one QML type.
+zero "no member read through a relative alias points at a missing file" \
+  '$3 == "member" && $6 == "missing"'
+t_note "relative member reads: $(awk -F'\t' '$3 == "member" && ($6 == "relfile" || $6 == "reldir")' \
+  "$WORK/resolved.tsv" | wc -l | tr -d ' ')"
+t_eq "every relative directory import is one of the five pinned owner edges" "5" \
+  "$(awk -F'\t' '$3 == "relqml" && $6 == "dir"' "$WORK/resolved.tsv" | wc -l | tr -d ' ')"
+t_eq "the pinned directory imports name the exact five owner/type pairs" \
+  "shell/boot/Boot.qml generated/bar BarHandlers.qml
+shell/boot/Boot.qml generated/demand DemandHandlers.qml
+shell/boot/Boot.qml generated/floor FloorHandlers.qml
+shell/boot/BootLate.qml generated/features FeaturesHandlers.qml
+shell/boot/BootServices.qml generated/services ServicesHandlers.qml" \
+  "$(awk -F'\t' '$3 == "relqml" && $6 == "dir" { print $1, $4 }' "$WORK/resolved.tsv" |
+     while read -r src dir; do
+       case "$src $dir" in
+         "shell/boot/Boot.qml generated/floor") printf '%s %s %s\n' "$src" "$dir" FloorHandlers.qml ;;
+         "shell/boot/Boot.qml generated/bar") printf '%s %s %s\n' "$src" "$dir" BarHandlers.qml ;;
+         "shell/boot/Boot.qml generated/demand") printf '%s %s %s\n' "$src" "$dir" DemandHandlers.qml ;;
+         "shell/boot/BootServices.qml generated/services") printf '%s %s %s\n' "$src" "$dir" ServicesHandlers.qml ;;
+         "shell/boot/BootLate.qml generated/features") printf '%s %s %s\n' "$src" "$dir" FeaturesHandlers.qml ;;
+         *) printf '%s %s <UNPINNED>\n' "$src" "$dir" ;;
+       esac
+     done | LC_ALL=C sort)"
 
 # --------------------------------------------------------------------------
 t_section "a member read resolves through its alias to a module that exists"

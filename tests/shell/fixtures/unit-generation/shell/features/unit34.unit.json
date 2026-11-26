@@ -1,0 +1,19 @@
+{
+  "id": "unit34",
+  "after": "unit33",
+  "provider": "features",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit33"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false,
+  "ref": "SyntheticFeature.tag"
+}

@@ -13,11 +13,14 @@ TESTS_DIR="$(dirname "$TESTS_SHELL_DIR")"
 VIBRANIUM_DIR="$(dirname "$TESTS_DIR")"
 SHELL_DIR="$VIBRANIUM_DIR/shell"
 
-# The pinned platform, from shell/README.md. A different pair is a platform
-# gate failure, not a silent "probably fine": the suites below assert on
-# behavior that was written against this exact Quickshell and Qt.
+# The pinned platform. Qt 6.12.1 is the host toolchain the suites' exact
+# baselines were measured against (see suites/static/qmllint-test.sh): patch
+# releases are not interchangeable here, since 6.12.1 emits different qmllint
+# diagnostics from 6.12.0. A different pair is a platform gate failure, not a
+# silent "probably fine": the suites below assert on behavior that was written
+# against this exact Quickshell and Qt.
 REQUIRED_QUICKSHELL_VERSION="0.3.2"
-REQUIRED_QT_VERSION="6.12.0"
+REQUIRED_QT_VERSION="6.12.1"
 
 QMLLINT_BIN="${QMLLINT_BIN:-/usr/lib/qt6/bin/qmllint}"
 

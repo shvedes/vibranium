@@ -1,0 +1,16 @@
+{
+  "id": "mediaArt",
+  "after": "audio",
+  "provider": "services",
+  "phase": "deferred",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch", "audio"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

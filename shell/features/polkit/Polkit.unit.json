@@ -1,0 +1,16 @@
+{
+  "id": "polkit",
+  "after": "update",
+  "provider": "features",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "theme", "ui", "state", "watch", "session"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

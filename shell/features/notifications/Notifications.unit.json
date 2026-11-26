@@ -1,0 +1,17 @@
+{
+  "id": "notifications",
+  "after": "osd",
+  "provider": "features",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "theme", "ui", "state", "privacy"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": false,
+  "hooks": "shell/features/notifications/NotificationsUnitHooks.qml"
+}

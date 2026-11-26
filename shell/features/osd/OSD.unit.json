@@ -1,0 +1,16 @@
+{
+  "id": "osd",
+  "after": "bar",
+  "provider": "features",
+  "phase": "entrance",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "theme", "ui", "state"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

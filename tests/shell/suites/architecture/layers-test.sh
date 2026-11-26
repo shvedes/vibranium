@@ -22,9 +22,16 @@
 #   module  `import qs.x` / `import qs.x as A`  -> the module named by the
 #                                                   qmldir whose module line
 #                                                   is `module qs.x`
-#   relqml  `import "path"` inside a .qml       -> a file relative to the source
+#   relqml  `import "path"` inside a .qml       -> a file relative to the source,
+#                                                  or one of the five pinned
+#                                                  generated provider-private
+#                                                  directories; a single-file
+#                                                  hook import is just a file
 #   reljs   `.import "path"` inside a .js       -> a sibling file
-#   member  `A.member`, A a module alias        -> a member of that module
+#   member  `A.member`, A an alias              -> a member of that module, a
+#                                                  type in a pinned relative
+#                                                  directory, or a type reached
+#                                                  through a single-file alias
 #
 # Qt and Quickshell imports are marked external: they name no qmldir in the
 # tree, they belong to no layer, and they cannot violate a direction rule. All
@@ -72,12 +79,24 @@ FNR == 1 {
   body[n] = $0
   line = $0
   if (line ~ /^[ \t]*\.import[ \t]+"/) {
-    s = line; sub(/^[ \t]*\.import[ \t]+"/, "", s); sub(/".*$/, "", s)
+    full = line; sub(/^[ \t]*\.import[ \t]+"/, "", full)
+    s = full; sub(/".*$/, "", s)
     print file "\t" n "\treljs\t" s
+    al = ""
+    if (full ~ /^[^"]*"[ \t]+as[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*$/) {
+      al = full; sub(/^[^"]*"[ \t]+as[ \t]+/, "", al); sub(/[ \t]*$/, "", al)
+    }
+    if (al != "" && !(al in alias)) alias[al] = "@rel:" s
   }
   if (line ~ /^[ \t]*import[ \t]+"/) {
-    s = line; sub(/^[ \t]*import[ \t]+"/, "", s); sub(/".*$/, "", s)
+    full = line; sub(/^[ \t]*import[ \t]+"/, "", full)
+    s = full; sub(/".*$/, "", s)
     print file "\t" n "\trelqml\t" s
+    al = ""
+    if (full ~ /^[^"]*"[ \t]+as[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*$/) {
+      al = full; sub(/^[^"]*"[ \t]+as[ \t]+/, "", al); sub(/[ \t]*$/, "", al)
+    }
+    if (al != "" && !(al in alias)) alias[al] = "@rel:" s
   }
   if (line ~ /^[ \t]*import[ \t]+[A-Za-z_][A-Za-z0-9_.]*/) {
     s = line; sub(/^[ \t]*import[ \t]+/, "", s)
@@ -119,6 +138,16 @@ BEGIN {
   while ((getline ln < modfile) > 0) { split(ln, a, "\t"); moddir[a[1]] = a[2] }
   while ((getline ln < alfile) > 0) { split(ln, a, "\t"); aliasmod[a[1] SUBSEP a[2]] = a[3] }
   while ((getline ln < exfile) > 0) exists[ln] = 1
+  # The only relative directory imports admitted anywhere in the tree. Each
+  # entry names the source, the exact import text and the one QML file that
+  # directory must contain. There is no fallback for any other directory: a
+  # relative import is either a real file/single-file hook or one of these
+  # five pinned pairs.
+  pin["shell/boot/Boot.qml" SUBSEP "generated/floor"] = "FloorHandlers.qml"
+  pin["shell/boot/Boot.qml" SUBSEP "generated/bar"] = "BarHandlers.qml"
+  pin["shell/boot/Boot.qml" SUBSEP "generated/demand"] = "DemandHandlers.qml"
+  pin["shell/boot/BootServices.qml" SUBSEP "generated/services"] = "ServicesHandlers.qml"
+  pin["shell/boot/BootLate.qml" SUBSEP "generated/features"] = "FeaturesHandlers.qml"
 }
 function norm(p,   sp, parts, stack, top, i, out) {
   sp = split(p, parts, "/")
@@ -158,10 +187,22 @@ function sublayer(p) {
     target = norm(base "/" d4)
     if (target in exists) tkind = "file"
     else if (target "/qmldir" in exists) tkind = "dir"
+    else if ((src SUBSEP d4) in pin && (target "/" pin[src SUBSEP d4]) in exists) tkind = "dir"
     else tkind = "missing"
   } else if (kind == "member") {
     am = aliasmod[src SUBSEP e[4]]
     if (am == "") tkind = "noalias"
+    else if (am ~ /^@rel:/) {
+      base = src; sub(/\/[^\/]*$/, "", base)
+      reldir = norm(base "/" substr(am, 6))
+      if (reldir in exists) { target = reldir; tkind = "relfile" }
+      else if ((src SUBSEP substr(am, 6)) in pin &&
+               e[5] ".qml" == pin[src SUBSEP substr(am, 6)] &&
+               (reldir "/" e[5] ".qml") in exists) {
+        target = reldir "/" e[5] ".qml"
+        tkind = "reldir"
+      } else tkind = "missing"
+    }
     else if (am in moddir) { target = moddir[am]; tkind = "module" }
     else if (am ~ /^Qt[.A-Z]/ || am ~ /^Quickshell([.]|$)/) tkind = "external"
     else tkind = "unknown-module"
@@ -181,6 +222,68 @@ awk -v root="$SHELL_DIR/" -v aliasfile="$WORK/aliases.tsv" \
 awk -F'\t' -v modfile="$WORK/modules.tsv" -v alfile="$WORK/aliases.tsv" \
   -v exfile="$WORK/files.txt" -f "$WORK/join.awk" "$WORK/edges.tsv" \
   >"$WORK/resolved.tsv"
+
+# 5. Relative-import closure. Module imports are excluded here: the generated
+#    handler types are private to their provider through a quoted directory
+#    import that is pinned above, so this asks what a boot file can reach
+#    *relatively*. A pinned directory target expands to the files under it; a
+#    single-file hook import is one file. One row per (source, reached file).
+cat >"$WORK/closure.awk" <<'AWK'
+BEGIN {
+  FS = "\t"
+  while ((getline p < exfile) > 0) {
+    n = split(p, parts, "/")
+    dir = ""
+    for (i = 1; i < n; i++) {
+      dir = (i == 1 ? parts[i] : dir "/" parts[i])
+      children[dir] = children[dir] p "\n"
+    }
+  }
+  close(exfile)
+}
+function target_of(kind, how, target,   list, n, parts, i, out) {
+  if (kind == "relqml" || kind == "reljs") {
+    if (how == "dir") return children[target]
+    return target "\n"
+  }
+  if (kind == "member" && (how == "relfile" || how == "reldir")) {
+    if (how == "reldir") return children[target]
+    return target "\n"
+  }
+  return ""
+}
+{
+  list = target_of($3, $6, $5)
+  if (list == "") next
+  n = split(list, parts, "\n")
+  for (i = 1; i <= n; i++) {
+    if (parts[i] != "") adj[$1] = adj[$1] parts[i] "\n"
+  }
+}
+function walk(start,   queue, seen, head, tail, cur, list, n, parts, i) {
+  head = 1; tail = 1; queue[1] = start; seen[start] = 1
+  while (head <= tail) {
+    cur = queue[head++]
+    if (cur != start && cur ~ /^shell\/boot\/generated\/(floor|services|features|bar|demand)\//) print start "\t" cur
+    list = adj[cur]
+    n = split(list, parts, "\n")
+    for (i = 1; i <= n; i++) {
+      if (parts[i] != "" && !(parts[i] in seen)) {
+        seen[parts[i]] = 1
+        queue[++tail] = parts[i]
+      }
+    }
+  }
+}
+END {
+  n = split(sources, src, " ")
+  for (i = 1; i <= n; i++) walk(src[i])
+}
+AWK
+awk -F'\t' -v exfile="$WORK/files.txt" \
+  -v sources="shell/boot/Boot.qml shell/boot/AsyncLoader.qml shell/boot/BootPump.qml shell/boot/BootTrace.js shell/boot/Units.adapter.js shell/boot/BootServices.qml shell/boot/BootLate.qml shell/boot/generated/floor/FloorHandlers.qml shell/boot/generated/services/ServicesHandlers.qml shell/boot/generated/features/FeaturesHandlers.qml shell/boot/generated/bar/BarHandlers.qml shell/boot/generated/demand/DemandHandlers.qml" \
+  -f "$WORK/closure.awk" "$WORK/resolved.tsv" \
+  | LC_ALL=C sort -u >"$WORK/closure.tsv"
 
 # Fields of resolved.tsv:
 #   1 source  2 line  3 kind  4 detail  5 target
@@ -225,9 +328,13 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 8 (the four published files plus the Phase 0
-# recorder, Phase 1 pump, Phase 2 loader and Phase 3 catalog/adapter),
-# features 184, services 30, common 175.
+# The table: composition 1, boot 13 (the four published files plus the Phase 0
+# recorder, Phase 1 pump, Phase 2 loader, Phase 3 catalog/adapter, and all five
+# generator-owned handler types under boot/generated/), plus two boot-owned
+# authored hook modules beside their declarations. features 190, services 31,
+# common 182: the migration added three, one and seven authored hook modules
+# beside their owners. layer_files counts .qml and .js, so declarations do not
+# move these numbers; hook modules do, and each count is pinned with its reason.
 # Batch E added MenuIpc.js and batch C added BarIpc.js under features/.
 # Batch B added MixerTabs.js (features), AudioIpc.js (services) and
 # AudioNodeKind.js (common); Batch A added the three shared IPC files to
@@ -255,12 +362,19 @@ for layer in boot common features services; do
   t_true "the $layer/ layer directory exists" test -d "$SHELL_DIR/$layer"
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
-t_count "features/ holds the tree's 187 .qml and .js files" "187" "$(layer_files features)"
+# features/ gained AppHostUnitHooks, NotificationsUnitHooks and PassUnitHooks.
+t_count "features/ holds 187 baseline files plus three authored hook modules" "190" "$(layer_files features)"
 # services/ gained Login1Sleep.js when grace began closing on the logind
-# sleep boundary rather than on the wall clock alone.
-t_count "services/ holds the 30 files the README publishes" "30" "$(layer_files services)"
-t_count "common/ holds the 175 files the README publishes" "175" "$(layer_files common)"
-t_count "boot/ holds the 4 published files plus the Phase 0 recorder, Phase 1 pump, Phase 2 loader and Phase 3 catalog/adapter" "8" "$(layer_files boot)"
+# sleep boundary rather than on the wall clock alone, then ScreenshotsUnitHooks.
+t_count "services/ holds 30 baseline files plus one authored hook module" "31" "$(layer_files services)"
+# common/ gained seven authored hook modules beside their owner declarations.
+t_count "common/ holds 175 baseline files plus seven authored hook modules" "182" "$(layer_files common)"
+# The two boot-owned hook modules are counted separately from the pinned 13 so
+# an extra generated file and an extra authored hook cannot hide each other.
+t_count "boot/ holds the 4 published files, Phase 0-3 records, and all five generated handler types" "13" \
+  "$(( $(layer_files boot) - $(find "$SHELL_DIR/boot" -name '*UnitHooks.qml' -type f | wc -l | tr -d ' ') ))"
+t_count "boot/ holds two authored hook modules beside the bar and annotation declarations" "2" \
+  "$(find "$SHELL_DIR/boot" -name '*UnitHooks.qml' -type f | wc -l | tr -d ' ')"
 t_true "the Phase 0 boot recorder exists" test -f "$SHELL_DIR/boot/BootTrace.js"
 t_eq "the Phase 0 boot recorder is a .pragma library" ".pragma library" \
   "$(head -1 "$SHELL_DIR/boot/BootTrace.js")"
@@ -399,6 +513,115 @@ t_eq "and it is shell.qml that reads it" \
 rule "no boot/ file imports a boot module other than its own" \
   '$9 == "boot" && $7 == "boot" && $3 == "module" && $4 != "qs.boot"'
 t_note "boot/ reads its own module $(awk -F'\t' '$9 == "boot" && $7 == "boot" { printf "%s:%s (%s)\n", $1, $2, $4 }' "$WORK/resolved.tsv" | tr '\n' ' ')"
+
+# --------------------------------------------------------------------------
+t_section "the five generated handler types are private to their own provider"
+# Every generated directory has no qmldir: its owner imports that one directory
+# by an exact quoted path and reads the one type pinned here. The import edge
+# and the alias member edge both live in resolved.tsv, so these rules read the
+# same table as every other layer rule. closure.tsv is relative reach only; a
+# versioned qs.boot import stays outside it, because the privacy boundary is
+# the quoted directory import.
+declare -A OWNER_DIR OWNER_TYPE OWNER_SOURCE
+OWNER_DIR[boot]=floor OWNER_DIR[services]=services OWNER_DIR[features]=features
+OWNER_DIR[bar]=bar OWNER_DIR[demand]=demand
+OWNER_TYPE[boot]=FloorHandlers OWNER_TYPE[services]=ServicesHandlers
+OWNER_TYPE[features]=FeaturesHandlers OWNER_TYPE[bar]=BarHandlers
+OWNER_TYPE[demand]=DemandHandlers
+OWNER_SOURCE[boot]=shell/boot/Boot.qml
+OWNER_SOURCE[services]=shell/boot/BootServices.qml
+OWNER_SOURCE[features]=shell/boot/BootLate.qml
+OWNER_SOURCE[bar]=shell/boot/Boot.qml
+OWNER_SOURCE[demand]=shell/boot/Boot.qml
+
+edge_exists() {
+  awk -F'\t' -v s="$1" -v k="$2" -v d="$3" -v t="$4" \
+    '$1 == s && $3 == k && $4 == d && $5 == t { found = 1 } END { exit !found }' \
+    "$WORK/resolved.tsv"
+}
+modules_of() {
+  awk -F'\t' -v s="$1" '$1 == s && $3 == "module" && \
+    $4 !~ /^Qt[.A-Z]/ && $4 !~ /^Quickshell([.]|$)/ { print $4 }' \
+    "$WORK/resolved.tsv" | LC_ALL=C sort -u
+}
+for provider in boot services features bar demand; do
+  dir="shell/boot/generated/${OWNER_DIR[$provider]}"
+  type="${OWNER_TYPE[$provider]}.qml"
+  src="${OWNER_SOURCE[$provider]}"
+  t_true "the generated $provider type exists at its pinned path" \
+    test -f "$SHELL_DIR/${dir#shell/}/$type"
+  t_true "$src imports ${dir#shell/}" \
+    edge_exists "$src" relqml "generated/${OWNER_DIR[$provider]}" "$dir"
+  # The alias spelling is an implementation detail; what matters is that the
+  # provider reads the pinned type out of its own directory.
+  t_true "$src reads the pinned $provider type out of that directory" \
+    awk -F'\t' -v s="$src" -v t="$dir/$type" \
+      '$1 == s && $3 == "member" && $5 == t { found = 1 } END { exit !found }' \
+      "$WORK/resolved.tsv"
+  t_eq "the generated $provider type adds no module its provider does not import" \
+    "" "$(comm -23 <(modules_of "$dir/$type") <(modules_of "$src"))"
+done
+t_true "the generated services type resolves through qs.services" \
+  edge_exists "shell/boot/generated/services/ServicesHandlers.qml" module "qs.services" "shell/services"
+t_true "the generated features type resolves through qs.features.launcher" \
+  edge_exists "shell/boot/generated/features/FeaturesHandlers.qml" module "qs.features.launcher" "shell/features/launcher"
+t_true "a generated handler reads a declared member of the qs.services module" \
+  awk -F'\t' '$1 == "shell/boot/generated/services/ServicesHandlers.qml" && \
+    $3 == "member" && $7 == "services" { found = 1 } END { exit !found }' \
+    "$WORK/resolved.tsv"
+
+# Authored hook modules are imported from generated types by QUOTED SINGLE-FILE
+# paths, never by a directory or an undeclared qs module. Every such import
+# must resolve to a real file; the pinned table in join.awk is still the only
+# way a relative directory is admitted.
+t_note "generated single-file hook imports: $(awk -F'\t' '$1 ~ /^shell\/boot\/generated\// && \
+  $3 == "relqml" && $6 == "file" { print $1 ":" $2 " -> " $4 }' "$WORK/resolved.tsv" | wc -l | tr -d ' ')"
+t_eq "every generated relative import resolves to a file or a pinned directory" "" \
+  "$(awk -F'\t' '$1 ~ /^shell\/boot\/generated\// && ($3 == "relqml" || $3 == "member") && \
+     $6 != "file" && $6 != "relfile" && $6 != "dir" && $6 != "reldir" && \
+     $6 != "module" && $6 != "external" \
+     { print $1 ":" $2 " -> " $4 }' "$WORK/resolved.tsv")"
+t_eq "no generated type imports an unpinned relative directory" "" \
+  "$(awk -F'\t' '$1 ~ /^shell\/boot\/generated\// && $3 == "relqml" && $6 == "dir" && \
+     $4 !~ /^generated\/(floor|services|features|bar|demand)$/ { print $1 ":" $2 " -> " $4 }' \
+     "$WORK/resolved.tsv")"
+
+# Transitive relative reach: Boot owns floor/bar/demand, each late half owns
+# one provider. No boot file may reach a directory it does not own.
+for src in shell/boot/AsyncLoader.qml shell/boot/BootPump.qml shell/boot/BootTrace.js \
+  shell/boot/Units.adapter.js; do
+  t_eq "$src reaches no generated directory" "0" \
+    "$(awk -F'\t' -v s="$src" '$1 == s' "$WORK/closure.tsv" | wc -l | tr -d ' ')"
+done
+for provider in floor services features bar demand; do
+  owner=""
+  for candidate in boot services features bar demand; do
+    [[ ${OWNER_DIR[$candidate]} == "$provider" ]] && owner="${OWNER_SOURCE[$candidate]}"
+  done
+  t_eq "only $owner reaches generated/$provider" "$owner" \
+    "$(awk -F'\t' -v d="shell/boot/generated/$provider/" \
+       '$2 ~ "^" d { print $1 }' "$WORK/closure.tsv" | LC_ALL=C sort -u | tr '\n' ' ' | sed 's/ $//')"
+done
+t_true "the closure sees the five pinned owner/type edges, so the rules are not vacuous" \
+  test "$(awk -F'\t' '($1 == "shell/boot/Boot.qml" && ($2 == "shell/boot/generated/floor/FloorHandlers.qml" || \
+    $2 == "shell/boot/generated/bar/BarHandlers.qml" || $2 == "shell/boot/generated/demand/DemandHandlers.qml")) || \
+    ($1 == "shell/boot/BootServices.qml" && $2 == "shell/boot/generated/services/ServicesHandlers.qml") || \
+    ($1 == "shell/boot/BootLate.qml" && $2 == "shell/boot/generated/features/FeaturesHandlers.qml")' \
+    "$WORK/closure.tsv" | wc -l | tr -d ' ')" -eq 5
+
+# The eager boot path must not pull the heavy bar module or the annotation
+# controller in at compile time: both remain URL/demand-loaded.
+for src in shell/boot/Boot.qml shell/boot/generated/floor/FloorHandlers.qml \
+  shell/boot/generated/bar/BarHandlers.qml shell/boot/generated/demand/DemandHandlers.qml; do
+  t_eq "$src imports neither the heavy bar module nor an annotation module" "0" \
+    "$(awk -F'\t' -v s="$src" '$1 == s && $3 == "module" && \
+       ($4 == "qs.features.bar" || $4 ~ /annotation/i) { n++ } END { print n+0 }' \
+       "$WORK/resolved.tsv")"
+done
+t_contains "the bar runtime is still reached by URL, not by a compile-time import" \
+  'Qt.resolvedUrl("../features/bar/BarRuntime.qml")' "$(cat "$SHELL_DIR/boot/Boot.qml")"
+t_contains "the annotation controller is still demand-activated" \
+  'annotationLoader.active = true' "$(cat "$SHELL_DIR/boot/Boot.qml")"
 
 # --------------------------------------------------------------------------
 t_section "the whole table in one derived fact: the set of cross-layer edges"

@@ -1,0 +1,17 @@
+{
+  "id": "lockscreen",
+  "after": "session",
+  "provider": "services",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "essential",
+  "dependencies": ["settings", "session", "state", "watch", "theme"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false,
+  "ref": "Lockscreen.locked"
+}

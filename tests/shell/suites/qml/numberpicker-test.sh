@@ -3,7 +3,7 @@
 # used to switch it off.
 #
 # A QValidator applies to a field only while the text ALREADY in that field is
-# one the validator accepts. Measured on this Qt (6.12.0) with real synthesised
+# one the validator accepts. Measured on this Qt (6.12.1) with real synthesised
 # key events, on a bare TextInput carrying the same DoubleValidator:
 #
 #   seeded "5"     + key "a"     ->  "5"        the letter is refused

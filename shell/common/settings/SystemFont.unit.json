@@ -1,0 +1,16 @@
+{
+  "id": "systemFont",
+  "after": "miscSettings",
+  "provider": "floor",
+  "phase": "floor",
+  "activation": "eager",
+  "criticality": "essential",
+  "dependencies": ["settings"],
+  "retry": {
+    "maxAttempts": 0,
+    "backoffMs": 0,
+    "maxBackoffMs": 1000
+  },
+  "hasReady": false,
+  "hasTeardown": false
+}

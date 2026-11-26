@@ -197,26 +197,69 @@ eq('no wrapper called a provider dispatcher directly',
   calls.filter(c => c[0] === 'lateReady' || c[0] === 'lateTeardown'), [])
 
 // ---------------------------------------------------------------------------
-section('Boot.qml keeps the Boot-owned ready/teardown and bar resolver')
+section('generated Boot-owned rows keep the floor/bar/demand semantics')
+// The old switch cases are now data: one generated handler row per owned id,
+// with authored hook modules carrying Boot's runtime facts. The same nine
+// ready predicates, two teardowns, bar refusal and late fallthrough are read
+// from those rows and from Boot's generic dispatcher.
+const OWNED_PROVIDERS = ['floor', 'bar', 'demand']
+const OWNED_SRC = Object.fromEntries(OWNED_PROVIDERS.map(provider => [provider,
+  fs.readFileSync(path.join(SHELL_DIR, `boot/generated/${provider}/${provider[0].toUpperCase()}${provider.slice(1)}Handlers.qml`), 'utf8')]))
+const HOOK_SRC = Object.fromEntries(['BarUnitHooks.qml', 'AnnotationsUnitHooks.qml'].map(file => [file,
+  fs.readFileSync(path.join(SHELL_DIR, `boot/${file}`), 'utf8')]))
+const ownedRowsOf = (provider) => [...OWNED_SRC[provider].matchAll(/^    "([^"]+)": \{/gm)].map(m => m[1])
+const ownedRows = OWNED_PROVIDERS.flatMap(ownedRowsOf).sort()
+const ownedGolden = goldenRows.filter(g => OWNED_PROVIDERS.includes(g.owner))
+eq('the three generated types own exactly the floor/bar/demand ids', ownedRows,
+  ownedGolden.map(g => g.id).sort())
+eq('the three generated types hold all 52 catalog ids with the two late providers',
+  ownedRows.length + goldenRows.filter(g => ['services', 'features'].includes(g.owner)).length, 52)
+
+const ownedReady = OWNED_PROVIDERS.flatMap(provider => ownedRowsOf(provider).filter(id =>
+  /^\s+ready: function/m.test(braceBody(OWNED_SRC[provider], `    "${id}": `)))).sort()
+const ownedTeardown = OWNED_PROVIDERS.flatMap(provider => ownedRowsOf(provider).filter(id =>
+  /^\s+teardown: function/m.test(braceBody(OWNED_SRC[provider], `    "${id}": `)))).sort()
+eq('the generated Boot-owned rows expose exactly nine ready predicates', ownedReady,
+  ownedGolden.filter(g => g.hasReady).map(g => g.id).sort())
+eq('the generated Boot-owned rows expose exactly the bar and annotation teardowns', ownedTeardown,
+  ['annotations', 'bar'])
+match('the bar row resolves through its authored hook',
+  braceBody(OWNED_SRC.bar, '    "bar": '), /return root\.barHooks\.resolve\(\)/)
+match('the bar hook still mounts the URL-loaded runtime', HOOK_SRC['BarUnitHooks.qml'],
+  /root\.boot\._mountBarRuntime\(\)/)
+match('the bar hook still reads the live runtime state', HOOK_SRC['BarUnitHooks.qml'],
+  /root\.boot\._barRuntimeItem !== null/)
+match('the annotation teardown goes through its authored hook',
+  braceBody(OWNED_SRC.demand, '    "annotations": '), /root\.annotationsHooks\.teardown\(\)/)
+match('the annotation hook still releases the loader', HOOK_SRC['AnnotationsUnitHooks.qml'],
+  /root\.boot\._teardownAnnotations\(\)/)
+match('the annotation resolve still activates the demand loader', HOOK_SRC['AnnotationsUnitHooks.qml'],
+  /root\.boot\._activateAnnotations\(\)/)
+
 const readyBody = braceBody(BOOT_QML, 'function _unitReady(id)')
 const teardownBody = braceBody(BOOT_QML, 'function _unitTeardown(id)')
 const resolveBody = braceBody(BOOT_QML, 'function _resolveDescriptor(id)')
-eq('_unitReady owns exactly nine ids plus its default', casesOf(readyBody),
-  ['log', 'paths', 'watch', 'settings', 'hyprlandSettings', 'miscSettings', 'icons', 'bar', 'annotations'])
-eq('_unitTeardown owns exactly the two Boot-held units', casesOf(teardownBody), ['bar', 'annotations'])
-match('bar readiness is the live runtime check', readyBody, /case "bar":\s*return boot\._barRuntimeItem !== null/)
-match('annotations readiness is the Boot predicate', readyBody, /case "annotations":\s*return boot\._annotationsReady\(\)/)
-match('_unitReady defaults to the provider dispatcher', readyBody, /default:\s*return boot\._lateReady\(id\)/)
-match('bar teardown unmounts the runtime', teardownBody, /case "bar":\s*boot\._unmountBarRuntime\(\); return/)
-match('annotations teardown releases the loader', teardownBody, /case "annotations":\s*boot\._teardownAnnotations\(\); return/)
-match('_unitTeardown defaults to the provider dispatcher', teardownBody, /default:\s*boot\._lateTeardown\(id\); return/)
-match('_resolveDescriptor has the bar case', resolveBody, /case "bar":\s*return boot\._mountBarRuntime\(\)/)
+const ownedBody = braceBody(BOOT_QML, 'function _ownedHandler(id)')
+match('the owned-handler lookup reads floor, bar and demand in that order', ownedBody,
+  /floorHandlers[\s\S]*barHandlers[\s\S]*demandHandlers/)
+match('Boot readiness reads an owned row before the late dispatcher', readyBody,
+  /_ownedHandler[\s\S]*_lateReady/)
+match('Boot teardown reads an owned row before the late dispatcher', teardownBody,
+  /_ownedHandler[\s\S]*_lateTeardown/)
+match('Boot resolution reads an owned row before the late dispatcher', resolveBody,
+  /_ownedHandler[\s\S]*_lateResolve/)
+match('a false bar resolve verdict is preserved', resolveBody,
+  /row\.resolve\(\) === false[\s\S]*return false/)
+match('the bar mount still refuses when the master switch is off',
+  braceBody(BOOT_QML, 'function _mountBarRuntime()'), /if \(!boot\._barDemand\(\)\) return false/)
 const barRow = rows.find(r => r.id === 'bar')
 group('bar descriptor resolver', () => {
   const barBoot = { _resolveDescriptor(id) { return id }, _unitReady() {}, _unitTeardown() {} }
   const barDescriptor = A.descriptor(barRow, barBoot)
   eq('adapter dispatches bar through _resolveDescriptor', barDescriptor.resolver(), 'bar')
   match('bar wrapper source uses _resolveDescriptor(boundId)', String(barDescriptor.resolver), /_resolveDescriptor\(boundId\)/)
+  eq('a refused bar mount reaches the gate as false',
+    A.descriptor(barRow, { _resolveDescriptor() { return false } }).resolver(), false)
 })
 
 // ---------------------------------------------------------------------------

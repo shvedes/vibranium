@@ -253,7 +253,7 @@ t_summary
 ```
 
 `require_qs` applies the platform gate, which pins **Quickshell 0.3.2 / Qt
-6.12.0** and calls `t_block` on a mismatch — an unrunnable suite is never
+6.12.1** and calls `t_block` on a mismatch — an unrunnable suite is never
 reported as a pass.
 
 Three assertion kinds are worth knowing about, because they are what keeps a
@@ -271,7 +271,7 @@ suite honest:
 ## Platform gate
 
 Suites that need a live Quickshell are pinned to **Quickshell 0.3.2 /
-Qt 6.12.0** (`lib/lib.sh`). `hasVersion()` is not accepted as a substitute: it
+Qt 6.12.1** (`lib/lib.sh`). `hasVersion()` is not accepted as a substitute: it
 does not verify patch releases. A different pair fails the gate rather than
 being assumed compatible.
 

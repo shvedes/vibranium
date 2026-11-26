@@ -32,6 +32,15 @@ const CATALOG_JS = path.join(SHELL, 'boot', 'Units.catalog.js')
 const BOOT_QML = path.join(SHELL, 'boot', 'Boot.qml')
 const BOOTSERVICES_QML = path.join(SHELL, 'boot', 'BootServices.qml')
 const BOOTLATE_QML = path.join(SHELL, 'boot', 'BootLate.qml')
+// Ownership in the installed tree is read from the five generated handler
+// types. The directory name is the provider; no authored table is involved.
+const GENERATED_OWNERS = Object.freeze([
+  ['floor', 'FloorHandlers.qml'],
+  ['services', 'ServicesHandlers.qml'],
+  ['features', 'FeaturesHandlers.qml'],
+  ['bar', 'BarHandlers.qml'],
+  ['demand', 'DemandHandlers.qml']
+])
 const IPC_CATALOG_JS = path.join(SHELL, 'common', 'text', 'IpcCatalog.js')
 const IPC_ROUTER_QML = path.join(SHELL, 'common', 'bus', 'IpcRouter.qml')
 const DESKTOP_STATE_QML = path.join(SHELL, 'common', 'state', 'DesktopLayoutState.qml')
@@ -155,7 +164,51 @@ function evaluate(text, bindings = {}) {
   return new Function(...names, 'return (' + text + ')')(...names.map(n => bindings[n]))
 }
 
-function ownerMap() {
+// Top-level string keys of a generated `handlers: ({ ... })` literal. The
+// lexer tracks bracket depth and skips strings and comments, so a nested key
+// inside a resolver body cannot be mistaken for an owned unit id. Nothing is
+// evaluated: the generated closures are irrelevant to ownership.
+function generatedHandlerKeys(file) {
+  const src = fs.readFileSync(file, 'utf8')
+  const marker = 'readonly property var handlers:'
+  const lit = literalAt(src, marker)
+  const keys = []
+  let depth = 0
+  let objectDepth = 0
+  let i = 0
+  while (i < lit.length) {
+    const c = lit[i]
+    if (c === '"' || c === "'" || c === '`') {
+      const quote = c
+      let raw = ''
+      i++
+      while (i < lit.length && lit[i] !== quote) {
+        if (lit[i] === '\\') { i++; continue }
+        raw += lit[i++]
+      }
+      i++
+      let j = i
+      while (j < lit.length && /\s/.test(lit[j])) j++
+      if (depth === objectDepth && lit[j] === ':') keys.push(raw)
+      continue
+    }
+    if (c === '/' && lit[i + 1] === '/') { while (i < lit.length && lit[i] !== '\n') i++; continue }
+    if (c === '/' && lit[i + 1] === '*') {
+      const close = lit.indexOf('*/', i + 2)
+      i = close < 0 ? lit.length : close + 2
+      continue
+    }
+    if (c === '{' && objectDepth === 0) objectDepth = depth + 1
+    if (c === '(' || c === '[' || c === '{') depth++
+    else if (c === ')' || c === ']' || c === '}') depth--
+    i++
+  }
+  return keys
+}
+
+// Baseline discovery stays authoritative for the pre-extraction tree: the
+// pinned HEAD Boot switch and the authored tables in that same snapshot.
+function baselineOwnerMap() {
   const boot = headBootQml()
   const switchText = boot.slice(boot.indexOf('function _resolveDescriptor(id)'),
     boot.indexOf('return true', boot.indexOf('function _resolveDescriptor(id)')))
@@ -170,6 +223,21 @@ function ownerMap() {
     for (const m of block.matchAll(/^    "([^"]+)":/gm)) owners.set(m[1], owner)
   }
   owners.set('bar', 'bar')
+  return owners
+}
+
+// Installed ownership: exactly one generated row per id, keyed by the
+// provider directory that owns it. No seed and no authored handler table is
+// read here, so a stale author-side row cannot influence the comparison.
+function ownerMap() {
+  const owners = new Map()
+  for (const [provider, file] of GENERATED_OWNERS) {
+    const pathToType = path.join(SHELL, 'boot', 'generated', provider, file)
+    for (const id of generatedHandlerKeys(pathToType)) {
+      if (owners.has(id)) throw new Error(`unit ${id} has two generated owners`)
+      owners.set(id, provider)
+    }
+  }
   return owners
 }
 
@@ -197,7 +265,7 @@ function unitRow(row, owners) {
 function baselineUnits() {
   const src = headBootQml()
   const rows = evaluate(literalAt(src, 'readonly property var _catalog: '))
-  const owners = ownerMap()
+  const owners = baselineOwnerMap()
   return rows.map(row => unitRow(row, owners))
 }
 

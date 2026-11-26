@@ -1,0 +1,19 @@
+{
+  "id": "unit03",
+  "after": "unit02",
+  "provider": "floor",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit02"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false,
+  "ref": "Common.Synthetic.tag"
+}

@@ -3,7 +3,7 @@
 //
 // The bug this exists for is a Qt rule, not a shell rule, and the rule is
 // this: a QValidator applies to a field only while the text ALREADY in it is
-// one the validator accepts. Measured on this Qt (6.12.0) with real
+// one the validator accepts. Measured on this Qt (6.12.1) with real
 // synthesised key events, through qmltestrunner on a bare TextInput carrying
 // the same DoubleValidator:
 //

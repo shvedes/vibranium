@@ -1,0 +1,17 @@
+{
+  "id": "bar",
+  "after": "privacy",
+  "provider": "bar",
+  "phase": "visual",
+  "activation": "first_use",
+  "criticality": "optional",
+  "dependencies": ["settings", "theme", "ui", "state", "watch"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": true,
+  "hooks": "shell/boot/BarUnitHooks.qml"
+}

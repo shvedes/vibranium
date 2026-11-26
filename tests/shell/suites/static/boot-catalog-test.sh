@@ -47,6 +47,15 @@ ADAPTER_JS="$SHELL_DIR/boot/Units.adapter.js"
 BAR_RUNTIME_QML="$SHELL_DIR/features/bar/BarRuntime.qml"
 BOOTSERVICES_QML="$SHELL_DIR/boot/BootServices.qml"
 BOOTLATE_QML="$SHELL_DIR/boot/BootLate.qml"
+GENERATED_DIR="$SHELL_DIR/boot/generated"
+GENERATED_HANDLERS=(
+  "$GENERATED_DIR/floor/FloorHandlers.qml"
+  "$GENERATED_DIR/services/ServicesHandlers.qml"
+  "$GENERATED_DIR/features/FeaturesHandlers.qml"
+  "$GENERATED_DIR/bar/BarHandlers.qml"
+  "$GENERATED_DIR/demand/DemandHandlers.qml"
+)
+DECLARATION_ROOTS=(common features services boot)
 GATE_QML="$SHELL_DIR/common/runtime/UnitGate.qml"
 
 # The vocabulary this suite validates against. The assertions below read the
@@ -376,29 +385,29 @@ expect_count() {
   fi
 }
 
-# resolver_cases prints the case labels of Boot.qml's _resolveDescriptor plus
-# the owned ids of the two provider handler tables. The cases were moved into
-# `handlers` rows; resolve(id) now dispatches through the table rather than a
-# switch, so the same union is read from the table keys.
-resolver_cases() {
-  # The resolver map is split: floor, Phase-1 and demand-driven cases live
-  # in Boot.qml (pre-paint), the service singletons in BootServices.qml and
-  # the feature modules in BootLate.qml (both post-paint). The bar is boot-owned
-  # again: its case calls _mountBarRuntime() in the switch, so all 52 units have
-  # exactly one resolver site. The union is what has to cover the catalog once.
-  awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/' "$BOOT_QML" |
-    sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
-  awk '/property var handlers: \(\{/,/^  \}\)/' "$BOOTSERVICES_QML" |
-    sed -n 's/^[[:space:]]*"\([^"]*\)":.*/\1/p'
-  awk '/property var handlers: \(\{/,/^  \}\)/' "$BOOTLATE_QML" |
-    sed -n 's/^[[:space:]]*"\([^"]*\)":.*/\1/p'
+# Ownership no longer comes from resolver sites: every id is declared once in
+# a *.unit.json next to its owner and realised as one row in a generated
+# handler type. Declaration ids and generated handler keys are independent
+# reads of the same fact; each must cover the catalog exactly once.
+declaration_ids() {
+  find "${DECLARATION_ROOTS[@]/#/$SHELL_DIR/}" -name '*.unit.json' -type f -print0 |
+    xargs -0 grep -h '"id"' |
+    sed -n 's/^[[:space:]]*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
 }
 
-# The late half's controller releases now live in its handler rows. Only the
-# extraction site moved: the assertions below still read the same two expression
-# bodies out of the same file.
-latelate_body() {
-  awk '/property var handlers: \(\{/,/^  \}\)/' "$BOOTLATE_QML"
+generated_ids() {
+  for file in "${GENERATED_HANDLERS[@]}"; do
+    awk '/readonly property var handlers: \(\{/,/^  \}\)/' "$file" |
+      sed -n 's/^[[:space:]]*"\([^"]*\)":.*/\1/p'
+  done
+}
+
+# Authored hook modules are next to their declarations; generated rows call
+# them lazily through hook instance properties. Reading all of them keeps the
+# controller-release assertions independent of which provider owns the row.
+hook_bodies() {
+  find "${DECLARATION_ROOTS[@]/#/$SHELL_DIR/}" -name '*UnitHooks.qml' -type f -print0 |
+    xargs -0 cat
 }
 
 # Graph probes. Each prints one line per offender, or nothing when clean.
@@ -644,26 +653,27 @@ else
   t_note "the id list is not lexicographic, and should not be: it is boot order, which Boot.qml:748 makes load-bearing. The first inversion is $(first_inversion)"
 fi
 
-t_section "the resolver map covers the catalog exactly"
-RESOLVER_CASES="$(resolver_cases)"
-# The bar is boot-owned again: its _resolveDescriptor case calls
-# _mountBarRuntime() directly, so the switch now names all 52 units exactly
-# once. The count expectation follows the catalog rather than the old 51.
-t_count "the _resolveDescriptor switch covers every unit except the bar" "$U_N" \
-  "$(printf '%s\n' "$RESOLVER_CASES" | wc -l | tr -d ' ')"
-t_eq "the switch plus the bar equal the catalog" \
-  "$(printf '%s\n' "$RESOLVER_CASES" bar | LC_ALL=C sort -u)" "$(id_list | LC_ALL=C sort)"
-t_contains "annotations resolves by activating the loader" "annotationLoader.active = true" \
-  "$(awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/' "$BOOT_QML" |
-    sed -n 's/^[[:space:]]*case "annotations":[[:space:]]*//p')"
-# Every case in the switch puts its statement where the long sibling ids put
-# theirs, so the column the colon lands in is uniform; one case off it would be
-# the only one a reader could not find by scanning the column.
-t_eq "every resolver case indents the same as its longest sibling" "1" \
-  "$(awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/ {
-    match($0, /case "[^"]+":[[:space:]]+/)
-    if (RSTART > 0) print RSTART
-  }' "$BOOT_QML" | LC_ALL=C sort -u | wc -l | tr -d ' ')"
+t_section "declarations and generated rows cover the catalog exactly"
+DECLARED_IDS="$(declaration_ids)"
+GENERATED_IDS="$(generated_ids)"
+t_count "every catalog unit has exactly one declaration" "$U_N" \
+  "$(printf '%s\n' "$DECLARED_IDS" | wc -l | tr -d ' ')"
+t_eq "declaration ids equal the catalog" \
+  "$(printf '%s\n' "$DECLARED_IDS" | LC_ALL=C sort)" "$(id_list | LC_ALL=C sort)"
+t_count "every catalog unit has exactly one generated handler row" "$U_N" \
+  "$(printf '%s\n' "$GENERATED_IDS" | wc -l | tr -d ' ')"
+t_eq "generated handler ids equal the catalog" \
+  "$(printf '%s\n' "$GENERATED_IDS" | LC_ALL=C sort)" "$(id_list | LC_ALL=C sort)"
+t_eq "no id is declared twice" "" \
+  "$(printf '%s\n' "$DECLARED_IDS" | LC_ALL=C sort | uniq -d)"
+t_eq "no id has two generated rows" "" \
+  "$(printf '%s\n' "$GENERATED_IDS" | LC_ALL=C sort | uniq -d)"
+t_contains "the demand hook still calls Boot's loader activation" "_activateAnnotations()" \
+  "$(hook_bodies)"
+t_contains "Boot's loader activation still activates the URL loader" "annotationLoader.active = true" \
+  "$(awk '/^  function _activateAnnotations\(\)/,/^  \}$/' "$BOOT_QML")"
+t_contains "the bar hook still mounts the URL-loaded runtime" "_mountBarRuntime" \
+  "$(hook_bodies)"
 
 t_section "descriptor validity, unit by unit, against UnitGate's registration rules"
 i=0
@@ -760,10 +770,10 @@ t_contains "pass's teardown delegates to the late half" "_lateTeardown" \
 t_file "BarRuntime.qml exists" "$BAR_RUNTIME_QML"
 t_file "BootServices.qml exists" "$BOOTSERVICES_QML"
 t_file "BootLate.qml exists" "$BOOTLATE_QML"
-t_contains "the late half releases the appLauncher controller" "AppLauncher.teardownController()" \
-  "$(latelate_body)"
-t_contains "the late half releases the pass controller" "Pass.teardownController()" \
-  "$(latelate_body)"
+t_contains "the generated/hook ownership releases the appLauncher controller" "AppLauncher.teardownController()" \
+  "$(cat "${GENERATED_HANDLERS[@]}"; hook_bodies)"
+t_contains "the generated/hook ownership releases the pass controller" "Pass.teardownController()" \
+  "$(cat "${GENERATED_HANDLERS[@]}"; hook_bodies)"
 t_eq "exactly eight units sit outside the eager/resident floor" \
   "annotations,appLauncher,audioMixer,bar,imageViewer,pass,printers,systemUpdates" \
   "$(printf '%s\n' "${U_ID[@]}" |
@@ -790,7 +800,7 @@ t_ne "annotations is not a facade" "facade" "$(unit_field annotations ACT)"
 # the loader teardown boot owns. Both halves are checked, because a delegation
 # to a function that does not release anything would look identical here.
 t_contains "annotations' teardown delegates to boot's loader teardown" \
-  "_teardownAnnotations" "$(unit_teardown_chain annotations)"
+  "_teardownAnnotations" "$(unit_teardown_chain annotations; hook_bodies)"
 t_contains "and that teardown is the one that releases the loader" \
   "annotationLoader.active = false" \
   "$(awk '/^  function _teardownAnnotations\(\) \{$/,/^  \}$/' "$BOOT_QML")"

@@ -34,14 +34,21 @@ t_note "bar screen spread: $(qp_get hold.barSpread)px"
 
 t_section "rows slide; no one-frame full-row teleport"
 qp_assert "a frame moves less than one row" hold.noTeleport true
+# The probe reads the centre at the landing edge of each short leg, not on a
+# fixed timer turn: a read two turns after a step races the 30ms leg against
+# the 16ms timer and can catch the row half a row short of centre. A count
+# guard keeps the centre assertion from passing with no landed leg sampled.
+qp_assert "every short leg was measured at its landing edge" hold.samples 10
 qp_assert "the cursor stays near the centre" hold.centred true
 qp_assert "the row is the 48px fixture the step is measured against" hold.rowH 48
 # A whole-row cut lands on an integer pixel count; an eased leg lands on a
-# fractional one. Requiring a decimal as well as a positive sub-row step
-# makes a one-frame teleport fail even if the end state is right.
+# fractional one. The probe counts fractional steps from the raw frames: a
+# printed one-decimal "30" can hide a 30.04px frame under load, so checking
+# the string for a decimal point made a legitimate eased leg flake.
 t_true "each frame is a positive, fractional, sub-row step" \
   awk -v s="$(qp_get hold.maxFrameStep)" -v r="$(qp_get hold.rowH)" \
-  'BEGIN { exit !(s > 0 && s < r && index(s, ".") > 0) }'
+  -v f="$(qp_get hold.fractionalFrames)" \
+  'BEGIN { exit !(s > 0 && s < r && f > 0) }'
 t_note "max frame step $(qp_get hold.maxFrameStep)px against row $(qp_get hold.rowH)px; centre offset $(qp_get hold.maxCentreOffset)px"
 
 t_section "the hold lands and releases cleanly"

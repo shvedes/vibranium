@@ -1,0 +1,17 @@
+{
+  "id": "ui",
+  "after": "theme",
+  "provider": "floor",
+  "phase": "floor",
+  "activation": "eager",
+  "criticality": "essential",
+  "dependencies": ["settings", "theme"],
+  "retry": {
+    "maxAttempts": 0,
+    "backoffMs": 0,
+    "maxBackoffMs": 1000
+  },
+  "hasReady": false,
+  "hasTeardown": false,
+  "ref": "Ui.primaryScreen"
+}

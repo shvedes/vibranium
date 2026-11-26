@@ -19,6 +19,7 @@ const LEASE = read('common/runtime/UnitLease.qml')
 const GATE = read('common/runtime/UnitGate.qml')
 const LAUNCHER = read('features/launcher/AppLauncher.qml')
 const LATE = read('boot/BootLate.qml')
+const GENERATED_FEATURES = read('boot/generated/features/FeaturesHandlers.qml')
 const CATALOG = read('boot/Units.catalog.js')
 
 const FIXTURES = path.resolve(path.dirname(import.meta.dirname), '..', 'fixtures', 'boot-lease')
@@ -106,7 +107,15 @@ contains('a null controller is a refused open', around(LAUNCHER, 'function open(
 contains('_openVerb has no retry of its own', around(LAUNCHER, 'function _openVerb() {', 0, 400), 'return root._unavailableVerb()')
 
 section('provider ownership: the resolver constructs the facade')
-const lateRow = around(LATE, '"appLauncher": {', 0, 420)
+// The launcher handler row now lives in the provider-private generated type;
+// BootLate.qml only imports it and exposes one owned handler object.
+contains('BootLate.qml imports the generated features directory', LATE,
+  'import "generated/features" as Generated')
+eq('BootLate.qml owns exactly one generated handler property',
+  (LATE.match(/property var generatedHandlers:/g) || []).length, 1)
+notContains('BootLate.qml no longer declares an authored appLauncher handler row', LATE,
+  '"appLauncher": {')
+const lateRow = around(GENERATED_FEATURES, '"appLauncher": {', 0, 420)
 contains('resolver touches the singleton', lateRow, 'resolve: function() { void AppLauncher.tag },')
 contains('ready predicate is the facade flag', lateRow, 'ready: function() { return AppLauncher.facadeReady === true },')
 contains('teardown reaches the facade', lateRow, 'teardown: function() { AppLauncher.teardownController() }')

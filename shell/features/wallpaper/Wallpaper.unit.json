@@ -1,0 +1,17 @@
+{
+  "id": "wallpaper",
+  "after": "lockscreen",
+  "provider": "floor",
+  "phase": "visual",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "theme", "paths", "state", "watch", "ui"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false,
+  "ref": "Wallpaper.enabled"
+}

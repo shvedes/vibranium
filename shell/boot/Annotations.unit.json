@@ -1,0 +1,17 @@
+{
+  "id": "annotations",
+  "after": "imageViewer",
+  "provider": "demand",
+  "phase": "first_use",
+  "activation": "first_use",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch", "paths"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": true,
+  "hooks": "shell/boot/AnnotationsUnitHooks.qml"
+}

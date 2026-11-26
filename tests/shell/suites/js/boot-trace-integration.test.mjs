@@ -6,6 +6,7 @@
 // tests/shell/fixtures/boot-trace/frozen-report.json; the CLI probe imports the
 // installed bin/vb-shell module and calls render_data directly.
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { loadLib } from '../../lib/qmlloader.mjs'
@@ -87,9 +88,9 @@ l.exec_module(m)
 f = json.load(open(sys.argv[2], encoding='utf-8'))
 sys.stdout.write(m.render_data({'data': f}, {'kind': sys.argv[3]}, sys.argv[4] == 'json'))
 `
-function cliRender(kind, mode) {
+function cliRender(kind, mode, file) {
   return execFileSync('python3', ['-c', PY, path.join(VIBRANIUM_DIR, 'bin/vb-shell'),
-    path.join(FIXTURES, 'frozen-report.json'), kind, mode], { encoding: 'utf8' })
+    file || path.join(FIXTURES, 'frozen-report.json'), kind, mode], { encoding: 'utf8' })
 }
 
 group('boottime JSON path', () => {
@@ -113,6 +114,36 @@ group('other kinds still strip state', () => {
   const plain = cliRender('value', 'json')
   eq('a non-boottime JSON reply is parseable', (() => { try { return !!JSON.parse(plain) } catch { return false } })(), true)
   eq('a non-boottime reply drops nested state', plain.includes('"state"'), false)
+})
+
+group('boot.timeline declares an explicit output kind', () => {
+  eq('boottimeline is an installed output kind', P.OUTPUT_KINDS.includes('boottimeline'), true)
+  const row = C.findRow('boot.timeline')
+  eq('the boot.timeline row carries the boottimeline renderer', row.output.kind, 'boottimeline')
+  eq('formatOf keeps boottimeline', P.formatOf(row, []).kind, 'boottimeline')
+  eq('the timeline verb still matches', P.match(row.words, ['timeline']).ok, true)
+})
+
+group('boottimeline render_data path', () => {
+  const timeline = [
+    { id: 'floor', phase: 'floor', constructionMs: 2, readyMs: 7, totalMs: 9, state: 'ready' },
+    { id: 'entrance', phase: 'entrance', constructionMs: 3, readyMs: 12, totalMs: 15, state: 'ready' }
+  ]
+  const file = path.join(os.tmpdir(), 'vb-boottimeline-' + process.pid + '.json')
+  fs.writeFileSync(file, JSON.stringify(timeline))
+  try {
+    const text = cliRender('boottimeline', 'text', file)
+    eq('the explicit kind renders the blame tree', text.startsWith('Booted 2 units'), true)
+    eq('the explicit kind keeps the nested state', text.includes('ready'), true)
+    const json = cliRender('boottimeline', 'json', file)
+    let parsed = null
+    try { parsed = JSON.parse(json) } catch { parsed = null }
+    eq('the explicit kind JSON is the raw timeline', parsed, timeline)
+    const fallback = cliRender('value', 'text', file)
+    eq('the conservative shape fallback still renders', fallback.startsWith('Booted 2 units'), true)
+  } finally {
+    fs.unlinkSync(file)
+  }
 })
 
 // --- static purity of the observation hooks ---------------------------------

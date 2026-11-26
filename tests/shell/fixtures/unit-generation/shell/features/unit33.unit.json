@@ -1,0 +1,19 @@
+{
+  "id": "unit33",
+  "after": "unit32",
+  "provider": "features",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit32"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": true,
+  "hooks": "shell/features/unit33Hooks.qml"
+}

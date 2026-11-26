@@ -1,0 +1,17 @@
+{
+  "id": "app",
+  "after": "keyboard",
+  "provider": "features",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": ["settings", "state", "watch"],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": true,
+  "hasTeardown": false,
+  "hooks": "shell/features/apps/AppHostUnitHooks.qml"
+}

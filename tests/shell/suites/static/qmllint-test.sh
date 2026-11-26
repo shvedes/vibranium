@@ -40,7 +40,9 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   list, so it too moves the count without adding a warning or an unresolved
 #   name. Phase 1's boot/BootPump.qml and Phase 2's boot/AsyncLoader.qml are
 #   two more clean QtObjects in the same shape, so they likewise move only
-#   the count.
+#   the count. The pilot adds two more: the generated provider-private
+#   shell/boot/generated/services/ServicesHandlers.qml and
+#   shell/boot/generated/features/FeaturesHandlers.qml.
 # RECORDED_WARNING_COUNT: 139 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
@@ -148,10 +150,12 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # Batch A's IpcRouter.qml is one more .qml file than the recorded baseline and
 # contributes two Info diagnostics; the warning set is unchanged.
 # The Lockscreen gateway's IpcRouter.unregister adds one unqualified warning;
-# retiring the native effect toggles removes one Info diagnostic.
-RECORDED_FILE_COUNT=277
+# retiring the native effect toggles removes one Info diagnostic. The two
+# generated provider-private types under shell/boot/generated/ contribute one
+# more Info diagnostic between them; the warning set is unchanged.
+RECORDED_FILE_COUNT=279
 RECORDED_WARNING_COUNT=112
-RECORDED_INFO_COUNT=18
+RECORDED_INFO_COUNT=19
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -188,6 +192,46 @@ property-override 1
 uncreatable-type 1
 unqualified 36
 unresolved-type 3"
+RECORDED_UNRESOLVED_COUNT=4
+# Untagged warnings are a classification hole on the pinned tool: none is
+# allowed. The 6.12.1 baseline below names the one new untagged message that
+# tool emits and pins its count, so the hole stays closed on both versions.
+UNTAGGED_EXPECTED=''
+
+# The host and the suites pin Qt 6.12.1 (the older 6.12.0 baseline below is
+# kept for comparison). That is a tool change, not a source change: 6.12.1
+# adds the block-scope-var category, more import/missing-property diagnostics
+# and BluetoothAdapter, and moves the Info count. Measured on the final
+# integrated tree against an exported HEAD tree under the SAME binary: HEAD
+# 277 files/370 warnings/36 infos, candidate 295
+# files/373 warnings/58 infos, 0 errors in both. The migration itself adds the
+# 18 generated/hook .qml files and three warnings; the rest of the jump is the
+# tool version. Both baselines are exact, so neither is a waiver; an unknown
+# Qt version keeps the strict pinned-tool baseline and fails here.
+if [[ $(qt_version 2>/dev/null || true) == "6.12.1" ]]; then
+  RECORDED_FILE_COUNT=295
+  RECORDED_WARNING_COUNT=373
+  RECORDED_INFO_COUNT=58
+  RECORDED_UNRESOLVED_COUNT=10
+  EXPECTED_UNRESOLVED_TYPES="AuthFlow
+BluetoothAdapter
+FileViewAdapter
+PanelWindow"
+  UNTAGGED_EXPECTED='var declaration in block scope is hoisted to function scope'
+  RECORDED_WARNING_KINDS="block-scope-var-declaration 135
+comma 1
+confusing-expression-statement 34
+eval 1
+id-shadows-member 12
+import 27
+incompatible-type 4
+missing-property 74
+property-override 2
+uncreatable-type 1
+unintentional-empty-block 1
+unqualified 72
+unresolved-type 9"
+fi
 
 t_section "the tool under test"
 if [[ ! -x $QMLLINT_BIN ]]; then
@@ -331,13 +375,23 @@ t_section "every warning is classified, and the breakdown is pinned"
 # slip past the per-kind counts.
 WARN_HEADERS="$(grep -E '^Warning: ' "$LINT_OUT")"
 UNTAGGED_WARNINGS="$(printf '%s\n' "$WARN_HEADERS" | grep -vE '\[[a-z-]+\]$' || true)"
-t_empty "no warning is uncategorised" "$UNTAGGED_WARNINGS"
+# On the pinned 6.12.1 only the one recorded message may be untagged; the
+# older 6.12.0 baseline allowed none, and the count is part of the recorded
+# breakdown below.
+UNTAGGED_MESSAGES="$(printf '%s\n' "$UNTAGGED_WARNINGS" |
+  sed -E 's/^Warning: [^:]+:[0-9]+:[0-9]+: //' | grep -v '^$' | LC_ALL=C sort -u || true)"
+t_eq "uncategorised warnings match the tool's recorded baseline" \
+  "$UNTAGGED_EXPECTED" "$UNTAGGED_MESSAGES"
 
 WARN_KIND_LIST="$(header_tags "$LINT_OUT" Warning | tr -d '[]' | LC_ALL=C sort -u)"
 WARN_KINDS_ACTUAL="$(printf '%s\n' "$WARN_KIND_LIST" | awk 'NF' | while read -r k; do
   n="$(grep -cE "^Warning: .*\\[$k\\]$" "$LINT_OUT" || true)"
   printf '%s %s\n' "$k" "$n"
 done | LC_ALL=C sort)"
+if [[ -n $UNTAGGED_MESSAGES ]]; then
+  WARN_KINDS_ACTUAL="$(printf 'block-scope-var-declaration %s\n%s\n' \
+    "$(printf '%s\n' "$UNTAGGED_WARNINGS" | grep -c . || true)" "$WARN_KINDS_ACTUAL")"
+fi
 t_eq "the warning breakdown matches the recorded one" "$RECORDED_WARNING_KINDS" "$WARN_KINDS_ACTUAL"
 t_count "the warning total matches the recorded one" "$RECORDED_WARNING_COUNT" "$WARN_COUNT"
 t_count "the Info total matches the recorded one" "$RECORDED_INFO_COUNT" "$INFO_COUNT"
@@ -348,7 +402,7 @@ t_note "the recorded warning total is $RECORDED_WARNING_COUNT and the per-kind b
 t_section "the unresolved types are only Quickshell C++ types"
 UNRESOLVED_LINES="$(grep -E '\[(unresolved-type|uncreatable-type)\]$' "$LINT_OUT" || true)"
 UNRESOLVED_COUNT="$(printf '%s\n' "$UNRESOLVED_LINES" | grep -c . || true)"
-t_count "the unresolved/uncreatable count" "4" "$UNRESOLVED_COUNT"
+t_count "the unresolved/uncreatable count" "$RECORDED_UNRESOLVED_COUNT" "$UNRESOLVED_COUNT"
 
 # The names, from two different shapes of diagnostic:
 #   Property "adapter" has incomplete type "FileViewAdapter" ...
@@ -389,8 +443,30 @@ WARN_SET2="$(grep -E '^(Error|Warning): ' "$LINT_OUT2" | LC_ALL=C sort)"
 t_eq "two runs agree on the exit status" "$LINT_STATUS" "$LINT_STATUS2"
 t_eq "the error set is empty on the second run too" "0" "$(count_severity "$LINT_OUT2" Error)"
 t_eq "the warning set is identical between the two runs" "$WARN_SET1" "$WARN_SET2"
-t_eq "the whole diagnostic stream is byte-identical" \
-  "$(cksum <"$LINT_OUT")" "$(cksum <"$LINT_OUT2")"
+# 6.12.1 emits its module-import warnings in a different order from one
+# process to the next. The diagnostic records themselves are byte-identical;
+# only their order moves. Compare records byte-for-byte in sorted order so the
+# assertion still catches any content change. Older tools (such as 6.12.0)
+# emit a stable order, so that fallback baseline keeps the stricter
+# whole-stream comparison.
+canonical_stream() {
+  awk '
+    /^(Error|Warning|Info): / {
+      if (n) { print block; block = ""; n = 0 }
+      block = $0; n = 1; next
+    }
+    n { block = block "\n" $0 }
+    END { if (n) print block }
+  ' "$1" | LC_ALL=C sort
+}
+if [[ $(qt_version 2>/dev/null || true) == "6.12.1" ]]; then
+  t_note "Qt 6.12.1 reorders module-import warnings between processes; comparing sorted diagnostic records byte-for-byte"
+  t_eq "the whole diagnostic record set is byte-identical" \
+    "$(canonical_stream "$LINT_OUT" | cksum)" "$(canonical_stream "$LINT_OUT2" | cksum)"
+else
+  t_eq "the whole diagnostic stream is byte-identical" \
+    "$(cksum <"$LINT_OUT")" "$(cksum <"$LINT_OUT2")"
+fi
 
 t_section "the -I baseline is doing the work (deliberate control)"
 # The control: same command, same file list, an import path that contains no

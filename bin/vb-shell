@@ -1371,15 +1371,15 @@ def render_boottime(data: dict) -> str:
     verdict = record(data.get("firstVerdict"))
     state = label(verdict.get("state")) if verdict else "unknown"
 
-    names = [("firstVerdict", "verdict"), ("entrancePlayed", "entrance"), ("drainComplete", "complete")]
+    names = [("firstVerdict", "firstVerdict"), ("entrancePlayed", "entrance"), ("drainComplete", "complete")]
     names += [(k, k) for k in sorted(endpoints) if k not in {n for n, _ in names}]
     label_width = max(cells(alias) for _, alias in names)
     time_width = max([len(ms(endpoints.get(n)).rstrip("ms")) for n, _ in names] or [1])
 
     out: list[str] = []
-    summary = "Boot " + state + " in " + ms(endpoints.get("firstVerdict"))
+    summary = "Vibranium boot " + state + " | firstVerdict: " + ms(endpoints.get("firstVerdict"))
     for name, alias in names[1:3]:
-        summary += " | " + alias + " " + ms(endpoints.get(name))
+        summary += " | " + alias + ": " + ms(endpoints.get(name))
     out.append(summary)
     if data.get("sealed") is True:
         out.append("Capture sealed " + label(data.get("sealReason"))
@@ -1467,7 +1467,11 @@ def render_data(payload: dict, fmt: dict | None, json_mode: bool) -> str:
     data = payload["data"]
     if kind == "boottime" and isinstance(data, dict):
         return compact_ascii(data) + "\n" if json_mode else render_boottime(data)
-    if isinstance(data, list) and (kind == "boottimeline" or (kind == "value" and is_boot_timeline(data))):
+    # The declared output kind is primary. The shape check below only serves an
+    # already-running shell that still advertises the old `value` kind.
+    if kind == "boottimeline" and isinstance(data, list):
+        return compact_ascii(data) + "\n" if json_mode else render_boottimeline(data)
+    if kind == "value" and isinstance(data, list) and is_boot_timeline(data):
         return compact_ascii(data) + "\n" if json_mode else render_boottimeline(data)
     data = _without_state(payload["data"])
     if isinstance(data, dict) and not data:

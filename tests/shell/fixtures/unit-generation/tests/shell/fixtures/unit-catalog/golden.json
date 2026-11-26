@@ -1,0 +1,887 @@
+{
+  "units": [
+    {
+      "id": "unit01",
+      "owner": "floor",
+      "phase": "floor",
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [],
+      "retry": {
+        "maxAttempts": 0,
+        "backoffMs": 0,
+        "maxBackoffMs": 800
+      },
+      "hasReady": true,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit02",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit01"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit03",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit02"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit04",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit03"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit05",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit04"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit06",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit05"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit07",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit06"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit08",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit07"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit09",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit08"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit10",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit09"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit11",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit10"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit12",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit11"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit13",
+      "owner": "floor",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit12"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit14",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit13"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": true,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit15",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit14"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit16",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit15"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit17",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit16"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit18",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit17"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit19",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit18"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit20",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit19"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit21",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit20"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit22",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit21"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit23",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit22"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit24",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit23"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit25",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit24"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit26",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit25"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit27",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit26"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit28",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit27"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit29",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit28"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit30",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit29"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit31",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit30"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit32",
+      "owner": "services",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit31"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit33",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit32"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": true,
+      "hasTeardown": true
+    },
+    {
+      "id": "unit34",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit33"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit35",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit34"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit36",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit35"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit37",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit36"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit38",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit37"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit39",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit38"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit40",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit39"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit41",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit40"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit42",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit41"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit43",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit42"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit44",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit43"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit45",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit44"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit46",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit45"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit47",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit46"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit48",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit47"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit49",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit48"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit50",
+      "owner": "features",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit49"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": false,
+      "hasTeardown": false
+    },
+    {
+      "id": "unit51",
+      "owner": "bar",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit50"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": true,
+      "hasTeardown": true
+    },
+    {
+      "id": "unit52",
+      "owner": "demand",
+      "phase": "early",
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "unit51"
+      ],
+      "retry": {
+        "maxAttempts": 3,
+        "backoffMs": 200,
+        "maxBackoffMs": 800
+      },
+      "hasReady": true,
+      "hasTeardown": true
+    }
+  ],
+  "unitsDigest": "7599bc3a"
+}

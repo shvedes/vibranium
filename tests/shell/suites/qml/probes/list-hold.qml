@@ -15,10 +15,15 @@ Item {
 
   property bool completed: false
   property int turn: 0
+  // Ten repeats, each measured at the landing edge of its own short leg.
+  property int steps: 0
+  property int lastStepTurn: 0
+  property bool measuring: true
+  property int resultTurn: -1
   property var cys: []
   property var bars: []
-  property var offs: []
   property var pins: []
+  property var offs: []
 
   List {
     id: hold
@@ -40,7 +45,66 @@ Item {
     return it.y + it.height / 2 - hold.contentY - hold.height / 2
   }
 
+  // A repeat leg is Ui.fastMs / 4 = 30ms, while this timer runs every 16ms.
+  // Sampling "two timer turns after the step" reads the centre BEFORE the
+  // animation's second frame when the two clocks are out of phase: under
+  // full-suite load that observed 21.7-23.3px, half of a 48px row, although
+  // the leg lands at zero offset. Measure at the completion edge instead.
+  // The 15px ceiling stays: on a landed leg the cursor centre must coincide
+  // with the viewport centre, so a limit well below a third of the fixture's
+  // 48px row still rejects both an unfinished leg and a whole-row cut.
+  function reportHold() {
+    const s0 = bars.length > 0 ? bars[0] : barScreenY()
+    let lo = s0, hi = s0
+    let maxStep = 0
+    let fractional = 0
+    for (let i = 1; i < cys.length; i++) {
+      const d = Math.abs(cys[i] - cys[i - 1])
+      maxStep = Math.max(maxStep, d)
+      // Read the raw step, not its printed one-decimal rounding: a 30.04px
+      // frame prints as "30" and a string check would call an eased leg an
+      // integer cut. At least one genuinely fractional frame per hold is
+      // the edge an eased leg has and a whole-row teleport does not.
+      if (d > 0 && Math.abs(d - Math.round(d)) > 0.001) fractional++
+    }
+    for (let i = 0; i < bars.length; i++) {
+      lo = Math.min(lo, bars[i])
+      hi = Math.max(hi, bars[i])
+    }
+    let legArmed = false
+    for (let i = 0; i < pins.length; i++) {
+      if (pins[i] === true) { legArmed = true; break }
+    }
+    let maxOff = 0
+    for (let i = 0; i < offs.length; i++) {
+      maxOff = Math.max(maxOff, Math.abs(offs[i]))
+    }
+    kv("hold.legArmed", legArmed)
+    kv("hold.barSpread", Math.round((hi - lo) * 10) / 10)
+    kv("hold.barPinned", (hi - lo) < 0.5)
+    kv("hold.maxFrameStep", Math.round(maxStep * 10) / 10)
+    kv("hold.fractionalFrames", fractional)
+    kv("hold.rowH", Math.round(hold.rowHeightAt(0) * 10) / 10)
+    kv("hold.noTeleport", maxStep < hold.rowHeightAt(0))
+    kv("hold.samples", offs.length)
+    kv("hold.maxCentreOffset", Math.round(maxOff * 10) / 10)
+    kv("hold.centred", maxOff < 15)
+  }
+
   Component.onCompleted: kv("probe.error", "none")
+
+  // contentY is written once per animation frame by the list's one seat
+  // writer. Reading it on that edge measures the actual frame step: polling
+  // it on a 16ms timer samples two clocks that drift under load, where one
+  // whole eased leg (a 50px row pitch) can fall between two timer turns and
+  // look like a one-frame teleport. The centre offset stays on the landing
+  // edge below; this is only the frame-step sample.
+  Connections {
+    target: hold
+    function onContentYChanged() {
+      if (root.measuring) root.cys.push(hold.contentY)
+    }
+  }
 
   Timer {
     interval: 16
@@ -52,40 +116,12 @@ Item {
         // Start mid-list so every step has room to centre; at the very top
         // the clamp holds contentY at 0 and centring is impossible.
         hold.settle(10, false)
-      } else if (root.turn <= 22) {
-        // A repeat step every other frame (~32ms). Read the centre offset at
-        // the step boundary, where the previous leg has landed; mid-leg the
-        // row is still sliding into the centre under a pinned bar by design.
-        if (root.turn % 2 === 0) {
-          root.offs.push(root.centreOffset())
-          hold.move(1, undefined, true)
-        }
-        root.cys.push(hold.contentY)
-        root.bars.push(root.barScreenY())
-        root.pins.push(hold.debugHoldLegMs > 0)
-      } else if (root.turn === 23) {
-        kv("hold.legArmed", root.pins[3] === true)
-        let s0 = root.bars[3], lo = s0, hi = s0
-        let maxStep = 0
-        for (let i = 4; i < root.cys.length; i++) {
-          lo = Math.min(lo, root.bars[i])
-          hi = Math.max(hi, root.bars[i])
-          maxStep = Math.max(maxStep, Math.abs(root.cys[i] - root.cys[i - 1]))
-        }
-        let maxOff = 0
-        for (let i = 1; i < root.offs.length; i++) {
-          maxOff = Math.max(maxOff, Math.abs(root.offs[i]))
-        }
-        kv("hold.barSpread", Math.round((hi - lo) * 10) / 10)
-        kv("hold.barPinned", (hi - lo) < 0.5)
-        kv("hold.maxFrameStep", Math.round(maxStep * 10) / 10)
-        kv("hold.rowH", Math.round(hold.rowHeightAt(0) * 10) / 10)
-        kv("hold.noTeleport", maxStep < hold.rowHeightAt(0))
-        kv("hold.maxCentreOffset", Math.round(maxOff * 10) / 10)
-        kv("hold.centred", maxOff < 15)
-      } else if (root.turn === 55) {
-        // The hold has long landed: the short leg is spent and the bar sits
-        // on its row, so the next step takes the normal single-step glide.
+        return
+      }
+      if (!root.measuring) {
+        // The last short leg has landed and been measured. Leave it well
+        // behind, then read the landed state and the wrap.
+        if (root.turn < root.resultTurn + 30) return
         const idx = hold.currentIndex
         kv("after.legSpent", hold.debugHoldLegMs === 0)
         kv("after.landed", Math.abs(hold.contentY - hold.centerTarget(idx)) < 0.5)
@@ -102,6 +138,38 @@ Item {
         kv("wrap.lengthPaced", hold._sweepMs > Ui.fastMs)
         console.log("##DONE##")
         root.completed = true
+        return
+      }
+
+      // The bar and the arm flag are polled on the timer; the frame step is
+      // sampled on contentY's own write edge (above). The centre offset is
+      // only meaningful once the leg has landed: mid-leg the row is still
+      // sliding into the centre by design.
+      root.bars.push(root.barScreenY())
+      root.pins.push(hold.debugHoldLegMs > 0)
+
+      // A repeat arrives at the key's cadence, but never before the previous
+      // leg has landed. Waiting for this edge is what keeps the measurement
+      // off a frame that the 30ms leg has not reached yet.
+      if (hold.debugAnimRunning || hold.debugHoldLegMs > 0) return
+      if (root.turn - root.lastStepTurn < 2) return
+      if (root.steps === 0) {
+        // The settle landed: take the first repeat step now. Its own landing
+        // is the first offset that gets measured.
+        root.steps = 1
+        root.lastStepTurn = root.turn
+        hold.move(1, undefined, true)
+        return
+      }
+      root.offs.push(root.centreOffset())
+      if (root.steps < 10) {
+        root.steps++
+        root.lastStepTurn = root.turn
+        hold.move(1, undefined, true)
+      } else {
+        root.reportHold()
+        root.measuring = false
+        root.resultTurn = root.turn
       }
     }
   }

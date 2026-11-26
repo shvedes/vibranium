@@ -1,0 +1,19 @@
+{
+  "id": "unit15",
+  "after": "unit14",
+  "provider": "services",
+  "phase": "early",
+  "activation": "resident",
+  "criticality": "optional",
+  "dependencies": [
+    "unit14"
+  ],
+  "retry": {
+    "maxAttempts": 3,
+    "backoffMs": 200,
+    "maxBackoffMs": 800
+  },
+  "hasReady": false,
+  "hasTeardown": false,
+  "ref": "Services.SyntheticService.tag"
+}
