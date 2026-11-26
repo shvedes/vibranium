@@ -123,19 +123,24 @@ _ask_yes_no_all() {
 #   $1         - scope: "user" or "system"
 #   $2 (nref)  - associative array mapping pkg -> space-separated unit names
 #   $3 (nref)  - indexed array to append background PIDs into
+#   $4 (nref)  - sticky "all" flag shared across scopes and packages
 _disable_scope_units() {
 	local scope="$1"
 	log Info "Disabling units (scope=$scope)"
 	local -n _pkg_map="$2"
 	local -n _pids="$3"
+	local -n _all="$4"
 
 	local pkg unit u
 	local -a remaining
+	local response
 
 	# _ask_yes_no_all returns 0 for yes, 1 for no, and 2 for all. Only those
 	# accepted responses consume queued units; invalid input leaves the current
-	# unit queued. systemctl runs in the background, and package removal starts
-	# after the caller waits for all collected PIDs.
+	# unit queued. "all" is sticky: once chosen it answers every remaining unit
+	# in every scope and package, so the user is not prompted a second time.
+	# systemctl runs in the background, and package removal starts after the
+	# caller waits for all collected PIDs.
 	term::enable_input
 
 	for pkg in "${!_pkg_map[@]}"; do
@@ -144,8 +149,12 @@ _disable_scope_units() {
 		while ((${#remaining[@]} > 0)); do
 			unit="${remaining[0]}"
 
-			_ask_yes_no_all Y "${B}[*]${RS} Disable unit '${B}${unit}${RS}' from package '${G}${pkg}${RS}' ($scope scope)?"
-			local response=$?
+			if [[ $_all == true ]]; then
+				response=2
+			else
+				_ask_yes_no_all Y "${B}[*]${RS} Disable unit '${B}${unit}${RS}' from package '${G}${pkg}${RS}' ($scope scope)?"
+				response=$?
+			fi
 
 			case $response in
 				0)
@@ -158,7 +167,10 @@ _disable_scope_units() {
 					remaining=("${remaining[@]:1}")
 					;;
 				2)
-					vb::print "$B" "Disabling all units for '${G}${pkg}${RS}'..."
+					if [[ $_all == false ]]; then
+						_all=true
+						vb::print "$B" "Disabling all units for '${G}${pkg}${RS}'..."
+					fi
 					for u in "${remaining[@]}"; do
 						if [[ "$scope" == "user" ]]; then
 							systemctl -q --user disable --now "$u" &
@@ -182,6 +194,9 @@ _disable_scope_units() {
 # Disables enabled units per package, prompting for each unit with Y/n/all.
 _disable_systemd_units() {
 	local -a pids=()
+	# Passed by name to _disable_scope_units, which mutates it via a nameref.
+	# shellcheck disable=SC2034
+	local disable_all=false
 
 	# Build pkg -> "unit1 unit2 ..." maps for each scope
 	declare -A pkg_user_units=()
@@ -199,8 +214,8 @@ _disable_systemd_units() {
 		pkg_system_units[$pkg]+="$unit "
 	done
 
-	_disable_scope_units "user" pkg_user_units pids
-	_disable_scope_units "system" pkg_system_units pids
+	_disable_scope_units "user" pkg_user_units pids disable_all
+	_disable_scope_units "system" pkg_system_units pids disable_all
 
 	# Waiting here makes unit cleanup complete, so pacman removal starts only
 	# after the files that back those units are handled. With no PIDs, Bash
