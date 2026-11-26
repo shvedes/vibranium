@@ -144,6 +144,28 @@ function Hypr.Helpers.ForceKillWindow()
   KillConfirm = { pid = pid, addr = addr, timer = timer }
 end
 
+-- Suppresses the border color fade during workspace switches for presets that
+-- disable workspace animation: the border fade is then the only motion left
+-- and makes the switch feel slow. Disabling the leaf makes Hyprland warp an
+-- in-flight fade on its next tick; the oneshot timer restores the preset config
+-- so focus and window-move color changes keep animating.
+function Hypr.Helpers.SkipBorderFade(borderAnim)
+  local restoreTimer = nil
+
+  hl.on("workspace.active", function()
+    hl.animation({ leaf = "border", enabled = false })
+
+    if restoreTimer then
+      restoreTimer:set_enabled(false)
+    end
+
+    restoreTimer = hl.timer(function()
+      hl.animation(borderAnim)
+      restoreTimer = nil
+    end, { timeout = 20, type = "oneshot" })
+  end)
+end
+
 -- Closes all windows on every workspace.
 -- Replaces vb-cmd-close-windows.
 function Hypr.Helpers.CloseWindows()

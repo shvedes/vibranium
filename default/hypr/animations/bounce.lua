@@ -1,10 +1,6 @@
--- Workspace switching animates on a laptop only: a touchpad swipe between
--- workspaces reads as stutter without it, while a desktop has no gesture for
--- the animation to smooth (a VM included). `hostnamectl chassis` answers
--- "laptop", or "convertible" for a touchscreen laptop; anything else is a
--- desktop.
-local chassis = (os.getenv("CHASSIS_TYPE") or ""):lower()
-local touchpad = chassis == "laptop" or chassis == "convertible"
+-- Workspace switching is instant in this preset; the border color fade is
+-- suppressed on switch for the same reason.
+local workspaceAnim = false
 
 hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
 hl.curve("easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } })
@@ -16,7 +12,8 @@ hl.curve("hobbyist", { type = "spring", mass = 1, stiffness = 150, dampening = 2
 hl.curve("cat", { type = "spring", mass = 1, stiffness = 200, dampening = 20 })
 
 hl.animation({ leaf = "global", enabled = true, speed = 1, bezier = "default" })
-hl.animation({ leaf = "border", enabled = true, speed = 2, bezier = "almostLinear" })
+local borderAnim = { leaf = "border", enabled = true, speed = 2, bezier = "almostLinear" }
+hl.animation(borderAnim)
 hl.animation({ leaf = "windows", enabled = true, speed = 5, spring = "cat", style = "slide" })
 hl.animation({ leaf = "windowsIn", enabled = true, speed = 5, spring = "cat", style = "slide" })
 hl.animation({ leaf = "windowsOut", enabled = true, speed = 5, bezier = "easeOutQuint", style = "slide bottom" })
@@ -26,5 +23,8 @@ hl.animation({ leaf = "fadeOut", enabled = true, speed = 0.73, bezier = "almostL
 hl.animation({ leaf = "fade", enabled = true, speed = 1.515, bezier = "quick" })
 hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 0.695, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 0.695, bezier = "almostLinear" })
-hl.animation({ leaf = "workspaces", enabled = touchpad, speed = 3, spring = "hobbyist", style = "slidevert" })
+hl.animation({ leaf = "workspaces", enabled = workspaceAnim, speed = 3, spring = "hobbyist", style = "slidevert" })
+if not workspaceAnim then
+  Hypr.Helpers.SkipBorderFade(borderAnim)
+end
 hl.animation({ leaf = "zoomFactor", enabled = true, speed = 4, bezier = "quick" })
