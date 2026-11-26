@@ -199,6 +199,8 @@ describe() {
   menu-result-fade) printf 'one handoff progress behind four result presentations on the live shell' ;;
   menu-lib-live) printf 'frame-level menu geometry with motion on and off' ;;
   launcher-keys-live) printf 'launcher navigation while delete confirmation is open' ;;
+  panel-card-release-grow) printf 'a slot release into a larger row set glides' ;;
+  launcher-delete-fold-hold) printf 'a confirmation folds before its row set swaps' ;;
   dropdown-land) printf 'a landed DropdownSlot keeps following its content height' ;;
   list-follow-curve) printf 'keyboard follow keeps the centre on a held key' ;;
   list-hold) printf 'held-key centre lock: a pinned bar and sliding rows' ;;

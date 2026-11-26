@@ -72,7 +72,30 @@ PanelCard {
   property bool _fitPending: false
   exactListH: panel._latchedListH
   fitPending: panel._fitPending
-  rows: AppLauncher.results
+  // A model swap rebuilds the delegate that owns an open slot, so the new row
+  // is born with its confirmation already closed and the fold never paints.
+  // Hold the outgoing row set while that slot folds, then publish the fresh
+  // one: the slot finishes on the row that opened it, and the card follows the
+  // fold before it resizes to the restored list.
+  property var _foldHeldRows: null
+  property int _rowsRev: 0
+  rows: panel._foldHeldRows !== null ? panel._foldHeldRows : AppLauncher.results
+  Timer {
+    id: foldRowsTimer
+
+    interval: 0
+    property int rev: -1
+    onTriggered: {
+      const mine = foldRowsTimer.rev
+      foldRowsTimer.rev = -1
+      panel._foldHeldRows = null
+      // A newer result set during the hold owns the install now; its own
+      // handler either armed a new timer or ran syncRows() already.
+      if (mine !== panel._rowsRev) return
+      panel.recalcWidth()
+      panel.syncRows()
+    }
+  }
   // The gap between rows is the LIST's, read rather than assumed: the card
   // sums the same gap the list places, so the region's bottom edge stays on
   // a row boundary whatever a surface decides to space its rows by.
@@ -128,10 +151,29 @@ PanelCard {
   Connections {
     target: AppLauncher
     function onResultsChanged() {
-      panel.syncRows()
+      panel._rowsRev++
+      // Close before the install is scheduled: the slot's own duration is the
+      // time the outgoing delegate needs to fold, and a model swap inside that
+      // window would replace it with a row born closed.
+      const foldMs = panel.closeDelete() || panel._foldingSlotMs()
+      if (foldMs > 0) {
+        panel._foldHeldRows = panel._records
+        foldRowsTimer.interval = foldMs
+        foldRowsTimer.rev = panel._rowsRev
+        foldRowsTimer.restart()
+      } else {
+        // A newer result set during the hold outranks the old fold. Publish
+        // it now so the install scheduled below reads the fresh rows, not the
+        // array the outgoing fold was holding.
+        if (panel._foldHeldRows !== null) {
+          panel._foldHeldRows = null
+          foldRowsTimer.rev = -1
+          foldRowsTimer.stop()
+        }
+        panel.syncRows()
+      }
       if (!panel.searching) panel.recalcWidth()
       panel.closeTrailingInfo()
-      panel.closeDelete()
       // Deliberately no queueFit() here. `results` is assigned a turn before
       // the install (syncRows defers it), so a fit armed on this signal sizes
       // the card from rows the view has NOT shown yet - queueFit writes that
@@ -145,6 +187,11 @@ PanelCard {
 
     function onVisibleChanged() {
       if (!AppLauncher.visible) {
+        // A hold is tied to the summon that opened the slot. Closing retires
+        // it so the next open publishes its own fresh row set.
+        panel._foldHeldRows = null
+        foldRowsTimer.rev = -1
+        foldRowsTimer.stop()
         panel.closeNotice()
         // A staged delete belongs to the summon that opened it. The
         // results-change path also closes it, but a close need not publish a
@@ -885,10 +932,32 @@ PanelCard {
     // dropped keypress.
     if (rec && rec.kind === "app") panel.flashNotDeletable(idx)
   }
+  // The longest slot still unfolding or folding in the live rows. A results
+  // change that lands mid-fold has to hold the row set too: Escape or the
+  // field's backspace can close the confirmation a turn before the query
+  // clears, and swapping the model then still replaces the folding delegate.
+  function _foldingSlotMs() {
+    const kids = list.contentItem.children
+    let ms = 0
+    for (let i = 0; i < kids.length; i++) {
+      const d = kids[i]
+      if (!(d instanceof LauncherEntry)) continue
+      if (d.slotMotionMs > ms) ms = d.slotMotionMs
+    }
+    return ms
+  }
+
+  // Returns the fold duration of a confirmation that was actually open, so a
+  // caller that is also replacing the row set can hold it until the fold ends.
+  // A no-op close answers 0 and lets the row set publish immediately.
   function closeDelete() {
+    if (!confirmStage.open) return 0
+    const row = list.currentItem
+    const foldMs = row ? row.slotMotionMs : 0
     confirmStage.close()
     list.autoRevealIndex = -1
     AppLauncher.pendingDelete = null
+    return foldMs
   }
   function closeTrailingInfo() { _infoIndex = -1; list.autoRevealIndex = -1 }
 

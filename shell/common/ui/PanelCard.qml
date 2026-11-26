@@ -65,8 +65,8 @@ Rectangle {
   // "a slot is open" and "the card grows" are different facts about one
   // gesture. See _latchRestingBuffer.
   property bool slotOpen: false
-  // The region a releasing slot leaves the card shrinking FROM, or -1 when no
-  // collapse is in flight.
+  // The region a releasing slot leaves the card resizing FROM, or -1 when no
+  // release is in flight.
   //
   // An unfold needs no tween here: the consumer's override follows the slot's
   // own height as it eases out, which is why the height Behavior stands down
@@ -78,7 +78,10 @@ Rectangle {
   // the Behavior's `enabled` is read as a plain member at write time: in the
   // release turn that write reaches the height before the region comparison
   // that clears the gate has been re-evaluated, so the shrink takes the bypass
-  // branch and snaps instead of tweening.
+  // branch and snaps instead of tweening. The same latch carries a release
+  // that lands during a row-set change - clearing a filter with a delete
+  // confirmation open - where the resting region the slot releases INTO is
+  // larger than the one it grew against.
   property real _releaseH: -1
   // The last region a slot was asking for, kept to be read at the release
   // edge: the height the card is showing at that moment.
@@ -98,7 +101,7 @@ Rectangle {
 
   // The region's two edges. A slot asking for more room is followed frame by
   // frame, so only its latest value is remembered; the release turns that
-  // value into a tween down to rest.
+  // value into a tween to rest.
   onSlotRegionHChanged: {
     const base = root.restingListH
     const want = root.slotRegionH
@@ -108,11 +111,20 @@ Rectangle {
       root._releaseFromH = want
       return
     }
-    const from = root._releaseFromH
+    // A release can share its turn with a row-set change: clearing a filter
+    // with a delete confirmation open replaces a one-row fit with the full
+    // list while the slot claim goes away. The base the slot grew against is
+    // then no longer the base it releases into, so comparing `from` to the
+    // NEW base would refuse the tween and land the card in one frame. Carry
+    // the height the card is showing to the base it now owns, in either
+    // direction. A release already in flight is retargeted from its live
+    // value, so a second change in the same window cannot cancel it.
+    const from = root._releaseH > 0 ? root._releaseH : root._releaseFromH
     root._releaseFromH = -1
     releaseAnim.stop()
-    // Nothing grew, or motion is off: there is no collapse to carry.
-    if (!MotionPolicy.enabled || !(from > base + 0.5)) {
+    // Nothing grew, motion is off, or the card is already there: nothing to
+    // carry.
+    if (!MotionPolicy.enabled || !(from > 0) || Math.abs(from - base) <= 0.5) {
       root._releaseH = -1
       return
     }
@@ -455,9 +467,12 @@ Rectangle {
   // the rows it is showing.
   readonly property real listRegionH: {
     const base = root.restingListH
-    // A collapse in flight owns the region until it lands on rest: the claim
-    // is already gone, so there is no override left to read.
-    if (root._releaseH > 0) return Range.clamp(base, root._releaseH, root.screenMaxListH)
+    // A release in flight owns the region until it lands on rest: the claim
+    // is already gone, so there is no override left to read. The latch is the
+    // height the card was showing, not a region to floor at `base`: when the
+    // row set grows under the release the card glides UP from that height,
+    // and clamping to the new base would land it there in one frame.
+    if (root._releaseH > 0) return Math.min(root._releaseH, root.screenMaxListH)
     const want = root.slotRegionH
     if (!(want > 0)) return base
     return Range.clamp(base, want, root.screenMaxListH)
@@ -611,9 +626,8 @@ Rectangle {
   //
   // The release is the case this gate cannot serve: it clears in the same
   // turn the region falls back to rest, and the gate is read before that
-  // write. The shrink is therefore carried by `_releaseH` above, which keeps
-  // listRegionH over the resting region for the length of the collapse and
-  // lands it on rest.
+  // write. The resize is therefore carried by `_releaseH` above, which holds
+  // the height the card was showing until it lands on the resting region.
   Behavior on height {
     enabled: MotionPolicy.enabled
       && !root.sizeSnap
