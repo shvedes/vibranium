@@ -1,0 +1,37 @@
+{
+  "kind": "boot-lease-moments",
+  "version": 1,
+  "description": "Expected registered-handler state and wire replies at the four startup moments. The provider-pending windows have no registered target, so neither the direct open nor the shortcut reaches UnitLease.",
+  "shortcutWords": ["appLauncher", "toggle"],
+  "moments": {
+    "before": {
+      "registered": false,
+      "gateState": "not_started",
+      "open": { "ok": false, "code": "unavailable", "message": "owner not registered" },
+      "shortcut": { "ok": false, "code": "unavailable", "message": "owner not registered" }
+    },
+    "loading": {
+      "registered": false,
+      "gateState": "not_started",
+      "ensure": { "ok": true, "state": "not_started", "code": null, "hasLease": true },
+      "open": { "ok": false, "code": "unavailable", "message": "owner not registered" },
+      "shortcut": { "ok": false, "code": "unavailable", "message": "owner not registered" }
+    },
+    "adopted": {
+      "registered": false,
+      "gateState": "ready",
+      "refresh": true,
+      "stateAfterBootRelease": "stopped",
+      "open": { "ok": false, "code": "unavailable", "message": "owner not registered" },
+      "shortcut": { "ok": false, "code": "unavailable", "message": "owner not registered" }
+    },
+    "facade": {
+      "registered": true,
+      "gateState": "ready",
+      "phase": "ready",
+      "constructions": 1,
+      "open": { "ok": true, "code": null, "message": null },
+      "shortcut": { "ok": true, "code": null, "message": null }
+    }
+  }
+}

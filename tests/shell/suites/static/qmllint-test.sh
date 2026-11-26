@@ -28,7 +28,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 270 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 276 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
@@ -38,7 +38,9 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   name; the two feature-local files they replaced left it again. The shared
 #   BootGate/qml under state/ is a QtObject with an explicit default child
 #   list, so it too moves the count without adding a warning or an unresolved
-#   name.
+#   name. Phase 1's boot/BootPump.qml and Phase 2's boot/AsyncLoader.qml are
+#   two more clean QtObjects in the same shape, so they likewise move only
+#   the count.
 # RECORDED_WARNING_COUNT: 139 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
@@ -147,7 +149,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # contributes two Info diagnostics; the warning set is unchanged.
 # The Lockscreen gateway's IpcRouter.unregister adds one unqualified warning;
 # retiring the native effect toggles removes one Info diagnostic.
-RECORDED_FILE_COUNT=275
+RECORDED_FILE_COUNT=277
 RECORDED_WARNING_COUNT=112
 RECORDED_INFO_COUNT=18
 

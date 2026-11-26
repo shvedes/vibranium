@@ -1,0 +1,17 @@
+{
+  "kind": "boot-lease-facade-pending",
+  "version": 1,
+  "description": "Registered dispatch, resolver declining (provider pending), no publishable controller. The first demand is dropped; only a later demand after the provider lands succeeds. Constructions is cumulative on the shared stand-in facade: it was already 1 from the facade-present moment.",
+  "registered": true,
+  "ensure": { "ok": true, "state": "not_started", "code": null, "hasLease": true },
+  "first": { "ok": false, "code": "unavailable", "message": "launcher did not open" },
+  "phase": "unavailable",
+  "error": "load",
+  "gateState": "stopped",
+  "constructions": 1,
+  "retry": { "ok": false, "code": "unavailable", "message": "launcher did not open" },
+  "retryPhase": "unavailable",
+  "recovered": { "ok": true, "code": null, "message": null },
+  "recoveredPhase": "ready",
+  "recoveredConstructions": 2
+}

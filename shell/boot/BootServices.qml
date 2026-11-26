@@ -37,51 +37,136 @@ Item {
   // gate bookkeeping stays in one place.
   property var boot: null
 
-  function resolve(id) {
-    switch (id) {
-      // The session lock is essential - a lock request and the shell's own
-      // readiness verdict both wait on it - and its module set is small, so it
-      // resolves here instead of with the feature half. Behind the feature half
-      // it could not land until the menu, launcher, apps and picker sets had
-      // compiled and the entrance had settled; here it lands when the services
-      // do. `qs.features.lock` imports `qs.services` already, so this shares
-      // that compile rather than repeating it in a fourth half.
-      case "lockscreen":    void Lockscreen.locked; break
-      // Timer, SystemUpdates, Connectivity and Tools are qualified because qs.services
-      // shares those names with the bar's own modules and with QtQuick's
-      // Timer; the qualified name is the one that cannot resolve to the wrong
-      // type.
-      case "idleDaemon":    void IdleDaemon.tag; break
-      case "inhibitor":     void Inhibitor.tag; break
-      case "session":       void Session.tag; break
-      case "privacy":       void Privacy.tag; break
-      case "audio":         void Audio.tag; break
-      case "mediaArt":      void MediaArt.tag; break
-      case "keyboard":      void Keyboard.tag; break
-      case "timer":         void Services.Timer.tag; break
-      case "recording":     void Recording.tag; break
-      case "update":        void Update.tag; break
-      case "systemUpdates": void Services.SystemUpdates.tag; break
-      case "powerProfile":  void PowerProfile.tag; break
-      case "printers":      void Printers.tag; break
-      case "powerPolicy":   void PowerPolicy.tag; break
-      case "batteryAlert":  void BatteryAlert.tag; break
-      case "connectivity":  void Services.Connectivity.tag; break
-      case "tools":         void Services.Tools.tag; break
-      case "screenshots":
+  // One row per owned id. The resolve closures are the former case bodies;
+  // the other fields say whether the id has a readiness predicate or a
+  // controller to release. Building the table touches no singleton, so a half
+  // that has loaded but is not yet demanded stays inert.
+  property var handlers: ({
+    // The session lock is essential - a lock request and the shell's own
+    // readiness verdict both wait on it - and its module set is small, so it
+    // resolves here instead of with the feature half. Behind the feature half
+    // it could not land until the menu, launcher, apps and picker sets had
+    // compiled and the entrance had settled; here it lands when the services
+    // do. `qs.features.lock` imports `qs.services` already, so this shares
+    // that compile rather than repeating it in a fourth half.
+    "lockscreen": {
+      resolve: function() { void Lockscreen.locked },
+      ready: null,
+      teardown: null
+    },
+    // Timer, SystemUpdates, Connectivity and Tools are qualified because qs.services
+    // shares those names with the bar's own modules and with QtQuick's
+    // Timer; the qualified name is the one that cannot resolve to the wrong
+    // type.
+    "idleDaemon": {
+      resolve: function() { void IdleDaemon.tag },
+      ready: null,
+      teardown: null
+    },
+    "inhibitor": {
+      resolve: function() { void Inhibitor.tag },
+      ready: null,
+      teardown: null
+    },
+    "session": {
+      resolve: function() { void Session.tag },
+      ready: null,
+      teardown: null
+    },
+    "privacy": {
+      resolve: function() { void Privacy.tag },
+      ready: null,
+      teardown: null
+    },
+    "audio": {
+      resolve: function() { void Audio.tag },
+      ready: null,
+      teardown: null
+    },
+    "mediaArt": {
+      resolve: function() { void MediaArt.tag },
+      ready: null,
+      teardown: null
+    },
+    "keyboard": {
+      resolve: function() { void Keyboard.tag },
+      ready: null,
+      teardown: null
+    },
+    "timer": {
+      resolve: function() { void Services.Timer.tag },
+      ready: null,
+      teardown: null
+    },
+    "recording": {
+      resolve: function() { void Recording.tag },
+      ready: null,
+      teardown: null
+    },
+    "update": {
+      resolve: function() { void Update.tag },
+      ready: null,
+      teardown: null
+    },
+    "systemUpdates": {
+      resolve: function() { void Services.SystemUpdates.tag },
+      ready: null,
+      teardown: null
+    },
+    "powerProfile": {
+      resolve: function() { void PowerProfile.tag },
+      ready: null,
+      teardown: null
+    },
+    "printers": {
+      resolve: function() { void Printers.tag },
+      ready: null,
+      teardown: null
+    },
+    "powerPolicy": {
+      resolve: function() { void PowerPolicy.tag },
+      ready: null,
+      teardown: null
+    },
+    "batteryAlert": {
+      resolve: function() { void BatteryAlert.tag },
+      ready: null,
+      teardown: null
+    },
+    "connectivity": {
+      resolve: function() { void Services.Connectivity.tag },
+      ready: null,
+      teardown: null
+    },
+    "tools": {
+      resolve: function() { void Services.Tools.tag },
+      ready: null,
+      teardown: null
+    },
+    "screenshots": {
+      resolve: function() {
         void Screenshots.tag
         late._observeScreenshots()
-        break
-      default:              return false
+      },
+      ready: function() { return Screenshots._runtimeReady === true },
+      teardown: null
     }
+  })
+
+  function handler(id) {
+    return Object.prototype.hasOwnProperty.call(handlers, id) ? handlers[id] : null
+  }
+
+  function resolve(id) {
+    var row = handler(id)
+    if (!row) return false
+    row.resolve()
     return true
   }
 
   function readyState(id) {
-    switch (id) {
-      case "screenshots": return Screenshots._runtimeReady === true
-      default:            return false
-    }
+    var row = handler(id)
+    return row && row.ready ? row.ready() : false
   }
 
   // An observation edge, attached when the unit is first resolved rather than

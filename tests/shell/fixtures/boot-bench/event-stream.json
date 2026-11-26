@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "boot-pilot-stream-v1",
+  "graphDigestSource": "rows + graphId only; no host, build, compositor or settings metadata",
+  "graphId": "boot-pilot-graph-v1",
+  "rows": [
+    { "op": "ipc", "name": "shell.register", "tMs": 0 },
+    { "op": "ipc", "name": "boot.register", "tMs": 0 },
+    { "op": "timer", "name": "watchdog.arm", "windowMs": 5000, "tMs": 0 },
+    { "id": "origin", "kind": "boot.begin", "fields": { "source": "launcher", "estimateMs": 0 }, "tMs": 0 },
+    { "id": "catalog", "kind": "catalog.registered", "fields": { "valid": true, "digest": "boot-pilot-graph-v1" }, "tMs": 1 },
+    { "id": "svc", "kind": "provider.request", "fields": { "source": "provider:services", "reason": "lateServicesHalf" }, "causes": ["origin"], "tMs": 2 },
+    { "op": "pump", "name": "services", "source": "queue:early", "tMs": 3 },
+    { "op": "pump", "name": "bar", "source": "queue:entrance", "tMs": 3 },
+    { "op": "turn", "tMs": 4 },
+    { "op": "turn", "tMs": 5 },
+    { "op": "loader", "name": "features", "tMs": 6 },
+    { "id": "features", "kind": "provider.result", "fields": { "source": "provider:features", "outcome": "adopted" }, "causes": ["origin"], "tMs": 7 },
+    { "id": "settled", "kind": "milestone.decision", "fields": { "milestone": "settled", "reason": "wallpaperSettled", "participant": "wallpaper" }, "causes": ["origin"], "tMs": 8 },
+    { "op": "ipc", "name": "ipc.readiness.poll", "tMs": 9 },
+    { "op": "ipc", "name": "ipc.readiness.poll", "tMs": 9 },
+    { "id": "played", "kind": "milestone.decision", "fields": { "milestone": "played", "reason": "barAnimationDone", "participant": "bar" }, "causes": ["settled"], "tMs": 10 },
+    { "id": "admit", "kind": "drain.admission", "fields": { "via": "features" }, "causes": ["features"], "tMs": 11 },
+    { "op": "pump", "name": "drain", "source": "queue:replay", "tMs": 12 },
+    { "op": "turn", "tMs": 13 },
+    { "id": "verdict", "kind": "verdict.decision", "fields": { "state": "ready" }, "causes": ["played"], "tMs": 14 },
+    { "op": "ipc", "name": "boot.ready", "tMs": 15 },
+    { "op": "loader.teardown", "tMs": 16 }
+  ]
+}

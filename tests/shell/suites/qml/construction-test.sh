@@ -365,9 +365,10 @@ supplied.qs.common.LyricsPane=player: null"
 # qs.common.BusySpinner, qs.common.DismissNet, qs.common.GlassPill and
 # qs.common.ConfirmStage replace the two feature-local declarations, all clean
 # headless builds over Text/Item/QtObject.)
-# Batch A declared qs.common.IpcRouter in common/qmldir, so the tree now
-# publishes 274 entries rather than 273.
-EXPECTED_DECLARED_COUNT=274
+# Batch A declared qs.common.IpcRouter in common/qmldir, so the tree published
+# 274 entries rather than 273. Phase 1 declares qs.boot.BootPump in boot/qmldir,
+# raising the published surface to 275; Phase 2 adds qs.boot.AsyncLoader for 276.
+EXPECTED_DECLARED_COUNT=276
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -397,7 +398,11 @@ EXPECTED_DECLARED_COUNT=274
 # RotationAnimation, DismissNet a QtObject, GlassPill an Item over a Rectangle
 # and ConfirmStage a QtObject state machine - none reaches a window.
 # qs.common.IpcRouter (Batch A) is a clean singleton over plain JS libraries.
-EXPECTED_CLEAN_COUNT=142
+# qs.boot.BootPump (Phase 1) is a clean QtObject: its one-shot timer is owned
+# through an explicit default child list, so it builds headlessly.
+# qs.boot.AsyncLoader (Phase 2) is a clean QtObject: it holds one URL load and
+# an injectable factory, with no window, timer or environment behind it.
+EXPECTED_CLEAN_COUNT=144
 EXPECTED_NEEDS_COUNT=122
 EXPECTED_UNCREATABLE_COUNT=9
 

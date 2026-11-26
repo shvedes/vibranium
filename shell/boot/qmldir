@@ -3,3 +3,5 @@ module qs.boot
 Boot 1.0 Boot.qml
 BootServices 1.0 BootServices.qml
 BootLate 1.0 BootLate.qml
+BootPump 1.0 BootPump.qml
+AsyncLoader 1.0 AsyncLoader.qml

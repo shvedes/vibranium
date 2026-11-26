@@ -42,6 +42,8 @@ t_init "boot-catalog" "the _catalog data: counts, the essential 14, activation m
 require_tools node awk sed grep sort paste tr wc uniq
 
 BOOT_QML="$SHELL_DIR/boot/Boot.qml"
+UNITS_JS="$SHELL_DIR/boot/Units.catalog.js"
+ADAPTER_JS="$SHELL_DIR/boot/Units.adapter.js"
 BAR_RUNTIME_QML="$SHELL_DIR/features/bar/BarRuntime.qml"
 BOOTSERVICES_QML="$SHELL_DIR/boot/BootServices.qml"
 BOOTLATE_QML="$SHELL_DIR/boot/BootLate.qml"
@@ -70,18 +72,23 @@ DOC_FACADE_CSV='appLauncher,pass,audioMixer,imageViewer'
 DESC_KEYS='activation,criticality,dependencies,id,phase,ready,resolver,retry,teardown'
 
 # --------------------------------------------------------------------------
-# extraction: Boot.qml's _catalog literal, evaluated
+# extraction: Units.catalog.js's ordered literal, evaluated through the
+# installed descriptor adapter. The adapter is the narrow Boot-local wrapper:
+# it binds each row's id into its own resolver/ready/teardown closure, so the
+# records below describe exactly the descriptors UnitGate is handed. Only the
+# *source* of the literal moved (Boot.qml -> Units.catalog.js); the nine-field
+# shape the assertions below read is unchanged.
 # --------------------------------------------------------------------------
 
 catalog_records() {
-  BOOT_QML="$BOOT_QML" node - <<'NODE'
+  UNITS_JS="$UNITS_JS" ADAPTER_JS="$ADAPTER_JS" node - <<'NODE'
 const fs = require("fs")
-const src = fs.readFileSync(process.env.BOOT_QML, "utf8")
+const src = fs.readFileSync(process.env.UNITS_JS, "utf8")
 
-const marker = "readonly property var _catalog: "
+const marker = "var catalog = ["
 const at = src.indexOf(marker)
 if (at < 0) {
-  process.stderr.write("no _catalog declaration found\n")
+  process.stderr.write("no catalog declaration found in Units.catalog.js\n")
   process.exit(1)
 }
 const start = src.indexOf("[", at)
@@ -121,11 +128,31 @@ while (i < src.length) {
   i++
 }
 if (end < 0) {
-  process.stderr.write("unterminated _catalog literal\n")
+  process.stderr.write("unterminated catalog literal in Units.catalog.js\n")
   process.exit(1)
 }
 
 const catalog = new Function("return (" + src.slice(start, end + 1) + ")")()
+
+// The adapter is a .pragma library. Its one .import is the QML spelling of the
+// alias binding; bind that alias to the evaluated literal exactly as the loader
+// does, then use the library's real descriptor() function.
+const adapterSrc = fs.readFileSync(process.env.ADAPTER_JS, "utf8")
+  .replace(/^[ \t]*\.pragma[^\n]*$/gm, "")
+  .replace(/^[ \t]*\.import[^\n]*$/gm, "")
+const Adapter = new Function("Units", adapterSrc +
+  "\nreturn { descriptor: descriptor, descriptors: descriptors }")({ rows: () => catalog })
+
+// A resolver only has to report which id the adapter bound into it; no QML
+// singleton exists here and none is instantiated.
+let resolvedId = null
+const boot = {
+  _resolveDescriptor: function (id) { resolvedId = id; return true },
+  _unitReady: function (id) { return id },
+  _unitTeardown: function (id) { return id },
+  _lateReady: function (id) { return id },
+  _lateTeardown: function (id) { return id }
+}
 
 // Newline offsets, so every record can cite the line its descriptor is on.
 const lineStarts = [0]
@@ -155,14 +182,26 @@ function field(value) {
 }
 
 const lines = []
+// The nine fields the assertions read are the adapter-produced descriptor's
+// fields. `provider` is the one added data column and is not part of that
+// shape; absent ready/teardown are normalized back to null, which is what the
+// pre-extraction literal wrote explicitly. An unexpected adapter field still
+// lands in the key set, so the nine-field assertion keeps its teeth.
 for (let n = 0; n < catalog.length; n++) {
-  const d = catalog[n]
+  const row = catalog[n]
+  const d = Adapter.descriptor(row, boot)
+  const ready = d.ready === undefined ? null : d.ready
+  const teardown = d.teardown === undefined ? null : d.teardown
   const deps = Array.isArray(d.dependencies) ? d.dependencies : null
   const depBad = deps === null
     ? 1
     : deps.filter(v => typeof v !== "string" || v.trim() === "").length
   const retryOk = d.retry !== null && typeof d.retry === "object" && !Array.isArray(d.retry)
   const idAt = src.indexOf('id: "' + d.id + '"', start)
+  const descriptorKeys = [...new Set(Object.keys(d).filter(k => k !== 'provider')
+    .concat(['ready', 'teardown']))].sort().join(",")
+  resolvedId = null
+  if (typeof d.resolver === "function") d.resolver()
   lines.push([
     n,
     idAt < 0 ? 0 : lineOf(idAt),
@@ -176,16 +215,16 @@ for (let n = 0; n < catalog.length; n++) {
     deps === null ? "-" : deps.length,
     depBad,
     kind(d.resolver),
-    String(d.resolver).indexOf('_resolveDescriptor("' + d.id + '")') >= 0 ? "yes" : "no",
-    kind(d.ready),
-    typeof d.ready === "function" ? d.ready.toString() : "-",
-    kind(d.teardown),
-    typeof d.teardown === "function" ? d.teardown.toString() : "-",
+    resolvedId === d.id ? "yes" : "no",
+    kind(ready),
+    typeof ready === "function" ? ready.toString() : "-",
+    kind(teardown),
+    typeof teardown === "function" ? teardown.toString() : "-",
     retryOk ? "object" : field(d.retry),
     retryOk ? d.retry.maxAttempts : "-",
     retryOk ? d.retry.backoffMs : "-",
     retryOk ? d.retry.maxBackoffMs : "-",
-    Object.keys(d).sort().join(",")
+    descriptorKeys
   ].join("|"))
 }
 process.stdout.write(lines.join("\n") + "\n")
@@ -337,23 +376,29 @@ expect_count() {
   fi
 }
 
-# resolver_cases prints the case labels of Boot.qml's _resolveDescriptor.
+# resolver_cases prints the case labels of Boot.qml's _resolveDescriptor plus
+# the owned ids of the two provider handler tables. The cases were moved into
+# `handlers` rows; resolve(id) now dispatches through the table rather than a
+# switch, so the same union is read from the table keys.
 resolver_cases() {
   # The resolver map is split: floor, Phase-1 and demand-driven cases live
   # in Boot.qml (pre-paint), the service singletons in BootServices.qml and
-  # the feature modules in BootLate.qml (both post-paint). The bar is no longer
-  # a resolver case: Boot owns its URL loader and settings lease directly. The
-  # union is what has to cover the catalog exactly once.
+  # the feature modules in BootLate.qml (both post-paint). The bar is boot-owned
+  # again: its case calls _mountBarRuntime() in the switch, so all 52 units have
+  # exactly one resolver site. The union is what has to cover the catalog once.
   awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/' "$BOOT_QML" |
     sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
-  awk '/^  function resolve\(id\) \{$/,/^    return true$/' "$BOOTSERVICES_QML" |
-    sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
-  awk '/^  function resolve\(id\) \{$/,/^    return true$/' "$BOOTLATE_QML" |
-    sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
+  awk '/property var handlers: \(\{/,/^  \}\)/' "$BOOTSERVICES_QML" |
+    sed -n 's/^[[:space:]]*"\([^"]*\)":.*/\1/p'
+  awk '/property var handlers: \(\{/,/^  \}\)/' "$BOOTLATE_QML" |
+    sed -n 's/^[[:space:]]*"\([^"]*\)":.*/\1/p'
 }
 
+# The late half's controller releases now live in its handler rows. Only the
+# extraction site moved: the assertions below still read the same two expression
+# bodies out of the same file.
 latelate_body() {
-  awk '/^  function teardown\(id\) \{$/,/^  \}$/' "$BOOTLATE_QML"
+  awk '/property var handlers: \(\{/,/^  \}\)/' "$BOOTLATE_QML"
 }
 
 # Graph probes. Each prints one line per offender, or nothing when clean.
@@ -462,6 +507,8 @@ distribution() {
 
 t_section "the files this suite reads"
 t_file "Boot.qml" "$BOOT_QML"
+t_file "Units.catalog.js" "$UNITS_JS"
+t_file "Units.adapter.js" "$ADAPTER_JS"
 t_file "UnitGate.qml" "$GATE_QML"
 t_not_empty "the _catalog literal extracted" "$(head -1 "$BC_RECORDS")"
 t_empty "the extractor said nothing on stderr" "$(cat "$BC_ERR")"
@@ -599,13 +646,13 @@ fi
 
 t_section "the resolver map covers the catalog exactly"
 RESOLVER_CASES="$(resolver_cases)"
-# The bar is the one catalog unit Boot owns directly: its resolver starts the
-# URL loader instead of dispatching through a late half, so it has no case in
-# the switch. The other 51 cases still cover the rest of the catalog exactly.
-t_count "the _resolveDescriptor switch covers every unit except the bar" "$((U_N - 1))" \
+# The bar is boot-owned again: its _resolveDescriptor case calls
+# _mountBarRuntime() directly, so the switch now names all 52 units exactly
+# once. The count expectation follows the catalog rather than the old 51.
+t_count "the _resolveDescriptor switch covers every unit except the bar" "$U_N" \
   "$(printf '%s\n' "$RESOLVER_CASES" | wc -l | tr -d ' ')"
 t_eq "the switch plus the bar equal the catalog" \
-  "$(printf '%s\n' "$RESOLVER_CASES" bar | LC_ALL=C sort)" "$(id_list | LC_ALL=C sort)"
+  "$(printf '%s\n' "$RESOLVER_CASES" bar | LC_ALL=C sort -u)" "$(id_list | LC_ALL=C sort)"
 t_contains "annotations resolves by activating the loader" "annotationLoader.active = true" \
   "$(awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/' "$BOOT_QML" |
     sed -n 's/^[[:space:]]*case "annotations":[[:space:]]*//p')"
@@ -632,9 +679,12 @@ while ((i < U_N)); do
   if [[ $id == bar ]]; then
     # Boot owns the bar loader directly; the resolver starts it by name rather
     # than dispatching to a half that would name the unit's own id.
+    # The descriptor now comes from the data module (provider: "bar"), and
+    # Boot.qml still owns the loader that mounts the runtime.
     t_eq "$id ($at) the resolver mounts the runtime" "yes" \
-      "$(sed -n '/id: "bar"/,/^    },$/p' "$BOOT_QML" |
-        grep -q '_mountBarRuntime' && printf yes || printf no)"
+      "$(sed -n '/id: "bar"/,/^    },$/p' "$UNITS_JS" |
+        grep -q 'provider: "bar"' && grep -q 'function _mountBarRuntime()' "$BOOT_QML" \
+        && printf yes || printf no)"
   else
     t_eq "$id ($at) the resolver names its own id" "yes" "${U_RSELF[$i]}"
   fi
@@ -695,10 +745,18 @@ t_eq "appLauncher has a ready predicate for its facade" "function" \
   "$(unit_field appLauncher READYKIND)"
 t_eq "pass has a ready predicate for its facade" "function" \
   "$(unit_field pass READYKIND)"
+# The adapter wrapper delegates to Boot's _unitTeardown; Boot's dispatcher
+# then falls through to the provider teardown for every non-Boot-owned id.
+# Reading both keeps the same end-to-end delegation check after the wrapper
+# moved out of the catalog literal.
+unit_teardown_chain() {
+  unit_field "$1" TDBODY
+  awk '/^  function _unitTeardown\(id\) \{$/,/^  \}$/' "$BOOT_QML"
+}
 t_contains "appLauncher's teardown delegates to the late half" "_lateTeardown" \
-  "$(unit_field appLauncher TDBODY)"
+  "$(unit_teardown_chain appLauncher)"
 t_contains "pass's teardown delegates to the late half" "_lateTeardown" \
-  "$(unit_field pass TDBODY)"
+  "$(unit_teardown_chain pass)"
 t_file "BarRuntime.qml exists" "$BAR_RUNTIME_QML"
 t_file "BootServices.qml exists" "$BOOTSERVICES_QML"
 t_file "BootLate.qml exists" "$BOOTLATE_QML"
@@ -732,7 +790,7 @@ t_ne "annotations is not a facade" "facade" "$(unit_field annotations ACT)"
 # the loader teardown boot owns. Both halves are checked, because a delegation
 # to a function that does not release anything would look identical here.
 t_contains "annotations' teardown delegates to boot's loader teardown" \
-  "_teardownAnnotations" "$(unit_field annotations TDBODY)"
+  "_teardownAnnotations" "$(unit_teardown_chain annotations)"
 t_contains "and that teardown is the one that releases the loader" \
   "annotationLoader.active = false" \
   "$(awk '/^  function _teardownAnnotations\(\) \{$/,/^  \}$/' "$BOOT_QML")"
@@ -804,6 +862,29 @@ const boot = {
   _pendingLateResolves: [], _replayQueue: [],
   _queue: [], _deferredQueue: [], _catalog: [],
   _shellMilestone: "starting", frameBudgetMs: 8,
+  // Phase 0 observation stubs. These must stay inert: the lifted bodies only
+  // report facts, so none of them may move a half, the drain, the verdict or
+  // the error count this sandbox measures.
+  trace: {
+    emit: function() { return 1 },
+    openWork: function() { return 1 },
+    closeWork: function() { return true },
+    closeAdmission: function() {}, skip: function() {},
+    armWatchdog: function() {}, watchdogFired: function() { return false },
+    seal: function() { return this.snapshot() },
+    snapshot: function() {
+      return JSON.parse(JSON.stringify({
+        sealed: false, integrity: { valid: true }, endpoints: {}, ledger: {}
+      }))
+    }
+  },
+  _traceRefs: function() { return [] },
+  _verdictCauses: function() { return [] },
+  _drainVia: function() { return "features" },
+  _drainCauses: function() { return [] },
+  _closeQueueLedger: function() {},
+  _observeFeaturesResult: function() {},
+  _maybeSealTrace: function() {},
   _startEarly: function() {},
   _requestPump: function(fn) { fn() },
   _drainNext: function() {}, _ensureAnnotations: function() {},
@@ -826,7 +907,7 @@ function params(name) {
   return sig.slice(sig.indexOf("(") + 1, sig.lastIndexOf(")"))
     .split(",").map(function(s) { return s.trim() }).filter(function(s) { return s.length > 0 })
 }
-for (const name of ["_failHalf", "_halfSettled", "_replayNext", "_beginDrain", "_adoptLate", "_shellMilestoneNow"]) {
+for (const name of ["_failHalf", "_halfSettled", "_replayNext", "_beginDrain", "_onFeaturesFailed", "_adoptLate", "_shellMilestoneNow"]) {
   if (src.indexOf("function " + name + "(") < 0) continue
   const raw = new Function(stubs.concat(params(name)), body(name))
   boot[name] = function() {
@@ -838,7 +919,13 @@ boot._halfSettled = function(heavy) { calls.push("settle"); return settle(heavy)
 const drain = boot._beginDrain
 boot._beginDrain = function() { calls.push("drain"); return drain() }
 
-boot._adoptLate({ createObject: function() { return null } })
+// AsyncLoader hands Boot an already-created object, not a component: the
+// only member the lifted adoption body reads from it is annotationComponent().
+// SET-8 is about a half that never lands, which is now the loader's failed
+// signal, so drive that real handler first (log -> settle -> drain), then
+// exercise the already-created-object adoption shape with no second settle.
+boot._onFeaturesFailed("loadError", 1, "fake load error")
+boot._adoptLate({ annotationComponent: function() { return null } })
 boot._shellMilestoneNow()
 
 emit("late.halvesPending", boot._halvesPending)

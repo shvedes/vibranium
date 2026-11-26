@@ -7,8 +7,7 @@ After=graphical-session.target
 [Service]
 Type=simple
 Environment=QS_CONFIG_PATH=%h/.local/share/vibranium/shell
-Environment="MALLOC_CONF=thp:never,narenas:4,dirty_decay_ms:3000"
-ExecStart=/bin/sh -c 'export VIBRANIUM_SHELL_START_MS=$(date +%%s%%3N); exec qs'
+ExecStart=qs
 Restart=always
 RestartSec=1s
 StartLimitIntervalSec=120

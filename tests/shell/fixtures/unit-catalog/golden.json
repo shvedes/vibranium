@@ -1,0 +1,5507 @@
+{
+  "canonicalization": {
+    "declaredOrder": "preserved: units, dependencies, shortcut argv",
+    "objectKeys": "sorted recursively",
+    "unorderedSets": "sorted: targets, verbs, verbNames, offers, aliases, milestones, participants, shortcut action keys"
+  },
+  "fixtures": {
+    "settingsCatalogPath": "/fixture/vibranium/menu.jsonc"
+  },
+  "identities": {
+    "bootHelpAliases": [
+      {
+        "owner": "idleDaemon",
+        "target": "idle"
+      },
+      {
+        "owner": "powerMenu",
+        "target": "power"
+      }
+    ],
+    "ipcCatalog": {
+      "targets": [
+        {
+          "id": "app",
+          "summary": "Manage Vibranium's Quickshell apps",
+          "title": "Apps"
+        },
+        {
+          "id": "appLauncher",
+          "summary": "Search and launch applications",
+          "title": "App launcher"
+        },
+        {
+          "id": "audio",
+          "summary": "Control volume and microphone levels",
+          "title": "Audio"
+        },
+        {
+          "id": "bar",
+          "summary": "Inspect and control the status bar",
+          "title": "Bar"
+        },
+        {
+          "id": "boot",
+          "summary": "Inspect startup and unit lifecycle",
+          "title": "Boot"
+        },
+        {
+          "id": "clipboard",
+          "summary": "Browse clipboard history and selections",
+          "title": "Clipboard"
+        },
+        {
+          "id": "colorPicker",
+          "summary": "Pick a color from the screen",
+          "title": "Color picker"
+        },
+        {
+          "id": "emojiPicker",
+          "summary": "Search for and copy emoji",
+          "title": "Emoji picker"
+        },
+        {
+          "id": "hyprlandSettings",
+          "summary": "View and edit live Hyprland settings",
+          "title": "Hyprland settings"
+        },
+        {
+          "id": "idle",
+          "summary": "Manage idle timers and actions",
+          "title": "Idle"
+        },
+        {
+          "id": "inhibitor",
+          "summary": "Keep the system awake for a set time",
+          "title": "Inhibitor"
+        },
+        {
+          "id": "keybindings",
+          "summary": "View Hyprland keybindings",
+          "title": "Keybindings"
+        },
+        {
+          "id": "log",
+          "summary": "Read the shell diagnostic log",
+          "title": "Log"
+        },
+        {
+          "id": "menu",
+          "summary": "Open and control menu bundles",
+          "title": "Menu"
+        },
+        {
+          "id": "notifications",
+          "summary": "Manage desktop notifications",
+          "title": "Notifications"
+        },
+        {
+          "id": "osd",
+          "summary": "Show on-screen display overlays",
+          "title": "OSD"
+        },
+        {
+          "id": "pass",
+          "summary": "Manage password-store entries",
+          "title": "Pass"
+        },
+        {
+          "id": "polkit",
+          "summary": "Handle authentication prompts",
+          "title": "Polkit"
+        },
+        {
+          "id": "power",
+          "summary": "Open the session power menu",
+          "title": "Power menu"
+        },
+        {
+          "id": "powerProfile",
+          "summary": "Choose the system power profile",
+          "title": "Power profile"
+        },
+        {
+          "id": "printers",
+          "summary": "Manage CUPS printers and jobs",
+          "title": "Printers"
+        },
+        {
+          "id": "privacy",
+          "summary": "Check microphone, camera and screen sharing",
+          "title": "Privacy indicators"
+        },
+        {
+          "id": "recording",
+          "summary": "Record the screen",
+          "title": "Recording"
+        },
+        {
+          "id": "screenshots",
+          "summary": "Capture and annotate screenshots",
+          "title": "Screenshots"
+        },
+        {
+          "id": "session",
+          "summary": "Lock, log out, suspend, reboot or power off",
+          "title": "Session"
+        },
+        {
+          "id": "settings",
+          "summary": "Read and write shell settings",
+          "title": "Settings"
+        },
+        {
+          "id": "shell",
+          "summary": "Inspect the shell and run diagnostics",
+          "title": "Shell"
+        },
+        {
+          "id": "state",
+          "summary": "Vibranium shell state & runtime queries",
+          "title": "State"
+        },
+        {
+          "id": "systemFont",
+          "summary": "Read the system font configuration",
+          "title": "System font"
+        },
+        {
+          "id": "systemUpdates",
+          "summary": "Check for and apply system updates",
+          "title": "System updates"
+        },
+        {
+          "id": "themePicker",
+          "summary": "Browse and apply themes",
+          "title": "Theme picker"
+        },
+        {
+          "id": "themeRemover",
+          "summary": "Uninstall community themes",
+          "title": "Theme remover"
+        },
+        {
+          "id": "timer",
+          "summary": "Run a countdown timer",
+          "title": "Timer"
+        },
+        {
+          "id": "tools",
+          "summary": "Standalone shell utilities",
+          "title": "Tools"
+        },
+        {
+          "id": "wallpaper",
+          "summary": "Manage the desktop wallpaper",
+          "title": "Wallpaper"
+        },
+        {
+          "id": "wallpaperPicker",
+          "summary": "Choose per-theme wallpapers",
+          "title": "Wallpaper picker"
+        },
+        {
+          "id": "watch",
+          "summary": "Watch files that drive the shell",
+          "title": "Watch"
+        }
+      ],
+      "verbs": [
+        {
+          "helpOnly": true,
+          "id": "app.call",
+          "route": "gateway",
+          "summary": "Run an app's own IPC commands",
+          "words": [
+            "call"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.call.audioMixer.openTab",
+          "route": "gateway",
+          "summary": "Open the mixer on a named tab",
+          "words": [
+            "call",
+            "audioMixer",
+            "openTab"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.call.audioMixer.selectTab",
+          "route": "gateway",
+          "summary": "Select a tab in the already open mixer",
+          "words": [
+            "call",
+            "audioMixer",
+            "selectTab"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.call.audioMixer.status",
+          "route": "gateway",
+          "summary": "Show the audio mixer's status, including its tab",
+          "words": [
+            "call",
+            "audioMixer",
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.call.imageViewer.openPath",
+          "route": "gateway",
+          "summary": "Open one absolute path or local file: URL in the image viewer",
+          "words": [
+            "call",
+            "imageViewer",
+            "openPath"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.call.imageViewer.status",
+          "route": "gateway",
+          "summary": "Show the image viewer's status",
+          "words": [
+            "call",
+            "imageViewer",
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.call.list",
+          "route": "gateway",
+          "summary": "List supported commands for ID",
+          "words": [
+            "call",
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.close",
+          "route": "gateway",
+          "summary": "Close apps by ID",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.list",
+          "route": "gateway",
+          "summary": "List all known apps",
+          "words": [
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.open",
+          "route": "gateway",
+          "summary": "",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "app.toggle",
+          "route": "gateway",
+          "summary": "",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.close",
+          "route": "gateway",
+          "summary": "Hide the launcher panel",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "appLauncher.history",
+          "route": "gateway",
+          "summary": "Inspect or clear usage history",
+          "words": [
+            "history"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.history.clear",
+          "route": "gateway",
+          "summary": "Clear usage history",
+          "words": [
+            "history",
+            "clear"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.history.is-empty",
+          "route": "gateway",
+          "summary": "Show whether usage history is empty",
+          "words": [
+            "history",
+            "is-empty"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.history.show",
+          "route": "gateway",
+          "summary": "Show usage counts, most used first",
+          "words": [
+            "history",
+            "show"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.open",
+          "route": "gateway",
+          "summary": "Show the launcher panel",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "appLauncher.plugin",
+          "route": "gateway",
+          "summary": "List and manage launcher plugins",
+          "words": [
+            "plugin"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "appLauncher.plugin.command",
+          "route": "gateway",
+          "summary": "Query and manage commands from plugins",
+          "words": [
+            "plugin",
+            "command"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.calc.eval",
+          "route": "gateway",
+          "summary": "Evaluate an arithmetic expression without copying it",
+          "words": [
+            "plugin",
+            "command",
+            "calc",
+            "eval"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.color.parse",
+          "route": "gateway",
+          "summary": "Parse a color into its known formats",
+          "words": [
+            "plugin",
+            "command",
+            "color",
+            "parse"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.constants.lookup",
+          "route": "gateway",
+          "summary": "Read named constants without copying a result",
+          "words": [
+            "plugin",
+            "command",
+            "constants",
+            "lookup"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.fx.convert",
+          "route": "gateway",
+          "summary": "Convert an amount between currencies",
+          "words": [
+            "plugin",
+            "command",
+            "fx",
+            "convert"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.time.convert",
+          "route": "gateway",
+          "summary": "Convert a typed time between zones",
+          "words": [
+            "plugin",
+            "command",
+            "time",
+            "convert"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.time.lookup",
+          "route": "gateway",
+          "summary": "Read the time in a city or zone",
+          "words": [
+            "plugin",
+            "command",
+            "time",
+            "lookup"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.unit.convert",
+          "route": "gateway",
+          "summary": "Convert units; keep successful readings in order",
+          "words": [
+            "plugin",
+            "command",
+            "unit",
+            "convert"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.command.websearch.url",
+          "route": "gateway",
+          "summary": "Build the configured search URL for a query",
+          "words": [
+            "plugin",
+            "command",
+            "websearch",
+            "url"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.disable",
+          "route": "gateway",
+          "summary": "Disable a plugin",
+          "words": [
+            "plugin",
+            "disable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.enable",
+          "route": "gateway",
+          "summary": "Enable a plugin",
+          "words": [
+            "plugin",
+            "enable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.id.reload",
+          "route": "gateway",
+          "summary": "Reload one plugin",
+          "words": [
+            "plugin",
+            "reload"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.list",
+          "route": "gateway",
+          "summary": "List all known plugins",
+          "words": [
+            "plugin",
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.reload",
+          "route": "gateway",
+          "summary": "Reload all enabled plugins",
+          "words": [
+            "plugin",
+            "reload"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.status",
+          "route": "gateway",
+          "summary": "Show one plugin's status",
+          "words": [
+            "plugin",
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.plugin.toggle",
+          "route": "gateway",
+          "summary": "Toggle a plugin",
+          "words": [
+            "plugin",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "appLauncher.toggle",
+          "route": "gateway",
+          "summary": "Toggle the launcher panel",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "audio.microphone",
+          "route": "gateway",
+          "summary": "Control the default microphone",
+          "words": [
+            "microphone"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.microphone.down",
+          "route": "gateway",
+          "summary": "Lower the default microphone volume",
+          "words": [
+            "microphone",
+            "down"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.microphone.get",
+          "route": "gateway",
+          "summary": "Get current default input level",
+          "words": [
+            "microphone",
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.microphone.set",
+          "route": "gateway",
+          "summary": "Set the microphone level, 0-200 percent",
+          "words": [
+            "microphone",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.microphone.toggle",
+          "route": "gateway",
+          "summary": "Mute or unmute the default microphone",
+          "words": [
+            "microphone",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.microphone.up",
+          "route": "gateway",
+          "summary": "Raise the default microphone volume",
+          "words": [
+            "microphone",
+            "up"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "audio.sink",
+          "route": "gateway",
+          "summary": "List or choose output devices",
+          "words": [
+            "sink"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.sink.list",
+          "route": "gateway",
+          "summary": "Live output devices from the shared PipeWire graph",
+          "words": [
+            "sink",
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.sink.set",
+          "route": "gateway",
+          "summary": "Make an output device the configured default",
+          "words": [
+            "sink",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "audio.source",
+          "route": "gateway",
+          "summary": "List or choose input devices",
+          "words": [
+            "source"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.source.list",
+          "route": "gateway",
+          "summary": "Live input devices from the shared PipeWire graph",
+          "words": [
+            "source",
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.source.set",
+          "route": "gateway",
+          "summary": "Make an input device the configured default",
+          "words": [
+            "source",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "audio.stream",
+          "route": "gateway",
+          "summary": "List and control application streams",
+          "words": [
+            "stream"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.stream.list",
+          "route": "gateway",
+          "summary": "Live application playback and capture streams",
+          "words": [
+            "stream",
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.stream.mute",
+          "route": "gateway",
+          "summary": "Set an application stream's explicit mute",
+          "words": [
+            "stream",
+            "mute"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.stream.route",
+          "route": "gateway",
+          "summary": "Move an application stream to a matching device",
+          "words": [
+            "stream",
+            "route"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.stream.route-status",
+          "route": "gateway",
+          "summary": "Read the state of one stream route request",
+          "words": [
+            "stream",
+            "route-status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.stream.set",
+          "route": "gateway",
+          "summary": "Set an application stream's level, 0-150 percent",
+          "words": [
+            "stream",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "audio.volume",
+          "route": "gateway",
+          "summary": "Control the default output volume",
+          "words": [
+            "volume"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.volume.down",
+          "route": "gateway",
+          "summary": "Lower the default output volume",
+          "words": [
+            "volume",
+            "down"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.volume.get",
+          "route": "gateway",
+          "summary": "Get current default output level",
+          "words": [
+            "volume",
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.volume.set",
+          "route": "gateway",
+          "summary": "Set the output level, 0-200 percent",
+          "words": [
+            "volume",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.volume.toggle",
+          "route": "gateway",
+          "summary": "Mute or unmute the default output",
+          "words": [
+            "volume",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "audio.volume.up",
+          "route": "gateway",
+          "summary": "Raise the default output volume",
+          "words": [
+            "volume",
+            "up"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.disable",
+          "route": "gateway",
+          "summary": "Disable the status bar",
+          "words": [
+            "disable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.enable",
+          "route": "gateway",
+          "summary": "Enable the status bar",
+          "words": [
+            "enable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.hide",
+          "route": "gateway",
+          "summary": "Hide the status bar",
+          "words": [
+            "hide"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "bar.layout",
+          "route": "gateway",
+          "summary": "Query and edit layout",
+          "words": [
+            "layout"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.layout.get",
+          "route": "gateway",
+          "summary": "Get current layout",
+          "words": [
+            "layout",
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.layout.set",
+          "route": "gateway",
+          "summary": "Update layout",
+          "words": [
+            "layout",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "bar.module",
+          "route": "gateway",
+          "summary": "Inspect and operate configured bar modules",
+          "words": [
+            "module"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.disable",
+          "route": "gateway",
+          "summary": "Disable [a] MODULE",
+          "words": [
+            "module",
+            "disable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.enable",
+          "route": "gateway",
+          "summary": "Enable [a] MODULE",
+          "words": [
+            "module",
+            "enable"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "bar.module.ID.island",
+          "route": "gateway",
+          "summary": "Open, close, toggle or query this module's island",
+          "words": [
+            "island"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.island.close",
+          "route": "gateway",
+          "summary": "Close one module's island",
+          "words": [
+            "module",
+            "island",
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.island.is-open",
+          "route": "gateway",
+          "summary": "Whether this module's island is the open one",
+          "words": [
+            "module",
+            "island",
+            "is-open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.island.open",
+          "route": "gateway",
+          "summary": "Open one module's island",
+          "words": [
+            "module",
+            "island",
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.island.toggle",
+          "route": "gateway",
+          "summary": "Toggle one module's island",
+          "words": [
+            "module",
+            "island",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "bar.module.ID.opt",
+          "route": "gateway",
+          "summary": "Read and write this module's options",
+          "words": [
+            "opt"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.opt.KEY.get",
+          "route": "gateway",
+          "summary": "Read one persisted module option",
+          "words": [
+            "module",
+            "opt"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.opt.KEY.set",
+          "route": "gateway",
+          "summary": "Write one persisted module option",
+          "words": [
+            "module",
+            "opt"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.opt.list",
+          "route": "gateway",
+          "summary": "List the persisted options that belong to this module",
+          "words": [
+            "module",
+            "opt",
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.status",
+          "route": "gateway",
+          "summary": "Show MODULE status",
+          "words": [
+            "module",
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.toggle",
+          "route": "gateway",
+          "summary": "Toggle [a] MODULE",
+          "words": [
+            "module",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.ID.trigger",
+          "route": "gateway",
+          "summary": "Run an explicit module announcement",
+          "words": [
+            "module",
+            "trigger"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "bar.module.ID.triggerBranch",
+          "route": "gateway",
+          "summary": "Run explicit module announcements",
+          "words": [
+            "trigger"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.module.list",
+          "route": "gateway",
+          "summary": "Show all known status bar modules",
+          "words": [
+            "module",
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "bar.position",
+          "route": "gateway",
+          "summary": "Set & query statusbar position",
+          "words": [
+            "position"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.position.get",
+          "route": "gateway",
+          "summary": "Get current position",
+          "words": [
+            "position",
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.position.set",
+          "route": "gateway",
+          "summary": "Set statusbar position",
+          "words": [
+            "position",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.show",
+          "route": "gateway",
+          "summary": "Show the status bar again",
+          "words": [
+            "show"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.showToggle",
+          "route": "gateway",
+          "summary": "Temporarily show or hide the status bar",
+          "words": [
+            "showToggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "bar.toggle",
+          "route": "gateway",
+          "summary": "Toggle the status bar",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "boot.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "boot.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "boot.state",
+          "route": "compat",
+          "summary": "Show the current unit lifecycle state as JSON",
+          "words": [
+            "state"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "boot.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "boot.time",
+          "route": "compat",
+          "summary": "Show the boot timeline tree",
+          "words": [
+            "time"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "boot.timeline",
+          "route": "compat",
+          "summary": "Show the startup event timeline as JSON",
+          "words": [
+            "timeline"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "clipboard.clear",
+          "route": "gateway",
+          "summary": "Clear the regular or pinned clipboard list",
+          "words": [
+            "clear"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.clear.pinned",
+          "route": "gateway",
+          "summary": "Clear the pinned clipboard list",
+          "words": [
+            "clear",
+            "pinned"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.clear.regular",
+          "route": "gateway",
+          "summary": "Clear the regular clipboard list",
+          "words": [
+            "clear"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "clipboard.copy",
+          "route": "gateway",
+          "summary": "Write new data to the system clipboard from the terminal",
+          "words": [
+            "copy"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.copy.entry",
+          "route": "gateway",
+          "summary": "Put one history item back on the system clipboard",
+          "words": [
+            "copy",
+            "entry"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.copy.file",
+          "route": "clipboard-copy",
+          "summary": "Copy one file or directory URI, resolved from the caller's cwd",
+          "words": [
+            "copy",
+            "file"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.copy.image",
+          "route": "clipboard-copy",
+          "summary": "Copy image bytes from stdin",
+          "words": [
+            "copy",
+            "image",
+            "-"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.copy.text",
+          "route": "clipboard-copy",
+          "summary": "Copy UTF-8 text from one literal word or stdin",
+          "words": [
+            "copy",
+            "text"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.copy.uri",
+          "route": "clipboard-copy",
+          "summary": "Copy one absolute URI as text/uri-list",
+          "words": [
+            "copy",
+            "uri"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "clipboard.list",
+          "route": "gateway",
+          "summary": "Show regular or pinned clipboard",
+          "words": [
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.list.current",
+          "route": "gateway",
+          "summary": "List the open panel's current filtered view",
+          "words": [
+            "list",
+            "current"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.list.pinned",
+          "route": "gateway",
+          "summary": "List pinned clipboard items with safe previews",
+          "words": [
+            "list",
+            "pinned"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.list.regular",
+          "route": "gateway",
+          "summary": "List regular clipboard items with safe previews",
+          "words": [
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.pin",
+          "route": "gateway",
+          "summary": "Pin one regular clipboard item",
+          "words": [
+            "pin"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "clipboard.purge",
+          "route": "gateway",
+          "summary": "Delete one clipboard item by list",
+          "words": [
+            "purge"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.purge.pinned",
+          "route": "gateway",
+          "summary": "Delete one pinned clipboard item",
+          "words": [
+            "purge",
+            "pinned"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.purge.regular",
+          "route": "gateway",
+          "summary": "Delete one regular clipboard item",
+          "words": [
+            "purge"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.select",
+          "route": "gateway",
+          "summary": "Select one row of the open panel's current filter",
+          "words": [
+            "select"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.unpin",
+          "route": "gateway",
+          "summary": "Unpin one pinned clipboard item",
+          "words": [
+            "unpin"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "clipboard.window",
+          "route": "gateway",
+          "summary": "Open, close or toggle the clipboard panel",
+          "words": [
+            "window"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.window.close",
+          "route": "gateway",
+          "summary": "Hide the clipboard panel",
+          "words": [
+            "window",
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.window.open",
+          "route": "gateway",
+          "summary": "Show the clipboard panel",
+          "words": [
+            "window",
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "clipboard.window.toggle",
+          "route": "gateway",
+          "summary": "Show or hide the clipboard panel",
+          "words": [
+            "window",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "colorPicker.close",
+          "route": "gateway",
+          "summary": "Cancel the active color picker, if any",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "colorPicker.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "colorPicker.pick",
+          "route": "gateway",
+          "summary": "Pick a color from the screen",
+          "words": [
+            "pick"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "colorPicker.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "colorPicker.status",
+          "route": "injected",
+          "summary": "Show the color picker's status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "emojiPicker.close",
+          "route": "gateway",
+          "summary": "Close the emoji picker window",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "emojiPicker.copy",
+          "route": "gateway",
+          "summary": "Copy one emoji by glyph, U+ code point, label or keyword",
+          "words": [
+            "copy"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "emojiPicker.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "emojiPicker.open",
+          "route": "gateway",
+          "summary": "Open the emoji picker window",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "emojiPicker.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "emojiPicker.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "emojiPicker.toggle",
+          "route": "gateway",
+          "summary": "Toggle the emoji picker window",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.dump",
+          "route": "gateway",
+          "summary": "Show all managed options",
+          "words": [
+            "dump"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.get",
+          "route": "gateway",
+          "summary": "Read one managed setting",
+          "words": [
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.reload",
+          "route": "gateway",
+          "summary": "Reload the live Hyprland config",
+          "words": [
+            "reload"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "hyprlandSettings.set",
+          "route": "gateway",
+          "summary": "Edit options live",
+          "words": [
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.set.toggle",
+          "route": "gateway",
+          "summary": "Flip a known managed boolean option",
+          "words": [
+            "set",
+            "--toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.set.value",
+          "route": "gateway",
+          "summary": "Write one managed option from a typed JSON value",
+          "words": [
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "hyprlandSettings.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.add",
+          "route": "gateway",
+          "summary": "Add a new timer",
+          "words": [
+            "add"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.class",
+          "route": "gateway",
+          "summary": "Declare what a command timer does to the session",
+          "words": [
+            "class"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.disable",
+          "route": "gateway",
+          "summary": "Disable the idle daemon",
+          "words": [
+            "disable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.enable",
+          "route": "gateway",
+          "summary": "Enable the idle daemon",
+          "words": [
+            "enable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.list",
+          "route": "gateway",
+          "summary": "List known and active timers",
+          "words": [
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.reload",
+          "route": "gateway",
+          "summary": "Reload the idle daemon",
+          "words": [
+            "reload"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.remove",
+          "route": "gateway",
+          "summary": "Remove a timer",
+          "words": [
+            "remove"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "idle.status",
+          "route": "injected",
+          "summary": "Show the idle daemon's status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "inhibitor.cycle",
+          "route": "gateway",
+          "summary": "Step through the named inhibit durations",
+          "words": [
+            "cycle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.cycle.back",
+          "route": "gateway",
+          "summary": "Step backward through the named durations",
+          "words": [
+            "cycle",
+            "back"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.cycle.next",
+          "route": "gateway",
+          "summary": "Step forward through the named durations",
+          "words": [
+            "cycle",
+            "next"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.remaining",
+          "route": "gateway",
+          "summary": "Show the remaining seconds on the active inhibitor",
+          "words": [
+            "remaining"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.start",
+          "route": "gateway",
+          "summary": "Start an inhibitor; 0 keeps it on until stopped",
+          "words": [
+            "start"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.status",
+          "route": "injected",
+          "summary": "Show whether the inhibitor is active",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "inhibitor.stop",
+          "route": "gateway",
+          "summary": "Release the active inhibitor",
+          "words": [
+            "stop"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "keybindings.close",
+          "route": "compat",
+          "summary": "Hide the cheatsheet",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "keybindings.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "keybindings.open",
+          "route": "compat",
+          "summary": "Show the cheatsheet",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "keybindings.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "keybindings.refresh",
+          "route": "compat",
+          "summary": "Rescan Hyprland keybindings",
+          "words": [
+            "refresh"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "keybindings.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "keybindings.toggle",
+          "route": "compat",
+          "summary": "Toggle the cheatsheet",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "log.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "log.ping",
+          "route": "log-read",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "log.status",
+          "route": "log-read",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.back",
+          "route": "gateway",
+          "summary": "Go back one page; closes at the root",
+          "words": [
+            "back"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.close",
+          "route": "gateway",
+          "summary": "Close a menu",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.current",
+          "route": "gateway",
+          "summary": "Show the current page, scope, revision and selected row",
+          "words": [
+            "current"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.go",
+          "route": "gateway",
+          "summary": "Go to a page by its shortest allowed path, or back to an existing page",
+          "words": [
+            "go"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.item",
+          "route": "gateway",
+          "summary": "Inspect and operate one row by reference",
+          "words": [
+            "item"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.activate",
+          "route": "gateway",
+          "summary": "Apply the row's own activation action",
+          "words": [
+            "item",
+            "activate"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.choose",
+          "route": "gateway",
+          "summary": "Choose one option by its exact ID; a disabled option is refused",
+          "words": [
+            "item",
+            "choose"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.close",
+          "route": "gateway",
+          "summary": "Cancel an editor or fold a dropdown; idempotent",
+          "words": [
+            "item",
+            "close"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.item.ROW.confirm",
+          "route": "gateway",
+          "summary": "Read or advance the row's confirmation",
+          "words": [
+            "confirm"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.confirm.cancel",
+          "route": "gateway",
+          "summary": "Reset the confirmation and collapse the row",
+          "words": [
+            "item",
+            "confirm",
+            "cancel"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.confirm.next",
+          "route": "gateway",
+          "summary": "Arm or advance one confirmation stage; run only after the final stage",
+          "words": [
+            "item",
+            "confirm",
+            "next"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.confirm.status",
+          "route": "gateway",
+          "summary": "Read the confirmation kind and stage",
+          "words": [
+            "item",
+            "confirm",
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.delete",
+          "route": "gateway",
+          "summary": "Arm or advance staged deletion; run exactly one configured action",
+          "words": [
+            "item",
+            "delete"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.item.ROW.flow",
+          "route": "gateway",
+          "summary": "Inspect or advance a staged flow on this row",
+          "words": [
+            "flow"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.flow.back",
+          "route": "gateway",
+          "summary": "Return to the previous visited step, dropping later values",
+          "words": [
+            "item",
+            "flow",
+            "back"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.flow.cancel",
+          "route": "gateway",
+          "summary": "Collapse the flow and drop its draft without persisting",
+          "words": [
+            "item",
+            "flow",
+            "cancel"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.flow.commit",
+          "route": "gateway",
+          "summary": "Commit a ready flow",
+          "words": [
+            "item",
+            "flow",
+            "commit"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.flow.next",
+          "route": "gateway",
+          "summary": "Record the current draft and advance, skipping unmatched stages",
+          "words": [
+            "item",
+            "flow",
+            "next"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.flow.set",
+          "route": "gateway",
+          "summary": "Fill only the current zero-based step's draft",
+          "words": [
+            "item",
+            "flow",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.flow.status",
+          "route": "gateway",
+          "summary": "Read the staged flow cursor, kind and committed values",
+          "words": [
+            "item",
+            "flow",
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.get",
+          "route": "gateway",
+          "summary": "Read safe row metadata, value, options and flow/confirm state",
+          "words": [
+            "item",
+            "get"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.item.ROW.info",
+          "route": "gateway",
+          "summary": "Open or close the row's description",
+          "words": [
+            "info"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.info.close",
+          "route": "gateway",
+          "summary": "Close the row's description slot",
+          "words": [
+            "item",
+            "info",
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.info.open",
+          "route": "gateway",
+          "summary": "Open the row's description",
+          "words": [
+            "item",
+            "info",
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.open",
+          "route": "gateway",
+          "summary": "Open an editor, dropdown or submenu; idempotent when already open",
+          "words": [
+            "item",
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.options",
+          "route": "gateway",
+          "summary": "List selectable options by their exact IDs",
+          "words": [
+            "item",
+            "options"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.set",
+          "route": "gateway",
+          "summary": "Set a typed bool, number or string on the row",
+          "words": [
+            "item",
+            "set"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.item.ROW.step",
+          "route": "gateway",
+          "summary": "Step a number or range row up or down",
+          "words": [
+            "step"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.step.down",
+          "route": "gateway",
+          "summary": "Step a number/range row down by its configured increment",
+          "words": [
+            "item",
+            "step",
+            "down"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.step.up",
+          "route": "gateway",
+          "summary": "Step a number/range row up by its configured increment",
+          "words": [
+            "item",
+            "step",
+            "up"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.item.ROW.toggle",
+          "route": "gateway",
+          "summary": "Invert a toggle row",
+          "words": [
+            "item",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.list",
+          "route": "gateway",
+          "summary": "List the current rows or a page's tree without navigating",
+          "words": [
+            "list"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.open",
+          "route": "gateway",
+          "summary": "Open a menu bundle",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.open.file",
+          "route": "gateway",
+          "summary": "Open a bundle file or an existing path#page entry",
+          "words": [
+            "open",
+            "file"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.open.inline",
+          "route": "gateway",
+          "summary": "Open one inline JSON/JSONC bundle",
+          "words": [
+            "open",
+            "inline"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.pages",
+          "route": "gateway",
+          "summary": "Show the entry, stack and reachable pages",
+          "words": [
+            "pages"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.search",
+          "route": "gateway",
+          "summary": "Search the current menu",
+          "words": [
+            "search"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.search.clear",
+          "route": "gateway",
+          "summary": "Clear global and scoped queries together",
+          "words": [
+            "search",
+            "clear"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.search.global",
+          "route": "gateway",
+          "summary": "Search the whole current bundle scope",
+          "words": [
+            "search",
+            "global"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.search.scoped",
+          "route": "gateway",
+          "summary": "Filter the current page with the scoped '/'-filter pipeline",
+          "words": [
+            "search",
+            "scoped"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.select",
+          "route": "gateway",
+          "summary": "Select a row without activating it",
+          "words": [
+            "select"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "menu.toggle",
+          "route": "gateway",
+          "summary": "Toggle a menu bundle",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.toggle.file",
+          "route": "gateway",
+          "summary": "Close the same file+entry or open a different one",
+          "words": [
+            "toggle",
+            "file"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "menu.toggle.inline",
+          "route": "gateway",
+          "summary": "Switch bundles, or close when the same inline bundle is already open",
+          "words": [
+            "toggle",
+            "inline"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.clear",
+          "route": "compat",
+          "summary": "Clear this session's history",
+          "words": [
+            "clear"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "notifications.dismiss",
+          "route": "gateway",
+          "summary": "Dismiss notifications by scope or ID",
+          "words": [
+            "dismiss"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.dismiss.all",
+          "route": "compat",
+          "summary": "Dismiss every notification, including buffered ones",
+          "words": [
+            "dismiss",
+            "all"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.dismiss.id",
+          "route": "gateway",
+          "summary": "Dismiss one notification by ID",
+          "words": [
+            "dismiss"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.dismiss.visible",
+          "route": "compat",
+          "summary": "Dismiss visible notifications",
+          "words": [
+            "dismiss",
+            "visible"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "notifications.dnd",
+          "route": "gateway",
+          "summary": "Enable, disable, toggle or read do-not-disturb",
+          "words": [
+            "dnd"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.dnd.disable",
+          "route": "compat",
+          "summary": "Turn do-not-disturb off",
+          "words": [
+            "dnd",
+            "disable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.dnd.enable",
+          "route": "compat",
+          "summary": "Turn do-not-disturb on",
+          "words": [
+            "dnd",
+            "enable"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.dnd.get",
+          "route": "compat",
+          "summary": "Show do-not-disturb state",
+          "words": [
+            "dnd",
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.dnd.toggle",
+          "route": "compat",
+          "summary": "Flip do-not-disturb",
+          "words": [
+            "dnd",
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.history",
+          "route": "compat",
+          "summary": "Show notification history",
+          "words": [
+            "history"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "notifications.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "osd.flash",
+          "route": "compat",
+          "summary": "Flash the OSD with a JSON payload",
+          "words": [
+            "flash"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "osd.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "osd.hide",
+          "route": "compat",
+          "summary": "Hide the OSD",
+          "words": [
+            "hide"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "osd.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "osd.status",
+          "route": "injected",
+          "summary": "Show the OSD's current state",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "pass.close",
+          "route": "compat",
+          "summary": "Close the password manager page",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "pass.copy",
+          "route": "compat",
+          "summary": "Copy line 1 of an entry to the clipboard",
+          "words": [
+            "copy"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "pass.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "pass.open",
+          "route": "compat",
+          "summary": "Open the password manager page",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "pass.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "pass.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "pass.toggle",
+          "route": "compat",
+          "summary": "Toggle the password manager page",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "polkit.cancel",
+          "route": "compat",
+          "summary": "Cancel the current authentication prompt",
+          "words": [
+            "cancel"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "polkit.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "polkit.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "polkit.status",
+          "route": "injected",
+          "summary": "Show the authentication prompt state",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "power.close",
+          "route": "compat",
+          "summary": "Close the power menu",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "power.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "power.open",
+          "route": "compat",
+          "summary": "Open the power menu",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "power.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "power.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "power.toggle",
+          "route": "compat",
+          "summary": "Toggle the power menu",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.get",
+          "route": "compat",
+          "summary": "Show the current power profile",
+          "words": [
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.list",
+          "route": "compat",
+          "summary": "List available power profiles",
+          "words": [
+            "list"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.next",
+          "route": "compat",
+          "summary": "Cycle to the next profile",
+          "words": [
+            "next"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.prev",
+          "route": "compat",
+          "summary": "Cycle to the previous profile",
+          "words": [
+            "prev"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.set",
+          "route": "compat",
+          "summary": "Switch to a named profile",
+          "words": [
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "powerProfile.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.cancel",
+          "route": "compat",
+          "summary": "Cancel a job",
+          "words": [
+            "cancel"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.clear",
+          "route": "compat",
+          "summary": "Clear all finished entries",
+          "words": [
+            "clear"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.config",
+          "route": "gateway",
+          "summary": "Open print settings",
+          "words": [
+            "config"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.connect",
+          "route": "compat",
+          "summary": "Set the user default printer",
+          "words": [
+            "connect"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.dismiss",
+          "route": "compat",
+          "summary": "Clear a finished entry",
+          "words": [
+            "dismiss"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.hold",
+          "route": "compat",
+          "summary": "Hold a job",
+          "words": [
+            "hold"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "printers.job",
+          "route": "gateway",
+          "summary": "Hold, release or cancel one queued job",
+          "words": [
+            "job"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.refresh",
+          "route": "compat",
+          "summary": "Refresh printers and jobs",
+          "words": [
+            "refresh"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.release",
+          "route": "compat",
+          "summary": "Release a job",
+          "words": [
+            "release"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.remove",
+          "route": "compat",
+          "summary": "Delete a printer queue",
+          "words": [
+            "remove"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.rename",
+          "route": "compat",
+          "summary": "Set a printer's display name",
+          "words": [
+            "rename"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "printers.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "privacy.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "privacy.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "privacy.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.close",
+          "route": "compat",
+          "summary": "Close the recording panel",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.open",
+          "route": "compat",
+          "summary": "Start or stop recording depending on the current state",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.start",
+          "route": "compat",
+          "summary": "Start a recording",
+          "words": [
+            "start"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.stop",
+          "route": "compat",
+          "summary": "Stop a recording",
+          "words": [
+            "stop"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "recording.toggle",
+          "route": "compat",
+          "summary": "Start or stop a recording",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "screenshots.annotate",
+          "route": "compat",
+          "summary": "Open the annotation editor",
+          "words": [
+            "annotate"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "screenshots.capture",
+          "route": "compat",
+          "summary": "Capture the screen or a selected region",
+          "words": [
+            "capture"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "screenshots.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "screenshots.last",
+          "route": "compat",
+          "summary": "Show the path of the last capture",
+          "words": [
+            "last"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "screenshots.picker",
+          "route": "compat",
+          "summary": "Choose region or screen",
+          "words": [
+            "picker"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "screenshots.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "screenshots.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.lock",
+          "route": "compat",
+          "summary": "Lock the session",
+          "words": [
+            "lock"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.lockForSleep",
+          "route": "compat",
+          "summary": "Lock the session for sleep without suspending",
+          "words": [
+            "lockForSleep"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.logout",
+          "route": "compat",
+          "summary": "End the session",
+          "words": [
+            "logout"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.poweroff",
+          "route": "compat",
+          "summary": "Power off the machine",
+          "words": [
+            "poweroff"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.reboot",
+          "route": "compat",
+          "summary": "Reboot the machine",
+          "words": [
+            "reboot"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.reboot.firmware",
+          "route": "compat",
+          "summary": "Reboot into UEFI firmware setup",
+          "words": [
+            "reboot",
+            "firmware"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.status",
+          "route": "injected",
+          "summary": "Show session lock and power state",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "session.suspend",
+          "route": "compat",
+          "summary": "Suspend the session",
+          "words": [
+            "suspend"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.dump",
+          "route": "compat",
+          "summary": "Show all stored values as JSON",
+          "words": [
+            "dump"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "settings.fonts",
+          "route": "gateway",
+          "summary": "Manage installed system fonts",
+          "words": [
+            "fonts"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.fonts.reload",
+          "route": "gateway",
+          "summary": "Rescan installed system fonts",
+          "words": [
+            "fonts",
+            "reload"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.get",
+          "route": "compat",
+          "summary": "Read one stored value as JSON",
+          "words": [
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.reload",
+          "route": "compat",
+          "summary": "Reload settings from disk",
+          "words": [
+            "reload"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.set",
+          "route": "compat",
+          "summary": "Write one JSON value",
+          "words": [
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "settings.toggle",
+          "route": "compat",
+          "summary": "Flip a boolean key",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "shell.doctor",
+          "route": "compat",
+          "summary": "Show boot audit warnings as JSON",
+          "words": [
+            "doctor"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "shell.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "shell.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "shell.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "state.dump",
+          "route": "compat",
+          "summary": "Show all slots as JSON",
+          "words": [
+            "dump"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "state.get",
+          "route": "compat",
+          "summary": "Read one slot as JSON",
+          "words": [
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "state.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "state.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "state.set",
+          "route": "compat",
+          "summary": "Write one JSON slot",
+          "words": [
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "state.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemFont.dump",
+          "route": "compat",
+          "summary": "Show the current font configuration as JSON",
+          "words": [
+            "dump"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemFont.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemFont.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemFont.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.dump",
+          "route": "gateway",
+          "summary": "Show the current merged update rows",
+          "words": [
+            "dump"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "systemUpdates.dump.BUCKET",
+          "route": "gateway",
+          "summary": "Show current update rows by source",
+          "words": [
+            "dump"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.dump.all",
+          "route": "gateway",
+          "summary": "Show merged official and AUR update rows",
+          "words": [
+            "dump",
+            "all"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.dump.aur",
+          "route": "gateway",
+          "summary": "Show AUR-only update rows",
+          "words": [
+            "dump",
+            "aur"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.refresh",
+          "route": "compat",
+          "summary": "Check for available updates again",
+          "words": [
+            "refresh"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "systemUpdates.update",
+          "route": "compat",
+          "summary": "Apply a system update with a package list",
+          "words": [
+            "update"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themePicker.close",
+          "route": "compat",
+          "summary": "Close the theme picker overlay",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themePicker.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themePicker.open",
+          "route": "compat",
+          "summary": "Open the theme picker overlay",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themePicker.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themePicker.refresh",
+          "route": "compat",
+          "summary": "Rescan folders for new themes",
+          "words": [
+            "refresh"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themePicker.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themePicker.toggle",
+          "route": "compat",
+          "summary": "Toggle the theme picker overlay",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themeRemover.close",
+          "route": "compat",
+          "summary": "Close the theme remover panel",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themeRemover.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themeRemover.open",
+          "route": "compat",
+          "summary": "Open the theme remover panel",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themeRemover.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themeRemover.refresh",
+          "route": "compat",
+          "summary": "Rescan folders for new themes",
+          "words": [
+            "refresh"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themeRemover.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "themeRemover.toggle",
+          "route": "compat",
+          "summary": "Toggle the theme remover panel",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "timer.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "timer.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "timer.start",
+          "route": "compat",
+          "summary": "Start a timer from a duration",
+          "words": [
+            "start"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "timer.start.branch",
+          "route": "gateway",
+          "summary": "Start a timer from seconds or minutes",
+          "words": [
+            "start"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "timer.start.minutes",
+          "route": "compat",
+          "summary": "Start a timer from minutes",
+          "words": [
+            "start",
+            "minutes"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "timer.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "timer.stop",
+          "route": "compat",
+          "summary": "Stop the timer",
+          "words": [
+            "stop"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "tools.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": true,
+          "id": "tools.picker",
+          "route": "gateway",
+          "summary": "Pick a screen region",
+          "words": [
+            "picker"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "tools.picker.pick",
+          "route": "gateway",
+          "summary": "Pick a screen region",
+          "words": [
+            "picker",
+            "pick"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "tools.picker.stop",
+          "route": "compat",
+          "summary": "Stop the active region picker",
+          "words": [
+            "picker",
+            "stop"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "tools.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "tools.status",
+          "route": "injected",
+          "summary": "Show whether a region picker is active",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.drop",
+          "route": "compat",
+          "summary": "Set a wallpaper from a drag URI",
+          "words": [
+            "drop"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.get",
+          "route": "compat",
+          "summary": "Show the current wallpaper path",
+          "words": [
+            "get"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.next",
+          "route": "compat",
+          "summary": "Select the next wallpaper",
+          "words": [
+            "next"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.prev",
+          "route": "compat",
+          "summary": "Select the previous wallpaper",
+          "words": [
+            "prev"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.refresh",
+          "route": "compat",
+          "summary": "Rescan wallpaper folders",
+          "words": [
+            "refresh"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.set",
+          "route": "compat",
+          "summary": "Set the wallpaper from a path",
+          "words": [
+            "set"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaper.status",
+          "route": "injected",
+          "summary": "Show the current wallpaper state",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaperPicker.close",
+          "route": "compat",
+          "summary": "Close the wallpaper picker",
+          "words": [
+            "close"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaperPicker.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaperPicker.open",
+          "route": "compat",
+          "summary": "Open the wallpaper picker",
+          "words": [
+            "open"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaperPicker.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaperPicker.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "wallpaperPicker.toggle",
+          "route": "compat",
+          "summary": "Toggle the wallpaper picker",
+          "words": [
+            "toggle"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "watch.help",
+          "route": "injected",
+          "summary": "Describe this target, a branch, or a command",
+          "words": [
+            "help"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "watch.ping",
+          "route": "injected",
+          "summary": "Check that the target responds",
+          "words": [
+            "ping"
+          ]
+        },
+        {
+          "helpOnly": false,
+          "id": "watch.status",
+          "route": "injected",
+          "summary": "Show the target's current status",
+          "words": [
+            "status"
+          ]
+        }
+      ]
+    },
+    "milestones": {
+      "milestones": [
+        "construction",
+        "played",
+        "settled"
+      ],
+      "playedParticipants": [
+        "bar",
+        "wallpaper"
+      ]
+    },
+    "registryOffers": [
+      {
+        "description": "Manage Vibranium's Quickshell apps",
+        "id": "app",
+        "title": "Apps",
+        "verbNames": [
+          "call",
+          "close",
+          "help",
+          "list",
+          "open",
+          "ping",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Search and launch applications",
+        "id": "appLauncher",
+        "title": "App launcher",
+        "verbNames": [
+          "close",
+          "help",
+          "history",
+          "open",
+          "ping",
+          "plugin",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Control volume and microphone levels",
+        "id": "audio",
+        "title": "Audio",
+        "verbNames": [
+          "help",
+          "microphone",
+          "ping",
+          "sink",
+          "source",
+          "status",
+          "stream",
+          "volume"
+        ]
+      },
+      {
+        "description": "Inspect and control the status bar",
+        "id": "bar",
+        "title": "Bar",
+        "verbNames": [
+          "disable",
+          "enable",
+          "help",
+          "hide",
+          "layout",
+          "module",
+          "ping",
+          "position",
+          "show",
+          "showToggle",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Browse clipboard history and selections",
+        "id": "clipboard",
+        "title": "Clipboard",
+        "verbNames": [
+          "clear",
+          "copy",
+          "help",
+          "list",
+          "pin",
+          "ping",
+          "purge",
+          "select",
+          "status",
+          "unpin",
+          "window"
+        ]
+      },
+      {
+        "description": "Search for and copy emoji",
+        "id": "emojiPicker",
+        "title": "Emoji picker",
+        "verbNames": [
+          "close",
+          "copy",
+          "help",
+          "open",
+          "ping",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "View and edit live Hyprland settings",
+        "id": "hyprlandSettings",
+        "title": "Hyprland settings",
+        "verbNames": [
+          "dump",
+          "get",
+          "help",
+          "ping",
+          "reload",
+          "set",
+          "status"
+        ]
+      },
+      {
+        "description": "Manage idle timers and actions",
+        "id": "idle",
+        "title": "Idle",
+        "verbNames": [
+          "add",
+          "class",
+          "disable",
+          "enable",
+          "help",
+          "list",
+          "ping",
+          "reload",
+          "remove",
+          "status"
+        ]
+      },
+      {
+        "description": "Keep the system awake for a set time",
+        "id": "inhibitor",
+        "title": "Inhibitor",
+        "verbNames": [
+          "cycle",
+          "help",
+          "ping",
+          "remaining",
+          "start",
+          "status",
+          "stop"
+        ]
+      },
+      {
+        "description": "View Hyprland keybindings",
+        "id": "keybindings",
+        "title": "Keybindings",
+        "verbNames": [
+          "close",
+          "help",
+          "open",
+          "ping",
+          "refresh",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Read the shell diagnostic log",
+        "id": "log",
+        "title": "Logging",
+        "verbNames": [
+          "help",
+          "ping",
+          "status"
+        ]
+      },
+      {
+        "description": "Open and control menu bundles",
+        "id": "menu",
+        "title": "Menu",
+        "verbNames": [
+          "back",
+          "close",
+          "current",
+          "go",
+          "help",
+          "item",
+          "list",
+          "open",
+          "pages",
+          "ping",
+          "search",
+          "select",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Manage desktop notifications",
+        "id": "notifications",
+        "title": "Notifications",
+        "verbNames": [
+          "clear",
+          "dismiss",
+          "dnd",
+          "help",
+          "history",
+          "ping",
+          "status"
+        ]
+      },
+      {
+        "description": "Show on-screen display overlays",
+        "id": "osd",
+        "title": "OSD",
+        "verbNames": [
+          "flash",
+          "help",
+          "hide",
+          "ping",
+          "status"
+        ]
+      },
+      {
+        "description": "Manage password-store entries",
+        "id": "pass",
+        "title": "Password manager",
+        "verbNames": [
+          "close",
+          "copy",
+          "help",
+          "open",
+          "ping",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Handle authentication prompts",
+        "id": "polkit",
+        "title": "Polkit",
+        "verbNames": [
+          "cancel",
+          "help",
+          "ping",
+          "status"
+        ]
+      },
+      {
+        "description": "Open the session power menu",
+        "id": "powerMenu",
+        "title": "Power menu",
+        "verbNames": []
+      },
+      {
+        "description": "Choose the system power profile",
+        "id": "powerProfile",
+        "title": "Power profile",
+        "verbNames": [
+          "get",
+          "help",
+          "list",
+          "next",
+          "ping",
+          "prev",
+          "set",
+          "status"
+        ]
+      },
+      {
+        "description": "Manage CUPS printers and jobs",
+        "id": "printers",
+        "title": "Printers",
+        "verbNames": [
+          "cancel",
+          "clear",
+          "config",
+          "connect",
+          "dismiss",
+          "help",
+          "hold",
+          "ping",
+          "refresh",
+          "release",
+          "remove",
+          "rename",
+          "status"
+        ]
+      },
+      {
+        "description": "Check microphone, camera and screen sharing",
+        "id": "privacy",
+        "title": "Privacy indicators",
+        "verbNames": [
+          "help",
+          "ping",
+          "status"
+        ]
+      },
+      {
+        "description": "Record the screen",
+        "id": "recording",
+        "title": "Recording",
+        "verbNames": [
+          "close",
+          "help",
+          "open",
+          "ping",
+          "start",
+          "status",
+          "stop",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Lock, log out, suspend, reboot or power off",
+        "id": "session",
+        "title": "Session",
+        "verbNames": [
+          "help",
+          "lock",
+          "lockForSleep",
+          "logout",
+          "ping",
+          "poweroff",
+          "reboot",
+          "status",
+          "suspend"
+        ]
+      },
+      {
+        "description": "Read and write shell settings",
+        "id": "settings",
+        "title": "Settings",
+        "verbNames": [
+          "dump",
+          "fonts",
+          "get",
+          "help",
+          "ping",
+          "reload",
+          "set",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Vibranium shell state & runtime queries",
+        "id": "state",
+        "title": "State",
+        "verbNames": [
+          "dump",
+          "get",
+          "help",
+          "ping",
+          "set",
+          "status"
+        ]
+      },
+      {
+        "description": "Read the system font configuration",
+        "id": "systemFont",
+        "title": "System font",
+        "verbNames": [
+          "dump",
+          "help",
+          "ping",
+          "status"
+        ]
+      },
+      {
+        "description": "Check for and apply system updates",
+        "id": "systemUpdates",
+        "title": "System updates",
+        "verbNames": [
+          "dump",
+          "help",
+          "ping",
+          "refresh",
+          "status",
+          "update"
+        ]
+      },
+      {
+        "description": "Browse and apply themes",
+        "id": "themePicker",
+        "title": "Theme picker",
+        "verbNames": [
+          "close",
+          "help",
+          "open",
+          "ping",
+          "refresh",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Uninstall community themes",
+        "id": "themeRemover",
+        "title": "Theme remover",
+        "verbNames": [
+          "close",
+          "help",
+          "open",
+          "ping",
+          "refresh",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Run a countdown timer",
+        "id": "timer",
+        "title": "Timer",
+        "verbNames": [
+          "help",
+          "ping",
+          "start",
+          "status",
+          "stop"
+        ]
+      },
+      {
+        "description": "Manage the desktop wallpaper",
+        "id": "wallpaper",
+        "title": "Wallpaper",
+        "verbNames": [
+          "drop",
+          "get",
+          "help",
+          "next",
+          "ping",
+          "prev",
+          "refresh",
+          "set",
+          "status"
+        ]
+      },
+      {
+        "description": "Choose per-theme wallpapers",
+        "id": "wallpaperPicker",
+        "title": "Wallpaper picker",
+        "verbNames": [
+          "close",
+          "help",
+          "open",
+          "ping",
+          "status",
+          "toggle"
+        ]
+      },
+      {
+        "description": "Watch files that drive the shell",
+        "id": "watch",
+        "title": "Watch",
+        "verbNames": [
+          "help",
+          "ping",
+          "status"
+        ]
+      }
+    ],
+    "shortcuts": {
+      "actions": {
+        "appLauncher.toggle": [
+          "appLauncher",
+          "toggle"
+        ],
+        "audio.microphone.toggle": [
+          "audio",
+          "microphone",
+          "toggle"
+        ],
+        "audio.volume.down": [
+          "audio",
+          "volume",
+          "down"
+        ],
+        "audio.volume.toggle": [
+          "audio",
+          "volume",
+          "toggle"
+        ],
+        "audio.volume.up": [
+          "audio",
+          "volume",
+          "up"
+        ],
+        "bar.showToggle": [
+          "bar",
+          "showToggle"
+        ],
+        "clipboard.clear": [
+          "clipboard",
+          "clear"
+        ],
+        "clipboard.window.toggle": [
+          "clipboard",
+          "window",
+          "toggle"
+        ],
+        "colorPicker.pick": [
+          "colorPicker",
+          "pick"
+        ],
+        "emojiPicker.toggle": [
+          "emojiPicker",
+          "toggle"
+        ],
+        "menu.main": [
+          "menu",
+          "toggle",
+          "file",
+          "/fixture/vibranium/menu.jsonc#main"
+        ],
+        "menu.utilities": [
+          "menu",
+          "toggle",
+          "file",
+          "/fixture/vibranium/menu.jsonc#utilities"
+        ],
+        "power.toggle": [
+          "power",
+          "toggle"
+        ],
+        "powerProfile.next": [
+          "powerProfile",
+          "next"
+        ],
+        "screenshots.picker": [
+          "screenshots",
+          "picker"
+        ],
+        "screenshots.region": [
+          "screenshots",
+          "capture",
+          "region"
+        ],
+        "screenshots.screen": [
+          "screenshots",
+          "capture",
+          "screen"
+        ],
+        "session.lock": [
+          "session",
+          "lock"
+        ],
+        "session.lockForSleep": [
+          "session",
+          "lockForSleep"
+        ],
+        "themePicker.toggle": [
+          "themePicker",
+          "toggle"
+        ],
+        "wallpaperPicker.toggle": [
+          "wallpaperPicker",
+          "toggle"
+        ]
+      },
+      "fixturePrefix": "/fixture/vibranium/menu.jsonc"
+    }
+  },
+  "kind": "unit-catalog-structural-golden",
+  "sources": {
+    "catalog": "git HEAD:shell/boot/Boot.qml (pre-extraction _catalog)",
+    "identities": "working tree at golden creation (IpcCatalog, Registry, IpcRouter, Boot help, DesktopLayoutState)"
+  },
+  "units": [
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "log",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "paths",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "paths"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "watch",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "paths",
+        "watch"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "settings",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "settings"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "hyprlandSettings",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "settings"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "miscSettings",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "settings"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "systemFont",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "settings"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "theme",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "settings",
+        "theme"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "ui",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "settings",
+        "theme"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "icons",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "exec",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "eager",
+      "criticality": "essential",
+      "dependencies": [
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "state",
+      "owner": "floor",
+      "phase": "floor",
+      "retry": {
+        "backoffMs": 0,
+        "maxAttempts": 0,
+        "maxBackoffMs": 1000
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "idleDaemon",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "inhibitor",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "essential",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "session",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "essential",
+      "dependencies": [
+        "settings",
+        "session",
+        "state",
+        "watch",
+        "theme"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "lockscreen",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "theme",
+        "paths",
+        "state",
+        "watch",
+        "ui"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "wallpaper",
+      "owner": "floor",
+      "phase": "visual",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "clipboard",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "privacy",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "first_use",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "theme",
+        "ui",
+        "state",
+        "watch"
+      ],
+      "hasReady": true,
+      "hasTeardown": true,
+      "id": "bar",
+      "owner": "bar",
+      "phase": "visual",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "theme",
+        "ui",
+        "state"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "osd",
+      "owner": "features",
+      "phase": "entrance",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "theme",
+        "ui",
+        "state",
+        "privacy"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "notifications",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "ui"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "menu",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "audio",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "audio"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "mediaArt",
+      "owner": "services",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "keyboard",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "app",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "facade",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": true,
+      "hasTeardown": true,
+      "id": "appLauncher",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "timer",
+      "owner": "services",
+      "phase": "entrance",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "recording",
+      "owner": "services",
+      "phase": "entrance",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "paths",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "update",
+      "owner": "services",
+      "phase": "entrance",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "theme",
+        "ui",
+        "state",
+        "watch",
+        "session"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "polkit",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "emojiPicker",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "keybindings",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "theme"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "themePicker",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "theme"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "themeRemover",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "theme"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "cursorPicker",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths",
+        "theme"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "wallpaperPicker",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "theme",
+        "menu"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "fontPicker",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "facade",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": true,
+      "hasTeardown": true,
+      "id": "pass",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "facade",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": true,
+      "hasTeardown": true,
+      "id": "audioMixer",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "facade",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": true,
+      "hasTeardown": true,
+      "id": "imageViewer",
+      "owner": "features",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "first_use",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": true,
+      "hasTeardown": true,
+      "id": "annotations",
+      "owner": "demand",
+      "phase": "first_use",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "gated_compat",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "systemUpdates",
+      "owner": "services",
+      "phase": "on_demand",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "powerProfile",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "gated_compat",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "printers",
+      "owner": "services",
+      "phase": "on_demand",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths",
+        "powerProfile"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "powerPolicy",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "batteryAlert",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "state",
+        "watch",
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "connectivity",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "paths",
+        "state",
+        "watch"
+      ],
+      "hasReady": true,
+      "hasTeardown": false,
+      "id": "screenshots",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "paths"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "tools",
+      "owner": "services",
+      "phase": "early",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    },
+    {
+      "activation": "resident",
+      "criticality": "optional",
+      "dependencies": [
+        "settings",
+        "state",
+        "watch",
+        "menu",
+        "session"
+      ],
+      "hasReady": false,
+      "hasTeardown": false,
+      "id": "powerMenu",
+      "owner": "features",
+      "phase": "deferred",
+      "retry": {
+        "backoffMs": 200,
+        "maxAttempts": 3,
+        "maxBackoffMs": 800
+      }
+    }
+  ],
+  "unitsDigest": "aeab88b1",
+  "version": 1
+}

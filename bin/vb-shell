@@ -1265,11 +1265,210 @@ def _without_state(value: object) -> object:
     return value
 
 
+def is_boot_timeline(data: object) -> bool:
+    # Rollout compatibility: an already-running shell still advertises the old
+    # `value` kind for boot.timeline. The record shape is distinctive, so the
+    # CLI can render the pyramid without waiting for a shell restart.
+    if not isinstance(data, list) or not data:
+        return False
+    keys = {"id", "phase", "constructionMs", "readyMs", "totalMs"}
+    return all(isinstance(r, dict) and keys.issubset(r.keys()) for r in data[:16])
+
+
+def render_boottimeline(data: object) -> str:
+    """Blame-style phase tree: aligned columns, no decorative bars."""
+    rows = [r for r in data if isinstance(r, dict)] if isinstance(data, list) else []
+    if not rows:
+        return "Booted 0 units\n"
+
+    def number(value: object) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 0.0
+        return float(value)
+
+    def text(value: object) -> str:
+        return str(value) if isinstance(value, str) and value else "unknown"
+
+    def pad_end(value: str, width: int) -> str:
+        return value + " " * max(0, width - cells(value))
+
+    def pad_start(value: str, width: int) -> str:
+        return " " * max(0, width - cells(value)) + value
+
+    totals = {text(r.get("id")): number(r.get("totalMs")) for r in rows}
+    values = sorted(v for v in totals.values() if v > 0)
+    boot_ms = values[min(len(values) - 1, int(len(values) * 0.9))] if values else 0.0
+    p90 = boot_ms
+    id_width = min(26, max(cells(unit) for unit in totals))
+    time_width = max(len(str(int(value))) for value in totals.values())
+    order = ["floor", "visual", "early", "entrance", "deferred", "first_use", "on_demand"]
+    groups: dict[str, list[dict]] = {}
+    for row in rows:
+        groups.setdefault(text(row.get("phase")), []).append(row)
+    phases = sorted(groups, key=lambda p: (order.index(p) if p in order else len(order), p))
+
+    out = ["Booted " + str(len(rows)) + " units in " + str(int(boot_ms)) + "ms", ""]
+    for phase in phases:
+        members = sorted(groups[phase], key=lambda r: (-number(r.get("totalMs")), text(r.get("id"))))
+        # Units in a phase start in parallel: the phase's time is the span of
+        # its slowest member, never the sum of all members.
+        span = max(number(r.get("totalMs")) for r in members)
+        out.append(phase + "  span " + str(int(span)) + "ms")
+        for index, row in enumerate(members):
+            unit = text(row.get("id"))
+            total = number(row.get("totalMs"))
+            build = number(row.get("constructionMs"))
+            marker = "+"
+            late = "late" if total > p90 else ""
+            build_cell = "build " + pad_start(str(int(build)), time_width) + "ms" if build > 0 else ""
+            out.append((
+                "  " + marker + " " + pad_end(unit, id_width)
+                + "  " + pad_start(str(int(total)), time_width) + "ms"
+                + "  " + pad_end(text(row.get("state")), 9)
+                + "  " + pad_end(late, 4)
+                + "  " + build_cell
+            ).rstrip())
+        out.append("")
+    out.append("phase span = slowest unit in that phase (units run in parallel); unit totalMs = arrival; late = after boot")
+    return "\n".join(out) + "\n"
+
+
+
+def render_boottime(data: dict) -> str:
+    """Decision-oriented boot report from typed fields only."""
+
+    def num(value: object) -> int | float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return value
+
+    def ms(value: object) -> str:
+        n = num(value)
+        if n is None:
+            return "unknown"
+        if isinstance(n, int) or n == int(n):
+            return str(int(n)) + "ms"
+        return repr(n) + "ms"
+
+    def label(value: object) -> str:
+        return display(str(value)) if isinstance(value, str) and value else "unknown"
+
+    def record(value: object) -> dict:
+        return value if isinstance(value, dict) else {}
+
+    def pad_end(value: str, width: int) -> str:
+        return value + " " * max(0, width - cells(value))
+
+    def pad_start(value: str, width: int) -> str:
+        return " " * max(0, width - cells(value)) + value
+
+    origin = record(data.get("origin"))
+    integrity = record(data.get("integrity"))
+    coverage = record(data.get("coverage"))
+    endpoints = record(data.get("endpoints"))
+    chains = record(data.get("chains"))
+    ledger = record(data.get("ledger"))
+    verdict = record(data.get("firstVerdict"))
+    state = label(verdict.get("state")) if verdict else "unknown"
+
+    names = [("firstVerdict", "verdict"), ("entrancePlayed", "entrance"), ("drainComplete", "complete")]
+    names += [(k, k) for k in sorted(endpoints) if k not in {n for n, _ in names}]
+    label_width = max(cells(alias) for _, alias in names)
+    time_width = max([len(ms(endpoints.get(n)).rstrip("ms")) for n, _ in names] or [1])
+
+    out: list[str] = []
+    summary = "Boot " + state + " in " + ms(endpoints.get("firstVerdict"))
+    for name, alias in names[1:3]:
+        summary += " | " + alias + " " + ms(endpoints.get(name))
+    out.append(summary)
+    if data.get("sealed") is True:
+        out.append("Capture sealed " + label(data.get("sealReason"))
+                   + " at " + ms(data.get("sealedAtMs")))
+    else:
+        out.append("Capture open at " + ms(data.get("observedThroughMs")))
+    digest = data.get("graphDigest")
+    digest_text = display(str(digest)) if isinstance(digest, str) and digest else "unknown"
+    out.append("Catalog " + digest_text + " | schema " + str(num(data.get("schema")) or 0)
+               + " | pre-QML unknown")
+    out.append("")
+
+    out.append("Milestones")
+    for name, alias in names:
+        chain = record(chains.get(name))
+        out.append("  " + pad_end(alias, label_width)
+                   + "  " + pad_start(ms(endpoints.get(name)), time_width + 2)
+                   + "  chain " + label(chain.get("status")))
+    out.append("")
+
+    for name, alias in names:
+        chain = record(chains.get(name))
+        events = [record(e) for e in (chain.get("chain") or [])]
+        branches = [record(e) for e in (chain.get("parallel") or [])]
+        if not events and not branches:
+            continue
+        parts = []
+        for event in events:
+            part = label(event.get("kind"))
+            if event.get("participant"):
+                part += " (" + label(event.get("participant")) + ")"
+            parts.append(part + " " + ms(event.get("tMs")))
+        parts.append(alias + " " + ms(endpoints.get(name)))
+        out.append("Critical path -> " + alias + "  (" + label(chain.get("status")) + ")")
+        out.append("  " + " -> ".join(parts))
+        if branches:
+            side = []
+            for event in branches[:4]:
+                part = label(event.get("kind"))
+                if event.get("participant"):
+                    part += " (" + label(event.get("participant")) + ")"
+                side.append(part + " " + ms(event.get("tMs")))
+            out.append("  parallel: " + ", ".join(side))
+        for missing in chain.get("unobserved") or []:
+            u = record(missing)
+            ref = "#" + str(num(u.get("id"))) if num(u.get("id")) is not None else "root"
+            out.append("  unobserved " + ref + "  " + label(u.get("reason")))
+        out.append("")
+
+    if ledger:
+        out.append("Work ledger")
+        source_width = max(cells(s) for s in ledger)
+        for source in sorted(ledger):
+            row = record(ledger[source])
+            closed = "yes" if row.get("admissionClosed") is True else "no"
+            terminal = "pending" if row.get("terminal") is None else label(row.get("terminal"))
+            out.append("  " + pad_end(display(source), source_width)
+                       + "  closed " + pad_end(closed, 3)
+                       + "  " + pad_end(terminal, 18)
+                       + "  by " + label(row.get("by")))
+        out.append("")
+
+    pending = [display(s) for s in sorted(ledger)
+               if record(ledger[s]).get("arrived") is True
+               and (record(ledger[s]).get("terminal") is None or num(record(ledger[s]).get("inFlight")))]
+    out.append("Pending at seal: " + (", ".join(pending) if pending else "none"))
+    out.append("Coverage: dropped " + str(num(coverage.get("captureDropped")) or 0)
+               + " | omitted " + str(num(coverage.get("replyOmitted")) or 0)
+               + " | truncated " + ("yes" if data.get("truncated") is True else "no"))
+    out.append("Integrity: " + ("valid" if integrity.get("valid") is True else "invalid"))
+    violations = integrity.get("violations")
+    if isinstance(violations, list):
+        for violation in violations:
+            v = record(violation)
+            out.append("  " + label(v.get("code")) + ": " + label(v.get("detail")))
+    return "\n".join(out).rstrip() + "\n"
+
+
+
 def render_data(payload: dict, fmt: dict | None, json_mode: bool) -> str:
     fmt = fmt or {}
     kind = fmt.get("kind")
     if "data" not in payload or (kind == "none" and not json_mode):
         return ""
+    data = payload["data"]
+    if kind == "boottime" and isinstance(data, dict):
+        return compact_ascii(data) + "\n" if json_mode else render_boottime(data)
+    if isinstance(data, list) and (kind == "boottimeline" or (kind == "value" and is_boot_timeline(data))):
+        return compact_ascii(data) + "\n" if json_mode else render_boottimeline(data)
     data = _without_state(payload["data"])
     if isinstance(data, dict) and not data:
         return ""

@@ -1,0 +1,1 @@
+[{"op":"openWork","source":"queue:early","kind":"callback"},{"op":"noteFailure","code":"observerThrow"},{"op":"enqueue","source":"queue:early","outcome":"accepted"},{"op":"state","step":"armed","pending":1,"timer":true},{"op":"callback","name":"A"},{"op":"turn","result":"ok","pending":0,"timer":false}]

@@ -1,0 +1,13 @@
+[
+  {"id":"origin","tMs":0,"kind":"boot.begin","fields":{"source":"test","estimateMs":null}},
+  {"id":"settle","tMs":40,"kind":"milestone.decision","fields":{"milestone":"settled","reason":"barModulesBuilt","participant":""},"causes":["origin"]},
+  {"op":"workOpen","token":"feat","source":"provider:features","kind":"request","tMs":41},
+  {"id":"feat-req","tMs":41,"kind":"provider.request","fields":{"source":"provider:features","reason":"entranceSettled"},"causes":["settle"]},
+  {"id":"wall-done","tMs":60,"kind":"milestone.decision","fields":{"milestone":"played","reason":"reporter:wallpaper","participant":"wallpaper"},"causes":["origin"]},
+  {"id":"played","tMs":60,"kind":"endpoint.entrancePlayed","causes":["wall-done"]},
+  {"id":"feat-done","tMs":80,"kind":"provider.result","fields":{"source":"provider:features","outcome":"adopted"},"causes":["feat-req"]},
+  {"op":"workClose","token":"feat","source":"provider:features","outcome":"adopted","tMs":80},
+  {"op":"closeAdmission","source":"provider:features","by":"adopted","tMs":80},
+  {"id":"admit","tMs":81,"kind":"drain.admission","fields":{"via":"features"},"causes":["feat-done","played"]},
+  {"id":"drain-done","tMs":126,"kind":"endpoint.drainComplete","causes":["admit"]}
+]

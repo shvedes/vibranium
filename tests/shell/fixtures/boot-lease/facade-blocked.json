@@ -1,0 +1,11 @@
+{
+  "kind": "boot-lease-facade-blocked",
+  "version": 1,
+  "description": "Registered dispatch with a permanently blocked unit, for the distinguishability check against the retryable pending case.",
+  "registered": true,
+  "ensure": { "ok": false, "state": "blocked", "code": "dependency_blocked", "hasLease": true },
+  "reply": { "ok": false, "code": "unavailable", "message": "launcher did not open" },
+  "phase": "unavailable",
+  "error": "gate",
+  "gateState": "stopped"
+}

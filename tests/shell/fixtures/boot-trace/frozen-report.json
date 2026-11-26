@@ -1,0 +1,177 @@
+{
+  "schema": 2,
+  "sealed": true,
+  "sealReason": "normal",
+  "sealedAtMs": 42,
+  "observedThroughMs": 42,
+  "integrity": {
+    "valid": true,
+    "violations": []
+  },
+  "origin": {
+    "source": "launcher",
+    "launcherToQmlEstimateMs": 0
+  },
+  "endpoints": {
+    "firstVerdict": 0,
+    "entrancePlayed": 21,
+    "drainComplete": 41
+  },
+  "firstVerdict": {
+    "state": "ready",
+    "atMs": 0,
+    "eventId": 2
+  },
+  "verdictAtSeal": {
+    "state": "ready",
+    "atMs": 0,
+    "eventId": 2
+  },
+  "currentVerdict": {
+    "state": "ready",
+    "atMs": 0,
+    "eventId": 2
+  },
+  "ledger": {
+    "provider:services": {
+      "arrived": true,
+      "admissionClosed": true,
+      "terminal": "admissionComplete",
+      "inFlight": 0,
+      "by": "adopted"
+    },
+    "provider:features": {
+      "arrived": false,
+      "admissionClosed": true,
+      "terminal": "skipped",
+      "inFlight": 0,
+      "by": "featuresAbsent"
+    },
+    "surface:bar": {
+      "arrived": false,
+      "admissionClosed": true,
+      "terminal": "skipped",
+      "inFlight": 0,
+      "by": "barAbsent"
+    },
+    "queue:early": {
+      "arrived": false,
+      "admissionClosed": true,
+      "terminal": "admissionComplete",
+      "inFlight": 0,
+      "by": "earlyQueueExhausted"
+    },
+    "queue:entrance": {
+      "arrived": false,
+      "admissionClosed": true,
+      "terminal": "admissionComplete",
+      "inFlight": 0,
+      "by": "entranceQueueExhausted"
+    },
+    "queue:deferred": {
+      "arrived": false,
+      "admissionClosed": true,
+      "terminal": "skipped",
+      "inFlight": 0,
+      "by": "emptyAtHandoff"
+    },
+    "queue:replay": {
+      "arrived": false,
+      "admissionClosed": true,
+      "terminal": "skipped",
+      "inFlight": 0,
+      "by": "noHalfCanServe"
+    }
+  },
+  "chains": {
+    "firstVerdict": {
+      "status": "complete",
+      "chain": [
+        {
+          "eventId": 1,
+          "kind": "boot.begin",
+          "tMs": 0
+        },
+        {
+          "eventId": 2,
+          "kind": "verdict.decision",
+          "tMs": 0
+        }
+      ],
+      "parallel": [],
+      "unobserved": []
+    },
+    "entrancePlayed": {
+      "status": "complete",
+      "chain": [
+        {
+          "eventId": 1,
+          "kind": "boot.begin",
+          "tMs": 0
+        },
+        {
+          "eventId": 5,
+          "kind": "milestone.decision",
+          "tMs": 20,
+          "participant": "wallpaper"
+        }
+      ],
+      "parallel": [
+        {
+          "eventId": 4,
+          "kind": "milestone.decision",
+          "tMs": 20,
+          "participant": "日本語"
+        }
+      ],
+      "unobserved": []
+    },
+    "drainComplete": {
+      "status": "complete",
+      "chain": [
+        {
+          "eventId": 1,
+          "kind": "boot.begin",
+          "tMs": 0
+        },
+        {
+          "eventId": 5,
+          "kind": "milestone.decision",
+          "tMs": 20,
+          "participant": "wallpaper"
+        },
+        {
+          "eventId": 6,
+          "kind": "endpoint.entrancePlayed",
+          "tMs": 21
+        },
+        {
+          "eventId": 10,
+          "kind": "drain.admission",
+          "tMs": 40
+        }
+      ],
+      "parallel": [
+        {
+          "eventId": 4,
+          "kind": "milestone.decision",
+          "tMs": 20,
+          "participant": "日本語"
+        }
+      ],
+      "unobserved": []
+    }
+  },
+  "graphDigest": "49 units, 14 essential",
+  "coverage": {
+    "captureDropped": 0,
+    "replyOmitted": 0,
+    "preOriginEvents": 0,
+    "lossRanges": 0,
+    "explicitLosses": 0,
+    "reservedEntries": 4,
+    "lossTruncated": false,
+    "missingInstrumentation": []
+  },
+  "truncated": false
+}

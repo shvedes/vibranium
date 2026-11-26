@@ -7,6 +7,12 @@ import qs.common
 Singleton {
   id: root
 
+  // Neutral boot observation. Boot is the sole owner and assigns itself once;
+  // every wrapper below calls through this property only when it is non-null,
+  // so a shell that never installs Boot keeps its exact pre-instrumentation
+  // path. No boot module is imported here.
+  property var milestoneObserver: null
+
   property var _barLayout: ({
     owner: null,
     enabled: false,
@@ -45,8 +51,15 @@ Singleton {
   readonly property int bootEntranceBackstopMs: 2000
   property bool bootEntranceSettled: false
 
-  function noteBootEntranceSettled() {
+  function noteBootEntranceSettled(reason) {
     if (root.bootEntranceSettled) return false
+    // Allocate the decision id while the latch is still false: a synchronous
+    // subscriber to the change can link to the decision that produced it. The
+    // unlabelled backstop deliberately reports an unknown reason.
+    if (root.milestoneObserver) {
+      root.milestoneObserver._observeMilestone("settled",
+        reason === undefined || reason === null ? "unknown" : String(reason), "", [])
+    }
     root.bootEntranceSettled = true
     return true
   }
@@ -87,6 +100,9 @@ Singleton {
     if (root.bootEntrancePlayed) return false
     const key = String(participant === undefined || participant === null ? "" : participant)
     if (root._bootPlayLeft[key] !== true) return false
+    if (root.milestoneObserver) {
+      root.milestoneObserver._observeMilestone("played", "participantReported", key, [])
+    }
     const left = Object.assign({}, root._bootPlayLeft)
     delete left[key]
     root._bootPlayLeft = left
@@ -103,6 +119,9 @@ Singleton {
   function retireBootEntranceParticipant(participant): bool {
     const key = String(participant === undefined || participant === null ? "" : participant)
     if (root._bootPlayLeft[key] !== true) return false
+    if (root.milestoneObserver) {
+      root.milestoneObserver._observeMilestone("played", "participantRetired", key, [])
+    }
     const left = Object.assign({}, root._bootPlayLeft)
     delete left[key]
     root._bootPlayLeft = left
@@ -116,6 +135,9 @@ Singleton {
   // the whole session.
   function _forceBootEntrancePlayed() {
     if (root.bootEntrancePlayed) return
+    if (root.milestoneObserver) {
+      root.milestoneObserver._observeMilestone("played", "unknown", "", [])
+    }
     root._bootPlayLeft = ({})
     root.bootEntrancePlayed = true
   }
@@ -154,8 +176,12 @@ Singleton {
   readonly property int bootConstructionBackstopMs: 2000
   property bool bootConstructionSettled: false
 
-  function noteBootConstructionSettled(): bool {
+  function noteBootConstructionSettled(reason): bool {
     if (root.bootConstructionSettled) return false
+    if (root.milestoneObserver) {
+      root.milestoneObserver._observeMilestone("construction",
+        reason === undefined || reason === null ? "unknown" : String(reason), "", [])
+    }
     root.bootConstructionSettled = true
     return true
   }

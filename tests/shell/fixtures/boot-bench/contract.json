@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "id": "bench-gate-contract-v1",
+  "structuralGolden": {
+    "tool": "tests/shell/bench/unit-catalog-golden.mjs --check --no-diff",
+    "fixture": "tests/shell/fixtures/unit-catalog/golden.json",
+    "pinnedFixtureDigest": "00b09e9e68b715cfac3ee3c71b08ae35a25ffb25535ca5d3359641037b1a622d",
+    "requirement": "unchanged: candidate catalog must still match the pre-extraction golden"
+  },
+  "visualContract": {
+    "files": [
+      "shell/features/wallpaper/WallpaperView.qml",
+      "shell/features/bar/BarRuntime.qml",
+      "shell/common/state/DesktopLayoutState.qml",
+      "shell/boot/Boot.qml"
+    ],
+    "requirement": "independent wallpaper/bar schedules, their join and fallbacks, IPC availability and the bar settings lease hold in headless probes; presentation parity requires a compositor run",
+    "headlessVerdict": "UNVERIFIED_REQUIRES_COMPOSITOR",
+    "note": "File digests are recorded beside the result as provenance only. A byte hash is not a behavioural or visual check; this pilot never certifies the visual contract."
+  }
+}

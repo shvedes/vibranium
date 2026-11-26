@@ -158,8 +158,10 @@ var targets = [
   target("boot", "Boot", "Inspect startup and unit lifecycle", [
     query("boot.state", ["state"], "Show the current unit lifecycle state as JSON",
       { kind: "value", summary: "Lifecycle snapshot" }, "json"),
-    query("boot.timeline", ["timeline"], "Show the startup event timeline as JSON",
-      { kind: "value", summary: "Event timeline" }, "json")
+    query("boot.timeline", ["timeline"], "Show the boot unit timeline as a blame tree",
+      { kind: "boottimeline", summary: "Boot unit timeline" }, "json"),
+    query("boot.time", ["time"], "Show the boot timeline tree",
+      { kind: "boottime", summary: "Boot timeline" }, "json")
   ], {}),
 
   target("log", "Log", "Read the shell diagnostic log", [], {}),

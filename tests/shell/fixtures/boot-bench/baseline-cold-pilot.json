@@ -1,0 +1,457 @@
+{
+  "schema": 1,
+  "tool": "tests/shell/bench/boot-bench.mjs",
+  "classification": "PILOT_HEADLESS_COMMON_OBSERVABLE",
+  "bootEndpointClaim": false,
+  "presentationClaim": false,
+  "endpoint": {
+    "predeclared": true,
+    "kind": "pilotCommonObservable",
+    "name": "headlessExternalReady",
+    "definition": "The QML monotonic ElapsedTimer over passesPerLaunch identical complete walks of the boot-turn stream, divided by the pass count, taken when the final v1 framed reply (real IpcProtocol.encode of a pilot report carrying only the common step sequence) is complete. The node driver decodes that frame before accepting the run. This is a headless per-pass proxy, NOT a single-launch boot endpoint.",
+    "probeCadence": "Every run executes the same fixture rows in the same order for the same number of passes, emits the same external step list (IPC registration/poll/ready, timer arms, pump enqueue/turn, loader adoption/teardown) and probes the frame once at the end. No variant-specific polling. A fresh recorder/pump/loader is built per pass so the recorder cannot saturate.",
+    "passesPerLaunch": 200,
+    "clockResolutionNote": "ElapsedTimer.elapsedMs() reported integer milliseconds on this host; normalising over 200 passes gives a 0.005 ms reported resolution floor. This is a resolution floor, not an accuracy claim.",
+    "notCompared": [
+      "internal recorder timestamps (diagnostic only; the disabled variant has none)",
+      "first displayed surface / frame presented / missed frames (no compositor probe)",
+      "warm/cold wall-clock shell start (no live shell)"
+    ]
+  },
+  "fullProtocol": {
+    "blocked": true,
+    "reasons": [
+      "live shell launch is not authorized (VB_BENCH_ALLOW_LIVE_SHELL!=1); starting the real shell here would attach to the user session",
+      "no isolated compositor socket is provisioned (VB_BENCH_COMPOSITOR_SOCKET unset); WAYLAND_DISPLAY belongs to the host session",
+      "offscreen Quickshell exposes zero screens and no PanelWindow backend, so external IPC readiness of a registered boot target cannot be probed here",
+      "the registered boot target is present in source but live registration/readiness was not probed; no cold/warm boot endpoint is claimed"
+    ]
+  },
+  "run": {
+    "mode": "cold",
+    "runs": 20,
+    "passesPerLaunch": 200,
+    "reportedResolutionFloorMs": 0.005,
+    "completedPairs": 20,
+    "randomizationSeed": 20261126,
+    "tracedFirst": 9,
+    "censoring": {
+      "nonStart": "No ##DONE## sentinel, no readyMs line, or a spawn/transport error: the run is a non-start and is excluded from timing.",
+      "timeoutMs": 10000,
+      "timeout": "A run that exceeds probe.timeoutMs is killed as a process group and censored as a timeout.",
+      "pairRule": "A block contributes to paired statistics only when BOTH variants completed. Censored runs are counted and reported, never imputed.",
+      "inconclusiveRule": "If fewer than blocks.minimum complete pairs remain, or if censored runs exceed 10% of attempts, no p50/p95 effect claim is made."
+    },
+    "censored": {
+      "traced": [],
+      "inert": []
+    },
+    "censorRate": 0,
+    "cache": {
+      "cold": "A fresh XDG_CACHE_HOME is created for every launch; no prior identical launch seeds it; no decoder/icon caches are constructed by the probe (verified absent before each launch). This is a process-level cache-isolation PROXY, not verified QML disk-cache isolation.",
+      "warm": "One identical prior launch per variant seeds the shared XDG_CACHE_HOME before measurement; the same cache directory is reused for all measured launches. Whether quickshell writes any cache artifact is recorded, not assumed.",
+      "warmSeedLaunches": [],
+      "artifactsObservedPerCacheDir": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    },
+    "statistics": {
+      "percentile": "nearest-rank (ceil(q*n)-1 on ascending samples)",
+      "bootstrapBlocks": 2000,
+      "bootstrapSeed": 61126,
+      "confidenceInterval": "percentile 95% from block-level bootstrap (resample whole pairs with replacement)",
+      "effect": "p95(traced) - p95(inert) for overhead; p95(candidate primary) - p95(baseline primary) for --compare"
+    }
+  },
+  "pin": {
+    "pinned": {
+      "schema": 1,
+      "id": "host-profile-v1",
+      "note": "Pinned beside every result, never inside graphDigest. Observed values are re-read at run time; drift is reported, not silently accepted.",
+      "build": {
+        "gitHash": "d0f9c6c083910245d03a95bfe4c0c25bc600e2aa",
+        "quickshell": "0.3.2",
+        "qt": "6.12.0"
+      },
+      "hardware": {
+        "cpuModel": "AMD Ryzen 7 5800X 8-Core Processor",
+        "cpuCount": 16,
+        "memTotalKiB": 32776500,
+        "kernel": "7.3.5-zen1-1-zen"
+      },
+      "compositor": {
+        "profile": "offscreen-quickshell-probe",
+        "sessionType": "wayland",
+        "desktop": "Hyprland",
+        "isolatedCompositorProvisioned": false,
+        "liveShellLaunched": false
+      },
+      "refresh": {
+        "hz": null,
+        "vrr": "unobserved",
+        "reason": "No compositor/surface-owner probe is available to this harness."
+      },
+      "outputs": {
+        "count": null,
+        "observed": [],
+        "reason": "QT_QPA_PLATFORM=offscreen exposes zero screens; multi-output geometry is unverified."
+      },
+      "settings": {
+        "algorithm": "sha256",
+        "sources": [
+          "config/hypr/hyprland.lua",
+          "config/qt6ct/qt6ct.conf",
+          "config/qt5ct/qt5ct.conf"
+        ],
+        "digest": "f8e1e78b43664740ce8450d4b108b043df60d328e509ae7aaacc74ffc11896b3"
+      }
+    },
+    "observed": {
+      "build": {
+        "gitHash": "d0f9c6c083910245d03a95bfe4c0c25bc600e2aa",
+        "quickshell": "0.3.2",
+        "qt": "6.12.0"
+      },
+      "hardware": {
+        "cpuModel": "AMD Ryzen 7 5800X 8-Core Processor",
+        "cpuCount": 16,
+        "memTotalKiB": 32776500,
+        "kernel": "7.3.5-zen1-1-zen"
+      },
+      "compositor": {
+        "profile": "offscreen-quickshell-probe",
+        "sessionType": "wayland",
+        "desktop": "Hyprland",
+        "waylandDisplay": "wayland-1",
+        "isolatedCompositorProvisioned": false,
+        "liveShellLaunched": false
+      },
+      "refresh": {
+        "hz": null,
+        "vrr": "unobserved",
+        "reason": "No compositor/surface-owner probe is available to this harness."
+      },
+      "outputs": {
+        "count": null,
+        "observed": [],
+        "reason": "QT_QPA_PLATFORM=offscreen exposes zero screens; multi-output geometry is unverified."
+      },
+      "settings": {
+        "algorithm": "sha256",
+        "sources": [
+          "config/hypr/hyprland.lua",
+          "config/qt6ct/qt6ct.conf",
+          "config/qt5ct/qt5ct.conf"
+        ],
+        "digest": "f8e1e78b43664740ce8450d4b108b043df60d328e509ae7aaacc74ffc11896b3"
+      }
+    },
+    "drift": [],
+    "graphDigest": "5223c282cfc1ebe973209f182f922656d77d9017d8f2dfbac381b1fb06e8f03f",
+    "metadataInsideGraphDigest": false
+  },
+  "parity": {
+    "commonObservableStepsEqual": true,
+    "parityProbeFrameBytes": 627,
+    "note": "Same external step sequence on both routes; the framed reply is decoded by the real IpcProtocol before any timing."
+  },
+  "censoringSummary": {
+    "nonStarts": 0,
+    "timeouts": 0
+  },
+  "result": {
+    "sufficient": true,
+    "traced": {
+      "n": 20,
+      "p50": 0.93,
+      "p95": 1.06,
+      "min": 0.63,
+      "max": 1.07
+    },
+    "inert": {
+      "n": 20,
+      "p50": 0.525,
+      "p95": 0.595,
+      "min": 0.36,
+      "max": 0.635
+    },
+    "pairedEffectP95Ms": 0.4650000000000001,
+    "ci": {
+      "low": 0.4099999999999999,
+      "high": 0.4900000000000001,
+      "draws": 2000
+    },
+    "pairedMedianDeltaMs": 0.365,
+    "overheadBudgetMs": 1,
+    "overheadVerdict": "WITHIN_BUDGET"
+  },
+  "diagnosticOnly": {
+    "source": "internal recorder timestamps (traced variant only; never compared to a disabled proxy)",
+    "value": {
+      "sealed": false,
+      "integrityValid": true,
+      "reservedEntries": 1
+    }
+  },
+  "compare": null,
+  "gate": {
+    "landed": false,
+    "performancePass": null,
+    "structuralGolden": "PASS",
+    "visualContract": "UNVERIFIED_REQUIRES_COMPOSITOR",
+    "reasons": [
+      "no --compare baseline supplied",
+      "visual contract unverified without a compositor run"
+    ],
+    "structuralDetail": "unit catalog matches golden: 52 units, digest aeab88b1",
+    "visualProvenanceDigests": {
+      "shell/features/wallpaper/WallpaperView.qml": "36f0c17df4e40d5abda50518605f5478793a0c2135dc18800f47b50366a189da",
+      "shell/features/bar/BarRuntime.qml": "ec047c163b0ae6a5fc5439aafa4b22ff21e25cf909b72d4d07c77b3a1881418a",
+      "shell/common/state/DesktopLayoutState.qml": "c878fdd106662ea4ff79af1ea023e943ca83dc60ebb97ba4c7db6f5e03e3301d",
+      "shell/boot/Boot.qml": "675776b477f52665ee8f3c5de9373f2c1586fd689c5bf930fff1e546f8c34e3d"
+    }
+  },
+  "blocks": [
+    {
+      "index": 0,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.965,
+      "inertReadyMs": 0.54,
+      "deltaMs": 0.42499999999999993
+    },
+    {
+      "index": 1,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 1.07,
+      "inertReadyMs": 0.55,
+      "deltaMs": 0.52
+    },
+    {
+      "index": 2,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 1.01,
+      "inertReadyMs": 0.58,
+      "deltaMs": 0.43000000000000005
+    },
+    {
+      "index": 3,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 1.015,
+      "inertReadyMs": 0.525,
+      "deltaMs": 0.4899999999999999
+    },
+    {
+      "index": 4,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 1.025,
+      "inertReadyMs": 0.52,
+      "deltaMs": 0.5049999999999999
+    },
+    {
+      "index": 5,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 0.9,
+      "inertReadyMs": 0.535,
+      "deltaMs": 0.365
+    },
+    {
+      "index": 6,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.945,
+      "inertReadyMs": 0.51,
+      "deltaMs": 0.43499999999999994
+    },
+    {
+      "index": 7,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.895,
+      "inertReadyMs": 0.555,
+      "deltaMs": 0.33999999999999997
+    },
+    {
+      "index": 8,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.925,
+      "inertReadyMs": 0.535,
+      "deltaMs": 0.39
+    },
+    {
+      "index": 9,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 0.965,
+      "inertReadyMs": 0.51,
+      "deltaMs": 0.45499999999999996
+    },
+    {
+      "index": 10,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.815,
+      "inertReadyMs": 0.54,
+      "deltaMs": 0.2749999999999999
+    },
+    {
+      "index": 11,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 0.965,
+      "inertReadyMs": 0.46,
+      "deltaMs": 0.5049999999999999
+    },
+    {
+      "index": 12,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 0.93,
+      "inertReadyMs": 0.595,
+      "deltaMs": 0.3350000000000001
+    },
+    {
+      "index": 13,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 1.06,
+      "inertReadyMs": 0.635,
+      "deltaMs": 0.42500000000000004
+    },
+    {
+      "index": 14,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.945,
+      "inertReadyMs": 0.59,
+      "deltaMs": 0.355
+    },
+    {
+      "index": 15,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.76,
+      "inertReadyMs": 0.475,
+      "deltaMs": 0.28500000000000003
+    },
+    {
+      "index": 16,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 0.705,
+      "inertReadyMs": 0.36,
+      "deltaMs": 0.345
+    },
+    {
+      "index": 17,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 0.63,
+      "inertReadyMs": 0.375,
+      "deltaMs": 0.255
+    },
+    {
+      "index": 18,
+      "order": [
+        "traced",
+        "inert"
+      ],
+      "tracedReadyMs": 0.64,
+      "inertReadyMs": 0.375,
+      "deltaMs": 0.265
+    },
+    {
+      "index": 19,
+      "order": [
+        "inert",
+        "traced"
+      ],
+      "tracedReadyMs": 0.66,
+      "inertReadyMs": 0.375,
+      "deltaMs": 0.28500000000000003
+    }
+  ],
+  "primary": "traced"
+}

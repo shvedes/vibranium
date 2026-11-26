@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "id": "boot-bench-pilot-protocol-v1",
+  "scope": "PILOT ONLY - headless common observables, NOT a boot endpoint and NOT a presentation claim",
+  "endpoint": {
+    "predeclared": true,
+    "kind": "pilotCommonObservable",
+    "name": "headlessExternalReady",
+    "definition": "The QML monotonic ElapsedTimer over passesPerLaunch identical complete walks of the boot-turn stream, divided by the pass count, taken when the final v1 framed reply (real IpcProtocol.encode of a pilot report carrying only the common step sequence) is complete. The node driver decodes that frame before accepting the run. This is a headless per-pass proxy, NOT a single-launch boot endpoint.",
+    "probeCadence": "Every run executes the same fixture rows in the same order for the same number of passes, emits the same external step list (IPC registration/poll/ready, timer arms, pump enqueue/turn, loader adoption/teardown) and probes the frame once at the end. No variant-specific polling. A fresh recorder/pump/loader is built per pass so the recorder cannot saturate.",
+    "passesPerLaunch": 200,
+    "clockResolutionNote": "ElapsedTimer.elapsedMs() reported integer milliseconds on this host; normalising over 200 passes gives a 0.005 ms reported resolution floor. This is a resolution floor, not an accuracy claim.",
+    "notCompared": [
+      "internal recorder timestamps (diagnostic only; the disabled variant has none)",
+      "first displayed surface / frame presented / missed frames (no compositor probe)",
+      "warm/cold wall-clock shell start (no live shell)"
+    ]
+  },
+  "blocks": {
+    "minimum": 20,
+    "orderRandomization": "seeded xorshift32; one coin flip per block decides traced-first or inert-first",
+    "seed": 20261126
+  },
+  "cache": {
+    "cold": "A fresh XDG_CACHE_HOME is created for every launch; no prior identical launch seeds it; no decoder/icon caches are constructed by the probe (verified absent before each launch). This is a process-level cache-isolation PROXY, not verified QML disk-cache isolation.",
+    "warm": "One identical prior launch per variant seeds the shared XDG_CACHE_HOME before measurement; the same cache directory is reused for all measured launches. Whether quickshell writes any cache artifact is recorded, not assumed."
+  },
+  "censoring": {
+    "nonStart": "No ##DONE## sentinel, no readyMs line, or a spawn/transport error: the run is a non-start and is excluded from timing.",
+    "timeoutMs": 10000,
+    "timeout": "A run that exceeds probe.timeoutMs is killed as a process group and censored as a timeout.",
+    "pairRule": "A block contributes to paired statistics only when BOTH variants completed. Censored runs are counted and reported, never imputed.",
+    "inconclusiveRule": "If fewer than blocks.minimum complete pairs remain, or if censored runs exceed 10% of attempts, no p50/p95 effect claim is made."
+  },
+  "statistics": {
+    "percentile": "nearest-rank (ceil(q*n)-1 on ascending samples)",
+    "bootstrapBlocks": 2000,
+    "bootstrapSeed": 61126,
+    "confidenceInterval": "percentile 95% from block-level bootstrap (resample whole pairs with replacement)",
+    "effect": "p95(traced) - p95(inert) for overhead; p95(candidate primary) - p95(baseline primary) for --compare"
+  },
+  "budget": {
+    "overheadBudgetMsP95": 1.0,
+    "meaningfulImprovementMs": 0.1
+  }
+}

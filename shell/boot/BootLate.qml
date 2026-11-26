@@ -47,54 +47,124 @@ Item {
   // it so the gate bookkeeping stays in one place.
   property var boot: null
 
-  function resolve(id) {
-    switch (id) {
-      case "clipboard":        void Clipboard.tag; break
-      case "osd":              void OSD.tag; break
-      case "notifications":    void Notifications.tag; break
-      case "menu":             void Menu.tag; break
-      case "app":              void AppHost.tag; break
-      case "appLauncher":      void AppLauncher.tag; break
-      case "polkit":           void Polkit.tag; break
-      case "emojiPicker":      void EmojiPicker.tag; break
-      case "keybindings":      void Keybindings.tag; break
-      case "themePicker":      void ThemePicker.tag; break
-      case "themeRemover":     void ThemeRemover.tag; break
-      case "cursorPicker":     void CursorPicker.tag; break
-      case "wallpaperPicker":  void WallpaperPicker.tag; break
-      case "fontPicker":       void FontPicker.tag; break
-      case "pass":
+  // One row per owned id. Each resolve closure is the former case body, and
+  // ready/teardown carry the predicates and controller releases that used to
+  // live in the other two switches. The table itself runs no singleton code.
+  property var handlers: ({
+    "clipboard": {
+      resolve: function() { void Clipboard.tag },
+      ready: null,
+      teardown: null
+    },
+    "osd": {
+      resolve: function() { void OSD.tag },
+      ready: null,
+      teardown: null
+    },
+    "notifications": {
+      resolve: function() { void Notifications.tag },
+      ready: function() { return Notifications.tag === "notifications" },
+      teardown: null
+    },
+    "menu": {
+      resolve: function() { void Menu.tag },
+      ready: null,
+      teardown: null
+    },
+    "app": {
+      resolve: function() { void AppHost.tag },
+      ready: function() { return AppHost.tag === "app" },
+      teardown: null
+    },
+    "appLauncher": {
+      resolve: function() { void AppLauncher.tag },
+      ready: function() { return AppLauncher.facadeReady === true },
+      teardown: function() { AppLauncher.teardownController() }
+    },
+    "polkit": {
+      resolve: function() { void Polkit.tag },
+      ready: null,
+      teardown: null
+    },
+    "emojiPicker": {
+      resolve: function() { void EmojiPicker.tag },
+      ready: null,
+      teardown: null
+    },
+    "keybindings": {
+      resolve: function() { void Keybindings.tag },
+      ready: null,
+      teardown: null
+    },
+    "themePicker": {
+      resolve: function() { void ThemePicker.tag },
+      ready: null,
+      teardown: null
+    },
+    "themeRemover": {
+      resolve: function() { void ThemeRemover.tag },
+      ready: null,
+      teardown: null
+    },
+    "cursorPicker": {
+      resolve: function() { void CursorPicker.tag },
+      ready: null,
+      teardown: null
+    },
+    "wallpaperPicker": {
+      resolve: function() { void WallpaperPicker.tag },
+      ready: null,
+      teardown: null
+    },
+    "fontPicker": {
+      resolve: function() { void FontPicker.tag },
+      ready: null,
+      teardown: null
+    },
+    "pass": {
+      resolve: function() {
         void Pass.tag
         late._observePass()
-        break
-      case "audioMixer":       void AudioMixer.tag; break
-      case "imageViewer":      void ImageViewer.tag; break
-      case "powerMenu":        void PowerMenu.tag; break
-      default:                 return false
+      },
+      ready: function() { return Pass.facadeReady === true },
+      teardown: function() { Pass.teardownController() }
+    },
+    "audioMixer": {
+      resolve: function() { void AudioMixer.tag },
+      ready: function() { return AudioMixer.facadeReady === true },
+      teardown: function() { AudioMixer.teardownController() }
+    },
+    "imageViewer": {
+      resolve: function() { void ImageViewer.tag },
+      ready: function() { return ImageViewer.facadeReady === true },
+      teardown: function() { ImageViewer.teardownController() }
+    },
+    "powerMenu": {
+      resolve: function() { void PowerMenu.tag },
+      ready: null,
+      teardown: null
     }
+  })
+
+  function handler(id) {
+    return Object.prototype.hasOwnProperty.call(handlers, id) ? handlers[id] : null
+  }
+
+  function resolve(id) {
+    var row = handler(id)
+    if (!row) return false
+    row.resolve()
     return true
   }
 
   function readyState(id) {
-    switch (id) {
-      case "notifications": return Notifications.tag === "notifications"
-      case "app":           return AppHost.tag === "app"
-      case "appLauncher":   return AppLauncher.facadeReady === true
-      case "pass":          return Pass.facadeReady === true
-      case "audioMixer":    return AudioMixer.facadeReady === true
-      case "imageViewer":   return ImageViewer.facadeReady === true
-      default:              return false
-    }
+    var row = handler(id)
+    return row && row.ready ? row.ready() : false
   }
 
   function teardown(id) {
-    switch (id) {
-      case "appLauncher": AppLauncher.teardownController(); break
-      case "pass":        Pass.teardownController(); break
-      case "audioMixer":  AudioMixer.teardownController(); break
-      case "imageViewer": ImageViewer.teardownController(); break
-      default:            break
-    }
+    var row = handler(id)
+    if (row && row.teardown) row.teardown()
   }
 
   // The annotation controller component. Boot's Loader stays declarative

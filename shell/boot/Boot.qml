@@ -2,8 +2,13 @@ pragma ComponentBehavior: Bound
 import QtQml
 import QtQuick
 import QtQuick as QQ
+import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
+import "BootTrace.js" as BootTrace
+import "../common/text/IpcProtocol.js" as Protocol
+import "Units.catalog.js" as Units
+import "Units.adapter.js" as Adapter
 import qs.common
 import qs.common as Common
 import qs.features.wallpaper
@@ -28,6 +33,15 @@ import qs.features.colorPicker
 Item {
   id: boot
 
+  // Phase 0 observation. One monotonic clock, one origin: ElapsedTimer is the
+  // only clock used by the recorder. A sample taken before onCompleted is
+  // negative and the recorder clamps it to zero rather than reporting noise.
+  ElapsedTimer { id: bootMono }
+
+  property real bootOriginMs: 0
+
+  function nowMs(): real { return bootMono.elapsedMs() - boot.bootOriginMs }
+
   Connections {
     target: Hyprland
 
@@ -36,648 +50,7 @@ Item {
     }
   }
 
-  readonly property var _catalog: [
-    {
-      // Log is first because it is what reports the other 50. Nothing may
-      // depend on it and nothing waits for it: the singleton resolves its own
-      // configuration from the environment at construction, and the settings
-      // side is adopted a tick later, so a unit that logs before `settings`
-      // is drained still gets a gate rather than an unfiltered stream.
-      id: "log",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: [],
-      resolver: function() { return boot._resolveDescriptor("log") },
-      // Nothing here is awaited, so the predicate observes the resolved
-      // configuration rather than asserting a constant.
-      ready: function() { return Log.ready === true },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "paths",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: [],
-      resolver: function() { return boot._resolveDescriptor("paths") },
-      ready: function() { return typeof Paths.home === "string" && Paths.home !== "" },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "watch",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["paths"],
-      resolver: function() { return boot._resolveDescriptor("watch") },
-      ready: function() { return typeof Watch.tag === "string" && Watch.tag !== "" },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "settings",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["paths", "watch"],
-      resolver: function() { return boot._resolveDescriptor("settings") },
-      ready: function() { return Settings.ready === true },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "hyprlandSettings",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["settings"],
-      resolver: function() { return boot._resolveDescriptor("hyprlandSettings") },
-      ready: function() { return HyprlandSettings.ready === true },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "miscSettings",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["settings"],
-      resolver: function() { return boot._resolveDescriptor("miscSettings") },
-      ready: function() { return MiscSettings.ready === true },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "systemFont",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["settings"],
-      resolver: function() { return boot._resolveDescriptor("systemFont") },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "theme",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["settings"],
-      resolver: function() { return boot._resolveDescriptor("theme") },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "ui",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["settings", "theme"],
-      resolver: function() { return boot._resolveDescriptor("ui") },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "icons",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["settings", "theme"],
-      resolver: function() { return boot._resolveDescriptor("icons") },
-      ready: function() { return Icons.ready === true },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "exec",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["paths"],
-      resolver: function() { return boot._resolveDescriptor("exec") },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "state",
-      phase: "floor",
-      criticality: "essential",
-      activation: "eager",
-      dependencies: ["paths"],
-      resolver: function() { return boot._resolveDescriptor("state") },
-      teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
-    },
-    {
-      id: "idleDaemon",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("idleDaemon") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "inhibitor",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("inhibitor") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "session",
-      phase: "early",
-      criticality: "essential",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("session") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "lockscreen",
-      phase: "early",
-      criticality: "essential",
-      activation: "resident",
-      dependencies: ["settings", "session", "state", "watch", "theme"],
-      resolver: function() { return boot._resolveDescriptor("lockscreen") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "wallpaper",
-      phase: "visual",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "theme", "paths", "state", "watch", "ui"],
-      resolver: function() { return boot._resolveDescriptor("wallpaper") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "clipboard",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("clipboard") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "privacy",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("privacy") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "bar",
-      phase: "visual",
-      criticality: "optional",
-      // The persisted master switch is the sole owner of the bar runtime.
-      // A transient hide is a control-state override and never a unit owner.
-      activation: "first_use",
-      // `icons` is deliberately not an edge. The icon scan is a `bash find`
-      // over every shipped SVG whose result fills bindings in place when it
-      // lands (Icons swaps `_raw` wholesale), so the only thing the edge bought
-      // was a bar that could not start until the whole asset set had been read
-      // - which delayed the entrance latch, and the whole drain behind it.
-      dependencies: ["settings", "theme", "ui", "state", "watch"],
-      resolver: function() { return boot._mountBarRuntime() },
-      ready: function() { return boot._barRuntimeItem !== null },
-      teardown: function() { boot._unmountBarRuntime() },
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "osd",
-      phase: "entrance",
-      criticality: "optional",
-      activation: "resident",
-      // Same reasoning as the bar: an icon that is not loaded yet paints
-      // nothing for a frame, it does not fail the surface.
-      dependencies: ["settings", "theme", "ui", "state"],
-      resolver: function() { return boot._resolveDescriptor("osd") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      // The notification daemon. Resident rather than first_use because the
-      // server has to own org.freedesktop.Notifications before anything can
-      // post to it: a unit that built on first notification would lose the
-      // ones sent while it did not exist, and notify-send's answer to a missing
-      // name is a silent no-op. The dependency order is load-bearing - the
-      // catalog graph check refuses a dependency declared at or after its
-      // dependent - and all five of these are essential units drained first.
-      id: "notifications",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      // `privacy` for Privacy.shareOn, the screen-share forced-DND source. It
-      // is a service and not a peer unit, so it is named here the way
-      // mediaArt names `audio` and powerMenu names `menu`: the daemon reads the
-      // service, so the service has to be resolved before it.
-      dependencies: ["settings", "theme", "ui", "state", "privacy"],
-      resolver: function() { return boot._resolveDescriptor("notifications") },
-      ready: function() { return boot._lateReady("notifications") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "menu",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "ui"],
-      resolver: function() { return boot._resolveDescriptor("menu") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "audio",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("audio") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "mediaArt",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "audio"],
-      resolver: function() { return boot._resolveDescriptor("mediaArt") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "keyboard",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("keyboard") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "app",
-      phase: "early",
-      criticality: "optional",
-      // The offer, the IPC target and this unit id are one string. Boot's
-      // audit reads the offered ids off the registry and compares them with
-      // the drained unit ids, so an offer under any other name would be an
-      // "offered but never drained" warning on a shell whose host works.
-      // Nothing is loaded here: the host names no app type, and the apps
-      // register themselves under their own ids.
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("app") },
-      ready: function() { return boot._lateReady("app") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "appLauncher",
-      phase: "early",
-      criticality: "optional",
-      // Facade resident, controller prewarmed. The descriptor is drained so
-      // the singleton - and therefore the `appLauncher` IPC target and the
-      // menu providers it claims - exists before any keybinding can call it;
-      // _drainNext returns that lease immediately, so nothing heavy runs.
-      // The usage read, the index build, the plugin scan and the panel tree
-      // are the controller's: the facade prewarms it right after drain and
-      // keeps it resident, so the first open paints the app list on frame
-      // one instead of an empty window.
-      activation: "facade",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("appLauncher") },
-      ready: function() { return boot._lateReady("appLauncher") },
-      teardown: function() { boot._lateTeardown("appLauncher") },
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "timer",
-      phase: "entrance",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("timer") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "recording",
-      phase: "entrance",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("recording") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "update",
-      phase: "entrance",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "paths", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("update") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "polkit",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "theme", "ui", "state", "watch", "session"],
-      resolver: function() { return boot._resolveDescriptor("polkit") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "emojiPicker",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("emojiPicker") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "keybindings",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("keybindings") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "themePicker",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "theme"],
-      resolver: function() { return boot._resolveDescriptor("themePicker") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "themeRemover",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "theme"],
-      resolver: function() { return boot._resolveDescriptor("themeRemover") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "cursorPicker",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "theme"],
-      resolver: function() { return boot._resolveDescriptor("cursorPicker") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "wallpaperPicker",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "paths", "theme"],
-      resolver: function() { return boot._resolveDescriptor("wallpaperPicker") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "fontPicker",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      // menu is a dependency, not a race: the boot scan composes a page and
-      // injectPage registers it into the search index, which is the menu's
-      // own table. Without the edge the arm has to poll for a Menu singleton
-      // that is not constructed yet, so font rows stay unsearchable for as
-      // long as that poll takes to succeed.
-      dependencies: ["settings", "state", "watch", "theme", "menu"],
-      resolver: function() { return boot._resolveDescriptor("fontPicker") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "pass",
-      phase: "early",
-      criticality: "optional",
-      // Facade resident, controller first use, for the same reason as
-      // appLauncher: the `pass` IPC target has to answer before anything can
-      // ask it, and the store scan, the children and the panel tree are the
-      // controller's. The drain constructs the facade and returns its lease.
-      activation: "facade",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("pass") },
-      ready: function() { return boot._lateReady("pass") },
-      teardown: function() { boot._lateTeardown("pass") },
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "audioMixer",
-      phase: "early",
-      criticality: "optional",
-      // Facade resident, controller first use, for the same reason as
-      // appLauncher: the mixer answers `app audioMixer` before anything can
-      // ask for it, and the node classification, the routing map, the peak
-      // handles and the window are the controller's. The drain constructs the
-      // facade and returns its lease, so the unit is only held while the
-      // facade's own demand holds it.
-      activation: "facade",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("audioMixer") },
-      ready: function() { return boot._lateReady("audioMixer") },
-      teardown: function() { boot._lateTeardown("audioMixer") },
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "imageViewer",
-      phase: "early",
-      criticality: "optional",
-      // Facade resident, controller first use: the singleton answers the app
-      // host on every verb and is built once, and the window plus the folder
-      // model it needs are built on the first open that asks for them.
-      activation: "facade",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("imageViewer") },
-      ready: function() { return boot._lateReady("imageViewer") },
-      teardown: function() { boot._lateTeardown("imageViewer") },
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "annotations",
-      phase: "first_use",
-      criticality: "optional",
-      // First use: the headless capture service is resident and asks for a
-      // region selector, a picker or an editor through the neutral
-      // AnnotationActions contract. Nothing is built until it asks, and the
-      // controller is released again once the last request closes, so a
-      // shell that never annotates constructs no view at all.
-      activation: "first_use",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("annotations") },
-      ready: function() { return boot._annotationsReady() },
-      teardown: function() { boot._teardownAnnotations() },
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "systemUpdates",
-      phase: "on_demand",
-      criticality: "optional",
-      activation: "gated_compat",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("systemUpdates") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      // Resident rather than gated_compat: the AC policy unit is resident and
-      // applies a profile through this one, so it holds no gate lease to open
-      // with, and the policy stays `blocked` on this dependency until a bar
-      // slot the user may have switched off materializes the singleton. A gate
-      // also assumes it is the only opener - a resident caller constructs the
-      // singleton from outside it, which leaves `UnitGate`'s state disagreeing
-      // with what exists - and the profile daemon is the machine's business,
-      // not one bar module's.
-      id: "powerProfile",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("powerProfile") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "printers",
-      phase: "on_demand",
-      criticality: "optional",
-      activation: "gated_compat",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("printers") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      // The AC policy: which profile the machine runs on, from the adapter.
-      // Resident because a policy that exists only while something is looking
-      // at it applies nothing - the adapter changes whether or not a bar, a
-      // menu or an OSD is on screen.
-      //
-      // `powerProfile` is an edge rather than a convenience: the policy reads
-      // the daemon's mirror (`profileName`) and then writes, so a singleton
-      // still constructing would answer a remembered profile out of a
-      // half-built service. The gate blocks rather than races, so the unit is
-      // held `blocked` until the dependency settles and `_refreshUnit`'s
-      // cascade starts it. The other four are the floor every services unit
-      // declares: the settings store it reads its two targets from, and the
-      // state, watcher and paths every service's configuration and logging
-      // path goes through.
-      id: "powerPolicy",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "paths", "powerProfile"],
-      resolver: function() { return boot._resolveDescriptor("powerPolicy") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      // Low battery alerts. Resident for the same reason as `powerPolicy`: a
-      // device running down is a fact about the machine, so the unit cannot
-      // hang off the lifetime of a view. A shell whose battery is at five
-      // percent with the bar switched off still says so.
-      //
-      // It reads `Settings` for the master switch and the two levels, and
-      // nothing else the catalog names: the device set is D-Bus, and both the
-      // percentage and the level policy come out of `BatteryModel`, a shared
-      // library rather than a unit. So the floor is the same four common
-      // primitives the other service units declare, and no service edge.
-      id: "batteryAlert",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("batteryAlert") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      // Captive-portal and metered-network announcements. Resident for the
-      // same reason as `batteryAlert`: the network's verdict is a fact
-      // about the machine, so the unit cannot hang off the lifetime of a
-      // view. It reads nothing but the NM system bus through short-lived
-      // children, and the value tables and argv come out of
-      // ConnectivityLib, a library rather than a unit. So the floor is the
-      // same primitives minus the settings store it never reads, and no
-      // service edge.
-      id: "connectivity",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["state", "watch", "paths"],
-      resolver: function() { return boot._resolveDescriptor("connectivity") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "screenshots",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "paths", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("screenshots") },
-      ready: function() { return boot._lateReady("screenshots") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "tools",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "paths"],
-      resolver: function() { return boot._resolveDescriptor("tools") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
-      id: "powerMenu",
-      phase: "deferred",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch", "menu", "session"],
-      resolver: function() { return boot._resolveDescriptor("powerMenu") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    }
-  ]
+  readonly property var _catalog: Adapter.descriptors(boot)
 
   property var _queue: []
   property var _deferredQueue: []
@@ -709,18 +82,345 @@ Item {
   // elapsed figure computed against it comes out as noise - a boot reported
   // as 1791001363123ms. Epoch millis do not fit an int.
   readonly property real _bootStartedAtMs: Date.now()
-  // Process start, stamped by the launcher that exec'd qs (the systemd unit
-  // exports VIBRANIUM_SHELL_START_MS). 0 when the shell was started by hand,
-  // in which case the boot figures fall back to this file's construction -
-  // which is after Qt initialised and after this module's import set compiled,
-  // so it under-reports the boot it names.
-  property real processStartedAtMs: 0
-  readonly property real _processStartedAtMs:
-    boot.processStartedAtMs > 0 && boot.processStartedAtMs <= Date.now()
-      ? boot.processStartedAtMs : boot._bootStartedAtMs
 
+  // Shell-relative elapsed time. Pre-QML time is intentionally unknown: the
+  // systemd unit carries no launcher stamp and the report says so.
   function _sinceProcessStart() {
-    return Math.max(0, Date.now() - boot._processStartedAtMs)
+    return Math.max(0, Date.now() - boot._bootStartedAtMs)
+  }
+
+  // --- Phase 0 capture -----------------------------------------------------
+  // Observation only. No latch, provider, lease, timer or log line depends on
+  // anything below: every hook notes a fact that has already happened, and a
+  // refused emit costs at most an event id. The recorder is one closure per
+  // Boot; `nowMs()` above is its only clock.
+  property var trace: BootTrace.create({ now: function () { return boot.nowMs() } })
+  property bool _traceSealed: false
+  property bool _verdictPublished: false
+  property bool _drainCompleted: false
+  property bool _historicalPlayed: false
+  property int _bootBeginId: 0
+  property int _catalogDigestId: 0
+  property int _entranceSettledDecisionId: 0
+  property int _entrancePlayedDecisionId: 0
+  property int _constructionDecisionId: 0
+  property int _servicesRequestId: 0
+  property int _featuresRequestId: 0
+  property int _drainAdmissionId: 0
+  property int _servicesToken: 0
+  property int _featuresToken: 0
+  property int _barToken: 0
+  property var _essentialStateIds: []
+  property var _openTraceTokens: []
+  property var _queueAdmissionClosed: ({})
+  property bool _servicesDemandObserved: false
+  property bool _servicesResultObserved: false
+  property bool _featuresDemandObserved: false
+  property bool _featuresResultObserved: false
+  property bool _barObservationOpened: false
+
+  function _traceRefs() {
+    const out = []
+    for (let i = 0; i < arguments.length; i++) {
+      const id = arguments[i]
+      if (typeof id === "number" && id > 0 && Math.floor(id) === id) out.push(id)
+    }
+    return out.slice(0, 16)
+  }
+
+  function _verdictCauses() {
+    const out = boot._essentialStateIds.slice()
+    if (boot._bootBeginId) out.push(boot._bootBeginId)
+    return out.slice(0, 16)
+  }
+
+  function _trackTraceToken(source, token) {
+    if (!token) return
+    boot._openTraceTokens = boot._openTraceTokens.concat([{ source: source, token: token }])
+  }
+
+  function _closeTraceToken(source, token, outcome) {
+    if (!token) return false
+    boot.trace.closeWork(source, token, outcome)
+    const next = []
+    for (let i = 0; i < boot._openTraceTokens.length; i++) {
+      if (boot._openTraceTokens[i].token !== token) next.push(boot._openTraceTokens[i])
+    }
+    boot._openTraceTokens = next
+    boot._maybeSealTrace()
+    return true
+  }
+
+  function _closePendingTraceTokens() {
+    const pending = boot._openTraceTokens.slice()
+    boot._openTraceTokens = []
+    for (let i = 0; i < pending.length; i++) {
+      try {
+        boot.trace.closeWork(pending[i].source, pending[i].token, "teardown")
+      } catch (error) {
+      }
+    }
+  }
+
+  function _sealTrace(reason) {
+    if (boot._traceSealed) return
+    const report = boot.trace.seal(reason)
+    if (report && report.sealed === true) {
+      boot._traceSealed = true
+      traceWatchdog.stop()
+    }
+  }
+
+  // A normal seal is only asked for at a real completion boundary, and only
+  // when the recorder's own conditions already hold. A refused normal seal
+  // leaves capture open with integrity untouched; the gate asks only at a real
+  // completion boundary.
+  function _maybeSealTrace() {
+    if (boot._traceSealed || !boot._verdictPublished || !boot._drainCompleted) return
+    const report = boot.trace.snapshot()
+    if (report.sealed) {
+      boot._traceSealed = true
+      traceWatchdog.stop()
+      return
+    }
+    if (!report.integrity.valid) return
+    if (!report.firstVerdict) return
+    if (!report.endpoints.entrancePlayed && !boot._historicalPlayed) return
+    const rows = report.ledger || ({})
+    const keys = Object.keys(rows)
+    for (let i = 0; i < keys.length; i++) {
+      const row = rows[keys[i]]
+      if (row.terminal === null || row.inFlight !== 0) return
+    }
+    boot._sealTrace("normal")
+  }
+
+  // The watchdog polls on the GUI thread and can close trace storage only.
+  // A blocked thread cannot tick it; once unblocked, a tick past the deadline
+  // seals capture without touching a latch, a queue or a log line.
+  QQ.Timer {
+    id: traceWatchdog
+    interval: 100
+    repeat: true
+    running: false
+    onTriggered: {
+      if (boot._traceSealed || boot.trace.snapshot().sealed) {
+        boot._traceSealed = true
+        traceWatchdog.stop()
+        return
+      }
+      if (boot.trace.watchdogFired(boot.nowMs())) {
+        boot._traceSealed = true
+        traceWatchdog.stop()
+      }
+    }
+  }
+
+  // The neutral observer interface DesktopLayoutState calls. The decision id
+  // is allocated while the caller's boolean is still false, so a synchronous
+  // subscriber can link to the cause of the change it is observing.
+  function _observeMilestone(milestone, reason, participant, causes) {
+    if (!boot.trace) return 0
+    const refs = boot._traceRefs(boot._bootBeginId)
+    if (Array.isArray(causes)) {
+      for (let i = 0; i < causes.length && refs.length < 16; i++) {
+        if (typeof causes[i] === "number" && causes[i] > 0) refs.push(causes[i])
+      }
+    }
+    const id = boot.trace.emit("milestone.decision", {
+      milestone: milestone,
+      reason: reason === undefined || reason === null ? "unknown" : String(reason).slice(0, 64),
+      participant: participant === undefined || participant === null ? "" : String(participant).slice(0, 64),
+      causes: refs
+    })
+    if (id && milestone === "settled") boot._entranceSettledDecisionId = id
+    if (id && milestone === "played") boot._entrancePlayedDecisionId = id
+    if (id && milestone === "construction") boot._constructionDecisionId = id
+    return id
+  }
+
+  function _observeAlreadyResolved(milestone, participant) {
+    if (!boot.trace) return
+    // A latch already true before installation is history, not a timed
+    // predecessor: it satisfies the played precondition but has no endpoint.
+    if (milestone === "played") boot._historicalPlayed = true
+    boot.trace.alreadyResolved(milestone,
+      participant === undefined || participant === null ? "" : String(participant).slice(0, 64))
+  }
+
+  function _installMilestoneObserver() {
+    if (DesktopLayoutState.milestoneObserver !== null) return
+    DesktopLayoutState.milestoneObserver = boot
+    if (DesktopLayoutState.bootConstructionSettled) boot._observeAlreadyResolved("construction", "")
+    if (DesktopLayoutState.bootEntranceSettled) boot._observeAlreadyResolved("settled", "")
+    if (DesktopLayoutState.bootEntrancePlayed) boot._observeAlreadyResolved("played", "")
+  }
+
+  // One accepted demand gets one provider request and one work token, on both
+  // the synchronous and asynchronous component paths.
+  function _observeServicesDemand() {
+    if (boot._servicesDemandObserved) return
+    boot._servicesDemandObserved = true
+    boot._servicesRequestId = boot.trace.emit("provider.request", {
+      source: "provider:services", reason: "lateServicesHalf",
+      causes: boot._traceRefs(boot._bootBeginId)
+    })
+    boot._servicesToken = boot.trace.openWork("provider:services", "request")
+    boot._trackTraceToken("provider:services", boot._servicesToken)
+  }
+
+  function _observeServicesResult(outcome) {
+    if (!boot._servicesDemandObserved || boot._servicesResultObserved) return
+    boot._servicesResultObserved = true
+    boot.trace.emit("provider.result", {
+      source: "provider:services", outcome: outcome,
+      causes: boot._traceRefs(boot._servicesRequestId, boot._bootBeginId)
+    })
+    boot._closeTraceToken("provider:services", boot._servicesToken, outcome)
+    boot._servicesToken = 0
+    boot.trace.closeAdmission("provider:services", outcome)
+    boot._maybeSealTrace()
+  }
+
+  function _observeFeaturesDemand(reason) {
+    if (boot._featuresDemandObserved) return
+    boot._featuresDemandObserved = true
+    boot._featuresRequestId = boot.trace.emit("provider.request", {
+      source: "provider:features",
+      reason: reason === undefined || reason === null ? "featuresNeeded" : String(reason).slice(0, 64),
+      causes: boot._traceRefs(boot._entranceSettledDecisionId, boot._entrancePlayedDecisionId,
+        boot._bootBeginId)
+    })
+    boot._featuresToken = boot.trace.openWork("provider:features", "request")
+    boot._trackTraceToken("provider:features", boot._featuresToken)
+  }
+
+  function _observeFeaturesResult(outcome) {
+    if (!boot._featuresDemandObserved || boot._featuresResultObserved) return
+    boot._featuresResultObserved = true
+    boot.trace.emit("provider.result", {
+      source: "provider:features", outcome: outcome,
+      causes: boot._traceRefs(boot._featuresRequestId, boot._entranceSettledDecisionId,
+        boot._bootBeginId)
+    })
+    boot._closeTraceToken("provider:features", boot._featuresToken, outcome)
+    boot._featuresToken = 0
+    boot.trace.closeAdmission("provider:features", outcome)
+    boot._maybeSealTrace()
+  }
+
+  function _closeQueueLedger(source, reason) {
+    if (boot._queueAdmissionClosed[source] === true) return
+    boot._queueAdmissionClosed[source] = true
+    boot.trace.closeAdmission(source, reason)
+    boot._maybeSealTrace()
+  }
+
+  function _drainVia() {
+    if (boot._lateFeatures) return "features"
+    if (boot._halvesPending === 0) return "fallback"
+    return "pending"
+  }
+
+  function _drainCauses() {
+    return boot._traceRefs(boot._entrancePlayedDecisionId, boot._entranceSettledDecisionId,
+      boot._featuresRequestId, boot._bootBeginId)
+  }
+
+  function _completeDrain() {
+    if (!boot._drainStarted) return
+    boot._drainCompleted = true
+    // A source that never arrived is known to have no work at this boundary;
+    // a source that arrived still has to close through its own real path.
+    const sources = ["provider:services", "provider:features", "surface:bar",
+      "queue:early", "queue:entrance", "queue:deferred", "queue:replay"]
+    for (let i = 0; i < sources.length; i++) {
+      const row = boot.trace.snapshot().ledger[sources[i]]
+      if (row && !row.arrived && row.terminal === null) {
+        boot.trace.skip(sources[i], "noDemandAtDrainComplete")
+      }
+    }
+    boot.trace.emit("endpoint.drainComplete", {
+      causes: boot._traceRefs(boot._drainAdmissionId, boot._entrancePlayedDecisionId,
+        boot._bootBeginId)
+    })
+    boot._maybeSealTrace()
+  }
+
+  function _pumpSource(fn) {
+    if (fn === boot._drainEarly) return "queue:early"
+    if (fn === boot._drainNext) return "queue:entrance"
+    if (fn === boot._drainDeferred) return "queue:deferred"
+    if (fn === boot._replayNext) return "queue:replay"
+    return ""
+  }
+
+  // Both routes hand out the same bounded report. The base fields are never
+  // pruned; only the optional causal projection is, parallel branches first
+  // and then chain tails, and only on a detached copy of the snapshot.
+  function _wireBytes(report) {
+    return Protocol.asciiBytes(Protocol.encode(Protocol.ok(report, "boottime")))
+  }
+
+  function _markReplyOmission(chain) {
+    chain.status = "partial"
+    if (!Array.isArray(chain.unobserved)) chain.unobserved = []
+    for (let i = 0; i < chain.unobserved.length; i++) {
+      if (chain.unobserved[i] && chain.unobserved[i].reason === "replyOmission") return false
+    }
+    chain.unobserved.push({ reason: "replyOmission" })
+    return true
+  }
+
+  function _fitBootReport(report) {
+    if (boot._wireBytes(report) <= Protocol.MAX_REPLY_BYTES) return report
+    const fitted = JSON.parse(JSON.stringify(report))
+    const chains = fitted.chains || ({})
+    const keys = Object.keys(chains)
+    let omitted = 0
+    for (let i = 0; i < keys.length; i++) {
+      const chain = chains[keys[i]]
+      if (Array.isArray(chain.parallel) && chain.parallel.length > 0) {
+        chain.parallel = []
+        if (boot._markReplyOmission(chain)) omitted++
+      }
+      if (boot._wireBytes(fitted) <= Protocol.MAX_REPLY_BYTES) break
+    }
+    let guard = 0
+    while (boot._wireBytes(fitted) > Protocol.MAX_REPLY_BYTES && guard < 64) {
+      let changed = 0
+      for (let i = 0; i < keys.length; i++) {
+        const chain = chains[keys[i]]
+        if (Array.isArray(chain.chain) && chain.chain.length > 1) {
+          chain.chain.pop()
+          if (boot._markReplyOmission(chain)) changed++
+        }
+      }
+      if (changed === 0) break
+      omitted += changed
+      guard++
+    }
+    fitted.coverage.replyOmitted = (fitted.coverage.replyOmitted || 0) + omitted
+    fitted.truncated = true
+    return fitted
+  }
+
+  function jsonOf(value): string { return JSON.stringify(value) }
+
+  function _bootReport() {
+    return boot._fitBootReport(boot.trace.snapshot())
+  }
+
+  // Called after each register() closes, never inside its inline route map:
+  // the map stays a plain route table, and a failed transport observation
+  // cannot abort capture, change the registration result or print a line.
+  function _noteGatewayRegistration(target, valid) {
+    try {
+      boot.trace.emit("gateway.registered", {
+        valid: Boolean(valid), target: String(target)
+      })
+    } catch (error) {
+    }
   }
   // shell.start names the build the line came from. Nothing else in the tree
   // publishes a version, so the boot contract declares its own: it moves when
@@ -744,25 +444,53 @@ Item {
   // recomputed on every unit event and printed only when it moves.
   property string _shellMilestone: ""
   Component.onCompleted: {
+    // Clock boundary: one monotonic origin, no launcher stamp. Pre-QML time is
+    // unknown and the report states that instead of estimating it.
+    boot.bootOriginMs = bootMono.elapsedMs()
+    const origin = { source: "unknown", estimate: null }
+    boot.trace.setContext(origin, Units.digest())
+    boot._bootBeginId = boot.trace.emit("boot.begin", {
+      source: origin.source, estimateMs: origin.estimate
+    })
+    boot.trace.armWatchdog(boot.nowMs(), 5000)
+    traceWatchdog.start()
+    boot._installMilestoneObserver()
     // The two transport targets are registered before anything can ask for
     // help or status. These are constant closures over boot's own projections;
     // the router owns parsing, validation and paging.
-    IpcRouter.register("shell", boot, {
+    const shellRegistered = IpcRouter.register("shell", boot, {
       "shell.status": function () { return boot._shellStatus() },
       "shell.doctor": function () { return boot._shellDoctor() },
       "shell.ping": function () { return "pong" }
     })
-    IpcRouter.register("boot", boot, {
+    boot._noteGatewayRegistration("shell", shellRegistered)
+    const bootRegistered = IpcRouter.register("boot", boot, {
       "boot.status": function () { return boot._shellStatus() },
       "boot.state": function () { return boot._bootState() },
       "boot.timeline": function () { return boot._bootTimeline() },
+      "boot.time": function () { return jsonOf(boot._bootReport()) },
       "boot.ping": function () { return "pong" }
     })
+    boot._noteGatewayRegistration("boot", bootRegistered)
+    // The loaders own the URL loads; Boot keeps the observation and adoption
+    // handlers. Direct signal connections preserve the inline/deferred caller
+    // order without installing a loader observer in production. `failed`
+    // carries the loader's error class: loadError, createObjectNull or
+    // createObjectThrew (the last two take Boot's instantiate fallback).
+    servicesLoader.failed.connect(boot._onServicesFailed)
+    servicesLoader.adopted.connect(boot._adoptServicesHalf)
+    featuresLoader.failed.connect(boot._onFeaturesFailed)
+    featuresLoader.adopted.connect(boot._adoptLate)
     // Fired first so the late half compiles on a worker thread while the
     // floor and Phase 1 drain on this one. Nothing below waits for it:
     // _beginDrain runs when it lands.
     boot._loadLate()
-    if (!boot._registerCatalog()) {
+    const catalogOk = boot._registerCatalog()
+    boot._catalogDigestId = boot.trace.emit("catalog.registered", {
+      valid: catalogOk === true, digest: boot.start
+    })
+    if (!catalogOk) {
+      boot._sealTrace("aborted")
       return
     }
     boot._catalogRegistered = true
@@ -781,8 +509,24 @@ Item {
   }
 
   Component.onDestruction: {
+    // Retire queued callbacks and close their open tokens while the recorder
+    // still exists, before anything below detaches or closes trace storage.
+    bootPump.shutdown()
+    // Cancel both URL loads before anything detaches or closes trace storage.
+    // Teardown is cancellation: a stale Ready/Error callback cannot adopt a
+    // half or invoke a Boot fallback, and no failed result is fabricated.
+    servicesLoader.teardown()
+    featuresLoader.teardown()
+    // Owner-guarded detach: never clear an observer installed by somebody
+    // else. Teardown observation is best effort and cannot throw.
+    if (DesktopLayoutState.milestoneObserver === boot) DesktopLayoutState.milestoneObserver = null
     IpcRouter.unregister("shell", boot)
     IpcRouter.unregister("boot", boot)
+    try {
+      boot._closePendingTraceTokens()
+      traceWatchdog.stop()
+    } catch (error) {
+    }
   }
 
   // Shared projections. The native handlers below keep their signatures and
@@ -813,9 +557,26 @@ Item {
   property var _lateBar: null
   property var _lateBarComponent: null
   property var _lateServices: null
-  property var _lateServicesComponent: null
   property var _lateFeatures: null
-  property var _lateFeaturesComponent: null
+  // Each late half is one URL load owned by this Boot. The loader compiles the
+  // component asynchronously and creates its object with this Boot as owner;
+  // Boot still decides *when* to request and observes the provider work itself.
+  // `observer` stays null in production: the pilot trace's provider events come
+  // from Boot's own observation functions, never from the loader's test seam.
+  AsyncLoader {
+    id: servicesLoader
+    sourceUrl: "BootServices.qml"
+    owner: boot
+    createProperties: ({ boot: boot })
+    observer: null
+  }
+  AsyncLoader {
+    id: featuresLoader
+    sourceUrl: "BootLate.qml"
+    owner: boot
+    createProperties: ({ boot: boot })
+    observer: null
+  }
   // Halves that have not landed yet (Ready or Error). A demand that arrives
   // while this is above zero is stashed for the replay; a failed half stops
   // counting too, so one broken half cannot hold demands - or the drain that
@@ -881,7 +642,9 @@ Item {
     // of the feature half's compile. Each heavy adoption replays its stashed
     // demands before this, so the turn that constructs the last of its units
     // has already run.
-    if (boot._constructHalvesPending === 0) DesktopLayoutState.noteBootConstructionSettled()
+    if (boot._constructHalvesPending === 0) {
+      DesktopLayoutState.noteBootConstructionSettled("lateHalvesSettled")
+    }
     // The last half settling is the moment a stashed demand has nowhere left
     // to go: the replay drops what no half owns and releases the drain.
     if (boot._halvesPending === 0) boot._replayNext()
@@ -931,30 +694,46 @@ Item {
       return false
     }
     boot._barRuntimeItem = item
-    boot._settleBarHalf()
+    boot._settleBarHalf("adopted")
     UnitGate.refresh("bar")
     return true
   }
 
   // The bar's construction slot is settled exactly once per boot. A later
   // enable has no boot slot to decrement; it uses the runtime's local reveal.
-  function _settleBarHalf() {
+  // The startup decision obligation is opened on the first entry and settled
+  // through this same guard; the Loader generation is a separate runtime fact.
+  function _settleBarHalf(outcome) {
+    if (!boot._barObservationOpened) {
+      boot._barObservationOpened = true
+      boot._barToken = boot.trace.openWork("surface:bar", "startupDecision")
+      boot._trackTraceToken("surface:bar", boot._barToken)
+    }
     if (boot._barDecisionMade) return
     boot._barDecisionMade = true
+    const decision = outcome === "skipped" ? "skipped" : "adopted"
+    boot._closeTraceToken("surface:bar", boot._barToken, decision)
+    boot._barToken = 0
+    if (decision === "skipped") {
+      boot.trace.skip("surface:bar", "barAbsent")
+    } else {
+      boot.trace.closeAdmission("surface:bar", decision)
+    }
     // The services half owns the first early-tier turn. Starting it here can
     // land before _bootP0(), leaving facade dependencies blocked with no
     // later edge to re-ensure them (AppLauncher's IPC target among them).
     boot._halfSettled(true)
+    boot._maybeSealTrace()
   }
 
   // A known-absent bar settles the entrance wait and retires only its played
   // obligation, leaving an enabled wallpaper's own fade to report its finish.
   function _barAbsent() {
     if (boot._barDecisionMade) return
-    boot._settleBarHalf()
-    DesktopLayoutState.noteBootEntranceSettled()
+    boot._settleBarHalf("skipped")
+    DesktopLayoutState.noteBootEntranceSettled("barAbsent")
     DesktopLayoutState.retireBootEntranceParticipant("bar")
-    boot._loadFeaturesHalf()
+    boot._loadFeaturesHalf("barAbsent")
   }
 
   // One owner for the master setting across the whole shell process.
@@ -970,7 +749,7 @@ Item {
       // runtime's compile. Wallpaper's first fade waits on this milestone, so
       // holding it for a module-heavy URL load would put a second, later
       // compile on the first-paint path.
-      boot._settleBarHalf()
+      boot._settleBarHalf("adopted")
       return
     }
     if (boot._barLeaseHeld) {
@@ -981,61 +760,65 @@ Item {
     boot._barAbsent()
   }
 
+  // One accepted demand per half. A loader that is loading or already adopted
+  // owns an outstanding request; a terminal failure is not refusal, so a later
+  // demand is allowed to request again. The loader's own load() guard is a
+  // second line of defence, not a reason to emit a duplicate provider.request.
   function _loadServicesHalf() {
-    if (boot._lateServices || boot._lateServicesComponent) return
-    const comp = Qt.createComponent("BootServices.qml", Component.Asynchronous)
-    if (comp.status === Component.Ready) {
-      boot._adoptServicesHalf(comp)
-    } else if (comp.status === Component.Error) {
-      Log.error("boot: services half failed to load: " + comp.errorString())
-      boot._halfSettled(true)
-    } else {
-      boot._lateServicesComponent = comp
-      comp.statusChanged.connect(boot._onServicesHalfStatus)
-    }
+    if (boot._lateServices || servicesLoader.state === "loading"
+        || servicesLoader.state === "adopted" || servicesLoader.instance !== null) return
+    boot._observeServicesDemand()
+    servicesLoader.load()
   }
 
-  function _onServicesHalfStatus() {
-    const comp = boot._lateServicesComponent
-    if (!comp || comp.status === Component.Loading) return
-    comp.statusChanged.disconnect(boot._onServicesHalfStatus)
-    boot._lateServicesComponent = null
-    if (comp.status === Component.Ready) {
-      boot._adoptServicesHalf(comp)
+  function _onServicesFailed(errorClass, attemptId, detail) {
+    if (errorClass !== "loadError") {
+      // Null (or throwing) createObject: no second Log.error line here; the
+      // shared instantiate fallback logs through _failHalf as before.
+      boot._observeServicesResult("failed")
+      boot._failHalf("services half failed to instantiate", true)
       return
     }
     // The shell degrades to no service singletons: the demands that waited on
     // this half have nowhere to go, and _halfSettled lets the replay drop them
-    // instead of holding the drain behind a half that will never land.
-    Log.error("boot: services half failed to load: " + comp.errorString())
+    // instead of holding the drain behind a half that will never land. Log,
+    // observation, settle is the order on both the synchronous and deferred
+    // component paths.
+    Log.error("boot: services half failed to load: " + detail)
+    boot._observeServicesResult("failed")
     boot._halfSettled(true)
   }
 
-  function _loadFeaturesHalf() {
-    if (boot._lateFeatures || boot._lateFeaturesComponent) return
-    const comp = Qt.createComponent("BootLate.qml", Component.Asynchronous)
-    if (comp.status === Component.Ready) {
-      boot._adoptLate(comp)
-    } else if (comp.status === Component.Error) {
-      Log.error("boot: late half failed to load: " + comp.errorString())
-      boot._halfSettled()
-      boot._beginDrain()
-    } else {
-      boot._lateFeaturesComponent = comp
-      comp.statusChanged.connect(boot._onFeaturesHalfStatus)
-    }
+  // A component that resolves Error inside load() emits before load() returns;
+  // a deferred one emits on statusChanged. The original late half logged before
+  // observing on the first path and observed before _failHalf logged on the
+  // second, so the flag preserves that caller order without a loader observer.
+  property bool _featuresLoadSync: false
+
+  function _loadFeaturesHalf(reason) {
+    if (boot._lateFeatures || featuresLoader.state === "loading"
+        || featuresLoader.state === "adopted" || featuresLoader.instance !== null) return
+    boot._observeFeaturesDemand(reason)
+    boot._featuresLoadSync = true
+    featuresLoader.load()
+    boot._featuresLoadSync = false
   }
 
-  function _onFeaturesHalfStatus() {
-    const comp = boot._lateFeaturesComponent
-    if (!comp || comp.status === Component.Loading) return
-    comp.statusChanged.disconnect(boot._onFeaturesHalfStatus)
-    boot._lateFeaturesComponent = null
-    if (comp.status === Component.Ready) {
-      boot._adoptLate(comp)
+  function _onFeaturesFailed(errorClass, attemptId, detail) {
+    if (errorClass !== "loadError") {
+      boot._observeFeaturesResult("failed")
+      boot._failHalf("late half failed to instantiate")
+      boot._beginDrain()
       return
     }
-    boot._failHalf("late half failed to load: " + comp.errorString())
+    if (boot._featuresLoadSync) {
+      Log.error("boot: late half failed to load: " + detail)
+      boot._observeFeaturesResult("failed")
+      boot._halfSettled()
+    } else {
+      boot._observeFeaturesResult("failed")
+      boot._failHalf("late half failed to load: " + detail)
+    }
     boot._beginDrain()
   }
 
@@ -1043,12 +826,13 @@ Item {
   // belongs to the bar half's adoption, and a unit whose turn has come is
   // resolved by the replay. Adopting this half is what lets the stashed
   // service demands move on.
-  function _adoptServicesHalf(comp) {
-    boot._lateServices = comp.createObject(boot, { boot: boot })
-    if (!boot._lateServices) {
-      boot._failHalf("services half failed to instantiate", true)
-      return
-    }
+  function _adoptServicesHalf(object) {
+    // The loader has already created this object with boot as owner. A null
+    // here is a defensive no-op: the loader reports a null createObject as a
+    // failed edge and never emits adopted for it.
+    boot._lateServices = object
+    if (!boot._lateServices) return
+    boot._observeServicesResult("adopted")
     Log.debug("boot: services half adopted in " + boot._sinceProcessStart() + "ms")
     // The early tier is the service singletons and the daemons that answer
     // IPC, and this half is what builds most of them. Starting it here instead
@@ -1064,13 +848,12 @@ Item {
   // The feature half landed. The annotation controller component lives here
   // with its import, and the drain is released now: its queues resolve feature
   // types, so it could not start earlier even if the bar half already had.
-  function _adoptLate(comp) {
-    boot._lateFeatures = comp.createObject(boot, { boot: boot })
-    if (!boot._lateFeatures) {
-      boot._failHalf("late half failed to instantiate")
-      boot._beginDrain()
-      return
-    }
+  function _adoptLate(object) {
+    // Already created by the loader with boot as owner; see _adoptServicesHalf
+    // for why the null branch is only a defensive no-op.
+    boot._lateFeatures = object
+    if (!boot._lateFeatures) return
+    boot._observeFeaturesResult("adopted")
     Log.debug("boot: late half adopted in " + boot._sinceProcessStart() + "ms")
     // `lockscreen` is essential and lives in this half, so the tier starts here
     // too when the bar's adoption did not already start it. Idempotent.
@@ -1156,10 +939,17 @@ Item {
     // No half left that could serve these: the same demand today would sit
     // behind an always-missing half and hold the drain with it.
     boot._replayQueue = []
+    boot._closeQueueLedger("queue:replay", "noHalfCanServe")
     if (boot._lateFeatures) boot._beginDrain()
   }
 
   function _beginDrain() {
+    // The guard inputs are visible here: the feature half, or no half left
+    // that could land, or a half still compiling. Eligibility is noted even
+    // when this call is parked; admission is noted only when it starts.
+    boot.trace.emit("drain.eligibility", {
+      via: boot._drainVia(), causes: boot._drainCauses()
+    })
     if (boot._drainStarted) return
     // The entrance queue resolves its units through the feature half, so a
     // release that lands while that half is still compiling would demand types
@@ -1195,6 +985,9 @@ Item {
     }
     boot._drainRequested = false
     boot._drainStarted = true
+    boot._drainAdmissionId = boot.trace.emit("drain.admission", {
+      via: boot._drainVia(), causes: boot._drainCauses()
+    })
     // The entrance queue resolves what the shell needs on screen. A first_use
     // unit is none of that: it is built by whoever demands it, through its own
     // UnitGate lease, and `first_use` is not a drain phase at all. Visual
@@ -1363,6 +1156,7 @@ Item {
       case "exec":             void Exec.run; break
       case "state":            void Common.AppState.tag; break
       case "wallpaper":        void Wallpaper.enabled; break
+      case "bar":              return boot._mountBarRuntime()
       case "annotations":      annotationLoader.active = true; break
       default:                  return boot._lateResolve(id)
     }
@@ -1399,6 +1193,33 @@ Item {
   // half with a teardown to dispatch (see BootLate.teardown).
   function _lateTeardown(id) {
     if (boot._lateFeatures) boot._lateFeatures.teardown(id)
+  }
+
+  // Boot-owned readiness/teardown kept local to Boot after the catalog
+  // extraction. The catalog adapter's wrappers call these; every other id
+  // falls through to the provider dispatchers above, so provider ownership and
+  // demand/replay order are unchanged.
+  function _unitReady(id) {
+    switch (id) {
+      case "log":              return Log.ready === true
+      case "paths":            return typeof Paths.home === "string" && Paths.home !== ""
+      case "watch":            return typeof Watch.tag === "string" && Watch.tag !== ""
+      case "settings":         return Settings.ready === true
+      case "hyprlandSettings": return HyprlandSettings.ready === true
+      case "miscSettings":     return MiscSettings.ready === true
+      case "icons":            return Icons.ready === true
+      case "bar":              return boot._barRuntimeItem !== null
+      case "annotations":      return boot._annotationsReady()
+      default:                 return boot._lateReady(id)
+    }
+  }
+
+  function _unitTeardown(id) {
+    switch (id) {
+      case "bar":         boot._unmountBarRuntime(); return
+      case "annotations": boot._teardownAnnotations(); return
+      default:            boot._lateTeardown(id); return
+    }
   }
 
   // Rebuild the diagnostic report. Called by the verbs that read it, never by
@@ -1517,6 +1338,15 @@ Item {
     // already reported, and nothing binds to it. Copying it made every settle
     // a fresh map of every unit that had settled before.
     boot._milestones[id] = state.state
+    const descriptor = boot._byId[id]
+    if (descriptor && descriptor.criticality === "essential") {
+      const stateId = boot.trace.emit("unit.state", {
+        unit: id, state: state.state,
+        ownerCategory: descriptor.activation || "resident",
+        causes: boot._traceRefs(boot._bootBeginId)
+      })
+      if (stateId) boot._essentialStateIds = boot._essentialStateIds.concat([stateId]).slice(-8)
+    }
     Log.debug("unit " + id + " reached " + state.state + ": constructed in "
       + state.constructionMs + "ms, ready at " + state.readyMs + "ms")
     // The verdict is a function of the essential records alone, so it can only
@@ -1538,6 +1368,14 @@ Item {
     if (verdict === boot._shellMilestone) return
     boot._shellMilestone = verdict
     if (verdict === "starting") return
+    const verdictId = boot.trace.emit("verdict.decision", {
+      state: verdict, causes: boot._verdictCauses()
+    })
+    boot.trace.emit("endpoint.firstVerdict", {
+      causes: boot._traceRefs(verdictId, boot._bootBeginId)
+    })
+    boot._verdictPublished = true
+    boot._maybeSealTrace()
     const line = "shell " + verdict + " in "
       + boot._sinceProcessStart() + "ms, start " + boot.start
     if (verdict === "degraded") {
@@ -1760,13 +1598,17 @@ Item {
       // competes with the bar's module builds (see _loadLate). The entrance
       // backstop settles this milestone even when no bar reported, so a shell
       // whose bar never latches still loads the half.
-      if (DesktopLayoutState.bootEntranceSettled) boot._loadFeaturesHalf()
+      if (DesktopLayoutState.bootEntranceSettled) boot._loadFeaturesHalf("entranceSettled")
       if (DesktopLayoutState.bootEntranceSettled) {
         Log.debug("boot: entrance settled in " + boot._sinceProcessStart() + "ms")
       }
     }
     function onBootEntrancePlayedChanged() {
       if (DesktopLayoutState.bootEntrancePlayed) {
+        boot.trace.emit("endpoint.entrancePlayed", {
+          causes: boot._traceRefs(boot._entrancePlayedDecisionId,
+            boot._entranceSettledDecisionId, boot._bootBeginId)
+        })
         boot._beginDrain()
         Log.debug("boot: entrance played in " + boot._sinceProcessStart() + "ms")
       }
@@ -1885,7 +1727,11 @@ Item {
     boot._earlyStarted = true
     boot._earlyQueue = boot._earlyDescriptors()
     boot._budgetedTurn(boot._earlyQueue)
-    if (boot._earlyQueue.length > 0) boot._requestPump(boot._drainEarly)
+    if (boot._earlyQueue.length > 0) {
+      boot._requestPump(boot._drainEarly)
+    } else {
+      boot._closeQueueLedger("queue:early", "earlyQueueExhausted")
+    }
   }
 
   function _drainEarly() {
@@ -1893,7 +1739,11 @@ Item {
     // Through the pump, not Idle.run: the early tier is now ~20 units, and a
     // chain of callLaters is serviced back to back before the render loop gets
     // its turn - the 105ms frame the pump exists to prevent.
-    if (boot._earlyQueue.length > 0) boot._requestPump(boot._drainEarly)
+    if (boot._earlyQueue.length > 0) {
+      boot._requestPump(boot._drainEarly)
+    } else {
+      boot._closeQueueLedger("queue:early", "earlyQueueExhausted")
+    }
   }
 
   function _drainNext() {
@@ -1902,8 +1752,13 @@ Item {
       boot._requestPump(boot._drainNext)
       return
     }
+    boot._closeQueueLedger("queue:entrance", "entranceQueueExhausted")
     if (boot._deferredQueue.length > 0) {
       boot._requestPump(boot._drainDeferred)
+    } else {
+      // The handoff established that there is no deferred work to do.
+      boot._closeQueueLedger("queue:deferred", "emptyAtHandoff")
+      boot._completeDrain()
     }
   }
 
@@ -1911,6 +1766,9 @@ Item {
     boot._budgetedTurn(boot._deferredQueue)
     if (boot._deferredQueue.length > 0) {
       boot._requestPump(boot._drainDeferred)
+    } else {
+      boot._closeQueueLedger("queue:deferred", "emptyAtHandoff")
+      boot._completeDrain()
     }
   }
 
@@ -1927,35 +1785,65 @@ Item {
   // A single pump carries every background phase, in arrival order: a phase
   // that is mid-queue when another asks to start (the early tier is still
   // running when the drain is released at the milestone) must not lose its
-  // continuation, which is what a one-slot `_pumpedFn` would do - it would
-  // overwrite the early turn and leave the rest of that queue undrained.
-  property var _pumpedFns: []
-
-  function _requestPump(fn) {
-    if (boot._pumpedFns.indexOf(fn) >= 0) return
-    boot._pumpedFns = boot._pumpedFns.concat([fn])
-    drainPump.restart()
+  // continuation. BootPump owns that FIFO and its one-shot timer; Boot only
+  // classifies the source and supplies the one monotonic clock.
+  BootPump {
+    id: bootPump
+    observer: boot
+    now: function () { return boot.nowMs() }
   }
 
-  function _pumpTurn() {
-    const pending = boot._pumpedFns
-    if (pending.length === 0) return
-    boot._pumpedFns = pending.slice(1)
-    pending[0]()
-    // One function runs per tick, and a finished phase does not reschedule
-    // itself - the early drain stops when its queue is empty while the drain
-    // it shared the pump with is still queued. Wake whatever is left, or that
-    // continuation sits in the queue with no timer running.
-    if (boot._pumpedFns.length > 0) drainPump.restart()
+  // Observer adapter for BootPump. The pump calls these guarded, and each is
+  // inert when capture is absent or sealed; an observation failure never
+  // reaches the pump's control flow.
+  function openWork(source, kind) {
+    if (!boot.trace || boot._traceSealed) return 0
+    try {
+      return boot.trace.openWork(source, kind)
+    } catch (error) {
+      return 0
+    }
   }
 
-  Timer {
-    id: drainPump
-
-    interval: 16
-    repeat: false
-    onTriggered: boot._pumpTurn()
+  function closeWork(source, token, outcome) {
+    if (!token || !boot.trace || boot._traceSealed) return
+    try {
+      boot.trace.closeWork(source, token, outcome)
+      // The last phase closes its own admission inside the callback, so this
+      // is where all ledger rows finally become terminal - the same normal
+      // seal boundary the inline pump turn used to reach.
+      boot._maybeSealTrace()
+    } catch (error) {
+    }
   }
+
+  function enqueue(source, outcome) {
+    if (!boot.trace || boot._traceSealed) return
+    try {
+      boot.trace.emit("queue.enqueue", { source: String(source), outcome: String(outcome) })
+    } catch (error) {
+    }
+  }
+
+  function dispatch(source, token, waitMs) {
+    if (!token || !boot.trace || boot._traceSealed) return
+    try {
+      boot.trace.emit("queue.dispatch", {
+        source: String(source), token: Number(token), waitMs: Number(waitMs)
+      })
+    } catch (error) {
+    }
+  }
+
+  function noteFailure(code) {
+    if (!boot.trace || boot._traceSealed) return
+    try {
+      boot.trace.emit("integrity.violation", { code: String(code).slice(0, 64), detail: "observerThrow" })
+    } catch (error) {
+    }
+  }
+
+  function _requestPump(fn) { return bootPump.enqueue(fn, boot._pumpSource(fn)) }
 
   // Bounded retries. Every non-floor descriptor declares one: a failure is the
   // one arrival nothing else wakes up, and at boot the plausible causes are
@@ -2021,9 +1909,11 @@ Item {
     function status(): string { return boot._shellStatus() }
     function state(): string { return boot._bootState() }
     function timeline(): string { return boot._bootTimeline() }
+    function time(): string { return jsonOf(boot._bootReport()) }
     function help(): string {
       return "Usage: vb-shell boot <command> [args...]\n"
         + "\nBoot lifecycle and startup timeline.\n"
+        + "\n  time                Show the boot timeline tree\n"
         + "\nRun `vb-shell boot help` for the command list, or `vb-shell help boot`.\n"
     }
     function ping(): string { return "pong" }

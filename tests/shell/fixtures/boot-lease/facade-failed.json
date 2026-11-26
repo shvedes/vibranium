@@ -1,0 +1,20 @@
+{
+  "kind": "boot-lease-facade-failed",
+  "version": 1,
+  "description": "Registered dispatch with a genuinely failed controller and with a resolver that throws. Both collapse to the same wire reply as a pending demand.",
+  "registered": true,
+  "controllerStartupError": {
+    "reply": { "ok": false, "code": "unavailable", "message": "launcher did not open" },
+    "phase": "failed",
+    "error": "controller exploded",
+    "gateState": "stopped",
+    "recovered": { "ok": true, "code": null, "message": null },
+    "recoveredPhase": "ready"
+  },
+  "resolverThrows": {
+    "ensure": { "ok": false, "state": "failed", "code": null, "hasLease": true },
+    "reply": { "ok": false, "code": "unavailable", "message": "launcher did not open" },
+    "phase": "failed",
+    "error": "unit"
+  }
+}

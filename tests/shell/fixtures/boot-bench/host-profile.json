@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "id": "host-profile-v1",
+  "note": "Pinned beside every result, never inside graphDigest. Observed values are re-read at run time; drift is reported, not silently accepted.",
+  "build": {
+    "gitHash": "d0f9c6c083910245d03a95bfe4c0c25bc600e2aa",
+    "quickshell": "0.3.2",
+    "qt": "6.12.0"
+  },
+  "hardware": {
+    "cpuModel": "AMD Ryzen 7 5800X 8-Core Processor",
+    "cpuCount": 16,
+    "memTotalKiB": 32776500,
+    "kernel": "7.3.5-zen1-1-zen"
+  },
+  "compositor": {
+    "profile": "offscreen-quickshell-probe",
+    "sessionType": "wayland",
+    "desktop": "Hyprland",
+    "isolatedCompositorProvisioned": false,
+    "liveShellLaunched": false
+  },
+  "refresh": {
+    "hz": null,
+    "vrr": "unobserved",
+    "reason": "No compositor/surface-owner probe is available to this harness."
+  },
+  "outputs": {
+    "count": null,
+    "observed": [],
+    "reason": "QT_QPA_PLATFORM=offscreen exposes zero screens; multi-output geometry is unverified."
+  },
+  "settings": {
+    "algorithm": "sha256",
+    "sources": [
+      "config/hypr/hyprland.lua",
+      "config/qt6ct/qt6ct.conf",
+      "config/qt5ct/qt5ct.conf"
+    ],
+    "digest": "f8e1e78b43664740ce8450d4b108b043df60d328e509ae7aaacc74ffc11896b3"
+  }
+}

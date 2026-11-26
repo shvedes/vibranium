@@ -1,0 +1,21 @@
+[
+  {"id":"origin","tMs":0,"kind":"boot.begin","fields":{"source":"launcher","estimateMs":0}},
+  {"id":"v","tMs":0,"kind":"verdict.decision","fields":{"state":"ready"},"causes":["origin"]},
+  {"id":"fv","tMs":0,"kind":"endpoint.firstVerdict","causes":["v"]},
+  {"id":"p1","tMs":20,"kind":"milestone.decision","fields":{"milestone":"played","reason":"reporter:日本語","participant":"日本語"},"causes":["origin"]},
+  {"id":"p2","tMs":20,"kind":"milestone.decision","fields":{"milestone":"played","reason":"reporter:wallpaper","participant":"wallpaper"},"causes":["origin"]},
+  {"id":"played","tMs":21,"kind":"endpoint.entrancePlayed","causes":["p2","p1"]},
+  {"op":"workOpen","token":"svc","source":"provider:services","kind":"request","tMs":22},
+  {"id":"svc-done","tMs":30,"kind":"provider.result","fields":{"source":"provider:services","outcome":"adopted"},"causes":["p2"]},
+  {"op":"workClose","token":"svc","source":"provider:services","outcome":"adopted","tMs":30},
+  {"op":"closeAdmission","source":"provider:services","by":"adopted","tMs":30},
+  {"op":"skip","source":"provider:features","reason":"featuresAbsent","tMs":31},
+  {"op":"skip","source":"surface:bar","reason":"barAbsent","tMs":31},
+  {"op":"closeAdmission","source":"queue:early","by":"earlyQueueExhausted","tMs":31},
+  {"op":"closeAdmission","source":"queue:entrance","by":"entranceQueueExhausted","tMs":31},
+  {"op":"skip","source":"queue:deferred","reason":"emptyAtHandoff","tMs":31},
+  {"op":"skip","source":"queue:replay","reason":"noHalfCanServe","tMs":31},
+  {"id":"admit","tMs":40,"kind":"drain.admission","fields":{"via":"fallback"},"causes":["played"]},
+  {"id":"dc","tMs":41,"kind":"endpoint.drainComplete","causes":["admit"]},
+  {"op":"seal","reason":"normal","tMs":42}
+]

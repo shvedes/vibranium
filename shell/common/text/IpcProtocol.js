@@ -21,7 +21,7 @@ var MAX_SAFE = 9007199254740991
 
 // Result renderers the client understands. `help` carries the canonical
 // descriptor shape and is laid out by the help renderer, not as a record.
-var OUTPUT_KINDS = ["none", "text", "bool", "number", "record", "table", "help", "value", "lines"]
+var OUTPUT_KINDS = ["none", "text", "bool", "number", "record", "table", "help", "value", "lines", "boottime", "boottimeline"]
 
 var ERRORS = {
   usage: 2, "unknown-target": 2, "unknown-command": 2, "invalid-argument": 2,

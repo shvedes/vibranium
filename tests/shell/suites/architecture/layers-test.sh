@@ -225,7 +225,9 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 3, features 184, services 30, common 175.
+# The table: composition 1, boot 8 (the four published files plus the Phase 0
+# recorder, Phase 1 pump, Phase 2 loader and Phase 3 catalog/adapter),
+# features 184, services 30, common 175.
 # Batch E added MenuIpc.js and batch C added BarIpc.js under features/.
 # Batch B added MixerTabs.js (features), AudioIpc.js (services) and
 # AudioNodeKind.js (common); Batch A added the three shared IPC files to
@@ -258,7 +260,16 @@ t_count "features/ holds the tree's 187 .qml and .js files" "187" "$(layer_files
 # sleep boundary rather than on the wall clock alone.
 t_count "services/ holds the 30 files the README publishes" "30" "$(layer_files services)"
 t_count "common/ holds the 175 files the README publishes" "175" "$(layer_files common)"
-t_count "boot/ holds the 3 files the README publishes" "3" "$(layer_files boot)"
+t_count "boot/ holds the 4 published files plus the Phase 0 recorder, Phase 1 pump, Phase 2 loader and Phase 3 catalog/adapter" "8" "$(layer_files boot)"
+t_true "the Phase 0 boot recorder exists" test -f "$SHELL_DIR/boot/BootTrace.js"
+t_eq "the Phase 0 boot recorder is a .pragma library" ".pragma library" \
+  "$(head -1 "$SHELL_DIR/boot/BootTrace.js")"
+t_true "the Phase 1 pump exists and is registered in qs.boot" \
+  bash -c 'test -f "$1/boot/BootPump.qml" && grep -q "^BootPump .* BootPump.qml$" "$1/boot/qmldir"' \
+  bash "$SHELL_DIR"
+t_true "the Phase 2 loader exists and is registered in qs.boot" \
+  bash -c 'test -f "$1/boot/AsyncLoader.qml" && grep -q "^AsyncLoader .* AsyncLoader.qml$" "$1/boot/qmldir"' \
+  bash "$SHELL_DIR"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
 
 t_section "every module sits inside one of the four layers, and every file inside one"
