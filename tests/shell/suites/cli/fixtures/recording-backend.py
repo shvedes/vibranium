@@ -24,7 +24,13 @@ with tempfile.TemporaryDirectory(prefix="vbr-") as tmp:
 printf '%s\n' "$TEST_REGION"
 """)
     tool("wl-copy", '#!/bin/bash\ncat >"$TEST_BASE/copied"\n')
-    tool("notify-send", '#!/bin/bash\nprintf "%s\\n" "$*" >>"$TEST_BASE/notify"\n')
+    tool("notify-send", """#!/bin/bash
+printf "%s\\n" "$*" >>"$TEST_BASE/notify"
+for arg in "$@"; do
+  [[ "$arg" == --action=open=* ]] && printf 'open\\n'
+done
+""")
+    tool("xdg-open", '#!/bin/bash\nprintf "%s\\n" "$*" >>"$TEST_BASE/opened"\n')
     tool("python3", '#!/bin/bash\ntouch "$TEST_BASE/python-invoked"\nexit 99\n')
     tool("gpu-screen-recorder", f"#!{sys.executable}\n" + """
 import json, os, socket, sys, time
@@ -70,13 +76,14 @@ while True:
         conn.sendall((json.dumps({"id":req["id"],"result":"ok"})+"\\n").encode())
 """)
     env = dict(os.environ, PATH=f"{fake}:{root}/bin:{os.environ['PATH']}",
-               CHASSIS_TYPE="desktop", TEST_BASE=str(base),
+               CHASSIS_TYPE="desktop", TEST_BASE=str(base), HOME=str(base),
                XDG_VIDEOS_DIR=str(base / "space % # ? é"),
                VIBRANIUM_RUNTIME=str(base / "run"), VIBRANIUM_CACHE=str(base / "cache"),
                TEST_MODE="normal", TEST_MONITORS='[{"name":"DP-1","focused":true}]')
     marker = base / "run/recording-ongoing"
     results = base / "notify"
     clipboard = base / "copied"
+    opened = base / "opened"
     attempts = base / "attempts"
     process_groups = []
 
@@ -128,8 +135,19 @@ while True:
         until(lambda: clipboard.exists() and not marker.exists())
         assert b"space%20%25%20%23%20%3F%20%C3%A9" in clipboard.read_bytes()
         until(lambda: "Recording saved" in results.read_text())
+        saved = [line for line in results.read_text().splitlines()
+                 if "Recording saved" in line]
+        assert len(saved) == 1 and saved[0].count("--action=") == 1, saved
+        # The body names the save folder, not the file, and leaves the expiry
+        # to the notification server's default timeout.
+        assert "Video saved to ~/space % # ? é/Screencasts" in saved[0], saved
+        assert "recording-" not in saved[0] and " -t " not in saved[0], saved
         files = list(Path(env["XDG_VIDEOS_DIR"]).glob("Screencasts/recording-*"))
         assert len(files) == 1 and files[0].read_text() == "finalized", files
+        # The mock answers the notification's only action; the listener must
+        # hand that recording to the default opener, not just report the path.
+        until(lambda: opened.exists() and opened.read_text().splitlines()
+              and opened.read_text().splitlines()[0] == str(files[0]))
 
         start(TEST_MODE="fallback")
         assert attempts.read_text().splitlines()[-2:] == ["gpu", "cpu"]
