@@ -35,6 +35,17 @@ BarModule {
     return null
   }
 
+  // No Quickshell API steps workspaces, so dispatch directly. The syntax
+  // depends on Hyprland's config provider, which is only known once its
+  // async status request lands - read it at call time, not at load time.
+  function stepWorkspace(target) {
+    if (Hyprland.usingLua) {
+      Hyprland.dispatch("hl.dsp.focus({ workspace = '" + target + "' })")
+    } else {
+      Hyprland.dispatch("workspace " + target)
+    }
+  }
+
   builtinFill: false
   implicitWidth: row.implicitWidth
     + (root.submapActive ? WSM.numberGap() + submapText.implicitWidth + BarControl.slotInset : 0)
@@ -178,6 +189,17 @@ BarModule {
           }
         }
       }
+    }
+  }
+
+  // Wheel over the module steps workspaces on this monitor: down goes to
+  // the next, up to the previous, matching the battery module's direction.
+  // The relative targets are the same ones the workspace keybinds use.
+  WheelHandler {
+    acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+    onWheel: event => {
+      if (event.angleDelta.y === 0) return
+      root.stepWorkspace(event.angleDelta.y > 0 ? "m-1" : "m+1")
     }
   }
 

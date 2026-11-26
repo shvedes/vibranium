@@ -2702,6 +2702,20 @@ group('the click contract survives both refactors', () => {
   match('right click still fires the declarative hook', WS_QML, /root\.clickCommand\("rightClick"\)/)
 })
 
+// The wheel handler needs a real pointer and a live Hyprland socket, neither
+// of which a headless probe has. Pin its mapping and both dispatch forms at
+// the source level, the way the strip and urgency contracts are pinned above.
+section('workspaces: wheel steps next/prev workspaces')
+group('the wheel contract', () => {
+  match('a wheel handler covers the module', WS_QML, /WheelHandler\s*\{/)
+  contains('mouse wheels and touchpads are accepted', WS_QML, 'acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad')
+  contains('a zero vertical delta is ignored', WS_QML, 'if (event.angleDelta.y === 0) return')
+  contains('wheel up walks back, wheel down walks forward', WS_QML, 'event.angleDelta.y > 0 ? "m-1" : "m+1"')
+  match('the provider is read when the wheel turns', WS_QML, /function stepWorkspace\(target\) \{\s*if \(Hyprland\.usingLua\)/)
+  match('lua mode focuses the relative workspace', WS_QML, /hl\.dsp\.focus\(\{ workspace = '" \+ target \+ "' \}\)/)
+  contains('conf mode uses the plain dispatch', WS_QML, 'Hyprland.dispatch("workspace " + target)')
+})
+
 section('now playing: synced lyrics')
 group('LRC stamps become sorted cues', () => {
   eq('two cues in order', CN.parseLrc('[00:12.50]Hello\n[00:15.00]World'),
