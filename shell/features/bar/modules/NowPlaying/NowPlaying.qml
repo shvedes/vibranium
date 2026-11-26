@@ -57,26 +57,27 @@ CollapsibleSlot {
 
     interval: 1000
     repeat: false
-    onTriggered: root.transportIcon = ""
+    onTriggered: root._flashTransport("")
   }
+  // One writer for the glyph and its dwell: a named icon opens the hold, an
+  // empty one releases it. A handler that loses its client goes through the
+  // same function instead of clearing the property and stopping the timer on
+  // its own, so the two cannot disagree about who ended the flash.
   function _flashTransport(icon) {
     root.transportIcon = icon
-    transportTimer.restart()
+    if (icon === "") transportTimer.stop()
+    else transportTimer.restart()
   }
   onPlayingChanged: {
     if (!root._transportSeeded) return
     if (!root.hasClient) {
-      transportTimer.stop()
-      root.transportIcon = ""
+      root._flashTransport("")
       return
     }
     root._flashTransport(root.playing ? "play" : "pause")
   }
   onHasClientChanged: {
-    if (!root.hasClient) {
-      transportTimer.stop()
-      root.transportIcon = ""
-    }
+    if (!root.hasClient) root._flashTransport("")
   }
   // Whether the active player takes a volume write at all. MPRIS cannot
   // say, and a browser client declares Volume and drops the write, so the
@@ -105,14 +106,17 @@ CollapsibleSlot {
   // either way.
   readonly property bool showTitle: Settings.value("shell.statusbar.nowPlayingTitle") === true
   readonly property bool flashEnabled: Settings.value("shell.statusbar.nowPlayingFlash") !== false
-  property bool flashActive: false
-  Timer {
-    id: flashTimer
+  // The reveal window is the shared one, so the clock owns `active` and no
+  // handler keeps a second copy of it. The track observer already seeds on
+  // the first track, so this instance opts out of the reveal's backend settle
+  // gate: that gate would swallow a real next/prev in the first seconds
+  // after the bar loads.
+  FlashReveal {
+    id: nameFlash
 
-    interval: 3000
-    repeat: false
-    onTriggered: root._stopFlash()
+    settled: true
   }
+  readonly property bool flashActive: nameFlash.active
   readonly property string trackKey: root.player !== null ? NP.playerKey(root.player) : ""
   property bool _trackSeeded: false
   property string _lastTrackKey: ""
@@ -142,7 +146,7 @@ CollapsibleSlot {
     }
     if (key === root._lastTrackKey) return
     root._lastTrackKey = key
-    if (root.flashEnabled) root._startFlash()
+    if (root.flashEnabled) root._fireFlash(key)
   }
 
   // Track-name flash: reveals the title for 3s on a track change. The
@@ -155,21 +159,43 @@ CollapsibleSlot {
       root._stopFlash()
       return
     }
-    root.flashActive = true
-    flashTimer.restart()
+    nameFlash.pulse()
+  }
+
+  // Fullscreen defer, the Network/Bluetooth convention: a track announced
+  // while a fullscreen window owns this screen must not expand the bar over
+  // the content. The event itself is parked, not just a flag: a newer
+  // next/prev replaces the held event, so a burst leaves only the last one.
+  // Its payload is a track key, not a title snapshot - the reveal still reads
+  // the live name, and a held key that no longer names the active track is
+  // stale and gets dropped on replay.
+  property var _flashPendingEvent: null
+  readonly property bool _flashPending: root._flashPendingEvent !== null
+  function _parkFlash(key) {
+    const held = root._flashPendingEvent
+    if (key === null && held === null) return
+    root._flashPendingEvent = key === null ? null : { key: key }
+  }
+
+  function _fireFlash(key) {
+    if (root.fullscreenActive) {
+      root._parkFlash(key)
+      return
+    }
+    root._startFlash()
   }
 
   // IPC's explicit track flash. It never observes the track or updates a
-  // track key: automatic announcements keep their existing behavior.
+  // track key; it shares the gate so an explicit announcement parks the same
+  // event an automatic one does.
   function ipcTrigger(name) {
     if (name !== "flashTrack") return false
-    root._startFlash()
+    root._fireFlash(root.trackKey)
     return true
   }
 
   function _stopFlash() {
-    flashTimer.stop()
-    root.flashActive = false
+    nameFlash.clear()
   }
 
   onTrackKeyChanged: root._queueTrackObservation()
@@ -183,10 +209,32 @@ CollapsibleSlot {
   onArtistChanged: root._queueTrackObservation()
   onAlbumChanged: root._queueTrackObservation()
   onHasTrackChanged: {
-    if (!root.hasTrack) root._stopFlash()
+    if (!root.hasTrack) {
+      root._stopFlash()
+      root._parkFlash(null)
+    }
   }
   onFlashEnabledChanged: {
-    if (!root.flashEnabled) root._stopFlash()
+    if (!root.flashEnabled) {
+      root._stopFlash()
+      root._parkFlash(null)
+    }
+  }
+  onFullscreenActiveChanged: {
+    if (root.fullscreenActive) {
+      // Entering fullscreen with a flash up: park the event and take the
+      // reveal off screen instead of running it under the fullscreen window.
+      if (root.flashActive) {
+        root._parkFlash(root.trackKey)
+        root._stopFlash()
+      }
+      return
+    }
+    if (root._flashPending) {
+      const key = root._flashPendingEvent.key
+      root._parkFlash(null)
+      if (key === root.trackKey) root._startFlash()
+    }
   }
   // Opening an island shows the track there, so a flash already running ends
   // with the open rather than playing out behind the card.

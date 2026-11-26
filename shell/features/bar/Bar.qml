@@ -2241,6 +2241,11 @@ Singleton {
         else if (!item.flashEnabled) reason = "flash disabled"
         else if (item.showTitle) reason = "title shown"
         else if (anyIsland) reason = "island open"
+        else if (item._flashPending) return BarIpc.ok({ state: "deferred", reason: "pending" })
+        else if (item.fullscreenActive) {
+          item.ipcTrigger(name)
+          return BarIpc.ok({ state: "deferred", reason: "fullscreen" })
+        }
         break
       case "flashTemperature":
         if (!Core.Weather.current) reason = "no weather data"
