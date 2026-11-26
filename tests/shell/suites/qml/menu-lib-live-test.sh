@@ -20,6 +20,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
 t_init "menu-lib-live" "frame-level menu trace: two seeded walks, motion on and off"
 
+# One resident shell is shared by every live menu suite. Serialise the live
+# phase here so a concurrent suite cannot change the open bundle or the guard
+# state under a sampling walk. This changes no assertion and no animation.
+MENU_LIVE_LOCK="${TMPDIR:-/tmp}/vb-menu-live.lock"
+exec 9>"$MENU_LIVE_LOCK"
+flock -w 600 9 || t_block "could not acquire the menu live lock"
+
 if ! command -v qs >/dev/null 2>&1; then
   t_block "qs is not on PATH"
 fi
@@ -147,15 +154,15 @@ PY
     p debugDeep on >/dev/null 2>&1
     p deepPhase "deep-$3" >/dev/null 2>&1
     p debugSetCurrentIdx "$1" >/dev/null 2>&1
-    sleep 0.3
-    p debugActivatePanel >/dev/null 2>&1
-    sleep 0.3
-    for ((k = 0; k < $2; k++)); do
-      p debugChildMove 1 >/dev/null 2>&1
-      sleep 0.1
-    done
+    sleep 0.4
     p debugActivatePanel >/dev/null 2>&1
     sleep 0.5
+    for ((k = 0; k < $2; k++)); do
+      p debugChildMove 1 >/dev/null 2>&1
+      sleep 0.15
+    done
+    p debugActivatePanel >/dev/null 2>&1
+    sleep 0.6
     if [[ $3 == flow ]]; then
       p deepPhase "flow-next" >/dev/null 2>&1
       p debugKey returnKey >/dev/null 2>&1
@@ -464,3 +471,55 @@ walk animations 0.12 28 || t_no "animations: the capture completed"
 
 t_section "pass 2: animations collapsed"
 walk noanim 0.04 28 || t_no "noanim: the capture completed"
+
+# Regression: clearing a global search must not paint the result row under
+# the bar while the page's rows resize back. The old path kept the hit by
+# identity for one install, then moved to the saved seat on the next frame -
+# a visible Reload flash. Start on a row that is not the page head, so the
+# assertion also proves the saved seat, not just "row zero".
+t_section "search clear keeps the pre-search seat with no result flash"
+p close >/dev/null 2>&1 || true
+sleep 0.3
+p restoreAnims >/dev/null 2>&1 || true
+p openFile "$VIBRANIUM_DIR/shell/common/settings/catalog.jsonc#utilities" >/dev/null
+sleep 0.7
+p debugSetCurrentIdx 4 >/dev/null
+sleep 0.25
+p debugDeep on >/dev/null
+sleep 0.2
+p debugType "Reload" >/dev/null
+sleep 0.65
+p debugKey escape >/dev/null
+sleep 0.65
+SEARCH_TRACE="${TMPDIR:-/tmp}/vb-menu-search-clear.jsonl"
+: > "$SEARCH_TRACE"
+for off in 0 8 16 24 32 40 48 56 64 72 80 88; do
+  p probeDeep "$off" 8 >> "$SEARCH_TRACE" 2>/dev/null || true
+  printf '\n' >> "$SEARCH_TRACE"
+done
+p debugDeep off >/dev/null 2>&1 || true
+search_result=$(python3 - "$SEARCH_TRACE" <<'PY'
+import json, sys
+frames = []
+for line in open(sys.argv[1]):
+    line = line.strip()
+    if line:
+        frames.extend(json.loads(line))
+cleared = [f for f in frames
+           if f["base"]["query"] == "" and not f["base"]["searching"]]
+bad = [f for f in cleared if f["base"]["rowLabel"] == "Reload Vibranium"]
+# The target is 4. -1 is the deliberate empty swap frame while the page
+# rows are being adopted; any other index is the first-entry frame the bug
+# painted before the saved row won.
+wrong = [f for f in cleared if f["base"]["index"] not in (4, -1)]
+last = frames[-1]["base"] if frames else {}
+print(f"{len(bad)}|{len(wrong)}|{last.get('index', -1)}|{last.get('rowLabel', '')}")
+PY
+)
+t_eq "no cleared-search frame paints the Reload hit" "0" "${search_result%%|*}"
+rest=${search_result#*|}
+t_eq "no cleared-search frame seats another row" "0" "${rest%%|*}"
+rest=${rest#*|}
+t_eq "the saved row is the cursor after the resize" "4" "${rest%%|*}"
+t_eq "the saved row is Reading mode" "Reading mode" "${rest#*|}"
+p close >/dev/null 2>&1 || true

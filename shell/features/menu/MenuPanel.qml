@@ -1053,6 +1053,18 @@ Rectangle {
   }
 
   function _writeRecords(records, keepRow) {
+    // A cleared search restores the row saved at entry, not the result row
+    // the cursor is on now. Arm that row by identity at the model's single
+    // write site, so both install shapes (keyed and wholesale) hand the same
+    // target to the view before it replaces the row set. The view restores
+    // it from the page rows it is adopting: no seat against the outgoing
+    // one-row projection, and no second correction once the page lands.
+    const armSavedRow = !panel.searching && !panel.scopedSearching && !panel.gridMode
+      && !panel._searchClearByResult && panel._searchReturnIdx >= 0
+      && panel._searchReturnUid !== ""
+      && panel._searchReturnPage === (Menu.frame ? Menu.frame.id : "")
+    if (armSavedRow)
+      list.keepRow(panel._searchReturnUid, panel._searchReturnY, panel._modelListH())
     // An install that changes the row COUNT is a live row edit, not a
     // re-order: a row was added or removed under the cursor while the cursor
     // stayed on the row the user was looking at. Two answers follow, and this
@@ -1087,6 +1099,13 @@ Rectangle {
     if (keepRow !== false && !countEdit) list.keepCursor()
     else if (keepRow !== false) list.pinHighlight()
     panel._records = records
+    // The saved-row target is resolved against the row set the view is
+    // adopting. Apply that set in this turn so the first frame after the
+    // erase already carries the target row instead of the empty projection.
+    if (armSavedRow) {
+      list.forceLayout()
+      list.restoreKeptRow()
+    }
     // A model replacement ends user-motion provenance: any cursor move
     // after this point is the view adjusting, not the user asking, until
     // the next seat. Without this, a native adjustment landing on some
@@ -1198,7 +1217,16 @@ Rectangle {
   // than wrong. Outside a summon this is a no-op by contract: callers only
   // invoke it on the install paths below while _summonSeat is armed.
   function _clearCursorForSwap(records) {
-    if (!panel._summonSeat) return
+    // A search exit replaces the hit projection with the page and restores
+    // the row saved at entry. The hit's index names nothing in the outgoing
+    // projection once the page is armed, and the view would paint it under
+    // the bar until the page rows land. Clear it for the swap, exactly as a
+    // summon does: an empty frame until the saved row is restored is the
+    // correct answer, and the identity target fills it on the model edge.
+    const savedReturn = !panel.gridMode && panel._searchReturnPending
+      && !panel._searchClearByResult && panel._searchReturnUid !== ""
+      && panel._searchReturnPage === (Menu.frame ? Menu.frame.id : "")
+    if (!panel._summonSeat && !savedReturn) return
     if (panel.gridMode) {
       if (grid.currentIndex !== -1) grid.currentIndex = -1
       return
@@ -1210,7 +1238,7 @@ Rectangle {
     // Clearing it in this case made the first open of a page drop its
     // selection bar - and the row under it - for one frame every time:
     // the install cleared a cursor it then put back on the very same row.
-    if (panel._cursorSurvives(records)) return
+    if (panel._summonSeat && panel._cursorSurvives(records)) return
     list._hlHeld = false
     if (list.currentIndex !== -1) list.seat(-1, "land", true)
   }
@@ -1258,7 +1286,8 @@ Rectangle {
       if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
       if (!panel._sameRecords(records)) {
         panel._writeRecords(records,
-          !navSeat && !panel.searching && !panel.scopedSearching)
+          !navSeat && !panel.searching && !panel.scopedSearching
+          && !panel._searchReturnPending)
         if (plan.glide) panel._quiesceDisarm()
         else panel._quiesceArm()
       }
@@ -1315,7 +1344,8 @@ Rectangle {
         // The same answer as the incremental path above: the search
         // projections seat the head of the new order instead of keeping
         // the cursor's row, so they do not ask the view to keep it.
-        panel._writeRecords(records, !panel.searching && !panel.scopedSearching)
+        panel._writeRecords(records, !panel.searching && !panel.scopedSearching
+          && !panel._searchReturnPending)
         // Wholesale never glides, so every write here arms the handshake.
         panel._quiesceArm()
         // The summon's own install: the deferred fit below lands three turns
@@ -1341,10 +1371,24 @@ Rectangle {
         panel._swapPendingGen = -1
         list.endSwap()
       }
-      const returnIdx = panel._searchReturnIdx
-      const returnY = panel._searchReturnY
-      panel._searchReturnIdx = -1
-      panel._searchReturnY = -1
+      // A search install also comes through this same-turn branch. The seat
+      // saved at entry belongs to the EXIT install, not to the keystrokes
+      // that build the projection: consuming it here left the erase with no
+      // saved seat, so the page restore kept the result row by identity for
+      // a frame (the Reload flash) before another seat corrected it.
+      const leavingSearch = !panel.searching
+      // A result landing owns the page cursor. Its query clear still comes
+      // through this edge, but there is no saved seat to restore: keep the
+      // whole restore block (fit recommit, settle waiter, re-seat) out of
+      // the landing's way and let the navigation's pending seat win.
+      const restoreSeat = leavingSearch && !panel._searchClearByResult
+      const returnIdx = restoreSeat ? panel._searchReturnIdx : -1
+      const returnY = restoreSeat ? panel._searchReturnY : -1
+      if (leavingSearch) {
+        panel._searchReturnIdx = -1
+        panel._searchReturnY = -1
+        panel._searchReturnUid = ""
+      }
       if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
       else {
         if (typeof list.unpinHighlight === "function") list.unpinHighlight()
@@ -1355,13 +1399,12 @@ Rectangle {
         // the fit sizes the card from the restored rows in this turn. With no
         // saved seat to honour, the ordinary path still arms immediately.
         if (returnIdx < 0) panel._rearmOpenSlot()
-        else if (!MotionPolicy.enabled && !panel.gridMode && !panel._searchClearByResult
-          && returnY >= 0 && Menu.frame?.id === panel._searchReturnPage) {
-          list.restoreAt(returnIdx, returnY, panel._modelListH())
-        }
       }
       Idle.run(() => {
-        panel._reseatFrameSel()
+        // A result landing owns the page cursor. Re-asserting the page's
+        // remembered frame here would pull the cursor off the row the
+        // navigation just seated, one turn after it lands.
+        if (!panel._searchClearByResult) panel._reseatFrameSel()
         if (panel.searching) {
           panel._restoreSeatPending = false
           return
@@ -1398,6 +1441,7 @@ Rectangle {
               || (panel._searchReturnPage !== ""
                 && Menu.frame && Menu.frame.id !== panel._searchReturnPage)) {
               panel._searchReturnPage = ""
+              list.dropKeepRow()
               panel._finishModeRestore()
               panel._searchClearByResult = false
               return
@@ -1408,6 +1452,7 @@ Rectangle {
             panel._followSlotRow()
             panel._latchClaim()
             if (returnY >= 0) list.restoreAt(returnIdx, returnY)
+            list.dropKeepRow()
           }, function(row) {
             return panel._modeRestoreSettled(row, returnIdx,
               panel._searchReturnPage, panel._searchClearByResult)
@@ -1633,6 +1678,9 @@ Rectangle {
 
   onSearchingChanged: {
     panel.projectionRev++
+    // A new query is a newer cursor intent than the seat the previous exit
+    // was restoring; the row target must not fight the projection's head.
+    if (panel.searching) list.dropKeepRow()
     // A query is the user asking for something else, so the launch that
     // wanted the head is over - whether or not the projection ever moves
     // the cursor, which a query with no hits does not.
@@ -1647,10 +1695,21 @@ Rectangle {
       // seat was saved, leaving a grid card blank after the query was erased.
       const at = panel.gridMode ? Math.max(0, grid.currentIndex) : list.currentIndex
       panel._searchReturnIdx = at
-      panel._searchReturnY = panel.gridMode ? -1 : list.contentY
       panel._searchReturnPage = Menu.frame ? Menu.frame.id : ""
       panel._restoreSeatPending = at >= 0
       const saved = panel.rowsModel[at]
+      panel._searchReturnUid = saved ? String(saved.uid) : ""
+      // The live contentY can already be a transient: entering search takes
+      // focus, and a follow may centre the row before this handler runs. The
+      // page's remembered frame is the seat the user actually left, so use
+      // it when it names the same row; otherwise the live offset is all
+      // there is.
+      const remembered = Menu.frame ? Menu.savedFor(Menu.frame.id) : null
+      const sameRow = !!(remembered && saved
+        && String(remembered.uid) === String(saved.uid))
+      panel._searchReturnY = panel.gridMode ? -1
+        : sameRow ? (typeof remembered.y === "number" ? remembered.y : -1)
+        : list.contentY
       panel._searchReturnOpen = !!saved
         && (Menu.isExpanded(saved) || Menu.infoOpen(saved))
       panel._modeReturnGrows = panel._modeWillGrow(list.currentItem)
@@ -1691,6 +1750,9 @@ Rectangle {
     if (!panel.searching) panel.recomputeRows("rebuild", true)
   }
   onCurrentPageIdChanged: {
+    // A row target names a row on the page that saved it. A page change is
+    // a newer intent, so the target retires with the old page.
+    list.dropKeepRow()
     panel._restoreSlotStartH = -1
     panel._searchReturnOpen = false
     panel._scopedReturnOpen = false
@@ -4098,6 +4160,18 @@ Rectangle {
   property int _searchReturnIdx: -1
   property real _searchReturnY: -1
   property string _searchReturnPage: ""
+  // The saved row by identity. The exit write replaces the projection with
+  // the page, and the saved index may not exist in the projection at all -
+  // the view restores this row once the page's model has landed (see
+  // List.keepRow), so no seat runs against a row set that cannot hold it.
+  property string _searchReturnUid: ""
+  // True for the install that leaves global search back onto the page. That
+  // install must not carry the result row across the model swap by identity:
+  // the row under the cursor is a search hit, and the seat the user left is
+  // restored separately. Letting _writeRecords keep it paints the hit under
+  // the bar for one frame before the saved seat wins - the Reload flash.
+  readonly property bool _searchReturnPending: panel._searchReturnIdx >= 0
+    && !panel._searchClearByResult
   // A result landing owns the cursor on the page it lands on. Its query clear
   // still runs through the search edge; without a token the search restore
   // waiter cannot tell that the seat it saved belongs to an older intent.
@@ -4228,6 +4302,7 @@ Rectangle {
         // staged action could publish onto a closed panel.
         panel._restoreSeatPending = false
         panel._searchReturnPage = ""
+        list.dropKeepRow()
         panel._viewFadeAction = null
         viewFadeOut.stop()
         viewFadeIn.stop()

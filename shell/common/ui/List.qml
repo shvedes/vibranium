@@ -202,6 +202,7 @@ ListView {
       root._holdLegMs = 0
     }
     if (c === "step" || c === "click") {
+      root.dropKeepRow()
       root._stillPreempt()
       // A gesture takes the bar back from any pinned origin: the user is
       // naming a row, and a bar still easing from an origin another
@@ -727,6 +728,75 @@ ListView {
     root._keepCursor = true
     root.pinHighlight()
   }
+  // Arm the next model change to restore a consumer-chosen row by identity.
+  // keepCursor names the row the cursor is on now; this names a row the
+  // consumer has remembered (the menu's pre-search seat). The write that
+  // follows may not contain that row at the old index - or, in the menu's
+  // search exit, at all until the page rows land - so a seat taken before
+  // the write would clamp against the projection and paint its head first.
+  // The view reads the live model after the change and keeps the target
+  // through the install, so the cursor never visits the row the model
+  // happens to put at its old index. The consumer drops the target when the
+  // restore settles, and a user gesture ends it (see seat).
+  property string _keepRowId: ""
+  property bool _keepRowPending: false
+  property real _keepRowY: -1
+  property real _keepRowViewH: 0
+  function keepRow(id, y, viewH) {
+    if (id === undefined || id === null || id === "") return false
+    root._keepRowId = String(id)
+    root._keepRowPending = true
+    root._keepRowY = typeof y === "number" && y >= 0 ? y : -1
+    root._keepRowViewH = typeof viewH === "number" ? viewH : 0
+    root.pinHighlight()
+    return true
+  }
+  // The target is looked up against the live row set, and stays pending until
+  // the row is actually there. A model replacement can emit an index change
+  // before the new count lands, and keepCursor's arm would be spent on that
+  // first look - which cannot find the row and leaves the cursor on the
+  // projection's head. This target survives that look and is re-derived on
+  // the count/model edges, which are the moments the row set is complete.
+  function _restoreKeptRow() {
+    if (!root._keepRowPending) return false
+    const id = root._keepRowId
+    for (let i = 0; i < root.count; i++) {
+      if (root._rowKey(i) !== id) continue
+      // The target stays live across the install. A model replacement can
+      // land its rows and then let the view reset the cursor to the head as
+      // it settles; a one-shot restore would be overwritten by that reset.
+      // The consumer drops the target when the restore has settled, and a
+      // user gesture ends it (see seat).
+      if (root._keepRowY >= 0) {
+        // The saved row and the viewport it was seen in are one seat. Landing
+        // the row without the offset paints the bar above or below the
+        // viewport for the frames until the deferred restore arrives.
+        const y = root._keepRowY
+        root._keepRowY = -1
+        root.restoreAt(i, y, root._keepRowViewH)
+        return true
+      }
+      // No saved offset: land the row and let the follow policy place it, so
+      // an off-screen target is brought into the viewport with the cursor.
+      root.settle(i, true, root._keepRowViewH)
+      root.unpinHighlight()
+      return true
+    }
+    return false
+  }
+  // Public edge for a consumer that flushed the model itself: apply the row
+  // target in that turn, before the first frame reads the new row set.
+  function restoreKeptRow() {
+    return root._restoreKeptRow()
+  }
+  function dropKeepRow() {
+    if (!root._keepRowPending) return
+    root._keepRowPending = false
+    root._keepRowId = ""
+    root._keepRowY = -1
+    root._keepRowViewH = 0
+    root.unpinHighlight()
+  }
   // The index the cursor belongs at once the next row set lands. Set by the
   // consumer that edited the row set under the cursor - it is the only one
   // holding both the old and the new rows, so it is the only one that can
@@ -890,6 +960,7 @@ ListView {
   onCountChanged: {
     root._drainSettlePending()
     root._syncIdentitySet()
+    root._restoreKeptRow()
     // A row added or removed ABOVE the cursor moves the cursor's row to a new
     // index while leaving the index itself untouched: neither
     // onCurrentIndexChanged nor onModelChanged fires, and an identity lookup
@@ -918,6 +989,7 @@ ListView {
     // the count may not move (a same-size replacement), so this is the sync
     // that rebuilds it.
     root._syncIdentitySet()
+    root._restoreKeptRow()
     // A model change that did NOT move the cursor leaves it on the same
     // INDEX, which is a different row. That case has no index change to
     // restore from, so it is restored here - and here is late enough to be
@@ -955,6 +1027,9 @@ ListView {
     // the cursor landed on and the selection bar has already started its
     // travel there, and the bar's glide from that row to the right one
     // makes the whole path visible.
+    if (root._keepRowPending) {
+      if (!root._restoreKeptRow()) return
+    }
     if (root._keepCursor) {
       root._keepCursor = false
       root._restoreCursor()
