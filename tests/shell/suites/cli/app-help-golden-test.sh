@@ -177,13 +177,14 @@ Usage: vb-shell clipboard window
 Clipboard panel visibility
 
 Commands:
-  open  [pinned]  Show the clipboard panel
-  close           Hide the clipboard panel
-  toggle          Show or hide the clipboard panel
+  open   [pinned]  Show the clipboard panel
+  close            Hide the clipboard panel
+  toggle [pinned]  Show or hide the clipboard panel
 
 Examples:
   vb-shell clipboard window open
   vb-shell clipboard window toggle
+  vb-shell clipboard window toggle pinned
 EOF
 check_page "the clipboard window controller" golden-clipboard-window "$WORK/golden-clip-window"
 t_not_contains "window page has no Output section" "Output:" "$(cat "$WORK/out")"

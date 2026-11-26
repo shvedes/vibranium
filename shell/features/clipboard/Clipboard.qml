@@ -69,9 +69,13 @@ Singleton {
     property bool visible: false
     property string query: ""
     property string mode: "normal"
+    property string initialList: "normal"
   }
   property string query: persist.query
   property string mode: persist.mode // "normal" | "pinned" (@)
+  // The list the panel opened with. Escape out of pinned view steps back to
+  // it; a panel that opened in the pinned list closes instead.
+  property string initialList: persist.initialList // "normal" | "pinned"
   readonly property bool showPinned: root.mode === "pinned"
   property var filtered: []
   property int matchedCount: 0
@@ -86,6 +90,7 @@ Singleton {
   onVisibleChanged: persist.visible = visible
   onQueryChanged: persist.query = query
   onModeChanged: persist.mode = mode
+  onInitialListChanged: persist.initialList = initialList
 
   function _attachPanel(p) {
     root._panels = PanelList.attach(root._panels, p)
@@ -134,7 +139,9 @@ Singleton {
         return root.ipcWindow(ctx.words.indexOf("pinned") >= 0 ? "pinned" : "open")
       },
       "clipboard.window.close": function () { return root.ipcWindow("close") },
-      "clipboard.window.toggle": function () { return root.ipcWindow("toggle") },
+      "clipboard.window.toggle": function (a, ctx) {
+        return root.ipcWindow(ctx.words.indexOf("pinned") >= 0 ? "togglePinned" : "toggle")
+      },
       "clipboard.list.regular": function () { return root.ipcBucketList(false) },
       "clipboard.list.pinned": function () { return root.ipcBucketList(true) },
       "clipboard.list.current": function () { return root.ipcCurrentList() },
@@ -469,6 +476,7 @@ Singleton {
     if (root.visible) return
     root.query = ""
     root.mode = "normal"
+    root.initialList = "normal"
     root.visible = true
     // Claimed once the panel is up, not before: the stored closer is
     // hidePanel, which refuses to run while `visible` is false, so a claim
@@ -495,6 +503,11 @@ Singleton {
   function open() { root.showPanel(); return true }
   function close() { root.hidePanel(); return true }
   function toggle() { root.visible ? root.hidePanel() : root.showPanel() }
+  function showPinnedPanel() {
+    root.showPanel()
+    root.initialList = "pinned"
+    if (!root.showPinned) root.enterPinned("")
+  }
 
   // --- search / mode ---
   function submit(text) {
@@ -519,6 +532,12 @@ Singleton {
     root.mode = "normal"
     root.query = ""
     root._recompute()
+  }
+  // Escape out of pinned view: step back to the list the panel opened with,
+  // or close when that list was already pinned.
+  function escapePinned() {
+    if (root.initialList === "pinned") root.close()
+    else root.exitPinned()
   }
   // Returns true when the escape was consumed by a state rollback;
   // the panel closes only on false.
@@ -2350,10 +2369,8 @@ Singleton {
     if (verb === "open") root.showPanel()
     else if (verb === "close") root.hidePanel()
     else if (verb === "toggle") root.visible ? root.hidePanel() : root.showPanel()
-    else if (verb === "pinned") {
-      root.showPanel()
-      if (!root.showPinned) root.enterPinned("")
-    }
+    else if (verb === "pinned") root.showPinnedPanel()
+    else if (verb === "togglePinned") root.visible ? root.hidePanel() : root.showPinnedPanel()
     return { v: 1, ok: true }
   }
 

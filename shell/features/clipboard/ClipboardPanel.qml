@@ -668,7 +668,7 @@ PanelCard {
       return
     }
     if (Clipboard.mode === "pinned") {
-      Clipboard.exitPinned()
+      Clipboard.escapePinned()
       return
     }
     Clipboard.close()

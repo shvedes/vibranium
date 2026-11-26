@@ -111,19 +111,20 @@ The public scripting surface is `vb-shell clipboard`; the old native
 `qs ipc call clipboard ...` verbs are retired.
 
 ```sh
-vb-shell clipboard window toggle     # show/hide (what super+v runs)
-vb-shell clipboard window open pinned  # open in the pinned view
-vb-shell clipboard status            # counters plus copyBusy; no content
-vb-shell clipboard list              # normal bucket
-vb-shell clipboard list pinned       # pinned bucket
-vb-shell clipboard list current      # open panel's current filter
-vb-shell clipboard pin 0             # pin a normal-bucket row
-vb-shell clipboard unpin 0           # unpin a pinned-bucket row
-vb-shell clipboard purge 1           # delete a normal-bucket row
-vb-shell clipboard purge pinned 0    # delete a pinned-bucket row
-vb-shell clipboard clear             # clear normal; pinned rows survive
-vb-shell clipboard clear pinned      # clear pinned; normal rows survive
-vb-shell clipboard select 2          # seat a row of the open panel
+vb-shell clipboard window toggle         # show/hide (what super+v runs)
+vb-shell clipboard window toggle pinned  # show pinned when opening
+vb-shell clipboard window open pinned    # open in the pinned view
+vb-shell clipboard status                # counters plus copyBusy; no content
+vb-shell clipboard list                  # normal bucket
+vb-shell clipboard list pinned           # pinned bucket
+vb-shell clipboard list current          # open panel's current filter
+vb-shell clipboard pin 0                 # pin a normal-bucket row
+vb-shell clipboard unpin 0               # unpin a pinned-bucket row
+vb-shell clipboard purge 1               # delete a normal-bucket row
+vb-shell clipboard purge pinned 0        # delete a pinned-bucket row
+vb-shell clipboard clear                 # clear normal; pinned rows survive
+vb-shell clipboard clear pinned          # clear pinned; normal rows survive
+vb-shell clipboard select 2              # seat a row of the open panel
 vb-shell clipboard copy entry regular 2
 ```
 

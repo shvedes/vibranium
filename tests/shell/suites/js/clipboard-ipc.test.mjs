@@ -166,4 +166,52 @@ group('selection verifies the displayed row', () => {
   notContains('seatTo is not used for row indexes', PANEL, 'list.seatTo(index')
 })
 
+section('pinned window additions')
+const qmlBody = name => {
+  const at = SRC.indexOf(`function ${name}(`)
+  const open = SRC.indexOf('{', at)
+  let depth = 0
+  let close = open
+  for (; close < SRC.length; close++) {
+    if (SRC[close] === '{') depth++
+    if (SRC[close] === '}' && --depth === 0) break
+  }
+  return SRC.slice(open + 1, close)
+}
+group('the initial list decides the escape', () => {
+  contains('the owner records the initial list', SRC, 'property string initialList: persist.initialList')
+  contains('a normal open records normal', SRC, 'root.initialList = "normal"')
+  contains('a pinned open records pinned', SRC, 'root.initialList = "pinned"')
+  contains('the panel routes pinned escape to the owner', PANEL, 'Clipboard.escapePinned()')
+  const escape = initialList => {
+    const calls = []
+    new Function('root', qmlBody('escapePinned'))({
+      initialList,
+      close: () => calls.push('close'),
+      exitPinned: () => calls.push('exit')
+    })
+    return calls
+  }
+  eq('a window opened pinned closes', escape('pinned'), ['close'])
+  eq('a window opened normal steps back', escape('normal'), ['exit'])
+})
+group('toggle [pinned] opens pinned and still hides an open window', () => {
+  contains('the toggle closure reads the pinned literal', SRC,
+    'ctx.words.indexOf("pinned") >= 0 ? "togglePinned" : "toggle"')
+  contains('toggle pinned hides an open window', SRC,
+    'verb === "togglePinned") root.visible ? root.hidePanel() : root.showPinnedPanel()')
+  const toggle = visible => {
+    const calls = []
+    new Function('root', 'verb', qmlBody('ipcWindow'))({
+      visible,
+      showPanel: () => calls.push('show'),
+      hidePanel: () => calls.push('hide'),
+      showPinnedPanel: () => calls.push('showPinned')
+    }, 'togglePinned')
+    return calls
+  }
+  eq('a closed window toggles open in the pinned view', toggle(false), ['showPinned'])
+  eq('an open window toggles closed', toggle(true), ['hide'])
+})
+
 finish()

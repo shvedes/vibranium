@@ -230,10 +230,11 @@ if mode in ("golden-clipboard-window", "golden-clipboard-list"):
         pages = [
             {"usage": "open [pinned]", "summary": "Show the clipboard panel"},
             {"usage": "close", "summary": "Hide the clipboard panel"},
-            {"usage": "toggle", "summary": "Show or hide the clipboard panel"},
+            {"usage": "toggle [pinned]", "summary": "Show or hide the clipboard panel"},
         ]
         summary = "Clipboard panel visibility"
-        examples = ["vb-shell clipboard window open", "vb-shell clipboard window toggle"]
+        examples = ["vb-shell clipboard window open", "vb-shell clipboard window toggle",
+                    "vb-shell clipboard window toggle pinned"]
     else:
         pages = [
             {"usage": "list", "summary": "List the regular bucket with safe previews"},

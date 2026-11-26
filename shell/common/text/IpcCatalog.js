@@ -1940,16 +1940,18 @@ var targets = [
       output: { kind: "record", summary: "" },
       examples: ["vb-shell clipboard window close"]
     }),
-    gateway("clipboard.window.toggle", ["window", "toggle"],
+    gateway("clipboard.window.toggle", ["window", "toggle", opt(["pinned"])],
       "Show or hide the clipboard panel", {
         parentHidden: true,
         output: { kind: "record", summary: "" },
-        examples: ["vb-shell clipboard window toggle"]
+        notes: ["The optional 'pinned' literal opens the pinned view when showing; it has no argument label"],
+        examples: ["vb-shell clipboard window toggle", "vb-shell clipboard window toggle pinned"]
       }),
     gateway("clipboard.window", ["window"], "Open, close or toggle the clipboard panel", {
       helpOnly: true,
-      notes: ["'open pinned' opens the pinned view; 'close' and 'toggle' need no argument"],
-      examples: ["vb-shell clipboard window open", "vb-shell clipboard window open pinned"]
+      notes: ["'open pinned' and 'toggle pinned' open the pinned view; 'close' needs no argument"],
+      examples: ["vb-shell clipboard window open", "vb-shell clipboard window open pinned",
+        "vb-shell clipboard window toggle pinned"]
     }),
     gateway("clipboard.list.regular", ["list"],
       "List regular clipboard items with safe previews", {
@@ -2096,7 +2098,8 @@ var targets = [
   ], {
     window: {
       summary: "Open, close or toggle the clipboard panel",
-      examples: ["vb-shell clipboard window open", "vb-shell clipboard window toggle"],
+      examples: ["vb-shell clipboard window open", "vb-shell clipboard window toggle",
+        "vb-shell clipboard window toggle pinned"],
       commands: ["clipboard.window.open", "clipboard.window.close", "clipboard.window.toggle"]
     },
     list: {

@@ -20,6 +20,7 @@ group('controller rows', () => {
     ['clipboard.window.open', ['window', 'open', 'pinned'], {}],
     ['clipboard.window.close', ['window', 'close'], {}],
     ['clipboard.window.toggle', ['window', 'toggle'], {}],
+    ['clipboard.window.toggle', ['window', 'toggle', 'pinned'], {}],
     ['clipboard.list.regular', ['list'], {}],
     ['clipboard.list.pinned', ['list', 'pinned'], {}],
     ['clipboard.list.current', ['list', 'current'], {}],
@@ -34,6 +35,7 @@ group('controller rows', () => {
     for (const key of Object.keys(args)) eq(`${argv.join(' ')}: ${key}`, m.args[key], args[key])
   }
   eq('window open usage is derived from words', P.usage(C.findRow('clipboard.window.open').words), 'window open [pinned]')
+  eq('window toggle usage is derived from words', P.usage(C.findRow('clipboard.window.toggle').words), 'window toggle [pinned]')
   eq('no PINNED argument record', C.findRow('clipboard.window.open').arguments, [])
   eq('copy entry displays literal alternatives',
     C.findRow('clipboard.copy.entry').usage, 'copy entry regular|pinned <INDEX>')
