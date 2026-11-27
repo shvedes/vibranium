@@ -3820,27 +3820,70 @@ Rectangle {
   // still held by the change being finished. Deferring keeps the search out
   // of that frame; the field still echoes the key immediately and the results
   // land one turn later.
-  function onFieldEdited(text) {
-    const publish = () => {
+  //
+  // ONE publish is owed at a time, and it carries the newest field text.
+  // Queueing a fresh closure per keystroke let a burst stack full search and
+  // install pipelines: Qt.callLater coalesces identical functions, but a
+  // closure minted inside onFieldEdited is a new function every time. Each
+  // pipeline re-ranks the hits, rebuilds every result row, remeasures the
+  // width and restarts the card's height tween, so keys arriving faster than
+  // that work finished made the lag grow with typing speed. The latch drops
+  // superseded queries instead of installing them; the field keeps echoing
+  // every key and the newest text lands as soon as the loop is free.
+  property bool _fieldPublishPending: false
+  property string _fieldPublishText: ""
+  // The route is latched at edit time, not read at publish time: arming the
+  // "/" filter can flip scopedActive while a publish is still owed, and the
+  // pending text must not be applied to the other query.
+  property bool _fieldPublishScoped: false
+
+  // True when this call changed the applied query, so a caller that needs the
+  // new row set (Enter) can re-drive itself once the install has landed.
+  function _flushFieldPublish() {
+    panel._fieldPublishPending = false
+    const text = panel._fieldPublishText
+    if (panel._fieldPublishScoped) {
+      if (text === "") {
+        if (!Menu.scopedActive && Menu.scopedQuery === "") return false
+        Menu.clearScoped()
+        return true
+      }
+      if (text === Menu.scopedQuery) return false
       // The arm owns the route, not the view: the first character reaches
       // the scoped query even though the projection is still the plain page.
-      if (Menu.scopedActive) {
-        // An empty query leaves the filter armed by design only when it was
-        // armed with no query at all. Erasing a real query is a cancel: the
-        // scope must go, or its arm-time seat is never handed back.
-        if (text === "") Menu.clearScoped()
-        else Menu.setScopedQuery(text)
-      } else Menu.setQuery(text)
+      Menu.setScopedQuery(text)
+      return true
     }
+    if (text === Menu.query) return false
+    Menu.setQuery(text)
+    return true
+  }
+
+  function flushFieldPublish() {
+    if (!panel._fieldPublishPending) return false
+    return panel._flushFieldPublish()
+  }
+
+  function onFieldEdited(text) {
+    panel._fieldPublishText = text
+    panel._fieldPublishScoped = Menu.scopedActive
     const query = Menu.scopedActive ? Menu.scopedQuery : Menu.query
     // Only the first character of a mode and its erase are edges. Re-ranking
-    // a live query installs its rows immediately, as before.
+    // a live query lands on the next turn like before, but at most one apply
+    // is outstanding no matter how many keys arrive in the meantime.
     if ((text === "") !== (query === "")) {
       // Hide only the frame the row set swaps. The restored card then grows
       // to the page while its content is already drawn: the resize is the
       // reveal, not a curtain held until the height has landed.
-      panel.fadeModeChange(publish)
-    } else Qt.callLater(publish)
+      // The fade's action reads the latch, so a key typed during the fade
+      // replaces the text without stacking another publish.
+      panel._fieldPublishPending = true
+      panel.fadeModeChange(() => panel._flushFieldPublish())
+      return
+    }
+    if (panel._fieldPublishPending) return
+    panel._fieldPublishPending = true
+    Qt.callLater(() => panel._flushFieldPublish())
   }
 
   function focusFilter(mode) {
@@ -4305,6 +4348,11 @@ Rectangle {
         panel._restoreSeatPending = false
         panel._searchReturnPage = ""
         list.dropKeepRow()
+        // A publish owed by a keystroke that landed inside the closing fade
+        // has no panel to install into. Drop it so the next open starts with
+        // no latch and its first edit publishes normally.
+        panel._fieldPublishPending = false
+        panel._fieldPublishText = ""
         panel._viewFadeAction = null
         viewFadeOut.stop()
         viewFadeIn.stop()
@@ -4686,11 +4734,13 @@ Rectangle {
 }
 
   function activateCurrent(shift) {
-    // A debounced scoped query may still be pending: apply it now and
-    // re-drive activation once the install it queues has landed, so Enter
-    // never picks from a set the field has already left behind. (The global
-    // query needs no flush - setQuery publishes it on the keystroke.)
-    if (Menu.flushScoped()) {
+    // A field edit may still be waiting for its deferred publish, and a
+    // debounced scoped query may be pending too: apply both now and re-drive
+    // activation once the install they queue has landed, so Enter never picks
+    // from a row set the field has already left behind.
+    const flushedField = panel.flushFieldPublish()
+    const flushedScoped = Menu.flushScoped()
+    if (flushedField || flushedScoped) {
       Qt.callLater(() => panel.activateCurrent(shift))
       return
     }
@@ -5862,8 +5912,13 @@ Rectangle {
         // Small lists stay fully instantiated (same gate as the
         // launcher): a far-end wrap target always has a live delegate,
         // so the follow tweens to measured geometry instead of snapping
-        // through positionViewAtIndex on a missing item.
-        autoCache: true
+        // through positionViewAtIndex on a missing item. A search
+        // projection is the exception: it changes on every keystroke and
+        // a broad query can hold dozens of hits, so full instantiation
+        // would build and tear down every Entry per key. The viewport and
+        // a short buffer are enough - a projection seats its own head and
+        // never needs a far-end target pre-built.
+        autoCache: !panel.searching && !panel.scopedSearching
         // Sliding selection lives in common/ui/List (library-driven):
         // one bar gliding behind transparent delegates. Only the motion
         // gate stays here - it snaps while searching and while any slot
