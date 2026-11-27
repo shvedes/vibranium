@@ -665,6 +665,17 @@ Singleton {
     root._scheduleRevBump()
 
     if (hook !== "") root._pendingHooks.push(hook)
+    // Night light lives in hyprsunset, outside the shell. Both keys must
+    // converge the unit from EVERY write path: the bar indicator is optional
+    // and absent when hidden or disabled, which left the settings toggle and
+    // the temperature slider inert. Queue the converge on the flush so the
+    // script reads the value already on disk and cannot echo a stale write
+    // back through IPC.
+    if (key === "shell.nightLight.enabled" && typeof v === "boolean")
+      root._pendingHooks.push("vb-cmd-nightshift --set-active " + (v ? "1" : "0"))
+    if (key === "shell.statusbar.nightLightTemperature"
+      && typeof v === "number" && v >= 2000 && v <= 20000)
+      root._pendingHooks.push("vb-cmd-nightshift --set " + v)
     root._scheduleFlush()
   }
 

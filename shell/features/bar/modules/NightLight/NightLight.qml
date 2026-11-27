@@ -7,10 +7,10 @@ import qs.common
 import qs.features.bar
 
 // Night light indicator. shell.nightLight.enabled is the source of truth:
-// vb-cmd-nightshift mirrors unit changes into the store after every
-// toggle, and this module binds to the key - so the icon flips instantly
-// on click, from the settings menu, or from any script that toggles
-// through --set-active. Click toggles, wheel steps -i/-d; nothing else.
+// the settings store converges the unit on every write, and this module only
+// binds to the key - so the icon flips instantly on click, from the settings
+// menu, or from any script that toggles through --set-active. Click toggles,
+// wheel steps -i/-d; nothing else.
 CollapsibleSlot {
   id: root
 
@@ -75,14 +75,4 @@ CollapsibleSlot {
     Exec.shell("vb-cmd-nightshift --set-active " + (on ? "1" : "0"))
   }
 
-  Connections {
-    target: Settings
-
-    function onOptionChanged(key, value) {
-      if (key !== "shell.nightLight.enabled" || typeof value !== "boolean") return
-      // Converge, never negate: the script re-writes the key only when
-      // the stored value drifted from the unit, so this cannot loop.
-      root._apply(value)
-    }
-  }
 }
