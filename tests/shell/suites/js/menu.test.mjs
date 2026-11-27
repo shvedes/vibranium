@@ -586,10 +586,10 @@ group('defaultsFor fills every key a row renderer branches on', () => {
   // README: "normalizeItem must fill every role the row renderer reads, so
   // views never branch on a missing key." The count is the contract; a new
   // role has to show up as a diff here.
-  eq('52 roles', Object.keys(d).length, 52)
+  eq('53 roles', Object.keys(d).length, 53)
   const expected = [
     'type', 'id', 'label', 'sub', 'icon', 'iconColor', 'glyph', 'desc', 'warning', 'enabled',
-    'when', 'checked', 'disabled', 'requires', 'command', 'call', 'page',
+    'when', 'checked', 'disabled', 'disabledIf', 'requires', 'command', 'call', 'page',
     'checked_', 'onToggle', 'close', 'value', 'options', 'onSelect', 'onCall',
     'marker', 'editValue', 'editText', 'editCall', 'keepOpen', 'hideValue',
     'flow', 'infoOnly', 'min', 'max', 'step', 'unit', 'onChange',
@@ -992,6 +992,24 @@ group('scopeBundle spans one entry tree, not the whole file', () => {
     seeded.pages.map(p => p.id).sort(),
     ['main', 'utilities'])
   eq('without moving the entry', seeded.entry, 'utilities')
+})
+
+group('the Caffeine row is gated on the Idle daemon', () => {
+  // With no idle daemon there are no timers for the inhibitor to hold back,
+  // so the row stays listed but goes dim and unselectable. Settings owns the
+  // fact, so the row binds to it through a store condition rather than a
+  // shell guard - no batch, no process, no stale verdict.
+  const raw = JSON.parse(M.stripJsonc(fs.readFileSync(
+    path.join(SHELL_DIR, 'common/settings/catalog.jsonc'), 'utf8')))
+  const util = M.scopeBundle(M.parseBundle(JSON.stringify(raw.menus)), 'utilities', [])
+  const caffeine = util.pages[0].items.find(i => i.id === 'caffeine')
+  eq('the row is declared', Boolean(caffeine), true)
+  eq('the gate names the idle setting and its false verdict',
+    caffeine.disabledIf.map(c => [c.var, c.op, String(c.arg)].join(':')).join(','),
+    'shell.idle.enabled:eq:false')
+  eq('it is not a shell guard', caffeine.disabled, '')
+  notContains('and contributes no guard line',
+    M.buildGuardScript(util.pages), 'caffeine:d:')
 })
 
 group('two pages claiming one id cannot share a uid space', () => {
@@ -4401,18 +4419,28 @@ group('MenuIndex merges registrations and shadows the pages they republish', () 
   is('row objects are carried by reference', MI.sectionRows(builtin, null, true)[0], (v) => v === builtin[0])
 })
 
-group('MenuIndex collects the vars any showIf gates on', () => {
+group('MenuIndex collects the vars any store condition gates on', () => {
   const b = { pages: [
     { items: [{ showIf: [{ var: 'a' }, { var: 'b' }] }, { showIf: [{ var: 'a' }] }] },
     { items: [] },
     {},
   ] }
-  eq('each var is collected once', Object.keys(MI.conditionVars(b)).sort().join(','), 'a,b')
+  eq('each showIf var is collected once', Object.keys(MI.conditionVars(b)).sort().join(','), 'a,b')
+  eq('a disabledIf var is collected too',
+    Object.keys(MI.conditionVars({ pages: [{ items: [
+      { disabledIf: [{ var: 'c' }] },
+    ] }] })).sort().join(','), 'c')
+  eq('the two gates share one slot per var',
+    Object.keys(MI.conditionVars({ pages: [{ items: [
+      { showIf: [{ var: 'a' }], disabledIf: [{ var: 'a' }] },
+    ] }] })).sort().join(','), 'a')
   eq('a null bundle has no vars', Object.keys(MI.conditionVars(null)).length, 0)
   eq('pages without items contribute nothing',
     Object.keys(MI.conditionVars({ pages: [{}, { items: [{}] }, { items: null }] })).length, 0)
-  eq('a malformed showIf is skipped',
-    Object.keys(MI.conditionVars({ pages: [{ items: [{ showIf: 'x' }, { showIf: [null] }] }] })).length, 0)
+  eq('a malformed condition is skipped',
+    Object.keys(MI.conditionVars({ pages: [{ items: [
+      { showIf: 'x' }, { showIf: [null] }, { disabledIf: 'x' }, { disabledIf: [null] },
+    ] }] })).length, 0)
 })
 
 group('MenuSpawnProbe names a spawn that inherited the previous box', () => {

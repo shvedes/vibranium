@@ -46,26 +46,29 @@ function sectionRows(builtin, registrations, settingsFamily) {
   return merged
 }
 
-// The store variables any row's `showIf` names. A variable is collected once
-// however many rows gate on it; a bundle that is null, or a page or item that
-// carries no showIf, contributes nothing.
+// The store variables any row's `showIf` or `disabledIf` names. Both gates
+// resolve through conditionsMet, so both keys must bump condRev on a write.
+// A variable is collected once however many rows gate on it; a bundle that
+// is null, or a page or item that carries no condition, contributes nothing.
 function conditionVars(bundle) {
   const vars = {}
   if (!bundle || !Array.isArray(bundle.pages)) return vars
   // A condition can ride a group's child as well as a page row. Walk the whole
-  // tree, or a store write that satisfies a child's showIf never bumps
+  // tree, or a store write that satisfies a child's condition never bumps
   // condRev and the child stays muted after its condition is met.
+  function collect(conds) {
+    if (!Array.isArray(conds)) return
+    for (let c = 0; c < conds.length; c++) {
+      const cond = conds[c]
+      if (cond && cond.var !== undefined) vars[cond.var] = true
+    }
+  }
   function walk(items) {
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       if (!item || typeof item !== "object" || Array.isArray(item)) continue
-      const conds = item.showIf
-      if (Array.isArray(conds)) {
-        for (let c = 0; c < conds.length; c++) {
-          const cond = conds[c]
-          if (cond && cond.var !== undefined) vars[cond.var] = true
-        }
-      }
+      collect(item.showIf)
+      collect(item.disabledIf)
       if (Array.isArray(item.children)) walk(item.children)
     }
   }

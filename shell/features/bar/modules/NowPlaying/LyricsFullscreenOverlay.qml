@@ -543,6 +543,9 @@ QtObject {
 
       IconButton {
         name: "caffeine"
+        // The manual hold exists to hold back the idle daemon's timers; with
+        // the daemon off there is nothing to hold back.
+        enabled: Settings.idleEnabled
         colorKey: root.inhibitWanted ? "accent" : "foreground_1"
         slotSize: content.chromeSlot
         iconSize: Math.max(16, Math.round(content.chromeSlot / 3))

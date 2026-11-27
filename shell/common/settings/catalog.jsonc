@@ -6209,6 +6209,17 @@
                     "label": "Caffeine",
                     "sub": "Block system sleep",
                     "icon": "caffeine",
+                    // Caffeine only holds back the idle daemon's timers; with
+                    // the daemon off there is nothing to inhibit. This is a
+                    // store condition, not a shell guard: Settings owns the
+                    // fact and both surfaces bind to it directly.
+                    "disabledIf": [
+                        {
+                            "var": "shell.idle.enabled",
+                            "op": "eq",
+                            "arg": false
+                        }
+                    ],
                     "value": "300",
                     "marker": false,
                     "options": [

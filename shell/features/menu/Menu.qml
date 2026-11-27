@@ -1616,9 +1616,15 @@ Singleton {
     }
   }
 
+  // Bash verdicts and store conditions are independent gates on the same
+  // outcome: either one disables the row. The store leg resolves through
+  // conditionsMet against the store that owns the key, so a setting flip
+  // re-answers the binding without waiting for a guard batch.
   function isDisabled(item) {
     if (!item) return false
-    return root.guardDisabled[item.uid] === true
+    if (root.guardDisabled[item.uid] === true) return true
+    return item.disabledIf !== undefined && item.disabledIf !== null
+      && !root.conditionsMet(item.disabledIf)
   }
 
   property var _guardProc: null

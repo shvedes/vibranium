@@ -63,7 +63,8 @@ A command row is *declared* before it is saved: declare it as a lock and the idl
 
 The Utilities menu (++ctrl+alt+u++) has a **Caffeine** dropdown: the sleep inhibitor.
 Pick a duration (5, 10, 15, 30 minutes, or Infinite) and the system won't go to sleep automatically until it expires.
-Each pick restarts the countdown immediately. There's a subtle distinction in how it works, set in the settings:
+Each pick restarts the countdown immediately. The row is dimmed while the Idle daemon setting is off, since Caffeine only holds back that daemon's timers.
+There's a subtle distinction in how it works, set in the settings:
 
 | Type | What gets inhibited |
 |---|---|

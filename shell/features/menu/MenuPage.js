@@ -54,6 +54,11 @@ function defaultsFor(type) {
     when: "",
     checked: "",
     disabled: "",
+    // Store-driven disabled conditions (normalized showIf list, see
+    // conditionsMet) - row stays listed but dims while a condition fails.
+    // Unlike `disabled`, this reads the owning store reactively: no guard
+    // batch and no process launch when the fact changes.
+    disabledIf: null,
     // Structured visibility (see requiresGuard): {chassis} and/or
     // {binary}. Normalized like showIf so guards evaluate it.
     requires: null,
