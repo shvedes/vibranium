@@ -131,6 +131,25 @@ group('buckets and indices are resolved inside the owner', () => {
   notContains('no MIME in a projected row', SRC, 'mime: e.mime')
 })
 
+group('a bucket clear removes only the named bucket', () => {
+  const rows = [
+    { id: 'n1' }, { id: 'p1', pinned: true },
+    { id: 'n2' }, { id: 'p2', pinned: true },
+  ]
+  const normal = CL.bucketEntries(rows, false)
+  eq('normal clear removes the normal rows', normal.removed.map(e => e.id), ['n1', 'n2'])
+  eq('normal clear keeps the pinned rows', normal.kept.map(e => e.id), ['p1', 'p2'])
+  const pinned = CL.bucketEntries(rows, true)
+  eq('pinned clear removes the pinned rows', pinned.removed.map(e => e.id), ['p1', 'p2'])
+  eq('pinned clear keeps the normal rows', pinned.kept.map(e => e.id), ['n1', 'n2'])
+  eq('only pinned rows leave a normal clear empty',
+    CL.bucketEntries([{ id: 'p', pinned: true }], false).removed, [])
+  eq('a truthy non-true flag counts as normal',
+    CL.bucketEntries([{ id: 'x', pinned: 1 }, { id: 'y', pinned: true }], false)
+      .removed.map(e => e.id), ['x'])
+  eq('an empty history removes nothing', CL.bucketEntries([], false).removed, [])
+})
+
 group('IPC paths do not leak metadata into logs', () => {
   contains('pin passes an ipc flag', SRC, 'root.togglePin(row.entry.id, true)')
   contains('ipc pin has a MIME-free log line', SRC, 'Log.info("pinned entry " + slot + ", total pinned "')

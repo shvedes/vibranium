@@ -1889,6 +1889,23 @@ function promoteEntry(history, id, now, use12h) {
   return h
 }
 
+// Partition history for a bucket clear. `pinned` names the bucket being
+// emptied: rows whose flag matches it are removed, the rest are kept. The
+// strict `=== true` comparison treats an absent flag as unpinned, the same
+// rule the pin toggle and the pinned count use.
+function bucketEntries(history, pinned) {
+  const rows = Array.isArray(history) ? history : []
+  const removed = []
+  const kept = []
+  const target = pinned === true
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    if ((row.pinned === true) === target) removed.push(row)
+    else kept.push(row)
+  }
+  return { removed: removed, kept: kept }
+}
+
 // The ledger a bulk clear owes: how many rows went, the type mix as one line,
 // and how many credential store slots were released. Counts only - no field of
 // any row's payload reaches this answer.

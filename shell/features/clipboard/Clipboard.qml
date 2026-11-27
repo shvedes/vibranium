@@ -776,12 +776,9 @@ Singleton {
   // use: one purge pass, one model replacement, one recompute and one write.
   function clearAll() { root.clearBucket(false) }
   function clearBucket(pinned, quiet) {
-    const removed = []
-    const kept = []
-    for (let i = 0; i < root.history.length; i++) {
-      if ((root.history[i].pinned === true) === (pinned === true)) kept.push(root.history[i])
-      else removed.push(root.history[i])
-    }
+    const parts = CL.bucketEntries(root.history, pinned)
+    const removed = parts.removed
+    const kept = parts.kept
     if (removed.length === 0) return
     root._purgeEntries(removed)
     root.history = kept
