@@ -552,9 +552,9 @@ Item {
     }
     // The deck keeps the navigation keys while the field owns the caret
     // (InputField.forwardNavigation), so the shared table is asked in list
-    // terms and Space keeps activating a card here. The table also names
-    // Down/Up and PageUp/PageDown, which this deck has never handled, so the
-    // next/prev cases below check the key and every other route stays absent.
+    // terms and Space keeps activating a card here. Up/Down and the page keys
+    // share the next/prev routes with Tab/Backtab; the cases below check the
+    // key so only Tab, Backtab and the page keys step a card.
     switch (PanelKeys.route(k, Qt, true, false)) {
       case "escape":
         if (panel.query !== "") {
@@ -577,16 +577,9 @@ Item {
         panel.activateCurrent()
         event.accepted = true
         return
+      // PgUp/Start reach the right end of this horizontal deck and PgDn/End
+      // the left one, the reverse of a vertical list.
       case "first":
-        if (open) {
-          panel.variantIndex = 0
-          panel._keepFolder = panel._folderOf(panel.variants[0])
-        } else {
-          panel.selectRow(0)
-        }
-        event.accepted = true
-        return
-      case "last":
         if (open) {
           panel.variantIndex = Math.max(0, panel.variants.length - 1)
           panel._keepFolder = panel._folderOf(panel.variants[panel.variantIndex])
@@ -595,18 +588,27 @@ Item {
         }
         event.accepted = true
         return
-      // Tab and Shift+Tab mean "next/previous card", exactly as in the
-      // wallpaper picker. In the main deck that is the next theme; in an open
-      // family row it is the next variant, because that row is the deck being
-      // browsed.
+      case "last":
+        if (open) {
+          panel.variantIndex = 0
+          panel._keepFolder = panel._folderOf(panel.variants[0])
+        } else {
+          panel.selectRow(0)
+        }
+        event.accepted = true
+        return
+      // Tab/Backtab take the ordinary next/previous card. PgUp/PgDn run
+      // right-to-left here, so PgUp takes next and PgDn takes previous. In
+      // the main deck that is a theme; in an open family row it is a variant,
+      // because that row is the deck being browsed.
       case "next":
-        if (k !== Qt.Key_Tab || ctrl) break
+        if ((k !== Qt.Key_Tab || ctrl) && k !== Qt.Key_PageUp) break
         if (open) panel.moveVariant(1)
         else panel.moveRow(1)
         event.accepted = true
         return
       case "prev":
-        if (k !== Qt.Key_Backtab) break
+        if (k !== Qt.Key_Backtab && k !== Qt.Key_PageDown) break
         if (open) panel.moveVariant(-1)
         else panel.moveRow(-1)
         event.accepted = true

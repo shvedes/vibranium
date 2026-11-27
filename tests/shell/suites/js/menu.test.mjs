@@ -3758,14 +3758,14 @@ group('keyRoute: list mode navigation and activation', () => {
   eq('Escape escapes', routeName({ key: 'escape' }), 'escape')
   eq('Home is the start edge', routeOf({ key: 'home' }), 'end false')
   eq('End is the end edge', routeOf({ key: 'endKey' }), 'end true')
-  eq('PageUp pages back by 0.8 of the model', routeOf({ key: 'pageUp' }), 'page -0.8')
-  eq('PageDown pages forward by 0.8 of the model', routeOf({ key: 'pageDown' }), 'page 0.8')
+  eq('PageUp steps back one row, like Up', routeOf({ key: 'pageUp' }), 'move -1')
+  eq('PageDown steps forward one row, like Down', routeOf({ key: 'pageDown' }), 'move 1')
   // "Space and Enter stay two routes because they were two call sites: Enter
   // hands activate the shift bit and Space never did."
   eq('Space activates without the shift bit', routeName({ key: 'space' }), 'activateNoShift')
   eq('and it carries no argument', routeOf({ key: 'space' }), 'activateNoShift')
-  approx('PageUp is a fraction, not a count', M.keyRoute(kctx({ key: 'pageUp' })).arg, -0.8, 1e-12)
-  approx('and PageDown is its mirror', M.keyRoute(kctx({ key: 'pageDown' })).arg, 0.8, 1e-12)
+  eq('PageUp carries the same -1 step as Up', M.keyRoute(kctx({ key: 'pageUp' })).arg, -1)
+  eq('and PageDown carries the same +1 step as Down', M.keyRoute(kctx({ key: 'pageDown' })).arg, 1)
 })
 
 group('keyRoute: the field keeps Enter, Space and the side arrows in filter mode', () => {
@@ -3921,7 +3921,8 @@ group('keyRoute: an open editor swallows navigation and typing', () => {
   // refusing a letter is the whole filter. Routing that letter into the query
   // typed it into a box the user never opened and pulled the filter field's
   // focus off the editor, so a numeric row read as a field taking letters.
-  for (const k of ['up', 'down', 'tab', 'backtab', 'left', 'right', 'home', 'endKey']) {
+  for (const k of ['up', 'down', 'tab', 'backtab', 'pageUp', 'pageDown',
+    'left', 'right', 'home', 'endKey']) {
     eq(`${k} is swallowed by the editor`, routeName({ key: k, editor: true }), 'swallow')
   }
   eq('Enter still activates the row', routeName({ key: 'returnKey', editor: true }), 'activate')
@@ -3940,7 +3941,6 @@ group('keyRoute: an open editor swallows navigation and typing', () => {
   eq('a digit is swallowed on the same terms as the letter beside it',
     routeOf({ key: '', editor: true, text: '4' }), 'swallow')
   eq('+ still steps', routeOf({ key: 'plus', editor: true }), 'step 1')
-  eq('PageUp still pages', routeName({ key: 'pageUp', editor: true }), 'page')
   eq('the swallow carries no argument', routeOf({ key: 'up', editor: true }), 'swallow')
   eq('and neither does the typing one', M.keyRoute(kctx({ key: '', editor: true, text: 'a' })).arg, null)
   // The same character with no editor open is still the panel's: the guard is

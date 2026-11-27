@@ -6,11 +6,12 @@
 // WHY IT EXISTS. Each panel's key handler carried its own switch over the same
 // keys, and they had already drifted - the wallpaper picker listed Delete in a
 // branch that could never run, because the delete key was handled above it.
-// The mapping is the part that must not drift: Down and Tab are both "next
-// row", PageUp/PageDown page, Home/End are the ends, Return/Enter activate,
-// Backspace is "back". What a route DOES stays with the panel, because that is
-// panel state rather than key meaning: the launcher guards a staged delete,
-// the pass panel stands down while a field owns the keyboard.
+// The mapping is the part that must not drift: Down, Tab and PageDown are all
+// "next row", Up, Backtab and PageUp are all "previous row", Home/End are the
+// ends, Return/Enter activate, Backspace is "back". What a route DOES stays
+// with the panel, because that is panel state rather than key meaning: the
+// launcher guards a staged delete, the pass panel stands down while a field
+// owns the keyboard.
 //
 // NO Qt IN HERE, for the reason NavKeys.js gives: a `.pragma library` cannot
 // import Qt, so the caller hands the `Qt` object in and this file only reads
@@ -30,8 +31,7 @@ function dropdownOpen(confirmOpen, row) {
 }
 
 function isNavigation(name) {
-  return name === "next" || name === "prev" || name === "pageUp"
-    || name === "pageDown" || name === "first" || name === "last"
+  return name === "next" || name === "prev" || name === "first" || name === "last"
 }
 
 // One rule for every list panel: while a dropdown is open, navigation keys
@@ -50,10 +50,8 @@ function route(key, qt, listMode, fieldFocused, openDropdown, selectionDropdown)
   if (openDropdown === true && selectionDropdown !== true && key !== undefined
     && (key === qt.Key_Left || key === qt.Key_Right)) return "swallow"
   let r = ""
-  if (key === qt.Key_Down || key === qt.Key_Tab) r = "next"
-  else if (key === qt.Key_Up || key === qt.Key_Backtab) r = "prev"
-  else if (key === qt.Key_PageUp) r = "pageUp"
-  else if (key === qt.Key_PageDown) r = "pageDown"
+  if (key === qt.Key_Down || key === qt.Key_Tab || key === qt.Key_PageDown) r = "next"
+  else if (key === qt.Key_Up || key === qt.Key_Backtab || key === qt.Key_PageUp) r = "prev"
   else if (key === qt.Key_Home) r = "first"
   else if (key === qt.Key_End) r = "last"
   else if (key === qt.Key_Return || key === qt.Key_Enter) r = "activate"

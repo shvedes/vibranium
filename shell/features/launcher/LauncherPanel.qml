@@ -1020,7 +1020,6 @@ PanelCard {
     focusCtrl.grabList()
   }
 
-  function scrollBy(factor) { list.pageBy(factor) }
   function jumpEnd(last) { list.jumpEnd(last) }
 
   // Ctrl-V with an inactive search box: append the clipboard text to the
@@ -1065,8 +1064,6 @@ PanelCard {
         panel.moveSelection(1, event.isAutoRepeat === true); event.accepted = true; return
       case "prev":
         panel.moveSelection(-1, event.isAutoRepeat === true); event.accepted = true; return
-      case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
-      case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
       case "first": panel.jumpEnd(false); event.accepted = true; return
       case "last": panel.jumpEnd(true); event.accepted = true; return
       case "activate": panel.activateCurrent(); event.accepted = true; return

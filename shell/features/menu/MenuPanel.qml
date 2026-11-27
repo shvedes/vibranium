@@ -46,6 +46,8 @@ import "../../common/ui/SlotGrowth.js" as SlotGrowth
 // In list mode printable keys flip into filter mode with that key applied.
 //
 //   arrows/tab     move selection (dropdown-aware)
+//   pgup/pgdn      same one-row step as up/down
+//   home/end       first/last selectable row
 //   enter          activate / pick option
 //   + - left right step number/range rows
 //   ctrl+i         expand description
@@ -4901,14 +4903,6 @@ Rectangle {
     }
   }
 
-  function scrollBy(factor) {
-    if (panel.gridMode) {
-      grid.pageBy(factor)
-      return
-    }
-    list.pageBy(factor)
-  }
-
   // End jumps. Both branches ask the same edge scan, so Home and End cannot
   // land on different rows.
   //
@@ -5187,9 +5181,6 @@ Rectangle {
         break
       case "end":
         panel.jumpEnd(arg)
-        break
-      case "page":
-        panel.scrollBy(arg)
         break
       case "scoped":
         // "/" arms the in-page quick-filter: focus the box and trim the

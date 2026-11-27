@@ -414,7 +414,6 @@ PanelCard {
     if (PowerMenu.query !== "") { PowerMenu.clearQuery(); return }
     PowerMenu.close()
   }
-  function scrollBy(factor) { list.pageBy(factor) }
   function jumpEnd(last) { list.jumpEnd(last) }
 
   function handleKey(event) {
@@ -439,8 +438,6 @@ PanelCard {
       case "swallow": event.accepted = true; return
       case "next": panel.moveSelection(1); event.accepted = true; return
       case "prev": panel.moveSelection(-1); event.accepted = true; return
-      case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
-      case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
       case "first": panel.jumpEnd(false); event.accepted = true; return
       case "last": panel.jumpEnd(true); event.accepted = true; return
       case "escape": panel.escapeChain(); event.accepted = true; return

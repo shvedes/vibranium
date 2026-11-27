@@ -1406,8 +1406,8 @@ function keyRoute(ctx) {
   }
 
   // Grid pages: arrows move spatially - Left/Right step cells, Up/Down
-  // jump rows. Tab/Backtab keep the linear next/prev walk of lists;
-  // everything else (Enter, Esc, Home/End, PgUp/PgDn, typing) falls
+  // jump rows. Tab/Backtab and PgUp/PgDn keep the linear next/prev walk
+  // of lists; everything else (Enter, Esc, Home/End, typing) falls
   // through to the shared routes. Delete/Ctrl+D removes a cell that
   // declares a forget command (recents) without closing, so this route
   // is chosen whether or not such a command exists - whether the key is
@@ -1434,8 +1434,8 @@ function keyRoute(ctx) {
   // Inline editors own navigation: arrows belong to the caret, and list
   // movement must not leak while typing.
   if (ctx.editor === true && (k === "up" || k === "down" || k === "tab"
-    || k === "backtab" || k === "left" || k === "right" || k === "home"
-    || k === "endKey")) return { name: "swallow", arg: null }
+    || k === "backtab" || k === "pageUp" || k === "pageDown" || k === "left"
+    || k === "right" || k === "home" || k === "endKey")) return { name: "swallow", arg: null }
 
   // List rows declaring a delCommand remove via the staged confirmation
   // (Delete / Ctrl+D arm and advance it), matching the grid-side forget
@@ -1463,9 +1463,11 @@ function keyRoute(ctx) {
       return unclaimed
     case "down":
     case "tab":
+    case "pageDown":
       return { name: "move", arg: 1 }
     case "up":
     case "backtab":
+    case "pageUp":
       return { name: "move", arg: -1 }
     case "plus":
     case "equal":
@@ -1493,10 +1495,6 @@ function keyRoute(ctx) {
       return { name: "end", arg: false }
     case "endKey":
       return { name: "end", arg: true }
-    case "pageUp":
-      return { name: "page", arg: -0.8 }
-    case "pageDown":
-      return { name: "page", arg: 0.8 }
     // Delete opens the filter rather than removing a row; in filter mode the
     // field keeps deleting text itself.
     //

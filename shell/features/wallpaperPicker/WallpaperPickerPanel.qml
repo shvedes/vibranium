@@ -660,13 +660,16 @@ Item {
         return
       }
     }
+    // PgUp/Start reach the right end of this horizontal deck and PgDn/End the
+    // left one, the reverse of a vertical list. They take their own key
+    // checks so Tab/Backtab keep the ordinary next/previous step.
+    if (k === Qt.Key_PageUp) { panel.moveSelection(1); event.accepted = true; return }
+    if (k === Qt.Key_PageDown) { panel.moveSelection(-1); event.accepted = true; return }
+    if (k === Qt.Key_Home) { panel.select(panel.rows.length - 1); event.accepted = true; return }
+    if (k === Qt.Key_End) { panel.select(0); event.accepted = true; return }
     switch (PanelKeys.route(k, Qt, true, false)) {
       case "next": panel.moveSelection(1); event.accepted = true; return
       case "prev": panel.moveSelection(-1); event.accepted = true; return
-      case "pageUp": panel.moveSelection(-4); event.accepted = true; return
-      case "pageDown": panel.moveSelection(4); event.accepted = true; return
-      case "first": panel.select(0); event.accepted = true; return
-      case "last": panel.select(panel.rows.length - 1); event.accepted = true; return
       case "activate": panel.activateCurrent(); event.accepted = true; return
       case "escape": panel.escapeChain(); event.accepted = true; return
     }
