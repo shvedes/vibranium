@@ -2,9 +2,9 @@
 # Suite: grace-scenarios - the whole grace lifecycle against its real interactions.
 #
 # Grace is an authentication bypass, so the scenarios here cover the paths
-# that can invalidated it: a fresh lock, a lock already holding a window, a
-# sleep shorter and longer than the window, a sleep requested through the
-# session verb, a logind signal, a settings flip while locked, and the idle
+# that can invalidate it: a fresh automatic lock, a lock already holding a
+# window, a sleep shorter and longer than the window, a sleep requested through
+# the session verb, a logind signal, a settings flip while locked, and the idle
 # rearm on release. The logic is lifted from the real sources and driven
 # against stubs - Lockscreen owns a WlSessionLock and a PAM context, so it
 # cannot be constructed headlessly.
@@ -99,7 +99,7 @@ function reset() {
 
 const out = {}
 
-// A fresh idle or manual lock arms, and the first real input releases.
+// An idle lock arms, and the first real input releases.
 reset()
 fns._armGrace("idle")
 out.idleArmed = root._graceDeadlineMs > 0
@@ -108,8 +108,10 @@ fns.graceActivity()
 out.idleReleased = releases
 out.releaseRearmsIdle = rearms === 1
 
+// A manual lock arms no window, so input cannot release it.
 reset()
 fns._armGrace("verb")
+out.manualArmed = root._graceDeadlineMs > 0
 fns.graceActivity()
 out.manualReleased = releases
 
@@ -197,11 +199,12 @@ while IFS='=' read -r key value; do
   [[ -n $key ]] && C["$key"]="$value"
 done <<<"$SCENARIOS"
 
-t_section "a fresh lock arms grace and the first input releases"
+t_section "an idle lock arms grace and the first input releases"
 t_eq "an idle lock arms the window" "true" "${C[idleArmed]}"
 t_eq "first input releases the session" "1" "${C[idleReleased]}"
 t_eq "the release re-arms the idle timers" "true" "${C[releaseRearmsIdle]}"
-t_eq "a manual lock releases on input" "1" "${C[manualReleased]}"
+t_eq "a manual lock arms no window" "false" "${C[manualArmed]}"
+t_eq "input after a manual lock does not release" "0" "${C[manualReleased]}"
 
 t_section "sleep and session-end locks never arm grace"
 t_eq "a suspend lock arms no window" "false" "${C[sleepLockArmed]}"

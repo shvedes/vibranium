@@ -23,12 +23,13 @@ import qs.features.wallpaper
 // backend at boot because compositors refuse the first request made from an
 // already-locked session.
 // Keyboard state (caps, layout) lives in the shared Keyboard singleton.
-// An optional grace window (Settings.lockscreenGraceSeconds) releases a fresh
-// lock on the first real input inside that window, so a user already back is
-// not asked for a password. A sleep boundary closes the window whether the
-// lock was fresh or already held: the wall clock alone would let a short sleep
-// fit inside the window. Locks that belong to a sleep never arm grace at all,
-// so a failed sleep still leaves the session held.
+// An optional grace window (Settings.lockscreenGraceSeconds) releases an
+// automatic lock on the first real input inside that window, so a user already
+// back is not asked for a password. A manual lock always needs a password. A
+// sleep boundary closes the window whether the lock was fresh or already held:
+// the wall clock alone would let a short sleep fit inside the window. Locks
+// that belong to a sleep never arm grace at all, so a failed sleep still
+// leaves the session held.
 Singleton {
   id: root
 
@@ -141,11 +142,12 @@ Singleton {
     if (root._sleepState && root._sleepState.preparing === true) root._endGrace()
   }
 
-  // A lock that belongs to a sleep or a session end never releases on input.
-  // The gate is deliberately narrow: a caller with a new reason must opt in.
+  // Only the idle daemon's automatic lock arms grace. A manual lock - keybind,
+  // menu or IPC - always needs a password, and a lock that belongs to a sleep or
+  // a session end must not release on input either. The allow-list fails closed:
+  // an unknown reason cannot bypass authentication.
   function _graceMayArm(reason) {
-    return reason !== "suspend" && reason !== "sleep"
-      && reason !== "logout" && reason !== "reboot" && reason !== "poweroff"
+    return reason === "idle"
   }
 
   function _armGrace(reason) {

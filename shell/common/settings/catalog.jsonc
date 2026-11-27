@@ -1525,7 +1525,7 @@
                     "type": "group",
                     "id": "lockGrace",
                     "label": "Grace",
-                    "sub": "Unlock with input after locking",
+                    "sub": "Unlock with input after an automatic lock",
                     "icon": "hourglass",
                     "children": [
                         "shell.lockscreen.grace",
@@ -1550,16 +1550,16 @@
                     "type": "bool",
                     "default": true,
                     "label": "Grace",
-                    "sub": "Unlock on activity after locking",
-                    "desc": "Allow keyboard or mouse activity within the grace window to unlock the screen without a password."
+                    "sub": "Unlock on activity after an automatic lock",
+                    "desc": "Allow keyboard or mouse activity within the grace window to unlock the screen without a password when the session was locked automatically. A manual lock always requires a password."
                 },
                 {
                     "key": "shell.lockscreen.graceSeconds",
                     "type": "int",
                     "default": 5,
                     "label": "Grace duration",
-                    "sub": "Seconds of activity window after locking",
-                    "desc": "Seconds after locking in which keyboard or mouse activity unlocks the screen without a password.",
+                    "sub": "Seconds of activity window after an automatic lock",
+                    "desc": "Seconds after an automatic lock in which keyboard or mouse activity unlocks the screen without a password.",
                     "showIf": [
                         {
                             "key": "shell.lockscreen.grace",

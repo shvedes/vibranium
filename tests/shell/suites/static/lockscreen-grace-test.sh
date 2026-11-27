@@ -1,13 +1,13 @@
 #!/bin/bash
-# Suite: lockscreen-grace - grace covers every fresh lock but suspend, on the wall clock.
+# Suite: lockscreen-grace - grace covers only automatic locks, on the wall clock.
 #
-# The grace window lets a fresh lock release on the first real input, so a user
-# already back is not asked for a password - the setting promises activity after
-# locking, whatever asked for the lock. The flaw this suite pins: a
-# suspend-triggered lock could carry an armed window into sleep, and a QML
-# timer's monotonic clock freezes during suspend, so the first input on wake
-# unlocked the session without a password. Arming is refused for the suspend
-# reason and the window is measured on the wall clock, which a suspend advances.
+# The grace window lets an automatic lock release on the first real input, so a
+# user already back is not asked for a password. A manual lock always needs a
+# password. The flaw this suite pins: a suspend-triggered lock could carry an
+# armed window into sleep, and a QML timer's monotonic clock freezes during
+# suspend, so the first input on wake unlocked the session without a password.
+# Only the idle reason arms grace and the window is measured on the wall clock,
+# which a suspend advances.
 #
 # This is a SOURCE suite: Lockscreen is a Singleton with a PAM context and a
 # WlSessionLock and cannot be constructed headlessly, so the three grace
@@ -19,7 +19,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
 
-t_init "lockscreen-grace" "grace arms on every fresh lock but suspend, and a suspend consumes its window"
+t_init "lockscreen-grace" "grace arms only on idle locks, and a suspend consumes its window"
 
 require_tools node
 
@@ -90,12 +90,20 @@ out.suspendArmed = armed()
 out.suspendKeyNotConsumed = fns.graceActivity() === false
 out.suspendReleased = state.release
 
-// A manual lock still arms grace: the setting promises activity after any
-// lock, not only one the idle daemon asked for.
-fns._armGrace("verb")
-out.manualArmed = armed()
-fns.graceActivity()
-out.manualReleased = state.release
+// A manual lock arms no window: keybind, menu and IPC callers all need a
+// password. `session` is the default reason of the plain lock verb, `verb` the
+// legacy one, and "" the coerced form of a non-string reason.
+const manualReasons = { Session: "session", Verb: "verb", Empty: "" }
+for (const name of Object.keys(manualReasons)) {
+  fns._armGrace(manualReasons[name])
+  out["manual" + name + "Armed"] = armed()
+  fns.graceActivity()
+  out["manual" + name + "Released"] = state.release
+}
+
+// An unknown reason fails closed instead of granting a password bypass.
+fns._armGrace("unrecognised")
+out.unknownArmed = armed()
 
 // A suspend after an idle lock advances the wall clock past the deadline:
 // the first input on wake must not release, and the stale grace is consumed.
@@ -132,11 +140,14 @@ t_eq "first input inside the window releases" "1" "${R[idleReleased]}"
 t_eq "the release consumes the window" "true" "${R[idleConsumed]}"
 t_eq "a second input cannot release again" "1" "${R[idleSecondRelease]}"
 
-t_section "every fresh lock but suspend arms grace"
+t_section "only an idle lock arms grace"
 t_eq "a suspend lock arms no window" "false" "${R[suspendArmed]}"
 t_eq "wake input after a suspend lock does not release" "0" "${R[suspendReleased]}"
-t_eq "a manual lock arms the window" "true" "${R[manualArmed]}"
-t_eq "input after a manual lock releases" "1" "${R[manualReleased]}"
+t_eq "a session lock arms no window" "false" "${R[manualSessionArmed]}"
+t_eq "a verb lock arms no window" "false" "${R[manualVerbArmed]}"
+t_eq "a coerced empty reason arms no window" "false" "${R[manualEmptyArmed]}"
+t_eq "an unknown reason arms no window" "false" "${R[unknownArmed]}"
+t_eq "input after a manual lock does not release" "0" "${R[manualSessionReleased]}"
 
 t_section "a suspend consumes an already-armed idle grace"
 t_eq "the idle window was armed before sleep" "true" "${R[sleepArmedBefore]}"
@@ -175,11 +186,11 @@ t_contains "the lock surface accepts only the press that unlocked" \
   "if (Lockscreen.graceActivity()) event.accepted = true" "$(<"$KEY_SURFACE")"
 
 # --- every pre-sleep lock uses the suspend reason ---------------------------
-# Grace is keyed on the lock reason, so a lock taken just before logind sleeps
-# must carry the same reason as one Session.suspend() takes. The plain lock
-# verb arms grace: a wake inside the window released the session without a
-# password. A dedicated sleep-lock verb gives both paths one authority that
-# does not request the sleep itself.
+# Grace is keyed on the lock reason, and only an idle lock arms it. A lock
+# taken just before logind sleeps must still carry the suspend reason: an idle
+# lock may already hold a grace window, and the sleep topic is what closes it
+# before the transition. A dedicated sleep-lock verb gives both paths one
+# authority that does not request the sleep itself.
 
 BINDS="$VIBRANIUM_DIR/default/hypr/binds.lua"
 SESSION="$SHELL_DIR/services/session/Session.qml"
