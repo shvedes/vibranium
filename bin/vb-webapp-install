@@ -141,8 +141,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# The absence of --url selects interactive mode. Resolving it here lets the
-# Chromium preflight report through the same result helpers as the prompts.
+# The absence of --url selects interactive mode.
 [[ -z $APP_URL ]] && INT_MODE=true
 
 webapp_install_prepare_result() {
@@ -477,7 +476,7 @@ Version=1.0
 Name=${name#PWA - }
 Comment=$name
 Exec=$exec_cmd
-TryExec=chromium
+TryExec=vb-launch-webapp
 Terminal=false
 Type=Application
 Icon=$icon
@@ -503,23 +502,6 @@ EOF
 # errors independent of the runtime environment.
 
 source vb-lib-core
-
-# Generated entries launch the site in Chromium's app mode, so the desktop file
-# is inert without the binary. A custom --exec can replace the launcher, but the
-# entry still has to be Chromium-backed to be a PWA at all.
-if ! command -v chromium &> /dev/null; then
-  if [[ $INT_MODE == true ]]; then
-    term::show_header --color red
-    vb::print "$R" "Chromium is not installed"
-    vb::print "$R" "PWA entries run as Chromium app windows, so they cannot be created without it"
-  else
-    log Error "Chromium is not installed"
-    log Error "PWA entries run as Chromium app windows, so they cannot be created without it"
-  fi
-
-  webapp_install_canceled
-  exit 1
-fi
 
 if ! [[ -d "$ICON_DIR" ]]; then
   mkdir -p "$ICON_DIR"

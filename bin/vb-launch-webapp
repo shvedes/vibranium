@@ -10,14 +10,13 @@ usage() {
   shcat << EOF
 Usage: $SELF [OPTION]... URL
 
-Open a Progressive Web App (PWA) in Vibranium.
-If a window for the URL already exists, focus it instead.
+Open a web app in a new browser tab.
 
 Arguments:
-  URL              Target URL to open or focus
+  URL              Target URL to open
 
 Options:
-  --own-profile    Launch in a separate browser data directory derived from the URL
+  --own-profile    Use a separate Chromium-based browser profile derived from the URL
                    hostname. The directory is stored under $XDG_DATA_HOME/webapps/
                    and is completely invisible to the main browser instance (no shared
                    profile picker, no shared session, cookies, or extensions).
@@ -30,31 +29,93 @@ Examples:
 EOF
 }
 
-get_default_browser() {
-  local -n _out="$1"
-  local browser=""
+is_webapp_browser() {
+  case $1 in
+    firefox.desktop | firefox-developer-edition.desktop)
+      [[ $OWN_PROFILE == false ]]
+      ;;
+    chromium.desktop | chromium-browser.desktop | ungoogled-chromium.desktop | \
+      google-chrome*.desktop | brave-browser*.desktop | microsoft-edge*.desktop | \
+      opera*.desktop | vivaldi*.desktop | helium*.desktop)
+      return 0
+      ;;
+    *) return 1 ;;
+  esac
+}
 
-  log Info "Detecting default browser"
+browser_executable() {
+  local entry="$1" line browser_exec="" try_exec=""
 
-  # Fast path: mimeapps.list
-  # Only the first HTTP handler is considered; semicolon-separated alternatives
-  # are discarded, and xdg-mime is consulted only when that field is absent.
-  if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
-    while IFS='=' read -r key value; do
-      if [[ ! $key == "x-scheme-handler/http" ]]; then
-        continue
+  # Only the main entry describes the browser. Actions can have different
+  # commands. Launch the executable directly to supply browser-specific arguments.
+  while IFS= read -r line || [[ -n $line ]]; do
+    case $line in
+      '[Desktop Entry]') ;;
+      '['*) break ;;
+      Hidden=true) return 1 ;;
+      Exec=*) browser_exec=${line#Exec=} ;;
+      TryExec=*) try_exec=${line#TryExec=} ;;
+    esac
+  done < "$entry"
+
+  browser_exec=${browser_exec%%[[:blank:]]*}
+  if [[ -n $try_exec ]] && ! type -P -- "$try_exec" > /dev/null; then
+    return 1
+  fi
+  if [[ -n $browser_exec ]] && type -P -- "$browser_exec" > /dev/null; then
+    printf '%s\n' "$browser_exec"
+  else
+    return 1
+  fi
+}
+
+find_webapp_browser() {
+  local scheme=http default_entry dir entry id browser_exec
+  local -a data_dirs
+  local -A seen=()
+
+  [[ $URL == https://* ]] && scheme=https
+  default_entry=$(xdg-mime query default "x-scheme-handler/$scheme" 2> /dev/null)
+  IFS=: read -r -a data_dirs <<< "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  data_dirs=("${XDG_DATA_HOME:-$HOME/.local/share}" "$HOME/.nix-profile/share" "${data_dirs[@]}")
+
+  if [[ $default_entry != */* ]] && is_webapp_browser "$default_entry"; then
+    for dir in "${data_dirs[@]}"; do
+      entry="$dir/applications/$default_entry"
+      if [[ -f $entry ]]; then
+        if browser_executable "$entry"; then
+          return 0
+        fi
+        break
       fi
-      browser="${value%%;*}"
-      break
-    done < "$XDG_CONFIG_HOME/mimeapps.list"
+    done
   fi
 
-  # Fallback
-  if [[ -z $browser ]]; then
-    IFS= read -r browser < <(xdg-mime query default x-scheme-handler/http 2> /dev/null) || browser=""
-  fi
+  for dir in "${data_dirs[@]}"; do
+    for entry in "$dir"/applications/*.desktop; do
+      [[ -f $entry ]] || continue
+      id=${entry##*/}
+      is_webapp_browser "$id" || continue
+      # The first desktop entry for an ID shadows lower-priority copies.
+      [[ -z ${seen[$id]+set} ]] || continue
+      seen[$id]=1
+      if browser_exec=$(browser_executable "$entry"); then
+        printf '%s\n' "$browser_exec"
+        return 0
+      fi
+    done
+  done
 
-  _out="$browser"
+  # Support browsers installed without desktop entries.
+  if [[ $OWN_PROFILE == false && -z ${seen[firefox.desktop]+set} ]] && type -P firefox > /dev/null; then
+    printf '%s\n' firefox
+    return 0
+  fi
+  if [[ -z ${seen[chromium.desktop]+set} ]] && type -P chromium > /dev/null; then
+    printf '%s\n' chromium
+    return 0
+  fi
+  return 1
 }
 
 # Derive a Chromium user-data directory name from a URL. The normalized host
@@ -71,49 +132,6 @@ _profile_dir_from_url() {
   host="${host,,}"
   host="${host//\./-}"
   _pdu_out="$host"
-}
-
-focus_or_launch() {
-  local -a cmd=("$@")
-
-  log Info "Focus or launch webapp: URL=$URL host=$host own_profile=$OWN_PROFILE"
-
-  # Extract the hostname from the URL global for window matching.
-  # Strip the scheme (e.g. "https://"), then strip any path, port,
-  # query string, or fragment that follows the host.
-  local host="${URL#*://}"
-  host="${host%%[/?#:]*}"
-  host="${host,,}"
-
-  # Chrome PWA window classes begin with `chrome-` followed by the encoded
-  # hostname and a profile suffix. A raw startswith match can also accept a
-  # longer hostname that shares this prefix; --own-profile uses the same class
-  # shape with a separate data root.
-  # jq `try` only suppresses errors raised while evaluating the expression; it
-  # neither repairs malformed input JSON nor filters a null .address.
-  local window_address
-  window_address="$(
-    hyprctl -j clients | jq -r --arg host "$host" '
-      try first(
-        .[]
-        | (.class        // "" | ascii_downcase) as $c
-        | (.initialClass // "" | ascii_downcase) as $ic
-        | select(
-            ($c  | startswith("chrome-\($host)")) or
-            ($ic | startswith("chrome-\($host)"))
-          )
-        | .address
-      )
-    ' 2> /dev/null
-  )"
-
-  if [[ -n "$window_address" ]]; then
-    log Info "Focusing existing PWA window: address=$window_address"
-    hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
-  else
-    log Info "No matching PWA window, launching: ${cmd[*]}"
-    exec setsid -f app2unit -- "${cmd[@]}"
-  fi
 }
 
 # Argument parsing
@@ -160,46 +178,17 @@ source vb-lib-core
 
 URL="$1"
 
-get_default_browser browser
-
-# This selects a supported desktop-entry family; the actual Exec token is
-# resolved from matching .desktop files below.
-case $browser in
-  google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
-  *)
-    browser="chromium.desktop"
-    ;;
-esac
-
-execs=()
-
-for dir in ~/.local/share/applications ~/.nix-profile/share/applications /usr/share/applications; do
-  if [[ ! -d $dir ]]; then
-    continue
+if ! browser_exec=$(find_webapp_browser); then
+  if [[ $OWN_PROFILE == true ]]; then
+    message="No compatible browser was found for a separate profile. Install a Chromium-based browser."
+  else
+    message="No compatible browser was found. Install Firefox or a Chromium-based browser."
   fi
-
-  for f in "$dir"/$browser; do
-    if [[ ! -f $f ]]; then
-      continue
-    fi
-
-    while IFS= read -r line; do
-      if [[ ! $line == Exec=* ]]; then
-        continue
-      fi
-      line=${line#Exec=}
-      # Only the first Exec token is retained; desktop-entry arguments and
-      # field codes are not interpreted by this wrapper.
-      execs+=("${line%% *}")
-    done < "$f"
-  done
-done
-
-# Fallback if nothing found
-# The first collected token is used without local validation; the no-entry
-# fallback is the literal name `chromium`.
-if ! ((${#execs[@]})); then
-  execs=("chromium")
+  log Error "$message"
+  if [[ ! -t 1 ]] && command -v notify-send > /dev/null; then
+    notify-send -a Vibranium "Cannot open web app" "$message"
+  fi
+  exit 1
 fi
 
 # An own-profile launch uses a separate Chromium user-data directory under
@@ -208,9 +197,7 @@ fi
 # URL. A separate data dir remains outside the main browser's profile picker.
 WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
 
-# Passing the URL through --app requests browser app-mode metadata, which is
-# the identity used by the PWA window matcher.
-browser_cmd=("${execs[0]}" --app="$URL")
+browser_cmd=("$browser_exec")
 if [[ $OWN_PROFILE == true ]]; then
   profile_dir=""
   _profile_dir_from_url profile_dir "$URL"
@@ -218,14 +205,12 @@ if [[ $OWN_PROFILE == true ]]; then
   browser_cmd+=(--user-data-dir="$WEBAPP_DATA_DIR/$profile_dir")
 fi
 
+# Firefox provides an explicit tab flag. Chromium-based browsers open a URL
+# passed on the command line in a tab when a window for the profile exists.
+case ${browser_exec##*/} in
+  firefox | firefox-developer-edition) browser_cmd+=(--new-tab) ;;
+esac
+browser_cmd+=("$URL")
+
 log Info "Browser command: ${browser_cmd[*]}"
-# The focus preference comes from the shared settings projection; when it is
-# disabled, the direct branch skips compositor lookup and starts a new app.
-if [[ "$APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
-  focus_or_launch "${browser_cmd[@]}"
-else
-  log Info "Always-focus disabled, launching directly"
-  # setsid detaches app2unit from the terminal session, but inherited stdio
-  # remains attached unless the command itself redirects it.
-  exec setsid -f app2unit -- "${browser_cmd[@]}"
-fi
+exec setsid -f app2unit -- "${browser_cmd[@]}"

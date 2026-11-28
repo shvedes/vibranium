@@ -4,7 +4,7 @@ Vibranium inherited the webapp and TUI installer ideas from Omarchy and improved
 
 ## Progressive Web Apps (PWAs)
 
-A PWA — or webapp — is essentially a web page that behaves like a native application: its own window, its own icon, without browser UI.
+Vibranium web apps are launcher shortcuts that open a site in a new browser tab.
 Vibranium's PWA installer actively tries to fetch everything about the site you give it:
 
 - **Automatic name generation** from the page's metadata
@@ -22,8 +22,8 @@ Even when everything is auto-detected, you're asked whether to keep the generate
 vb-webapp-install --help
 ```
 
-The installer creates a proper `.desktop` entry, an icon, and — optionally — an **isolated profile** (`--own-profile`), so the PWA gets its own cookie store and doesn't share browsing data with your main Chromium profile.
-Window rules and focus detection are set up from the class name, so PWAs behave like real apps in the launcher and in `hyprctl` matching.
+The installer creates a `.desktop` entry and an icon. The launcher uses a supported default browser when available and can discover other installed browsers.
+With `--own-profile`, a Chromium-based browser uses a separate cookie store and browsing data. If that profile has no open window, the browser creates one for the tab.
 
 ### Pre-installed PWAs
 
