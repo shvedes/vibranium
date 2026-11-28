@@ -1,0 +1,48 @@
+name: PR tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Vibranium tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container: archlinux:base@sha256:375a401bb3c6376b37f40b6dfa25067db37ec78d0b7af67ae6315f43a0184a9d
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Install test dependencies
+        run: |
+          # This snapshot matches the Quickshell and Qt versions in tests/shell/lib/lib.sh.
+          printf '%s\n' 'Server = https://archive.archlinux.org/repos/2026/11/27/$repo/os/$arch' \
+            > /etc/pacman.d/mirrorlist
+          pacman -Syyuu --noconfirm --needed git nodejs python jq \
+            quickshell qt6-declarative gpu-screen-recorder ttf-dejavu papirus-icon-theme
+
+      - name: Check out PR
+        id: checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Test web-app browser discovery
+        if: ${{ hashFiles('tests/webapp-browser-discovery.sh') != '' }}
+        run: bash tests/webapp-browser-discovery.sh
+
+      - name: Test template engine
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: bash tests/template-engine.sh
+
+      - name: Test shell headlessly
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        run: bash tests/shell/run-all.sh
