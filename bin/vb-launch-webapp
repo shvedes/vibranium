@@ -30,31 +30,86 @@ Examples:
 EOF
 }
 
-get_default_browser() {
-  local -n _out="$1"
-  local browser=""
+is_webapp_browser() {
+  case $1 in
+    chromium.desktop | chromium-browser.desktop | ungoogled-chromium.desktop | \
+      google-chrome*.desktop | brave-browser*.desktop | microsoft-edge*.desktop | \
+      opera*.desktop | vivaldi*.desktop | helium*.desktop)
+      return 0
+      ;;
+    *) return 1 ;;
+  esac
+}
 
-  log Info "Detecting default browser"
+browser_executable() {
+  local entry="$1" line browser_exec="" try_exec=""
 
-  # Fast path: mimeapps.list
-  # Only the first HTTP handler is considered; semicolon-separated alternatives
-  # are discarded, and xdg-mime is consulted only when that field is absent.
-  if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
-    while IFS='=' read -r key value; do
-      if [[ ! $key == "x-scheme-handler/http" ]]; then
-        continue
+  # Only the main entry describes the browser. Actions can have different
+  # commands. Launch the executable directly to supply app-mode arguments.
+  while IFS= read -r line || [[ -n $line ]]; do
+    case $line in
+      '[Desktop Entry]') ;;
+      '['*) break ;;
+      Hidden=true) return 1 ;;
+      Exec=*) browser_exec=${line#Exec=} ;;
+      TryExec=*) try_exec=${line#TryExec=} ;;
+    esac
+  done < "$entry"
+
+  browser_exec=${browser_exec%%[[:blank:]]*}
+  if [[ -n $try_exec ]] && ! type -P -- "$try_exec" > /dev/null; then
+    return 1
+  fi
+  if [[ -n $browser_exec ]] && type -P -- "$browser_exec" > /dev/null; then
+    printf '%s\n' "$browser_exec"
+  else
+    return 1
+  fi
+}
+
+find_webapp_browser() {
+  local scheme=http default_entry dir entry id browser_exec
+  local -a data_dirs
+  local -A seen=()
+
+  [[ $URL == https://* ]] && scheme=https
+  default_entry=$(xdg-mime query default "x-scheme-handler/$scheme" 2> /dev/null)
+  IFS=: read -r -a data_dirs <<< "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  data_dirs=("${XDG_DATA_HOME:-$HOME/.local/share}" "$HOME/.nix-profile/share" "${data_dirs[@]}")
+
+  if [[ $default_entry != */* ]] && is_webapp_browser "$default_entry"; then
+    for dir in "${data_dirs[@]}"; do
+      entry="$dir/applications/$default_entry"
+      if [[ -f $entry ]]; then
+        if browser_executable "$entry"; then
+          return 0
+        fi
+        break
       fi
-      browser="${value%%;*}"
-      break
-    done < "$XDG_CONFIG_HOME/mimeapps.list"
+    done
   fi
 
-  # Fallback
-  if [[ -z $browser ]]; then
-    IFS= read -r browser < <(xdg-mime query default x-scheme-handler/http 2> /dev/null) || browser=""
-  fi
+  for dir in "${data_dirs[@]}"; do
+    for entry in "$dir"/applications/*.desktop; do
+      [[ -f $entry ]] || continue
+      id=${entry##*/}
+      is_webapp_browser "$id" || continue
+      # The first desktop entry for an ID shadows lower-priority copies.
+      [[ -z ${seen[$id]+set} ]] || continue
+      seen[$id]=1
+      if browser_exec=$(browser_executable "$entry"); then
+        printf '%s\n' "$browser_exec"
+        return 0
+      fi
+    done
+  done
 
-  _out="$browser"
+  # Keep supporting a Chromium executable installed without a desktop entry.
+  if [[ -z ${seen[chromium.desktop]+set} ]] && type -P chromium > /dev/null; then
+    printf '%s\n' chromium
+    return 0
+  fi
+  return 1
 }
 
 # Derive a Chromium user-data directory name from a URL. The normalized host
@@ -160,46 +215,13 @@ source vb-lib-core
 
 URL="$1"
 
-get_default_browser browser
-
-# This selects a supported desktop-entry family; the actual Exec token is
-# resolved from matching .desktop files below.
-case $browser in
-  google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
-  *)
-    browser="chromium.desktop"
-    ;;
-esac
-
-execs=()
-
-for dir in ~/.local/share/applications ~/.nix-profile/share/applications /usr/share/applications; do
-  if [[ ! -d $dir ]]; then
-    continue
+if ! browser_exec=$(find_webapp_browser); then
+  message="No browser with web app support was found. Install Chromium or another compatible browser."
+  log Error "$message"
+  if [[ ! -t 1 ]] && command -v notify-send > /dev/null; then
+    notify-send -a Vibranium "Cannot open web app" "$message"
   fi
-
-  for f in "$dir"/$browser; do
-    if [[ ! -f $f ]]; then
-      continue
-    fi
-
-    while IFS= read -r line; do
-      if [[ ! $line == Exec=* ]]; then
-        continue
-      fi
-      line=${line#Exec=}
-      # Only the first Exec token is retained; desktop-entry arguments and
-      # field codes are not interpreted by this wrapper.
-      execs+=("${line%% *}")
-    done < "$f"
-  done
-done
-
-# Fallback if nothing found
-# The first collected token is used without local validation; the no-entry
-# fallback is the literal name `chromium`.
-if ! ((${#execs[@]})); then
-  execs=("chromium")
+  exit 1
 fi
 
 # An own-profile launch uses a separate Chromium user-data directory under
@@ -210,7 +232,7 @@ WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
 
 # Passing the URL through --app requests browser app-mode metadata, which is
 # the identity used by the PWA window matcher.
-browser_cmd=("${execs[0]}" --app="$URL")
+browser_cmd=("$browser_exec" --app="$URL")
 if [[ $OWN_PROFILE == true ]]; then
   profile_dir=""
   _profile_dir_from_url profile_dir "$URL"
