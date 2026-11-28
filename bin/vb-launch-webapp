@@ -10,14 +10,13 @@ usage() {
   shcat << EOF
 Usage: $SELF [OPTION]... URL
 
-Open a Progressive Web App (PWA) in Vibranium.
-If a window for the URL already exists, focus it instead.
+Open a web app in a new browser tab.
 
 Arguments:
-  URL              Target URL to open or focus
+  URL              Target URL to open
 
 Options:
-  --own-profile    Launch in a separate browser data directory derived from the URL
+  --own-profile    Use a separate Chromium-based browser profile derived from the URL
                    hostname. The directory is stored under $XDG_DATA_HOME/webapps/
                    and is completely invisible to the main browser instance (no shared
                    profile picker, no shared session, cookies, or extensions).
@@ -32,6 +31,9 @@ EOF
 
 is_webapp_browser() {
   case $1 in
+    firefox.desktop | firefox-developer-edition.desktop)
+      [[ $OWN_PROFILE == false ]]
+      ;;
     chromium.desktop | chromium-browser.desktop | ungoogled-chromium.desktop | \
       google-chrome*.desktop | brave-browser*.desktop | microsoft-edge*.desktop | \
       opera*.desktop | vivaldi*.desktop | helium*.desktop)
@@ -45,7 +47,7 @@ browser_executable() {
   local entry="$1" line browser_exec="" try_exec=""
 
   # Only the main entry describes the browser. Actions can have different
-  # commands. Launch the executable directly to supply app-mode arguments.
+  # commands. Launch the executable directly to supply browser-specific arguments.
   while IFS= read -r line || [[ -n $line ]]; do
     case $line in
       '[Desktop Entry]') ;;
@@ -104,7 +106,11 @@ find_webapp_browser() {
     done
   done
 
-  # Keep supporting a Chromium executable installed without a desktop entry.
+  # Support browsers installed without desktop entries.
+  if [[ $OWN_PROFILE == false && -z ${seen[firefox.desktop]+set} ]] && type -P firefox > /dev/null; then
+    printf '%s\n' firefox
+    return 0
+  fi
   if [[ -z ${seen[chromium.desktop]+set} ]] && type -P chromium > /dev/null; then
     printf '%s\n' chromium
     return 0
@@ -126,49 +132,6 @@ _profile_dir_from_url() {
   host="${host,,}"
   host="${host//\./-}"
   _pdu_out="$host"
-}
-
-focus_or_launch() {
-  local -a cmd=("$@")
-
-  log Info "Focus or launch webapp: URL=$URL host=$host own_profile=$OWN_PROFILE"
-
-  # Extract the hostname from the URL global for window matching.
-  # Strip the scheme (e.g. "https://"), then strip any path, port,
-  # query string, or fragment that follows the host.
-  local host="${URL#*://}"
-  host="${host%%[/?#:]*}"
-  host="${host,,}"
-
-  # Chrome PWA window classes begin with `chrome-` followed by the encoded
-  # hostname and a profile suffix. A raw startswith match can also accept a
-  # longer hostname that shares this prefix; --own-profile uses the same class
-  # shape with a separate data root.
-  # jq `try` only suppresses errors raised while evaluating the expression; it
-  # neither repairs malformed input JSON nor filters a null .address.
-  local window_address
-  window_address="$(
-    hyprctl -j clients | jq -r --arg host "$host" '
-      try first(
-        .[]
-        | (.class        // "" | ascii_downcase) as $c
-        | (.initialClass // "" | ascii_downcase) as $ic
-        | select(
-            ($c  | startswith("chrome-\($host)")) or
-            ($ic | startswith("chrome-\($host)"))
-          )
-        | .address
-      )
-    ' 2> /dev/null
-  )"
-
-  if [[ -n "$window_address" ]]; then
-    log Info "Focusing existing PWA window: address=$window_address"
-    hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
-  else
-    log Info "No matching PWA window, launching: ${cmd[*]}"
-    exec setsid -f app2unit -- "${cmd[@]}"
-  fi
 }
 
 # Argument parsing
@@ -216,7 +179,11 @@ source vb-lib-core
 URL="$1"
 
 if ! browser_exec=$(find_webapp_browser); then
-  message="No browser with web app support was found. Install Chromium or another compatible browser."
+  if [[ $OWN_PROFILE == true ]]; then
+    message="No compatible browser was found for a separate profile. Install a Chromium-based browser."
+  else
+    message="No compatible browser was found. Install Firefox or a Chromium-based browser."
+  fi
   log Error "$message"
   if [[ ! -t 1 ]] && command -v notify-send > /dev/null; then
     notify-send -a Vibranium "Cannot open web app" "$message"
@@ -230,9 +197,7 @@ fi
 # URL. A separate data dir remains outside the main browser's profile picker.
 WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
 
-# Passing the URL through --app requests browser app-mode metadata, which is
-# the identity used by the PWA window matcher.
-browser_cmd=("$browser_exec" --app="$URL")
+browser_cmd=("$browser_exec")
 if [[ $OWN_PROFILE == true ]]; then
   profile_dir=""
   _profile_dir_from_url profile_dir "$URL"
@@ -240,14 +205,12 @@ if [[ $OWN_PROFILE == true ]]; then
   browser_cmd+=(--user-data-dir="$WEBAPP_DATA_DIR/$profile_dir")
 fi
 
+# Firefox provides an explicit tab flag. Chromium-based browsers open a URL
+# passed on the command line in a tab when a window for the profile exists.
+case ${browser_exec##*/} in
+  firefox | firefox-developer-edition) browser_cmd+=(--new-tab) ;;
+esac
+browser_cmd+=("$URL")
+
 log Info "Browser command: ${browser_cmd[*]}"
-# The focus preference comes from the shared settings projection; when it is
-# disabled, the direct branch skips compositor lookup and starts a new app.
-if [[ "$APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
-  focus_or_launch "${browser_cmd[@]}"
-else
-  log Info "Always-focus disabled, launching directly"
-  # setsid detaches app2unit from the terminal session, but inherited stdio
-  # remains attached unless the command itself redirects it.
-  exec setsid -f app2unit -- "${browser_cmd[@]}"
-fi
+exec setsid -f app2unit -- "${browser_cmd[@]}"

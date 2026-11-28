@@ -6,7 +6,7 @@ sandbox=$(mktemp -d)
 trap 'rm -rf "$sandbox"' EXIT
 mkdir -p "$sandbox"/{bin,home,data/applications,system/applications}
 
-printf 'APP_LAUNCHER_ALWAYS_FOCUS=false\n' > "$sandbox/bin/vb-lib-core"
+touch "$sandbox/bin/vb-lib-core"
 cat > "$sandbox/bin/xdg-mime" <<'STUB'
 #!/bin/bash
 [[ $* == 'query default x-scheme-handler/https' ]] || exit 1
@@ -51,25 +51,31 @@ entry "$sandbox/system/applications/vivaldi-stable.desktop" vivaldi
 entry "$sandbox/data/applications/firefox.desktop" firefox
 
 run_launcher vivaldi-stable.desktop
-expect_launch vivaldi "--app=$url"
+expect_launch vivaldi "$url"
 
 entry "$sandbox/data/applications/chromium.desktop" missing
-run_launcher chromium.desktop --own-profile
-expect_launch vivaldi "--app=$url" "--user-data-dir=$sandbox/data/webapps/example-org"
+run_launcher chromium.desktop
+expect_launch firefox --new-tab "$url"
+
+run_launcher firefox.desktop --own-profile
+expect_launch vivaldi "--user-data-dir=$sandbox/data/webapps/example-org" "$url"
+
+run_launcher firefox.desktop
+expect_launch firefox --new-tab "$url"
 
 # A user-level entry can hide the system entry with the same desktop ID.
 printf '[Desktop Entry]\nHidden=true\n' > "$sandbox/data/applications/vivaldi-stable.desktop"
 rm "$sandbox/data/applications/chromium.desktop"
-run_launcher firefox.desktop
-expect_launch chromium "--app=$url"
+run_launcher "" --own-profile
+expect_launch chromium "--user-data-dir=$sandbox/data/webapps/example-org" "$url"
 
-rm "$sandbox/bin/chromium"
+rm "$sandbox/bin/chromium" "$sandbox/bin/firefox"
 if run_launcher firefox.desktop; then
   printf 'Expected failure when no compatible browser is installed\n' >&2
   exit 1
 fi
 [[ ! -e $sandbox/launch ]]
-[[ $(< "$sandbox/stderr") == *'No browser with web app support was found'* ]]
+[[ $(< "$sandbox/stderr") == *'No compatible browser was found'* ]]
 [[ $(< "$sandbox/notification") == *'Cannot open web app'* ]]
 
 printf 'Web-app browser discovery tests passed\n'
